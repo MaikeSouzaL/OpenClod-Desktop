@@ -1,0 +1,19 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+tmp/
+.forja/
+# clones de estudo (cada um tem o próprio .git e a própria licença)
+repositorios/*/
+
+# runtimes embarcados (reproduzíveis com scripts/embed-*.mjs; ver resources/MANIFEST.json)
+resources/runtime/
+resources/models/
+resources/bin/

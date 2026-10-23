@@ -1,0 +1,285 @@
+import type {
+  Message,
+  ModelRequest,
+  Provider,
+  ProviderEvent,
+  ProviderConfig,
+  ToolCall
+} from '../../shared/types.js'
+import { classifyProviderError, isRetryableKind, postStream, readSse } from './http.js'
+import { resolveCompat } from './compat.js'
+import { openaiReasoningEffort } from './reasoning.js'
+import { estimateTokens } from '../util/ids.js'
+
+/** Silence allowed between stream chunks before the request is abandoned. */
+export const STREAM_IDLE_TIMEOUT_MS = 600_000
+
+type OpenAIContent =
+  | string
+  | Array<
+      | { type: 'text'; text: string }
+      | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } }
+    >
+
+interface OpenAIMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: OpenAIContent | null
+  tool_calls?: Array<{
+    id: string
+    type: 'function'
+    function: { name: string; arguments: string }
+  }>
+  tool_call_id?: string
+  reasoning_content?: string
+}
+
+/**
+ * Converts our internal messages to the OpenAI chat format. With
+ * `echoReasoning`, reasoning of assistant messages after the last real user
+ * turn (the current tool loop) is sent back as `reasoning_content`.
+ */
+export function toOpenAIMessages(system: string, messages: Message[], echoReasoning = false): OpenAIMessage[] {
+  const out: OpenAIMessage[] = []
+  if (system.trim()) out.push({ role: 'system', content: system })
+  let lastUser = -1
+  messages.forEach((m, i) => {
+    if (m.role === 'user' && !m.hidden) lastUser = i
+  })
+
+  for (const [index, message] of messages.entries()) {
+    if (message.role === 'system') continue
+
+    if (message.role === 'user') {
+      const images = message.parts.filter((p) => p.type === 'image')
+      const text = message.parts
+        .map((p) => (p.type === 'text' ? p.text : p.type === 'image' ? (p.label ? `[imagem: ${p.label}]` : '[imagem]') : ''))
+        .join('\n')
+        .trim()
+      if (images.length === 0) {
+        if (text) out.push({ role: 'user', content: text })
+      } else {
+        const content: OpenAIContent = []
+        if (text) content.push({ type: 'text', text })
+        for (const img of images) {
+          if (img.type !== 'image') continue
+          content.push({
+            type: 'image_url',
+            image_url: { url: `data:${img.mediaType};base64,${img.data}`, detail: 'auto' }
+          })
+        }
+        out.push({ role: 'user', content })
+      }
+      continue
+    }
+
+    if (message.role === 'assistant') {
+      const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
+      const calls = message.parts.filter((p) => p.type === 'tool_call')
+      const msg: OpenAIMessage = { role: 'assistant', content: text || null }
+      if (echoReasoning && index > lastUser) {
+        const reasoning = message.parts.map((p) => (p.type === 'reasoning' ? p.text : '')).join('')
+        if (reasoning) msg.reasoning_content = reasoning
+      }
+      if (calls.length) {
+        msg.tool_calls = calls.map((c) => ({
+          id: c.type === 'tool_call' ? c.id : '',
+          type: 'function' as const,
+          function: {
+            name: c.type === 'tool_call' ? c.name : '',
+            arguments: JSON.stringify(c.type === 'tool_call' ? c.args ?? {} : {})
+          }
+        }))
+      }
+      out.push(msg)
+      continue
+    }
+
+    // role === 'tool'
+    for (const part of message.parts) {
+      if (part.type !== 'tool_result') continue
+      out.push({
+        role: 'tool',
+        tool_call_id: part.toolCallId,
+        content: part.ok ? part.text : `ERRO: ${part.text}`
+      })
+    }
+  }
+
+  return out
+}
+
+export class OpenAICompatibleProvider implements Provider {
+  readonly id: string
+  readonly label: string
+  readonly supportsVision: boolean
+  readonly contextWindow: number
+
+  constructor(
+    private readonly config: ProviderConfig,
+    private readonly secret?: string
+  ) {
+    this.id = config.id
+    this.label = config.label
+    this.supportsVision = config.supportsVision
+    this.contextWindow = config.contextWindow
+  }
+
+  countTokens(text: string): number {
+    return estimateTokens(text)
+  }
+
+  async *stream(req: ModelRequest): AsyncGenerator<ProviderEvent, void, unknown> {
+    const ref = this.config.apiKeyRef ?? ''
+    const apiKey = this.secret ?? (ref.startsWith('env:') ? (process.env[ref.slice(4)] ?? '') : ref)
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${apiKey || 'local'}`,
+      ...(this.config.baseUrl.includes('openrouter.ai')
+        ? { 'http-referer': 'https://forja.local', 'x-title': 'Forja' }
+        : {})
+    }
+
+    const compat = resolveCompat(this.config)
+    const body: Record<string, unknown> = {
+      model: this.config.model,
+      messages: toOpenAIMessages(req.system, req.messages, compat.echoReasoning),
+      stream: true,
+      stream_options: { include_usage: true }
+    }
+    const temperature = req.temperature ?? this.config.temperature
+    if (!compat.omitTemperature && temperature !== undefined) body.temperature = temperature
+    if (req.tools.length) {
+      body.tools = req.tools.map((t) => ({
+        type: 'function',
+        function: { name: t.name, description: t.description, parameters: t.parameters }
+      }))
+      body.tool_choice = req.toolChoice ?? 'auto'
+    }
+    const maxTokens = req.maxTokens ?? this.config.maxOutputTokens
+    if (maxTokens) body[compat.maxTokensField] = maxTokens
+    if (req.effort && compat.reasoningEffort) body.reasoning_effort = openaiReasoningEffort(req.effort)
+
+    const url = `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`
+    const response = await postStream({ url, headers, body, signal: req.signal })
+
+    if (!response.body) {
+      yield { type: 'end', stopReason: 'error', toolCalls: [], error: 'resposta sem corpo', errorKind: 'server', retryable: true }
+      return
+    }
+
+    const pending = new Map<number, { id: string; name: string; args: string }>()
+    let stopReason: 'stop' | 'tool_use' | 'length' | 'error' = 'stop'
+    let sawUsage = false
+    let textChars = 0
+
+    for await (const frame of readSse(response.body, STREAM_IDLE_TIMEOUT_MS)) {
+      if (frame.data === '[DONE]') break
+      let chunk: any
+      try {
+        chunk = JSON.parse(frame.data)
+      } catch {
+        continue
+      }
+      if (chunk.error) {
+        const error = chunk.error.message ?? JSON.stringify(chunk.error)
+        const kind = classifyProviderError(Number(chunk.error.code) || undefined, `${error} ${chunk.error.type ?? ''}`)
+        yield {
+          type: 'end',
+          stopReason: 'error',
+          toolCalls: [],
+          error,
+          errorKind: kind,
+          retryable: isRetryableKind(kind)
+        }
+        return
+      }
+
+      const choice = chunk.choices?.[0]
+      const delta = choice?.delta
+      if (delta) {
+        const reasoning = delta.reasoning_content ?? delta.reasoning
+        if (typeof reasoning === 'string' && reasoning) {
+          yield { type: 'reasoning_delta', text: reasoning }
+        }
+        if (typeof delta.content === 'string' && delta.content) {
+          textChars += delta.content.length
+          yield { type: 'text_delta', text: delta.content }
+        }
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const index = typeof tc.index === 'number' ? tc.index : 0
+            const entry = pending.get(index) ?? { id: '', name: '', args: '' }
+            if (tc.id) entry.id = tc.id
+            if (tc.function?.name) entry.name = tc.function.name
+            if (typeof tc.function?.arguments === 'string') entry.args += tc.function.arguments
+            if (!pending.has(index) && entry.name) {
+              yield { type: 'tool_call_start', id: entry.id || `call_${index}`, name: entry.name }
+            }
+            pending.set(index, entry)
+          }
+        }
+      }
+
+      if (choice?.finish_reason) {
+        if (choice.finish_reason === 'tool_calls' || choice.finish_reason === 'function_call') stopReason = 'tool_use'
+        else if (choice.finish_reason === 'length') stopReason = 'length'
+        else stopReason = 'stop'
+      }
+
+      if (chunk.usage) {
+        sawUsage = true
+        yield {
+          type: 'usage',
+          usage: {
+            input: chunk.usage.prompt_tokens ?? 0,
+            output: chunk.usage.completion_tokens ?? 0,
+            cachedInput: chunk.usage.prompt_tokens_details?.cached_tokens
+          }
+        }
+      }
+    }
+
+    const toolCalls: ToolCall[] = [...pending.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .filter(([, v]) => v.name)
+      .map(([index, v]) => ({
+        id: v.id || `call_${index}`,
+        name: v.name,
+        args: parseArgs(v.args)
+      }))
+
+    if (!sawUsage) {
+      const inputChars = JSON.stringify(req.messages).length + req.system.length
+      yield {
+        type: 'usage',
+        usage: { input: Math.ceil(inputChars / 3.4), output: Math.ceil(textChars / 3.4) }
+      }
+    }
+
+    if (stopReason === 'stop' && toolCalls.length) stopReason = 'tool_use'
+    yield { type: 'end', stopReason, toolCalls }
+  }
+}
+
+export function parseArgs(raw: string): unknown {
+  if (!raw || !raw.trim()) return {}
+  const attempts = [
+    raw,
+    // Local models often wrap arguments in a markdown fence or leave text around them.
+    raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, ''),
+    raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
+  ]
+  for (const candidate of attempts) {
+    if (!candidate.trim()) continue
+    for (const text of [candidate, candidate.replace(/,\s*([}\]])/g, '$1')]) {
+      try {
+        const parsed = JSON.parse(text)
+        // Some models double-encode: "{\"path\":\"a\"}"
+        if (typeof parsed === 'string' && parsed.trim().startsWith('{')) return JSON.parse(parsed)
+        return parsed
+      } catch {
+        /* next */
+      }
+    }
+  }
+  return { __raw: raw }
+}

@@ -1,0 +1,53 @@
+# Empacotamento do Forja (electron-builder).
+# Este arquivo tem precedência sobre o bloco "build" do package.json.
+# Alvo: Windows x64, instalador NSIS assistido.
+
+appId: com.forja.desktop
+productName: Forja
+copyright: Forja
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  # Dependências de produção são incluídas automaticamente pelo electron-builder;
+  # declaradas aqui para deixar o contrato explícito.
+  - node_modules/**/*
+
+asar: true
+# node-pty: .node binaries, OpenConsole.exe and its worker script must live on disk.
+asarUnpack:
+  - node_modules/@lydell/**
+  - '**/*.node'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Ícone do executável/instalador: build/icon.ico.
+  # Deixado comentado DE PROPÓSITO porque os binários de ícone não estão
+  # versionados. Se build/icon.ico existir, o electron-builder o usa
+  # automaticamente (buildResources: build). Descomente para EXIGIR o ícone —
+  # nesse caso o build falha se o arquivo não existir.
+  # icon: build/icon.ico
+  artifactName: Forja-Setup-${version}.${ext}
+
+# Ícone da janela em produção: src/main/index.ts procura
+# process.resourcesPath/icon.png. Descomente quando build/icon.png existir.
+# Sem o arquivo, a janela usa o ícone padrão do Electron e o build não falha.
+# extraResources:
+#   - from: build/icon.png
+#     to: icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Forja
+  deleteAppDataOnUninstall: false

@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "note": "Bundled runtimes. Regenerate with the scripts in scripts/embed-*.mjs. Large folders (runtime, models, bin) are git-ignored.",
+  "entries": [
+    {
+      "name": "ripgrep",
+      "version": "14.1.1",
+      "source": "https://github.com/BurntSushi/ripgrep (upstream release build, rev 4649aa9700); copied from ~/.local/share/opencode/bin/rg.exe",
+      "size": 5407744,
+      "sha256": "f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2",
+      "license": "MIT OR Unlicense",
+      "path": "bin/rg.exe"
+    },
+    {
+      "name": "open-computer-use",
+      "version": "1.3.0",
+      "source": "https://github.com/opensymph/open-computer-use apps/OpenComputerUseWindows @ e551c13e7082ce4c097234137582fbf4a1bc647a; built with go1.26.7 windows/amd64 (-trimpath, CGO_ENABLED=0, GOOS=windows GOARCH=amd64); modules: golang.org/x/image@v0.45.0, golang.org/x/sys@v0.47.0",
+      "size": 3802624,
+      "sha256": "30f8606d6f61c8bdbf7b0a2e77584e9c6d5a7ff25383a129dc18919a7474ee16",
+      "license": "MIT (module deps and Go runtime: BSD-3-Clause)",
+      "path": "bin/open-computer-use.exe"
+    },
+    {
+      "name": "python-embedded",
+      "kind": "runtime",
+      "version": "3.10.0",
+      "source": "copied from C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python310 (python.exe, python310.dll, vcruntime, DLLs, stdlib minus tests/idle/tkinter)",
+      "files": 3453,
+      "size": 276894031,
+      "license": "PSF-2.0",
+      "group": "stt"
+    },
+    {
+      "name": "faster-whisper",
+      "kind": "python-package",
+      "version": "1.2.1",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 12,
+      "size": 1380730,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "ctranslate2",
+      "kind": "python-package",
+      "version": "4.7.1",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 29,
+      "size": 62733330,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "huggingface-hub",
+      "kind": "python-package",
+      "version": "0.34.4",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 162,
+      "size": 2189463,
+      "license": "Apache",
+      "group": "stt"
+    },
+    {
+      "name": "tokenizers",
+      "kind": "python-package",
+      "version": "0.15.2",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 19,
+      "size": 6070284,
+      "license": "Apache Software License",
+      "group": "stt"
+    },
+    {
+      "name": "onnxruntime",
+      "kind": "python-package",
+      "version": "1.23.2",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 317,
+      "size": 39098392,
+      "license": "MIT License",
+      "group": "stt"
+    },
+    {
+      "name": "av",
+      "kind": "python-package",
+      "version": "17.0.0",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 146,
+      "size": 71012810,
+      "license": "BSD-3-Clause",
+      "group": "stt"
+    },
+    {
+      "name": "tqdm",
+      "kind": "python-package",
+      "version": "4.67.1",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 36,
+      "size": 222733,
+      "license": "MPL-2.0 AND MIT",
+      "group": "stt"
+    },
+    {
+      "name": "numpy",
+      "kind": "python-package",
+      "version": "1.22.0",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 265,
+      "size": 47574464,
+      "license": "BSD",
+      "group": "stt"
+    },
+    {
+      "name": "pyyaml",
+      "kind": "python-package",
+      "version": "6.0.2",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 21,
+      "size": 493987,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "filelock",
+      "kind": "python-package",
+      "version": "3.25.2",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 14,
+      "size": 79749,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "fsspec",
+      "kind": "python-package",
+      "version": "2026.2.0",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 51,
+      "size": 652785,
+      "license": "BSD-3-Clause",
+      "group": "stt"
+    },
+    {
+      "name": "packaging",
+      "kind": "python-package",
+      "version": "25.0",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 21,
+      "size": 236402,
+      "license": "Apache Software License / BSD License",
+      "group": "stt"
+    },
+    {
+      "name": "requests",
+      "kind": "python-package",
+      "version": "2.32.5",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 20,
+      "size": 202402,
+      "license": "Apache-2.0",
+      "group": "stt"
+    },
+    {
+      "name": "typing-extensions",
+      "kind": "python-package",
+      "version": "4.15.0",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 3,
+      "size": 177624,
+      "license": "PSF-2.0",
+      "group": "stt"
+    },
+    {
+      "name": "flatbuffers",
+      "kind": "python-package",
+      "version": "1.12",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 9,
+      "size": 42867,
+      "license": "Apache 2.0",
+      "group": "stt"
+    },
+    {
+      "name": "protobuf",
+      "kind": "python-package",
+      "version": "4.25.9",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 51,
+      "size": 1466444,
+      "license": "3-Clause BSD License",
+      "group": "stt"
+    },
+    {
+      "name": "colorama",
+      "kind": "python-package",
+      "version": "0.4.6",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 8,
+      "size": 49205,
+      "license": "BSD License",
+      "group": "stt"
+    },
+    {
+      "name": "charset-normalizer",
+      "kind": "python-package",
+      "version": "3.4.3",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 17,
+      "size": 320204,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "idna",
+      "kind": "python-package",
+      "version": "3.10",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 11,
+      "size": 349058,
+      "license": "BSD License",
+      "group": "stt"
+    },
+    {
+      "name": "urllib3",
+      "kind": "python-package",
+      "version": "2.6.3",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 40,
+      "size": 429922,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "certifi",
+      "kind": "python-package",
+      "version": "2026.2.25",
+      "source": "site-packages of the source Python (RECORD hash-verified)",
+      "files": 7,
+      "size": 279635,
+      "license": "MPL-2.0",
+      "group": "stt"
+    },
+    {
+      "name": "whisper-tiny",
+      "kind": "model",
+      "version": "d90ca5fe260221311c53c58e660288d3deb8d356",
+      "source": "huggingface.co/Systran/faster-whisper-tiny",
+      "sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
+      "files": 5,
+      "size": 78204107,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "whisper-base",
+      "kind": "model",
+      "version": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      "source": "huggingface.co/Systran/faster-whisper-base",
+      "sha256": "d01c3014881c9c6f3133c182f3d2887eb6ca1c789a7538c5c007196857a0a6a9",
+      "files": 5,
+      "size": 147883429,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "whisper-small",
+      "kind": "model",
+      "version": "536b0662742c02347bc0e980a01041f333bce120",
+      "source": "huggingface.co/Systran/faster-whisper-small",
+      "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+      "files": 5,
+      "size": 486212862,
+      "license": "MIT",
+      "group": "stt"
+    }
+  ]
+}

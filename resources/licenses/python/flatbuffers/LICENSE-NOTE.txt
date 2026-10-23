@@ -1,0 +1,7 @@
+flatbuffers 1.12
+Declared license (package metadata): Apache 2.0
+Author: FlatBuffers Contributors
+Upstream: https://google.github.io/flatbuffers/
+
+The distributed wheel did not include a license file, so this note records the license declared in
+its metadata. The full license text is available from the upstream project.

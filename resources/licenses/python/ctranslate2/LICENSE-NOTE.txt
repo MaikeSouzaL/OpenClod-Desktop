@@ -1,0 +1,7 @@
+ctranslate2 4.7.1
+Declared license (package metadata): MIT
+Author: OpenNMT
+Upstream: https://opennmt.net
+
+The distributed wheel did not include a license file, so this note records the license declared in
+its metadata. The full license text is available from the upstream project.

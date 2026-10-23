@@ -1,0 +1,7 @@
+tokenizers 0.15.2
+Declared license (package metadata): Apache Software License
+Author: Anthony MOI <m.anthony.moi@gmail.com>
+Upstream: Homepage, https://github.com/huggingface/tokenizers
+
+The distributed wheel did not include a license file, so this note records the license declared in
+its metadata. The full license text is available from the upstream project.
