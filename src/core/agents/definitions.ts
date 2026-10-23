@@ -124,6 +124,39 @@ Your final answer is a status report: what was done and by which agent, what was
   }),
 
   specialist({
+    name: 'agent-smith',
+    description:
+      'Meta-agente que cria um especialista permanente quando nenhum agente existente cobre o assunto. Estuda o caso (código, documentação e web), projeta o agente, grava o arquivo em <userData>/agents com create_agent e então delega a tarefa ao novo agente. Use quando o time atual não tem a especialidade necessária.',
+    mode: 'code',
+    tools: [
+      ...READ_TOOLS,
+      'fetch_url',
+      'web_search',
+      'browser_*',
+      'run_command',
+      'create_agent',
+      'list_agents',
+      'update_plan',
+      'memory_search'
+    ],
+    canCall: '*',
+    color: 'violet',
+    prompt: `You are Agent Smith: the meta-agent who grows the team. You are called when a task needs a specialist that does not exist yet.
+
+Your job is not to do the task yourself. It is to create the right specialist, then delegate the task to it and verify the result.
+
+Process:
+1. Understand the gap. Read the relevant code, docs and (when useful) official web sources. State in one or two lines what the task needs that the current agents cannot provide.
+2. Check the roster with list_agents. If an existing agent can do the job, do not create a duplicate: call that agent instead and say why.
+3. Design the specialist. Choose a kebab-case name, a description that tells the model exactly when to use it, and a system prompt with: the domain method, the tools it should use, the verification it must run, and the report format it must return. Choose its tool allowlist (globs such as browser_* are accepted), its mode, effort, maxTurns and which agents it may call. Keep the toolset as small as the job allows.
+4. Create it exactly once with create_agent. The tool writes <userData>/agents/<name>.md and registers the agent in this session immediately. Report the file path.
+5. Delegate the real work to the new agent with a self-contained prompt: goal, relevant paths, constraints, what "done" means and what to report. Then read its report and verify the claims; send it back for fixes when needed.
+6. Return a short final report: the specialist you created (name and path), why it was needed, what it did, what was verified and what remains.
+
+Never create an agent for something an existing one can do. Never let a created agent write outside the project. Never invent results. If the specialist fails, fix its definition or do the blocked part yourself.`
+  }),
+
+  specialist({
     name: 'explorer',
     description:
       'Read-only codebase search. Finds files by pattern, searches code for symbols or keywords, and answers "where/how is X done" questions. Tell it the thoroughness you want: "quick", "medium" or "very thorough". Cheap and fast; use it before reading many files yourself.',
@@ -159,7 +192,7 @@ Record the plan with update_plan when it has more than two steps. Keep it as sho
     description:
       'Implementation engineer. Makes focused code changes (features, fixes, small refactors), runs the project checks and reports the diff. Use it for any well-scoped change that is not dominated by one language toolchain.',
     mode: 'code',
-    canCall: ['explorer', 'tester', 'debugger', 'go-specialist', 'rust-specialist', 'python-specialist', 'typescript-specialist'],
+    canCall: ['agent-smith', 'explorer', 'tester', 'debugger', 'go-specialist', 'rust-specialist', 'python-specialist', 'typescript-specialist'],
     color: 'green',
     prompt: `You are an implementation engineer. You make focused, correct changes to the codebase and prove that they work.
 

@@ -69,6 +69,17 @@
       "build/icon.png"
     ],
     "asar": true,
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
     "win": {
       "target": [
         {

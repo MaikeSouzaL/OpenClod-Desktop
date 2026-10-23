@@ -395,8 +395,14 @@ export function parseAgentMarkdown(raw: string, fallbackName: string, source: Ag
 
   const model = field(data, 'model')
   if (typeof model === 'string') {
-    const normalized = normalizeModel(model, imported)
-    if (normalized !== 'inherit') def.model = normalized
+    // Keep an explicit `inherit` so serializeAgent(parse(x)) is lossless, but
+    // still drop bare Claude aliases imported from a .claude/agents folder.
+    if (model.trim().toLowerCase() === 'inherit') {
+      def.model = 'inherit'
+    } else {
+      const normalized = normalizeModel(model, imported)
+      if (normalized !== 'inherit') def.model = normalized
+    }
   }
 
   const effort = field(data, 'effort')
@@ -437,7 +443,7 @@ export function loadAgentsFromDir(dir: string, source: AgentSource, imported = f
     if (code !== 'ENOENT' && code !== 'ENOTDIR') out.warnings.push({ file: dir, message: `não foi possível ler a pasta: ${(err as Error).message}` })
     return out
   }
-  const seen = new Set<string>()
+  const valid: Array<{ file: string; agent: NonNullable<ParsedAgent['agent']> }> = []
   for (const entry of files.sort((a, b) => a.localeCompare(b))) {
     if (!/\.md$/i.test(entry) || entry.startsWith('.') || /^readme\.md$/i.test(entry)) continue
     const file = path.join(dir, entry)
@@ -453,15 +459,33 @@ export function loadAgentsFromDir(dir: string, source: AgentSource, imported = f
         out.warnings.push({ file, message: parsed.error ?? 'arquivo inválido' })
         continue
       }
-      if (seen.has(parsed.agent.name)) {
-        out.warnings.push({ file, message: `agente "${parsed.agent.name}" duplicado nesta pasta; o primeiro arquivo foi mantido` })
-        continue
-      }
-      seen.add(parsed.agent.name)
-      out.agents.push({ ...parsed.agent, file, ...(imported ? { imported: true } : {}) })
+      valid.push({ file, agent: parsed.agent })
     } catch (err) {
       out.warnings.push({ file, message: `falha ao ler o arquivo: ${(err as Error).message}` })
     }
+  }
+
+  // Two files may declare the same agent. Prefer the one whose file name is the
+  // agent name (`reviewer.md` beats `copy-of-reviewer.md`); otherwise keep the
+  // first in file-name order and warn about the later one.
+  const byName = new Map<string, { file: string; agent: NonNullable<ParsedAgent['agent']> }>()
+  const baseName = (file: string): string => path.basename(file).replace(/\.md$/i, '').toLowerCase()
+  for (const item of valid) {
+    const name = item.agent.name
+    const existing = byName.get(name)
+    if (!existing) {
+      byName.set(name, item)
+      continue
+    }
+    if (baseName(existing.file) !== name.toLowerCase() && baseName(item.file) === name.toLowerCase()) {
+      byName.set(name, item)
+      out.warnings.push({ file: existing.file, message: `agente "${name}" duplicado nesta pasta; mantido o arquivo com o nome do agente` })
+      continue
+    }
+    out.warnings.push({ file: item.file, message: `agente "${name}" duplicado nesta pasta; o primeiro arquivo foi mantido` })
+  }
+  for (const item of byName.values()) {
+    out.agents.push({ ...item.agent, file: item.file, ...(imported ? { imported: true } : {}) })
   }
   return out
 }

@@ -237,6 +237,46 @@ export interface SttStartOptions {
   language?: string
 }
 
+/** State of the global dictation flow (shortcut -> microphone -> insertion). */
+export interface DictationState {
+  phase: 'idle' | 'loading' | 'listening' | 'processing' | 'error'
+  /** 0..1, for the pill meter. */
+  level?: number
+  /** Best partial text so far. */
+  text?: string
+  error?: string
+}
+
+/* Per-project long-term memory (markdown wiki + handoffs, no LLM required). */
+
+export interface MemoryPageInfo {
+  slug: string
+  title: string
+  tags: string[]
+  pinned: boolean
+  updated: string
+  summary: string
+}
+
+export interface MemoryStatsInfo {
+  root: string
+  pages: number
+  pinned: number
+  openHandoffs: number
+  updatedAt?: string
+}
+
+export interface MemoryPageContent {
+  slug: string
+  title: string
+  body: string
+  tags: string[]
+  pinned: boolean
+  created: string
+  updated: string
+  source: string
+}
+
 export interface CreateTerminalInput {
   cwd: string
   cols: number
@@ -305,6 +345,15 @@ export const CH = {
   sttStop: 'stt:stop',
   sttAudio: 'stt:audio',
   sttEvent: 'forja:stt',
+  dictationToggle: 'forja:dictation:toggle',
+  dictationState: 'dictation:state',
+  dictationInsert: 'dictation:insert',
+  dictationComposer: 'forja:dictation:composer',
+  memoryStatus: 'memory:status',
+  memoryList: 'memory:list',
+  memoryRead: 'memory:read',
+  memoryDelete: 'memory:delete',
+  memoryOpen: 'memory:open',
   powerState: 'power:state',
 
   schedulesList: 'schedules:list',
@@ -404,6 +453,24 @@ export interface ForjaApi {
     /** 16 kHz mono little-endian int16 samples. Fire and forget. */
     audio(pcm: ArrayBuffer): void
     onEvent(callback: (event: SttEvent) => void): () => void
+  }
+  dictation: {
+    /** The global shortcut was pressed. */
+    onToggle(callback: () => void): () => void
+    /** Main asks the composer to insert the final text at the caret. */
+    onComposerInsert(callback: (text: string) => void): () => void
+    /** Renderer -> main: update the floating pill. */
+    state(state: DictationState): void
+    /** Renderer -> main: insert the final text into the focused target. */
+    insert(text: string): Promise<IpcResult<boolean>>
+  }
+  memory: {
+    status(projectId: string): Promise<IpcResult<MemoryStatsInfo>>
+    list(projectId: string): Promise<IpcResult<MemoryPageInfo[]>>
+    read(projectId: string, slug: string): Promise<IpcResult<MemoryPageContent | null>>
+    delete(projectId: string, slug: string): Promise<IpcResult<boolean>>
+    /** Opens the project's memory folder in Explorer. */
+    open(projectId: string): Promise<IpcResult<boolean>>
   }
   power: {
     keepAwake(enabled: boolean): Promise<IpcResult<boolean>>

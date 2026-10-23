@@ -160,6 +160,25 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
   ]
 }
 
+// Long-term project memory is orthogonal to the mode: every mode can read the
+// briefing; writes still go through the normal risk/policy decision.
+for (const tools of Object.values(MODE_TOOLS)) {
+  for (const name of ['memory_brief', 'memory_page', 'memory_handoff']) {
+    if (!tools.includes(name)) tools.push(name)
+  }
+  if (!tools.includes('web_research')) tools.push('web_research')
+}
+
+// Surgical edits are available wherever files can be written.
+for (const mode of ['code', 'debug', 'web', 'autonomous'] as const) {
+  if (!MODE_TOOLS[mode].includes('patch_file')) MODE_TOOLS[mode].push('patch_file')
+}
+
+// Growing the roster is a coding/autonomous capability, never a read-only one.
+for (const mode of ['code', 'debug', 'autonomous'] as const) {
+  if (!MODE_TOOLS[mode].includes('create_agent')) MODE_TOOLS[mode].push('create_agent')
+}
+
 export function toolsForMode(mode: AgentMode): string[] {
   return MODE_TOOLS[mode] ?? MODE_TOOLS.ask
 }

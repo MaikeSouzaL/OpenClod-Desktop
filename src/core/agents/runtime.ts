@@ -337,6 +337,8 @@ export async function spawnAgent(
     agentName: def.name,
     agentChain: [...caller.chain, def.name],
     agents: env.agents,
+    autoAgents: caller.autoAgents,
+    createAgent: caller.createAgent,
     effort: def.effort ?? caller.effort,
     cwd: caller.cwd,
     mode,

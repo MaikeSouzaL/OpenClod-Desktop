@@ -23,6 +23,16 @@ asarUnpack:
   - node_modules/@lydell/**
   - '**/*.node'
 
+# Runtime embarcado: Python + faster-whisper + modelos Whisper + binários
+# (open-computer-use, ripgrep). O app resolve isso em process.resourcesPath/resources.
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - '**/*'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+
 win:
   target:
     - target: nsis

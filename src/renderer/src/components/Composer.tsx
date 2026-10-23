@@ -22,7 +22,7 @@ import type {
 import { Icon } from './Icons'
 import { MenuPopover, type MenuItem } from './Chrome'
 import { effortLevelsFor } from '../../../shared/reasoning'
-import { useDictation } from '../lib/useDictation'
+import { stopDictation, toggleDictation, useDictationSnapshot } from '../lib/dictation-store'
 
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
   readonly: 'Somente leitura',
@@ -103,12 +103,12 @@ interface ComposerProps {
   queued: QueuedMessage[]
   skills: SkillInfo[]
   contextPercent: number
-  /** Speech recognition settings (model size, language). */
-  voice?: { model?: string; language?: string }
   /** null = the model's own default depth. */
   effort: ReasoningEffort | null
   workspaceName?: string
   seed?: { id: string; text: string }
+  /** Text dictated by the global shortcut; inserted at the caret. */
+  insert?: { id: string; text: string }
   onSend(text: string, images: ImagePart[]): Promise<boolean>
   onQueue(text: string, images: ImagePart[]): void
   onRemoveQueued(id: string): void
@@ -143,13 +143,13 @@ export function Composer({
   contextPercent,
   workspaceName,
   seed,
+  insert,
   onSend,
   onQueue,
   onRemoveQueued,
   onCommand,
   onStop,
   onModeChange,
-  voice,
   onModelChange,
   onEffortChange,
   onPermissionChange,
@@ -169,10 +169,11 @@ export function Composer({
   const [slashIndex, setSlashIndex] = useState(0)
   const [localError, setLocalError] = useState('')
   const [seedId, setSeedId] = useState<string | null>(null)
+  const [insertId, setInsertId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const dictation = useDictation({ text, setText, config: voice, onError: setLocalError })
+  const dictation = useDictationSnapshot()
   const busy = BUSY_STATES.includes(runState) || sending
   const provider = providers.find((item) => item.id === providerId) ?? providers[0]
   const modelLabel = model || provider?.model || 'modelo'
@@ -215,6 +216,26 @@ export function Composer({
     textareaRef.current?.focus()
   }, [seed, seedId])
 
+  // Global dictation: insert at the caret instead of replacing what the user typed.
+  useEffect(() => {
+    if (!insert || insert.id === insertId) return
+    setInsertId(insert.id)
+    const addition = insert.text
+    const node = textareaRef.current
+    if (!node) {
+      setText((current) => (current ? `${current} ${addition}` : addition))
+      return
+    }
+    const start = node.selectionStart ?? text.length
+    const end = node.selectionEnd ?? start
+    setText(`${text.slice(0, start)}${addition}${text.slice(end)}`)
+    requestAnimationFrame(() => {
+      node.focus()
+      const caret = start + addition.length
+      node.setSelectionRange(caret, caret)
+    })
+  }, [insert, insertId, text])
+
   useEffect(() => {
     setSlashIndex(0)
   }, [slashQuery])
@@ -230,7 +251,7 @@ export function Composer({
   }
 
   const submit = async (): Promise<void> => {
-    dictation.stop()
+    stopDictation()
     const payload = composed()
     if ((!payload.text && !payload.images.length) || busy) return
     setSending(true)
@@ -248,7 +269,7 @@ export function Composer({
   }
 
   const queue = (): void => {
-    dictation.stop()
+    stopDictation()
     const payload = composed()
     if (!payload.text && !payload.images.length) return
     onQueue(payload.text, payload.images)
@@ -502,10 +523,7 @@ export function Composer({
             ref={textareaRef}
             value={text}
             placeholder={placeholder}
-            onChange={(event) => {
-              dictation.noteEdit(event.target.value)
-              setText(event.target.value)
-            }}
+            onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             spellCheck={false}
@@ -614,20 +632,20 @@ export function Composer({
             </button>
             <button
               type="button"
-              className={`round-btn mic-btn state-${dictation.state}`}
+              className={`round-btn mic-btn state-${dictation.phase}`}
               style={{ ['--level' as string]: dictation.level.toFixed(2) }}
-              onClick={dictation.toggle}
-              disabled={dictation.state === 'stopping'}
-              aria-pressed={dictation.state === 'listening'}
+              onClick={toggleDictation}
+              disabled={dictation.phase === 'stopping'}
+              aria-pressed={dictation.phase === 'listening'}
               title={
-                dictation.state === 'listening'
-                  ? 'Parar o ditado (Esc)'
-                  : dictation.state === 'loading'
+                dictation.phase === 'listening'
+                  ? 'Parar o ditado (Esc ou o atalho global)'
+                  : dictation.phase === 'loading'
                     ? 'Carregando o modelo de voz… (clique para cancelar)'
-                    : 'Ditado por voz: o texto aparece enquanto você fala'
+                    : 'Ditado por voz: a pílula aparece e o texto vai para o campo em foco'
               }
             >
-              {dictation.state === 'loading' ? <span className="spinner tiny" /> : <Icon name={dictation.state === 'listening' ? 'audioLines' : 'mic'} size={16} />}
+              {dictation.phase === 'loading' ? <span className="spinner tiny" /> : <Icon name={dictation.phase === 'listening' ? 'audioLines' : 'mic'} size={16} />}
             </button>
             {busy ? (
               <button type="button" className="send-btn stop" onClick={onStop} title="Parar">
@@ -648,7 +666,7 @@ export function Composer({
         </div>
       </div>
 
-      {localError ? <div className="composer-error">{localError}</div> : null}
+      {localError || dictation.error ? <div className="composer-error">{localError || dictation.error}</div> : null}
 
       <div className="composer-meta">
         <span className="composer-permission-wrap">
@@ -659,9 +677,9 @@ export function Composer({
           {permissionOpen ? <MenuPopover items={permissionItems} onClose={() => setPermissionOpen(false)} className="permission-menu" /> : null}
         </span>
         <span className="composer-hint">
-          {dictation.state === 'listening' ? (
+          {dictation.phase === 'listening' ? (
             <em className="listening-note">
-              <span className="listening-dot" /> Ouvindo… fale normalmente · Esc para parar
+              <span className="listening-dot" /> Ouvindo… fale normalmente · clique no microfone ou use o atalho para inserir
             </em>
           ) : provider?.kind === 'mock' ? (
             <em className="mock-warning">Scripted: não é um modelo real</em>

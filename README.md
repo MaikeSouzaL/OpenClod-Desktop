@@ -92,6 +92,14 @@ que a UI finja uma ação que o núcleo não executou.
 - Plano de execução visível, atualizado pela ferramenta `update_plan`.
 - Memória por projeto: fatos gravados por `memory_write` entram no prompt de
   sistema de toda sessão do projeto e podem ser buscados com `memory_search`.
+- **Wiki de longo prazo por projeto** (`memory_brief`, `memory_page`,
+  `memory_handoff`): páginas markdown editáveis à mão, índice lexical,
+  briefing no início da sessão e handoffs claim-once entre sessões/agentes.
+  Nada é enviado a um serviço de memória; ver Configurações → Memória e
+  `docs/research/AI_MEMORY.md`.
+- **Ditado local** com Whisper embutido: atalho global, pílula flutuante,
+  transcrição ao vivo e inserção no campo em foco (inclusive fora do Forja).
+  O mesmo fluxo abre pelo atalho ou pelo botão de microfone.
 - **Hooks** no formato do Claude Code (§7.8), com 10 eventos e tipos `command` e `http`.
 - **Esforço de raciocínio** por sessão (Automático, Baixo, Médio, Alto, Extra,
   Máximo): `thinking` adaptativo e `output_config.effort` nos Claude 4.6+/5.x,
@@ -105,18 +113,31 @@ que a UI finja uma ação que o núcleo não executou.
   em qualquer modo, mesmo com "ignorar permissões".
 - **Agentes externos:** a ferramenta `external_agent` delega uma tarefa ao
   Claude Code ou ao Codex instalados (nunca com `bypassPermissions`).
+- **Modo equipe:** com esforço **Máximo** ou com o toggle em Configurações →
+  Permissões, o agente principal divide o trabalho e chama especialistas em
+  paralelo. Se não houver especialista para o assunto, ele chama `agent-smith`,
+  que estuda o caso, cria um agente permanente com `create_agent` em
+  `%APPDATA%\Forja\agents` e delega a tarefa.
+- **CLAUDE.md canônico:** o harness lê `CLAUDE.md` (e `AGENTS.md`/`FORJA.md`
+  como fallback) e cria automaticamente um `CLAUDE.md` na raiz de cada projeto
+  quando ele não existe, sem sobrescrever o que já está lá.
+- **Edição cirúrgica:** `edit_file` (trecho exato) e `patch_file` (diff
+  unificado) alteram só as linhas necessárias; o prompt proíbe reescrever o
+  arquivo inteiro para corrigir um trecho.
 
 ### Ferramentas nativas
 
-- **Arquivos:** ler, escrever, editar, listar e remover (com bloqueios por risco).
-  A edição grava o texto literalmente (inclusive `$$`, `$&`), preserva CRLF e
-  tolera aspas tipográficas.
+- **Arquivos:** ler, escrever, editar, aplicar patch, listar e remover (com
+  bloqueios por risco). A edição grava o texto literalmente (inclusive `$$`,
+  `$&`), preserva CRLF e tolera aspas tipográficas; `patch_file` aplica só os
+  hunks de um diff unificado.
 - **Busca:** `grep` e `glob`.
 - **Shell:** executar comando (também em segundo plano com `run_in_background`),
   iniciar/parar processo, `read_process_output` (saída nova desde a última
   leitura), `list_processes` e listar portas.
 - **Git:** status, diff, log, commit e checkout.
-- **Web:** `fetch_url`, `web_search` e `download_file`.
+- **Web:** `fetch_url`, `web_search`, `web_research` (pesquisa + lê as fontes e
+  devolve trechos com URL) e `download_file`.
 - **Navegador (10):** abrir, navegar, snapshot por acessibilidade, clicar, digitar,
   teclar, ler texto, screenshot, console/rede e esperar.
 - **Computer Use (14):** listar janelas, snapshot de UI Automation (por app ou
@@ -124,8 +145,27 @@ que a UI finja uma ação que o núcleo não executou.
   janela ou da captura; botão direito), preencher valor, digitar (focando o
   elemento), tecla, scroll, arrastar, abrir app, ativar janela, ação secundária
   de acessibilidade, esperar e esperar mudança de estado.
-- **Plano/skills/memória/subagente (6):** `update_plan`, `list_skills`, `use_skill`,
-  `memory_write`, `memory_search` e `task`.
+- **Plano/skills/memória/agentes (11):** `update_plan`, `list_skills`,
+  `use_skill`, `memory_write`, `memory_search`, `memory_brief`, `memory_page`,
+  `memory_handoff`, `task`, `agent`, `list_agents` e `create_agent`.
+
+### Voz (Whisper local, fluxo Wispr Flow)
+
+- **Atalho global** configurável (padrão `Control+Alt+Space`). Pressione uma
+  vez para ouvir e outra para inserir; `Esc` cancela enquanto ouve.
+- **Botão de microfone** do compositor usa exatamente o mesmo motor: abre a
+  pílula flutuante, mostra o nível e o texto parcial, e insere no campo em foco
+  ao parar. Não há dois caminhos diferentes de ditado.
+- **Pílula flutuante** always-on-top, separada da janela principal, com estado
+  (carregando/ouvindo/inserindo/erro), medidor e partial text.
+- **Inserção**: no compositor do Forja, no cursor; em outro aplicativo, via
+  clipboard + `Ctrl+V` (configurável em Configurações → Voz).
+- **Polish opcional**: corrige pontuação/vícios com uma chamada curta ao
+  provedor padrão antes de inserir; desligado por padrão, porque envia o texto
+  ao provedor.
+- **100% local por padrão**: Python 3.10 embutido + faster-whisper (CTranslate2)
+  + Silero VAD; modelos `tiny`, `base` e `small` em `resources/models/whisper`.
+  Nenhum áudio sai da máquina.
 
 ### Interface
 
@@ -185,6 +225,15 @@ Para evitar expectativas erradas:
   testes (`src/core/git/service.ts`), mas ainda não estão ligadas à criação
   de sessões.
 - **Sem chat lateral, rewind/checkpoints, comentários de diff nem split view.**
+- **O ditado alterna no atalho**, não no modo “segurar para falar”. O modo hold
+  exige um hook nativo de teclado (`WH_KEYBOARD_LL`), que pode ser um helper
+  Go/Rust futuro.
+- **A memória por projeto é local** (wiki markdown em `%APPDATA%`), sem sync
+  entre máquinas. Para FTS5/vetores/sync, ligue o binário oficial `ai-memory`
+  como MCP.
+- **`create_agent` grava em `%APPDATA%\Forja\agents`** (ou `.forja/agents` com
+  escopo de projeto). O agente criado passa pela mesma política de ferramentas;
+  não há sandbox de SO para o que ele executar.
 - **O terminal integrado é o seu shell**: não passa pelas aprovações do agente.
 - **Sem recursos de nuvem do Claude** (Artefatos, Design, Dispatch, Remote Control).
 - **Sem paridade visual com o Claude Desktop.** A identidade visual é própria.
@@ -199,6 +248,7 @@ Para evitar expectativas erradas:
 | npm | 10 ou superior (acompanha o Node 22) |
 | Espaço em disco | algumas centenas de MB para `node_modules` + Electron |
 | Rede | necessária apenas para provedores remotos, web e instalação de dependências |
+| Opcional | Microfone e ~1 GB de espaço para o Python + modelos Whisper embutidos (ditado) |
 | Opcional | Git no `PATH` (ferramentas de git) |
 | Opcional | Google Chrome ou Microsoft Edge (navegador) |
 | Opcional | `@opensymph/open-computer-use` (Computer Use por UI Automation) |
@@ -599,6 +649,10 @@ Tudo fica em `%APPDATA%\Forja` (o `userData` do Electron):
     sessions\<id>.json         sessão: mensagens, plano, mudanças, uso
     sessions\<id>.events.jsonl auditoria append-only
     memory\<projectId>.json    fatos de memória do projeto
+    memory\projects\<projectId>\
+      wiki\<slug>.md           wiki markdown do projeto (fonte da verdade)
+      index.json               índice lexical derivado
+      handoffs.json            handoffs claim-once
   skills\<nome>\SKILL.md       skills do usuário
   logs\main.log                log do processo principal
 ```
@@ -619,6 +673,10 @@ Tudo fica em `%APPDATA%\Forja` (o `userData` do Electron):
 | Ollama/LM Studio "sem credencial" | servidor local desligado | inicie o servidor, carregue um modelo e confirme a porta (11434/1234) |
 | "não foi possível iniciar o Chromium" | sem Chrome/Edge e sem Chromium do Playwright | instale Chrome/Edge ou rode `npx playwright install chromium` |
 | "open-computer-use não encontrado" | binário opcional ausente | `npm i -g @opensymph/open-computer-use` e reabra o app |
+| O microfone não inicia | microfone bloqueado, modelo ausente ou build antiga | Configurações → Voz mostra o motivo; confira `resources/models/whisper` e rode `npm run build` (o worklet é um arquivo estático) |
+| O atalho global não responde | outro aplicativo usa o mesmo atalho | Configurações → Voz → mude o atalho (ex.: `Control+Alt+J`) e salve |
+| O texto ditado foi para o app errado | "Inserir em" = qualquer app e o foco mudou | use "Somente no compositor do Forja" ou mantenha o campo em foco |
+| Página nova não aparece em Memória | wiki editada fora do app | Configurações → Memória → **Atualizar** (o índice é reconstruído a partir dos `.md`) |
 | "Controle de mouse/teclado desativado" | política | Configurações → Permissões → habilitar controle real |
 | Aprovação "sumiu" e o turno falhou | expirou em 5 min | responda o painel de aprovação; repita a ação |
 | Janela em branco ou app não abre | erro de inicialização | veja `%APPDATA%\Forja\logs\main.log`; rode `npm run build` e observe o typecheck |
@@ -665,6 +723,8 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 - Não há assinatura de código nem auto-update configurados.
 - Passo a passo reproduzível: [`docs/INSTALL.md`](docs/INSTALL.md).
 - Matriz de dependências e compatibilidade: [`docs/DEPENDENCY_MATRIX.md`](docs/DEPENDENCY_MATRIX.md).
+- Análise do Wispr Flow (REA) e decisão de implementação: [`docs/research/WISPR_FLOW.md`](docs/research/WISPR_FLOW.md).
+- Estudo do ai-memory e da memória por projeto: [`docs/research/AI_MEMORY.md`](docs/research/AI_MEMORY.md).
 - Avisos de terceiros: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## 16. Privacidade

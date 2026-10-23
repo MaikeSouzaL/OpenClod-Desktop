@@ -9,12 +9,19 @@ import type {
   ProviderConfig
 } from '../../../shared/types'
 import { AGENT_MODES } from '../../../shared/types'
-import type { AppVersions, ProviderPresetInfo, SttStatusInfo } from '../../../shared/api'
+import type {
+  AppVersions,
+  MemoryPageContent,
+  MemoryPageInfo,
+  MemoryStatsInfo,
+  ProviderPresetInfo,
+  SttStatusInfo
+} from '../../../shared/api'
 import { Icon } from './Icons'
 import { MODE_LABELS } from '../lib/format'
 import { errorMessage, unwrap } from '../lib/api'
 
-export type SettingsTab = 'providers' | 'appearance' | 'voice' | 'policy' | 'mcp' | 'about'
+export type SettingsTab = 'providers' | 'appearance' | 'voice' | 'policy' | 'memory' | 'mcp' | 'about'
 type Tab = SettingsTab
 
 const PERMISSION_CHOICES: Array<{ id: PermissionMode; title: string; detail: string; tone?: 'warn' }> = [
@@ -40,6 +47,8 @@ interface SettingsDialogProps {
   onRefreshCapabilities(): Promise<void>
   /** Tab shown when the dialog opens (e.g. "mcp" from the Customize page). */
   initialTab?: SettingsTab
+  /** Active project, used by the Memory tab. */
+  memoryProjectId?: string
 }
 
 export function SettingsDialog({
@@ -51,13 +60,15 @@ export function SettingsDialog({
   onClose,
   onSave,
   onRefreshCapabilities,
-  initialTab
+  initialTab,
+  memoryProjectId
 }: SettingsDialogProps): ReactElement | null {
   const [tab, setTab] = useState<Tab>('providers')
   const [providers, setProviders] = useState<ProviderConfig[]>([])
   const [defaultId, setDefaultId] = useState('')
   const [theme, setTheme] = useState<'dark' | 'light'>(settings.theme)
   const [policy, setPolicy] = useState<PolicyConfig>(settings.policy)
+  const [autoAgents, setAutoAgents] = useState(Boolean(settings.autoAgents))
   const [limits, setLimits] = useState(settings.limits)
   const [blockedText, setBlockedText] = useState('')
   const [rootsText, setRootsText] = useState('')
@@ -65,8 +76,19 @@ export function SettingsDialog({
   const [rulesText, setRulesText] = useState({ allow: '', ask: '', deny: '' })
   const [hooksText, setHooksText] = useState('{}')
   const [importClaude, setImportClaude] = useState(false)
-  const [voice, setVoice] = useState({ model: 'base', language: 'pt' })
+  const [voice, setVoice] = useState<NonNullable<AppSettings['voice']>>({
+    model: 'base',
+    language: 'pt',
+    shortcut: 'Control+Alt+Space',
+    mode: 'toggle',
+    polish: false,
+    insert: 'focused'
+  })
   const [voiceStatus, setVoiceStatus] = useState<SttStatusInfo | null>(null)
+  const [memoryStats, setMemoryStats] = useState<MemoryStatsInfo | null>(null)
+  const [memoryPages, setMemoryPages] = useState<MemoryPageInfo[]>([])
+  const [memoryPage, setMemoryPage] = useState<MemoryPageContent | null>(null)
+  const [memoryNotice, setMemoryNotice] = useState('')
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
   const [keyStatus, setKeyStatus] = useState<Record<string, string>>({})
   const [testStatus, setTestStatus] = useState<Record<string, { state: string; detail: string }>>({})
@@ -87,6 +109,7 @@ export function SettingsDialog({
     setDefaultId(settings.defaultProviderId)
     setTheme(settings.theme)
     setPolicy(structuredClone(settings.policy))
+    setAutoAgents(Boolean(settings.autoAgents))
     setLimits(structuredClone(settings.limits))
     setBlockedText(settings.policy.blockedCommands.join('\n'))
     setRootsText(settings.policy.allowedRoots.join('\n'))
@@ -98,7 +121,14 @@ export function SettingsDialog({
     })
     setHooksText(JSON.stringify(settings.hooks ?? {}, null, 2))
     setImportClaude(Boolean(settings.importClaudeSettings))
-    setVoice({ model: settings.voice?.model ?? 'base', language: settings.voice?.language ?? 'pt' })
+    setVoice({
+      model: settings.voice?.model ?? 'base',
+      language: settings.voice?.language ?? 'pt',
+      shortcut: settings.voice?.shortcut ?? 'Control+Alt+Space',
+      mode: settings.voice?.mode ?? 'toggle',
+      polish: settings.voice?.polish ?? false,
+      insert: settings.voice?.insert ?? 'focused'
+    })
     void window.forja.stt.status().then((result) => setVoiceStatus(result.ok ? result.value : null))
     setKeyDrafts({})
     setKeyStatus({})
@@ -106,6 +136,23 @@ export function SettingsDialog({
     setError('')
     setNotice('')
   }, [open, settings])
+
+  useEffect(() => {
+    if (!open || tab !== 'memory' || !memoryProjectId) return
+    let cancelled = false
+    void (async () => {
+      const [status, list] = await Promise.all([
+        window.forja.memory.status(memoryProjectId),
+        window.forja.memory.list(memoryProjectId)
+      ])
+      if (cancelled) return
+      setMemoryStats(status.ok ? status.value : null)
+      setMemoryPages(list.ok ? list.value : [])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, tab, memoryProjectId])
 
   if (!open) return null
 
@@ -271,6 +318,7 @@ export function SettingsDialog({
         defaultProviderId: defaultId,
         theme,
         policy: nextPolicy,
+        autoAgents,
         limits,
         mcpServers,
         hooks,
@@ -284,6 +332,16 @@ export function SettingsDialog({
     } finally {
       setSaving(false)
     }
+  }
+
+  const refreshMemoryView = async (): Promise<void> => {
+    if (!memoryProjectId) return
+    const [status, list] = await Promise.all([
+      window.forja.memory.status(memoryProjectId),
+      window.forja.memory.list(memoryProjectId)
+    ])
+    setMemoryStats(status.ok ? status.value : null)
+    setMemoryPages(list.ok ? list.value : [])
   }
 
   return (
@@ -312,6 +370,9 @@ export function SettingsDialog({
             </button>
             <button type="button" className={tab === 'policy' ? 'active' : ''} onClick={() => setTab('policy')}>
               <Icon name="shield" size={15} /> Permissões
+            </button>
+            <button type="button" className={tab === 'memory' ? 'active' : ''} onClick={() => setTab('memory')}>
+              <Icon name="archive" size={15} /> Memória
             </button>
             <button type="button" className={tab === 'mcp' ? 'active' : ''} onClick={() => setTab('mcp')}>
               <Icon name="plug" size={15} /> MCP
@@ -620,6 +681,56 @@ export function SettingsDialog({
                   <small>Fixar o idioma evita erros em frases curtas.</small>
                 </label>
               </div>
+
+              <h3>Fluxo estilo Wispr Flow</h3>
+              <p className="field-help">
+                Um atalho global abre o microfone de qualquer aplicativo. O texto aparece ao vivo na pílula flutuante e é
+                inserido no campo que estiver em foco quando você parar.
+              </p>
+              <div className="field-row">
+                <label className="field">
+                  <span>Atalho global</span>
+                  <input
+                    value={voice.shortcut ?? ''}
+                    onChange={(event) => setVoice((current) => ({ ...current, shortcut: event.target.value }))}
+                    placeholder="Control+Alt+Space"
+                    spellCheck={false}
+                  />
+                  <small>
+                    Pressione uma vez para começar e outra para inserir. Exemplos: <code>Control+Alt+Space</code>,{' '}
+                    <code>Control+Super</code> (Ctrl+Win). Evite atalhos já usados pelo Windows.
+                  </small>
+                </label>
+                <label className="field">
+                  <span>Inserir em</span>
+                  <select
+                    value={voice.insert ?? 'focused'}
+                    onChange={(event) =>
+                      setVoice((current) => ({ ...current, insert: event.target.value === 'composer' ? 'composer' : 'focused' }))
+                    }
+                  >
+                    <option value="focused">Qualquer aplicativo em foco (estilo Wispr Flow)</option>
+                    <option value="composer">Somente no compositor do Forja</option>
+                  </select>
+                  <small>
+                    Em “qualquer aplicativo”, o texto é colado com o clipboard e Ctrl+V. Em campos que bloqueiam colagem, use o
+                    compositor.
+                  </small>
+                </label>
+              </div>
+              <label className="check-line">
+                <input
+                  type="checkbox"
+                  checked={Boolean(voice.polish)}
+                  onChange={(event) => setVoice((current) => ({ ...current, polish: event.target.checked }))}
+                />
+                Polir o texto com o modelo antes de inserir (corrige pontuação e vícios; consome tokens e envia o texto ao provedor
+                configurado)
+              </label>
+              <p className="field-help">
+                <strong>Modo:</strong> alternar (uma vez para ouvir, outra para inserir). O modo “segurar para falar” exige um
+                gancho de teclado nativo e será habilitado junto com o helper de entrada.
+              </p>
             </div>
           ) : null}
 
@@ -663,9 +774,19 @@ export function SettingsDialog({
                   />
                   Permitir controle real de mouse e teclado
                 </label>
+                <label className="check-line">
+                  <input
+                    type="checkbox"
+                    checked={autoAgents}
+                    onChange={(event) => setAutoAgents(event.target.checked)}
+                  />
+                  Modo equipe: dividir tarefas em vários agentes (o esforço Máximo ativa automaticamente)
+                </label>
                 <p className="field-help">
                   Com o controle desligado, o agente pode listar janelas, ler a árvore de acessibilidade e capturar
-                  tela, mas não pode clicar, digitar ou arrastar.
+                  tela, mas não pode clicar, digitar ou arrastar. Com o modo equipe ligado, o agente principal pode
+                  chamar especialistas em paralelo; se não houver um especialista para o assunto, ele chama
+                  <code> agent-smith</code> para criar um novo agente permanente em <code>%APPDATA%\Forja\agents</code>.
                 </p>
               </div>
 
@@ -855,6 +976,105 @@ export function SettingsDialog({
                 Salvar com MCP alterado reinicia os servidores. Ferramentas MCP são tratadas como execução e pedem
                 aprovação no modo “Perguntar”.
               </p>
+            </div>
+          ) : null}
+
+          {tab === 'memory' ? (
+            <div className="appearance">
+              <h3>Memória de longo prazo</h3>
+              <p className="field-help">
+                Cada projeto tem a sua própria wiki markdown, independente do modelo ou provedor. O agente lê o briefing no
+                início da sessão e usa <code>memory_brief</code>, <code>memory_page</code> e <code>memory_handoff</code> para
+                consultar, gravar e passar o bastão. Tudo fica no disco local; nenhum texto é enviado a um serviço de memória.
+              </p>
+
+              {!memoryProjectId ? (
+                <div className="field-note">Abra um projeto para ver e gerenciar a memória dele.</div>
+              ) : (
+                <>
+                  <div className="field-note">
+                    {memoryStats
+                      ? `${memoryStats.pages} página(s) · ${memoryStats.pinned} fixada(s) · ${memoryStats.openHandoffs} handoff(s) aberto(s)`
+                      : 'Carregando…'}
+                  </div>
+                  <div className="field-row">
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => {
+                        if (!memoryProjectId) return
+                        void window.forja.memory.open(memoryProjectId).then(() => setMemoryNotice('Pasta aberta no Explorer.'))
+                      }}
+                    >
+                      <Icon name="folderOpen" size={14} /> Abrir pasta
+                    </button>
+                    <button type="button" className="btn ghost" onClick={() => void refreshMemoryView()}>
+                      <Icon name="refresh" size={14} /> Atualizar
+                    </button>
+                  </div>
+                  {memoryNotice ? <div className="field-note good">{memoryNotice}</div> : null}
+
+                  <div className="memory-list">
+                    {memoryPages.length ? (
+                      memoryPages.map((page) => (
+                        <div className="memory-row" key={page.slug}>
+                          <button
+                            type="button"
+                            className="memory-title"
+                            onClick={() => {
+                              if (!memoryProjectId) return
+                              void window.forja.memory.read(memoryProjectId, page.slug).then((result) => {
+                                if (result.ok) setMemoryPage(result.value)
+                              })
+                            }}
+                          >
+                            {page.title}
+                          </button>
+                          <span className="memory-meta">
+                            {new Date(page.updated).toLocaleString('pt-BR')}
+                            {page.pinned ? ' · fixada' : ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="msg-action"
+                            title="Excluir página"
+                            onClick={() => {
+                              if (!memoryProjectId) return
+                              if (!window.confirm(`Excluir a página "${page.title}"?`)) return
+                              void window.forja.memory.delete(memoryProjectId, page.slug).then(async (result) => {
+                                if (result.ok && result.value) {
+                                  setMemoryNotice(`Página "${page.title}" excluída.`)
+                                  if (memoryPage?.slug === page.slug) setMemoryPage(null)
+                                  await refreshMemoryView()
+                                }
+                              })
+                            }}
+                          >
+                            <Icon name="trash" size={13} />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="field-note">
+                        Ainda não há páginas. Peça ao agente para salvar uma decisão com <code>memory_page</code>.
+                      </div>
+                    )}
+                  </div>
+
+                  {memoryPage ? (
+                    <div className="memory-preview">
+                      <div className="memory-preview-head">
+                        <strong>{memoryPage.title}</strong>
+                        <span>{memoryPage.slug}</span>
+                        <button type="button" className="icon-btn" title="Fechar" onClick={() => setMemoryPage(null)}>
+                          <Icon name="x" size={14} />
+                        </button>
+                      </div>
+                      <pre>{memoryPage.body}</pre>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
 

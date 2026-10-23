@@ -272,6 +272,17 @@
       "size": 486212862,
       "license": "MIT",
       "group": "stt"
+    },
+    {
+      "name": "forja_stt.py",
+      "kind": "script",
+      "version": "1",
+      "source": "resources/stt/forja_stt.py",
+      "sha256": "6b01e6edd22f5770b32c986885bb822beeb3fb8de8d6099f9ca209a24b1bb5fb",
+      "files": 1,
+      "size": 30609,
+      "license": "MIT",
+      "group": "stt"
     }
   ]
 }

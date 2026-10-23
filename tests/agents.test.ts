@@ -618,7 +618,7 @@ const hangUntilAborted = (req: ModelRequest): Promise<void> =>
     else req.signal?.addEventListener('abort', abort, { once: true })
   })
 
-const agentCall = (id: string, agent: string, extra: Record<string, unknown> = {}): MockTurn['toolCalls'] => [
+const agentCall = (id: string, agent: string, extra: Record<string, unknown> = {}): NonNullable<MockTurn['toolCalls']> => [
   { id, name: 'agent', args: { agent, label: `${agent} job`, prompt: `Faça o trabalho de ${agent} com cuidado.`, ...extra } }
 ]
 
@@ -1048,7 +1048,9 @@ describe('events of the agent tree', () => {
     expect(end.summary).toBe(answer.slice(0, 400))
 
     // Order: start, the child's tool events, end.
-    const types = tree.events.filter((e) => ['subagent', 'tool_start', 'tool_end'].includes(e.type)).map((e) => `${e.type}:${'name' in e ? e.name : e.state}`)
+    const types = tree.events
+      .filter((e) => ['subagent', 'tool_start', 'tool_end'].includes(e.type))
+      .map((e) => `${e.type}:${'name' in e ? e.name : 'state' in e ? e.state : ''}`)
     expect(types).toEqual(['tool_start:agent', 'subagent:thinking', 'tool_start:read_file', 'tool_end:read_file', 'subagent:done', 'tool_end:agent'])
 
     // Forwarded tool events carry the child as agentId, the root as sessionId and a collision-proof id.
@@ -1246,7 +1248,7 @@ describe('list_agents', () => {
     expect(end.ok).toBe(true)
     const result = tree.runner.messages.find((m) => m.role === 'tool')!.parts[0] as { text: string }
     expect(result.text).toContain('nível 0 de 3')
-    expect(result.text).toMatch(/- coder: Implementation engineer.*\(pode chamar: explorer, tester, debugger,/)
+    expect(result.text).toMatch(/- coder: Implementation engineer.*\(pode chamar: agent-smith, explorer, tester, debugger,/)
     expect(result.text).toMatch(/- explorer: .*\(pode chamar: nenhum\)/)
     expect(result.text).toMatch(/- orchestrator: .*\(pode chamar: qualquer agente\)/)
     expect(result.text).not.toContain('- title:')

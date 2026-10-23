@@ -19,13 +19,14 @@ import type {
   Usage
 } from '../../shared/types.js'
 import type { ToolRegistry } from '../tools/registry.js'
-import type { AgentCatalog, SubagentOutcome, SubagentSpec, ToolContext } from '../tools/types.js'
+import type { AgentCatalog, CreateAgentInput, SubagentOutcome, SubagentSpec, ToolContext } from '../tools/types.js'
 import type { FileTracker } from '../session/tracker.js'
 import { WorkspaceGuard } from '../security/policy.js'
 import type { BrowserLayer } from '../browser/layer.js'
 import type { ComputerLayer } from '../computer/layer.js'
 import type { SkillLibrary } from '../skills/library.js'
 import type { MemoryFact, MemoryStore } from '../memory/store.js'
+import type { ProjectMemory } from '../memory/project.js'
 import type { HookOutcome, HookRunner } from '../hooks/runner.js'
 import { claudeToolInput } from '../hooks/runner.js'
 import { buildSystemPrompt, loadProjectInstructions } from './context.js'
@@ -91,6 +92,7 @@ export interface RunnerDeps {
     computer: ComputerLayer
     skills: SkillLibrary
     memory: MemoryStore
+    projectMemory: ProjectMemory
   }
   project: ProjectMeta
   /** Lifecycle hooks (Claude Code settings format). */
@@ -101,6 +103,10 @@ export interface RunnerDeps {
   runSubagent?: (spec: SubagentSpec, caller: SubagentCaller) => Promise<SubagentOutcome>
   /** Agent definitions this runner may delegate to. Without it the `agent` and `list_agents` tools are not offered. */
   agents?: AgentRegistry
+  /** Writes a new specialist agent and registers it in `agents` immediately. */
+  createAgent?: (input: CreateAgentInput) => Promise<{ path: string; agent: import('../../shared/types.js').AgentDefinition }>
+  /** Team mode: the system prompt tells the model to split work across agents (also on at max effort). */
+  autoAgents?: boolean
   persist?: (state: RunnerSnapshot) => void
   systemExtra?: string
   initial?: { messages?: Message[]; plan?: PlanItem[]; usage?: Usage }
@@ -232,6 +238,8 @@ export class SessionRunner {
   private toolCallCount = 0
   private startedAt = 0
   private memoryFacts: MemoryFact[] = []
+  /** Bounded wiki briefing from the project memory (pages + open handoffs). */
+  private projectMemoryBrief = ''
   private sessionStartContext: string[] | null = null
   /** Directories holding spilled tool output; read-only tools may open files there. */
   private readonly spillRoots: string[] = []
@@ -401,7 +409,9 @@ export class SessionRunner {
       workspace: deps.workspace,
       tracker: deps.tracker,
       project: deps.project,
-      services: deps.services
+      services: deps.services,
+      autoAgents: deps.autoAgents,
+      createAgent: deps.createAgent
     }
   }
 
@@ -415,10 +425,12 @@ export class SessionRunner {
       provider: this.deps.providerConfig.label,
       skills: this.deps.services.skills.list().map((s) => ({ name: s.name, description: s.description })),
       memory: this.memoryFacts,
+      projectMemory: this.projectMemoryBrief,
       agentsMd: loadProjectInstructions(this.deps.cwd),
       projectName: this.deps.project.name,
       gitBranch: this.deps.project.branch,
       isGitRepo: this.deps.project.isGitRepo,
+      teamMode: this.deps.effort === 'max' || Boolean(this.deps.autoAgents),
       extra: extra || undefined
     })
   }
@@ -428,6 +440,11 @@ export class SessionRunner {
       this.memoryFacts = await this.deps.services.memory.all()
     } catch {
       this.memoryFacts = []
+    }
+    try {
+      this.projectMemoryBrief = (await this.deps.services.projectMemory.brief()).text
+    } catch {
+      this.projectMemoryBrief = '(memória do projeto indisponível nesta sessão)'
     }
   }
 
@@ -542,6 +559,10 @@ export class SessionRunner {
         return deps.runSubagent(spec, this.callerInfo(signal))
       },
       agents: this.agentCatalog(),
+      createAgent: async (input) => {
+        if (!deps.createAgent) throw new Error('criação de agentes indisponível nesta sessão')
+        return deps.createAgent(input)
+      },
       log: (level, message) =>
         this.emit({
           type: 'audit',
@@ -673,13 +694,9 @@ export class SessionRunner {
                 })
                 break
               case 'tool_call_start':
-                this.emit({
-                  type: 'tool_start',
-                  sessionId: this.deps.sessionId,
-                  toolCallId: event.id,
-                  name: event.name,
-                  args: {}
-                })
+                // The `tool_start` event is emitted once, with arguments, right
+                // before execution. Emitting here too duplicated every card in
+                // the UI and every tool in the activity panel.
                 break
               case 'provider_blocks':
                 providerBlocks = { kind: event.kind, model: event.model, blocks: event.blocks }
@@ -843,8 +860,10 @@ export class SessionRunner {
         const changes = this.deps.tracker.changes()
         if (changes.length) this.emit({ type: 'diff', sessionId: this.deps.sessionId, files: changes })
 
-        // memory_write may have changed the facts shown in the system prompt.
-        if (toolCalls.some((c) => c.name === 'memory_write')) await this.refreshMemory()
+        // Memory tools may have changed what the system prompt shows next turn.
+        if (toolCalls.some((c) => c.name === 'memory_write' || c.name === 'memory_page' || c.name === 'memory_handoff')) {
+          await this.refreshMemory()
+        }
         stopReason = 'tool_use'
       }
       // Some local servers ignore tool_choice "none"; the loop then runs out

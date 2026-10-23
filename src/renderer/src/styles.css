@@ -1195,6 +1195,8 @@ a {
   min-height: 0;
   overflow: hidden;
   display: flex;
+  /* The transcript scrollbar must not shift the centered column. */
+  scrollbar-gutter: stable;
 }
 
 .transcript {
@@ -1207,7 +1209,7 @@ a {
 .thread {
   width: min(var(--thread), 100%);
   margin: 0 auto;
-  padding: 6px 24px 18px;
+  padding: 6px var(--thread-gutter) 18px;
 }
 
 /* ---- messages ---- */
@@ -1850,9 +1852,9 @@ a {
 .composer-dock {
   flex: 0 0 auto;
   width: 100%;
-  max-width: calc(var(--thread) + 48px);
+  max-width: var(--thread);
   margin: 0 auto;
-  padding: 0 24px 10px;
+  padding: 0 var(--thread-gutter) 10px;
 }
 
 .composer {
@@ -2134,9 +2136,9 @@ a {
 .approval-dock {
   flex: 0 0 auto;
   width: 100%;
-  max-width: calc(var(--thread) + 48px);
+  max-width: var(--thread);
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--thread-gutter);
 }
 
 .approval {
@@ -3571,19 +3573,12 @@ input[type='checkbox'] {
     max-width: 40vw;
   }
 
-  .composer-dock {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .thread {
+  .composer-dock,
+  .thread,
+  .approval-dock,
+  .plan-dock {
     padding-left: 18px;
     padding-right: 18px;
-  }
-
-  .approval-dock {
-    padding-left: 16px;
-    padding-right: 16px;
   }
 }
 
@@ -3597,6 +3592,9 @@ input[type='checkbox'] {
   --sidebar-w: 360px;
   --panel-w: 300px;
   --thread: 760px;
+  /* One gutter for every element of the chat column (thread, composer, plan,
+     approvals, queue, error bar). Keep them equal or the column looks off-center. */
+  --thread-gutter: 32px;
   --titlebar-h: 40px;
   --card: color-mix(in srgb, var(--elevated) 62%, var(--bg));
   --card-border: color-mix(in srgb, var(--border) 78%, transparent);
@@ -4052,7 +4050,7 @@ body {
 }
 
 .thread {
-  padding: 22px 32px 26px;
+  padding: 22px var(--thread-gutter) 26px;
 }
 
 .message {
@@ -4239,7 +4237,8 @@ body {
 
 .composer-dock {
   max-width: var(--thread);
-  padding: 0 24px 8px;
+  margin: 0 auto;
+  padding: 0 var(--thread-gutter) 8px;
 }
 
 .composer {
@@ -4451,8 +4450,8 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  max-width: calc(var(--thread) - 48px);
-  margin: 0 auto 6px;
+  max-width: none;
+  margin: 0 0 6px;
   padding: 6px 10px;
   border: 1px solid var(--card-border);
   border-radius: 10px;
@@ -5055,7 +5054,8 @@ button.env-row:hover {
 
 .approval-dock {
   max-width: var(--thread);
-  padding: 0 24px 8px;
+  margin: 0 auto;
+  padding: 0 var(--thread-gutter) 8px;
 }
 
 @media (max-width: 1240px) {
@@ -5075,7 +5075,10 @@ button.env-row:hover {
     --panel-w: 272px;
   }
 
-  .thread {
+  .thread,
+  .composer-dock,
+  .approval-dock,
+  .plan-dock {
     padding-left: 22px;
     padding-right: 22px;
   }
@@ -6568,7 +6571,7 @@ button.env-row:hover {
   right: auto;
   bottom: 112px;
   transform: translateX(-50%);
-  width: min(calc(var(--thread) - 48px), calc(100% - 48px));
+  width: min(calc(var(--thread) - 2 * var(--thread-gutter)), calc(100% - 2 * var(--thread-gutter)));
   z-index: 40;
 }
 
@@ -6647,7 +6650,7 @@ button.env-row:hover {
   width: 100%;
   max-width: var(--thread);
   margin: 0 auto -6px;
-  padding: 0 24px;
+  padding: 0 var(--thread-gutter);
   position: relative;
   z-index: 1;
 }
@@ -7103,3 +7106,14 @@ button.env-row:hover {
   background: var(--red);
   animation: forja-pulse 1s ease-in-out infinite;
 }
+
+/* Project memory (Settings > Memória) */
+.memory-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.memory-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--elevated); }
+.memory-title { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-title:hover { color: var(--accent); }
+.memory-meta { color: var(--text-3); font-size: 11px; flex: 0 0 auto; }
+.memory-preview { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--composer); }
+.memory-preview-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); }
+.memory-preview-head span { color: var(--text-3); font-size: 11px; font-family: monospace; }
+.memory-preview pre { margin: 0; padding: 10px 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.5; }

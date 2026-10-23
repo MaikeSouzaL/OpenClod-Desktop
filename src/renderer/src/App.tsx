@@ -30,6 +30,7 @@ import { PlanDock } from './components/PlanDock'
 import { reduceActivity, type ActivityState } from './lib/activity'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { SettingsDialog } from './components/SettingsDialog'
+import { DictationHost } from './components/DictationHost'
 import { HomeView } from './components/HomeView'
 import { CoworkView } from './components/CoworkView'
 import { ForjaMark, MenuPopover, Titlebar, type MenuItem, type PanelTab } from './components/Chrome'
@@ -127,6 +128,15 @@ export default function App(): ReactElement {
   /* ------------------------------- ui ------------------------------- */
   const [surface, setSurface] = useState<SessionSurface>('chat')
   const [composerSeed, setComposerSeed] = useState<{ id: string; text: string } | undefined>(undefined)
+  const [dictationInsert, setDictationInsert] = useState<{ id: string; text: string } | undefined>(undefined)
+
+  useEffect(
+    () =>
+      window.forja.dictation.onComposerInsert((text) => {
+        setDictationInsert({ id: logId(), text })
+      }),
+    []
+  )
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelTab, setPanelTab] = useState<PanelTab | null>(null)
   const [panelLayout, setPanelLayout] = useState<PanelLayout>(loadLayout)
@@ -1039,9 +1049,9 @@ export default function App(): ReactElement {
       skills={skills}
       contextPercent={contextPercent}
       effort={session ? (session.meta.effort ?? null) : defaultEffort}
-      voice={settings?.voice}
       workspaceName={activeProject?.name}
       seed={composerSeed}
+      insert={dictationInsert}
       onSend={(text, images) => send(text, images, { fresh: !session })}
       onQueue={enqueue}
       onRemoveQueued={removeQueued}
@@ -1279,6 +1289,7 @@ export default function App(): ReactElement {
         panelTab && panelLayout.maximized ? 'panel-maximized' : ''
       } panel-side-${panelLayout.side}`}
     >
+      <DictationHost voice={settings?.voice} />
       <Titlebar
         home={!session}
         sidebarOpen={sidebarOpen}
@@ -1460,6 +1471,7 @@ export default function App(): ReactElement {
             setSettingsTab(undefined)
           }}
           initialTab={settingsTab}
+          memoryProjectId={session?.meta.projectId ?? activeProject?.id}
           onSave={saveSettings}
           onRefreshCapabilities={refreshCapabilities}
         />

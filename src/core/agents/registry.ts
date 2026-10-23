@@ -16,6 +16,11 @@ export class AgentRegistry {
     for (const agent of agents) this.byName.set(agent.name, agent)
   }
 
+  /** Adds or replaces one definition in the live registry (create_agent / reloads). */
+  register(agent: AgentDefinition): void {
+    this.byName.set(agent.name, agent)
+  }
+
   get(name: string): AgentDefinition | undefined {
     return this.byName.get(name)
   }

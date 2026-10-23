@@ -1,9 +1,11 @@
-import workletUrl from './pcm-worklet.js?url'
-
 /**
  * Microphone capture for dictation: getUserMedia -> AudioContext at 16 kHz ->
  * AudioWorklet -> 100 ms int16 chunks. Chromium resamples the device stream to
  * the context's rate, so the chunks are exactly what the recognizer expects.
+ *
+ * The worklet is a static file (public/pcm-worklet.js), not a Vite `?url`
+ * import: small assets would be inlined as a data: URL, which the app's CSP
+ * blocks for scripts and Chromium refuses for AudioWorklet.addModule().
  */
 
 export interface MicChunk {
@@ -37,6 +39,7 @@ export async function startMic(onChunk: (chunk: MicChunk) => void, deviceId?: st
     }
   })
   const context = new AudioContext({ sampleRate: 16_000, latencyHint: 'interactive' })
+  const workletUrl = new URL('pcm-worklet.js', window.location.href).toString()
   try {
     await context.audioWorklet.addModule(workletUrl)
   } catch (error) {
@@ -72,52 +75,6 @@ export async function startMic(onChunk: (chunk: MicChunk) => void, deviceId?: st
 /* Text assembly                                                       */
 /* ------------------------------------------------------------------ */
 
-/**
- * Keeps the dictated text apart from what the user typed, so partial results
- * can be replaced as they improve without touching anything else.
- */
-export class Dictation {
-  private base = ''
-  private finals = ''
-  private partial = ''
-
-  /** `current` is the composer text when dictation begins. */
-  constructor(current: string) {
-    this.base = current
-  }
-
-  private join(left: string, right: string): string {
-    if (!left) return right
-    if (!right) return left
-    return /\s$/.test(left) ? `${left}${right}` : `${left} ${right}`
-  }
-
-  /** The text the composer should show right now. */
-  get text(): string {
-    return this.join(this.join(this.base, this.finals), this.partial)
-  }
-
-  setPartial(text: string): string {
-    this.partial = text.trim()
-    return this.text
-  }
-
-  addFinal(text: string): string {
-    const clean = text.trim()
-    this.partial = ''
-    if (clean) this.finals = this.join(this.finals, clean)
-    return this.text
-  }
-
-  /** The user edited the box by hand: what is there now becomes the new base. */
-  rebase(current: string): void {
-    this.base = current
-    this.finals = ''
-    this.partial = ''
-  }
-
-  /** True when `current` is not what dictation last wrote (the user typed or deleted). */
-  diverged(current: string): boolean {
-    return current !== this.text
-  }
-}
+// The text assembler is pure and lives in core; this re-export keeps the
+// renderer's imports stable.
+export { Dictation } from '../../../core/util/dictation.js'

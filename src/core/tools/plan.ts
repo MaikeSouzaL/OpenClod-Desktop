@@ -115,7 +115,7 @@ export const memoryWriteTool: ToolDef = {
 
 export const memorySearchTool: ToolDef = {
   name: 'memory_search',
-  description: 'Busca fatos salvos na memória do projeto.',
+  description: 'Busca fatos e páginas da memória de longo prazo do projeto.',
   risk: 'read',
   parallelSafe: true,
   schema: z.object({ query: z.string().min(1) }),
@@ -125,11 +125,18 @@ export const memorySearchTool: ToolDef = {
   },
   async execute(raw, ctx) {
     const args = this.schema.parse(raw) as { query: string }
-    const facts = await ctx.services.memory.search(args.query)
+    const [facts, pages] = await Promise.all([
+      ctx.services.memory.search(args.query),
+      ctx.services.projectMemory.search(args.query)
+    ])
+    const lines = [
+      ...pages.map((page) => `- [${page.slug}] ${page.title}: ${page.snippet}`),
+      ...facts.map((fact) => `- ${fact.text}`)
+    ]
     return {
       ok: true,
-      text: facts.length ? facts.map((f) => `- ${f.text}`).join('\n') : 'nenhum fato encontrado',
-      summary: `${facts.length} fatos`
+      text: lines.length ? lines.join('\n') : 'nenhum fato ou página encontrado',
+      summary: `${pages.length} páginas · ${facts.length} fatos`
     }
   }
 }

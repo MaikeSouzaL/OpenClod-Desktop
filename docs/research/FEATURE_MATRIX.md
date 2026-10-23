@@ -50,3 +50,24 @@ Decisão: **integrar** (dependência), **portar** (reimplementar conceito),
 | Editor de código embutido | custo alto, baixo retorno vs. diff viewer | visualização com números de linha + diff |
 | Remote/relay (acesso pelo celular) | fora do escopo desktop local | — |
 | Computer Use em macOS/Linux | backend nativo é Windows | camada abstrata pronta; `open-computer-use` cobre macOS |
+
+## Atualização 2026-10-23 (voz, memória e equipe)
+
+> As linhas acima são o retrato da primeira rodada. Esta seção registra o que foi
+> implementado e verificado depois dela; onde houver conflito, vale esta seção.
+
+| Recurso | Origem / decisão | Estado | Evidência |
+|---|---|---|---|
+| Ditado local com Whisper | faster-whisper + CTranslate2 + Silero VAD embutidos | **implementado** | `resources/stt/forja_stt.py`, `src/main/stt.ts`; teste real `tiny` carregou em 2,7 s e transcreveu |
+| Pílula flutuante estilo Wispr Flow | análise REA do app original; implementação própria | **implementado** | `src/main/dictation.ts`; UI verificada com `scripts/ui-mic-pill.cjs` |
+| Atalho global + botão de microfone no mesmo motor | requisito do usuário | **implementado** | `dictation-store.ts`, `DictationHost.tsx`; `scripts/ui-wispr.cjs` inseriu no compositor |
+| Inserção em qualquer app (clipboard + Ctrl+V) | comportamento observado no helper original | **implementado** | teste com Chrome: textarea recebeu `TESTE_EXTERNO_123` |
+| Polish opcional | comportamento observado (Wispr) | **implementado** | `Orchestrator.polishText`, opt-in em Configurações → Voz |
+| Memória por projeto (wiki markdown, briefing, handoffs) | modelo do ai-memory (MIT), implementação TS | **implementado** | `src/core/memory/project.ts`, `tools.ts`; 9 testes; UI Configurações → Memória |
+| Busca em fatos + páginas | requisito do usuário | **implementado** | `memory_search` consulta os dois stores |
+| Equipe / modo equipe | requisito do usuário | **implementado** | `settings.autoAgents` + esforço `max`; prompt "Modo equipe" |
+| `agent-smith` + `create_agent` | requisito do usuário | **implementado** | cria `<userData>/agents/<nome>.md`; teste E2E registrou e listou o agente na mesma sessão |
+| Pesquisa web em uma chamada | requisito do usuário | **implementado** | `web_research` (busca + lê fontes + URL por trecho); teste com fetch falso |
+| Edição cirúrgica por diff | requisito do usuário | **implementado** | `patch_file` (diff unificado) + `edit_file`; testes de aplicação, dry-run e recusa |
+| `CLAUDE.md` canônico criado automaticamente | requisito do usuário | **implementado** | `ensureProjectInstructions` em `context.ts`; chamado no init, addProject e ensureRunner; teste de não sobrescrita |
+| Coluna única centralizada | correção de UI | **implementado** | thread/composer/plano/aprovação/fila/erro com o mesmo gutter; `ui-work.cjs` mediu centros iguais |

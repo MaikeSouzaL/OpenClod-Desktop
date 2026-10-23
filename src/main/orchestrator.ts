@@ -22,12 +22,14 @@ import { FileTracker } from '../core/session/tracker.js'
 import { SettingsStore } from './settings.js'
 import { SkillLibrary } from '../core/skills/library.js'
 import { MemoryStore } from '../core/memory/store.js'
+import { ProjectMemory } from '../core/memory/project.js'
 import { BrowserLayer } from '../core/browser/layer.js'
 import { ComputerLayer } from '../core/computer/layer.js'
 import { ToolRegistry } from '../core/tools/registry.js'
 import type { ToolDef } from '../core/tools/types.js'
 import { createAgentRegistry, type AgentRegistry } from '../core/agents/registry.js'
 import { writeAgentFile } from '../core/agents/loader.js'
+import { agentForgeTools } from '../core/agents/tools.js'
 import { spawnAgent, type AgentRuntimeEnv } from '../core/agents/runtime.js'
 import { fsTools } from '../core/tools/fs.js'
 import { searchTools } from '../core/tools/search.js'
@@ -37,6 +39,7 @@ import { webTools } from '../core/tools/web.js'
 import { browserTools } from '../core/tools/browser.js'
 import { computerTools } from '../core/tools/computer.js'
 import { planTools } from '../core/tools/plan.js'
+import { projectMemoryTools } from '../core/memory/tools.js'
 import { SessionRunner } from '../core/agent/runner.js'
 import type { RunnerSnapshot } from '../core/agent/runner.js'
 import { createProvider, hasCredentials, resolveApiKey } from '../core/providers/index.js'
@@ -46,6 +49,7 @@ import { HookRunner } from '../core/hooks/runner.js'
 import { ApprovalStore, loadProjectSettings, mergeHooks } from '../core/config/project.js'
 import { McpClient, mcpQualifiedName, type McpServerConfig } from '../core/mcp/client.js'
 import { describeToolchains, toolchains } from '../core/util/toolchains.js'
+import { ensureProjectInstructions } from '../core/agent/context.js'
 import { listMcpPresets, type McpPresetInfo } from '../core/mcp/presets.js'
 import { discoverForProvider, type DiscoveryResult } from '../core/providers/discovery.js'
 import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/external-agent.js'
@@ -63,6 +67,8 @@ interface PendingApproval {
 export interface OrchestratorOptions {
   userData: string
   broadcast: (event: HarnessEvent) => void
+  /** Optional log sink (the main process writes to %APPDATA%\Forja\logs\main.log). */
+  log?: (message: string) => void
 }
 
 export class Orchestrator {
@@ -77,6 +83,7 @@ export class Orchestrator {
   private trackers = new Map<string, FileTracker>()
   private browsers = new Map<string, BrowserLayer>()
   private memories = new Map<string, MemoryStore>()
+  private projectMemories = new Map<string, ProjectMemory>()
   private persistTimers = new Map<string, NodeJS.Timeout>()
   private pending = new Map<string, PendingApproval>()
   private sessionAllow = new Map<string, Set<string>>()
@@ -124,6 +131,13 @@ export class Orchestrator {
   async init(): Promise<void> {
     await this.settings.init()
     await this.store.init()
+
+    // Every registered project gets the canonical CLAUDE.md if it is missing.
+    // Existing files are never touched.
+    for (const project of this.store.listProjects()) {
+      const created = ensureProjectInstructions(project.path, project.name)
+      if (created) this.options.log?.(`CLAUDE.md criado em ${created}`)
+    }
 
     const userSkills = path.join(this.options.userData, 'skills')
     await ensureStarterSkills(userSkills)
@@ -193,6 +207,7 @@ export class Orchestrator {
 
     const state = await this.store.loadSession(sessionId)
     if (!state) throw new Error(`sessão não encontrada: ${sessionId}`)
+    ensureProjectInstructions(state.meta.cwd)
     const settings = this.settings.get()
     const providerConfig =
       this.settings.providerConfig(state.meta.providerId) ??
@@ -217,6 +232,13 @@ export class Orchestrator {
       this.memories.get(sessionId) ??
       new MemoryStore(path.join(userDataPath(this.options.userData, 'data'), 'memory', `${state.meta.projectId}.json`))
     this.memories.set(sessionId, memory)
+
+    // One markdown wiki per project (not per session), shared by every agent
+    // and every model working in that project.
+    const projectMemory =
+      this.projectMemories.get(state.meta.projectId) ??
+      new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', state.meta.projectId))
+    this.projectMemories.set(state.meta.projectId, projectMemory)
 
     const workspace = new WorkspaceGuard([state.meta.cwd, ...(settings.policy.allowedRoots ?? [])].filter(Boolean))
     const project = this.store.listProjects().find((p) => p.id === state.meta.projectId)
@@ -243,7 +265,8 @@ export class Orchestrator {
         browser,
         computer: this.computer,
         skills: this.skills,
-        memory
+        memory,
+        projectMemory
       },
       project: {
         name: project?.name ?? path.basename(state.meta.cwd),
@@ -256,6 +279,8 @@ export class Orchestrator {
       emit: (event) => this.onEvent(event),
       approve: (request) => this.approve(request),
       agents,
+      autoAgents: Boolean(settings.autoAgents),
+      createAgent: (input) => this.createAgentFromTool(input, agents, state.meta.cwd),
       runSubagent: (spec, caller) => spawnAgent(agentEnv, caller, spec),
       persist: (snapshot) => this.persist(sessionId, snapshot),
       initial: { messages: state.messages, plan: state.plan, usage: state.usage },
@@ -305,6 +330,37 @@ export class Orchestrator {
     const file = writeAgentFile(dir, input.agent, { overwrite: input.overwrite })
     this.settingsChanged()
     return { path: file, listing: this.listAgents(input.cwd) }
+  }
+
+  /**
+   * Creates a specialist from the `create_agent` tool and registers it in the
+   * live session registry. Unlike the settings-screen helper above, this must
+   * NOT drop runners: the calling turn is still running.
+   */
+  async createAgentFromTool(
+    input: import('../core/tools/types.js').CreateAgentInput,
+    registry: AgentRegistry,
+    cwd?: string
+  ): Promise<{ path: string; agent: AgentDefinition }> {
+    const scope = input.scope === 'project' ? 'project' : 'user'
+    if (scope === 'project' && !cwd) throw new Error('agente de projeto exige uma pasta de projeto')
+    const dir = scope === 'project' ? path.join(cwd as string, '.forja', 'agents') : this.userAgentsDir()
+    const def: AgentDefinition = {
+      name: input.name,
+      description: input.description.trim(),
+      systemPrompt: input.systemPrompt.trim(),
+      mode: input.mode ?? 'code',
+      tools: input.tools,
+      canCall: input.canCall,
+      model: input.model,
+      effort: input.effort,
+      maxTurns: input.maxTurns,
+      source: scope
+    }
+    const file = writeAgentFile(dir, def)
+    const saved: AgentDefinition = { ...def, file }
+    registry.register(saved)
+    return { path: file, agent: saved }
   }
 
   /** What the agent runtime needs from the app: providers, the tool registry, events and approvals. */
@@ -661,6 +717,45 @@ export class Orchestrator {
     return { ok: true, detail: text.trim().slice(0, 120) || 'resposta vazia (mas a conexão funcionou)' }
   }
 
+  /**
+   * Optional dictation cleanup: one short, tool-less call to the default
+   * provider. It never throws and never blocks insertion — on any failure the
+   * raw transcription is returned unchanged.
+   */
+  async polishText(text: string): Promise<string> {
+    const raw = text.trim()
+    if (!raw) return raw
+    const settings = this.settings.get()
+    const config =
+      this.settings.providerConfig(settings.defaultProviderId) ??
+      settings.providers.find((provider) => provider.kind !== 'mock')
+    if (!config || config.kind === 'mock' || !hasCredentials(config, this.settings.resolver())) return raw
+
+    const provider = createProvider(config, this.settings.resolver())
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 20_000)
+    let out = ''
+    try {
+      for await (const event of provider.stream({
+        system:
+          'Você corrige texto ditado em português do Brasil. Corrija pontuação, acentuação e vícios de linguagem; preserve o sentido, nomes próprios, números, caminhos e comandos. Responda somente com o texto final, sem comentários e sem aspas.',
+        messages: [{ id: id('msg'), role: 'user', ts: Date.now(), parts: [{ type: 'text', text: raw }] }],
+        tools: [],
+        maxTokens: 1200,
+        temperature: 0.1,
+        signal: controller.signal
+      })) {
+        if (event.type === 'text_delta') out += event.text
+        if (event.type === 'end' && event.stopReason === 'error') return raw
+      }
+    } catch {
+      return raw
+    } finally {
+      clearTimeout(timer)
+    }
+    return out.trim() || raw
+  }
+
   /* ------------------------------- files --------------------------------- */
 
   async tree(root: string, depth = 2): Promise<Array<{ path: string; dir: boolean; size: number }>> {
@@ -717,7 +812,52 @@ export class Orchestrator {
   }
 
   async addProject(folder: string, name?: string): Promise<Project> {
-    return this.store.addProject(folder, name)
+    const project = await this.store.addProject(folder, name)
+    ensureProjectInstructions(project.path, project.name)
+    return project
+  }
+
+  /* ------------------------------- memory --------------------------------- */
+
+  private memoryForProject(projectId: string): ProjectMemory {
+    const existing = this.projectMemories.get(projectId)
+    if (existing) return existing
+    const memory = new ProjectMemory(
+      path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', projectId)
+    )
+    this.projectMemories.set(projectId, memory)
+    return memory
+  }
+
+  private requireProject(projectId: string): Project {
+    const project = this.store.listProjects().find((item) => item.id === projectId)
+    if (!project) throw new Error('projeto não encontrado')
+    return project
+  }
+
+  memoryStats(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['stats']>>> {
+    this.requireProject(projectId)
+    return this.memoryForProject(projectId).stats()
+  }
+
+  memoryList(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['listPages']>>> {
+    this.requireProject(projectId)
+    return this.memoryForProject(projectId).listPages()
+  }
+
+  memoryRead(projectId: string, slug: string): Promise<Awaited<ReturnType<ProjectMemory['readPage']>>> {
+    this.requireProject(projectId)
+    return this.memoryForProject(projectId).readPage(slug)
+  }
+
+  memoryDelete(projectId: string, slug: string): Promise<boolean> {
+    this.requireProject(projectId)
+    return this.memoryForProject(projectId).deletePage(slug)
+  }
+
+  memoryRoot(projectId: string): string {
+    this.requireProject(projectId)
+    return this.memoryForProject(projectId).root
   }
 }
 
@@ -737,6 +877,8 @@ function buildBaseRegistry(): ToolRegistry {
     .register(...browserTools)
     .register(...computerTools)
     .register(...planTools)
+    .register(...projectMemoryTools)
+    .register(...agentForgeTools)
     .register(...externalAgentTools)
 }
 

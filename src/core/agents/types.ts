@@ -9,9 +9,11 @@ import type { BrowserLayer } from '../browser/layer.js'
 import type { ComputerLayer } from '../computer/layer.js'
 import type { HookRunner } from '../hooks/runner.js'
 import type { MemoryStore } from '../memory/store.js'
+import type { ProjectMemory } from '../memory/project.js'
 import type { WorkspaceGuard } from '../security/policy.js'
 import type { SkillLibrary } from '../skills/library.js'
-import type { Tracker } from '../tools/types.js'
+import type { CreateAgentInput, Tracker } from '../tools/types.js'
+import type { AgentDefinition } from '../../shared/types.js'
 
 // The definition types live in shared/types.ts so the renderer can use them.
 export type { AgentDefinition, AgentLoadWarning, AgentSource, AgentsListing } from '../../shared/types.js'
@@ -51,5 +53,10 @@ export interface SubagentCaller {
     computer: ComputerLayer
     skills: SkillLibrary
     memory: MemoryStore
+    projectMemory: ProjectMemory
   }
+  /** Team mode toggle (also forced by effort "max"). */
+  autoAgents?: boolean
+  /** Writes a new specialist and registers it in the caller's registry. */
+  createAgent?: (input: CreateAgentInput) => Promise<{ path: string; agent: AgentDefinition }>
 }

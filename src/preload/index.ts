@@ -78,6 +78,29 @@ const api: ForjaApi = {
       return () => ipcRenderer.removeListener(CH.sttEvent, listener)
     }
   },
+  dictation: {
+    onToggle: (callback) => {
+      const listener = (): void => callback()
+      ipcRenderer.on(CH.dictationToggle, listener)
+      return () => ipcRenderer.removeListener(CH.dictationToggle, listener)
+    },
+    onComposerInsert: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { text?: string }): void => {
+        if (typeof payload?.text === 'string') callback(payload.text)
+      }
+      ipcRenderer.on(CH.dictationComposer, listener)
+      return () => ipcRenderer.removeListener(CH.dictationComposer, listener)
+    },
+    state: (state) => ipcRenderer.send(CH.dictationState, state),
+    insert: (text) => call(CH.dictationInsert, text)
+  },
+  memory: {
+    status: (projectId) => call(CH.memoryStatus, projectId),
+    list: (projectId) => call(CH.memoryList, projectId),
+    read: (projectId, slug) => call(CH.memoryRead, projectId, slug),
+    delete: (projectId, slug) => call(CH.memoryDelete, projectId, slug),
+    open: (projectId) => call(CH.memoryOpen, projectId)
+  },
   power: {
     keepAwake: (enabled) => call(CH.powerKeepAwake, enabled),
     state: () => call(CH.powerState)

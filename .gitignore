@@ -10,6 +10,7 @@ release/
 coverage/
 tmp/
 .forja/
+*.tsbuildinfo
 # clones de estudo (cada um tem o próprio .git e a própria licença)
 repositorios/*/
 

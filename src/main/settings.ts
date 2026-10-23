@@ -73,6 +73,7 @@ export function defaultSettings(): AppSettings {
     limits: { ...DEFAULT_LIMITS },
     theme: 'dark',
     telemetry: false,
+    autoAgents: false,
     mcpServers: [],
     hooks: {},
     importClaudeSettings: false,

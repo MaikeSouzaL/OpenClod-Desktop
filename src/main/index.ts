@@ -2,13 +2,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, Notification, powerSaveBlocker, session as electronSession, shell, type IpcMainInvokeEvent } from 'electron'
 import { Orchestrator } from './orchestrator.js'
+import { DictationController } from './dictation.js'
+import { SttService } from './stt.js'
+import { defaultSettings } from './settings.js'
 import { TerminalManager, availableShells } from './terminal.js'
 import { detectDevServers, startDevServer } from './preview.js'
 import { searchProjectFiles, writeProjectFile } from './project-files.js'
 import { backgroundProcessOutput, listBackgroundProcesses, stopBackgroundProcess } from '../core/tools/shell.js'
 import { gitFileDiff, gitStatus } from '../core/git/service.js'
 import { Scheduler, type ScheduledTask } from '../core/scheduler/scheduler.js'
-import { CH, type AppVersions, type CreateSessionInput, type ProviderPresetInfo } from '../shared/api.js'
+import { CH, type AppVersions, type CreateSessionInput, type ProviderPresetInfo, type SttStartOptions } from '../shared/api.js'
 import {
   AGENT_MODES,
   REASONING_EFFORTS,
@@ -32,6 +35,21 @@ let mainWindow: BrowserWindow | null = null
 let orchestrator: Orchestrator | null = null
 const terminals = new TerminalManager((event) => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(CH.terminalEvent, event)
+})
+const stt = new SttService({
+  emit: (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(CH.sttEvent, event)
+  },
+  log: (scope, message) => log(scope, message)
+})
+const dictation = new DictationController({
+  getSettings: () => orchestrator?.settings.get() ?? defaultSettings(),
+  sendToRenderer: (channel, payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+  },
+  isForjaFocused: () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+  polish: (text) => (orchestrator ? orchestrator.polishText(text) : Promise.resolve(text)),
+  log: (scope, message) => log(scope, message)
 })
 let closing = false
 let keepAwakeId: number | null = null
@@ -220,13 +238,19 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   }
 
   if (input.theme === 'light' || input.theme === 'dark') patch.theme = input.theme
+  if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
 
   if (input.voice && typeof input.voice === 'object') {
     const model = String(input.voice.model ?? 'base')
     const language = String(input.voice.language ?? 'pt')
+    const shortcut = typeof input.voice.shortcut === 'string' ? input.voice.shortcut.trim().slice(0, 40) : 'Control+Alt+Space'
     patch.voice = {
       model: /^[a-z0-9][a-z0-9._-]{0,40}$/i.test(model) ? model : 'base',
-      language: /^([a-z]{2,3}|auto)$/.test(language) ? language : 'pt'
+      language: /^([a-z]{2,3}|auto)$/.test(language) ? language : 'pt',
+      shortcut: /^[A-Za-z0-9+ ]{3,40}$/.test(shortcut) ? shortcut : 'Control+Alt+Space',
+      mode: input.voice.mode === 'hold' ? 'hold' : 'toggle',
+      polish: Boolean(input.voice.polish),
+      insert: input.voice.insert === 'composer' ? 'composer' : 'focused'
     }
   }
   return patch
@@ -269,7 +293,7 @@ function sanitizeHooks(raw: unknown): HooksConfig {
 /* IPC plumbing                                                        */
 /* ------------------------------------------------------------------ */
 
-function trustedSender(event: IpcMainInvokeEvent): boolean {
+function trustedSender(event: { sender: { id: number } }): boolean {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event.sender.id === mainWindow.webContents.id)
 }
 
@@ -332,6 +356,9 @@ function createWindow(): void {
       webSecurity: true,
       allowRunningInsecureContent: false,
       spellcheck: false,
+      // Dictation must keep the microphone and audio worklet alive when the
+      // window is in the background (the user is typing in another app).
+      backgroundThrottling: false,
       devTools: true,
       webviewTag: true
     }
@@ -405,6 +432,8 @@ async function cleanup(): Promise<void> {
   if (cleanedUp) return
   cleanedUp = true
   terminals.killAll()
+  stt.dispose()
+  dictation.dispose()
   scheduler?.stop()
   if (keepAwakeId !== null && powerSaveBlocker.isStarted(keepAwakeId)) powerSaveBlocker.stop(keepAwakeId)
   try {
@@ -514,6 +543,7 @@ function registerIpc(): void {
     const next = await need().settings.update(patch)
     need().settingsChanged()
     if (patch.mcpServers) await need().restartMcp()
+    if (patch.voice) dictation.register(next.voice?.shortcut ?? 'Control+Alt+Space')
     return next
   })
   handle(CH.appSetSecret, async (providerId, value) => {
@@ -743,6 +773,53 @@ function registerIpc(): void {
   })
   handle(CH.tasksStop, async (sessionId, pid) => stopBackgroundProcess(str(sessionId, 'sessionId', 80), Number(pid)))
 
+  handle(CH.sttStatus, async () => stt.status())
+  handle(CH.sttStart, async (options) => stt.start((options ?? {}) as SttStartOptions))
+  handle(CH.sttStop, async () => stt.stop())
+  handle(CH.dictationInsert, async (text) => {
+    const raw = str(text, 'texto', 20_000)
+    const polished = await dictation.polish(raw)
+    return dictation.insert(polished)
+  })
+  ipcMain.on(CH.dictationState, (event, raw) => {
+    if (!trustedSender(event) || !raw || typeof raw !== 'object') return
+    const state = raw as { phase?: unknown; level?: unknown; text?: unknown; error?: unknown }
+    const phase =
+      state.phase === 'loading' || state.phase === 'listening' || state.phase === 'processing' || state.phase === 'error'
+        ? state.phase
+        : 'idle'
+    dictation.update({
+      phase,
+      level: Number(state.level) || 0,
+      text: typeof state.text === 'string' ? state.text.slice(0, 2000) : undefined,
+      error: typeof state.error === 'string' ? state.error.slice(0, 500) : undefined
+    })
+  })
+
+  handle(CH.memoryStatus, async (projectId) => need().memoryStats(str(projectId, 'projectId', 80)))
+  handle(CH.memoryList, async (projectId) => need().memoryList(str(projectId, 'projectId', 80)))
+  handle(CH.memoryRead, async (projectId, slug) =>
+    need().memoryRead(str(projectId, 'projectId', 80), str(slug, 'slug', 80))
+  )
+  handle(CH.memoryDelete, async (projectId, slug) =>
+    need().memoryDelete(str(projectId, 'projectId', 80), str(slug, 'slug', 80))
+  )
+  handle(CH.memoryOpen, async (projectId) => {
+    const root = need().memoryRoot(str(projectId, 'projectId', 80))
+    fs.mkdirSync(root, { recursive: true })
+    const error = await shell.openPath(root)
+    if (error) throw new Error(error)
+    return true
+  })
+  ipcMain.on(CH.sttAudio, (event, pcm) => {
+    if (!trustedSender(event)) return
+    if (pcm instanceof ArrayBuffer) {
+      stt.audio(pcm)
+      return
+    }
+    if (ArrayBuffer.isView(pcm)) stt.audio(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
+  })
+
   handle(CH.powerState, async () => keepAwakeId !== null && powerSaveBlocker.isStarted(keepAwakeId))
   handle(CH.powerKeepAwake, async (enabled) => {
     if (enabled) {
@@ -865,7 +942,11 @@ if (!gotLock) {
     // Pages shown in the browser pane get no device or notification access.
     preview.setPermissionRequestHandler((_contents, permission, callback) => callback(permission === 'clipboard-sanitized-write' || permission === 'fullscreen'))
     preview.setPermissionCheckHandler((_contents, permission) => permission === 'clipboard-sanitized-write' || permission === 'fullscreen')
-    orchestrator = new Orchestrator({ userData: app.getPath('userData'), broadcast })
+    orchestrator = new Orchestrator({
+      userData: app.getPath('userData'),
+      broadcast,
+      log: (message) => log('orchestrator', message)
+    })
     try {
       await orchestrator.init()
       for (const change of orchestrator.settings.migrations) log('settings', `migração: ${change}`)
@@ -878,6 +959,7 @@ if (!gotLock) {
     }
     registerIpc()
     createWindow()
+    dictation.register(orchestrator?.settings.get().voice?.shortcut ?? 'Control+Alt+Space')
 
     try {
       scheduler = new Scheduler(path.join(app.getPath('userData'), 'schedules.json'))

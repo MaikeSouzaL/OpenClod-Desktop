@@ -7,6 +7,7 @@ import type {
   HarnessEvent,
   PlanItem,
   PolicyConfig,
+  ReasoningEffort,
   RiskLevel,
   ToolResult,
   ToolSpec,
@@ -17,6 +18,7 @@ import type { BrowserLayer } from '../browser/layer.js'
 import type { ComputerLayer } from '../computer/layer.js'
 import type { SkillLibrary } from '../skills/library.js'
 import type { MemoryStore } from '../memory/store.js'
+import type { ProjectMemory } from '../memory/project.js'
 
 export interface Tracker {
   markRead(path: string): void
@@ -48,6 +50,20 @@ export interface SubagentOutcome {
   usage?: Usage
 }
 
+/** Input for the `create_agent` tool: a new specialist saved as markdown. */
+export interface CreateAgentInput {
+  name: string
+  description: string
+  systemPrompt: string
+  tools?: string[]
+  canCall?: string[] | '*'
+  mode?: AgentMode
+  model?: string
+  effort?: ReasoningEffort
+  maxTurns?: number
+  scope?: 'user' | 'project'
+}
+
 /** The agents the current caller may delegate to, as the tools see them. */
 export interface AgentCatalog {
   /** Level of the caller: 0 for the user's session. */
@@ -72,11 +88,14 @@ export interface ToolContext {
   setPlan(items: PlanItem[]): void
   runSubagent(spec: SubagentSpec): Promise<SubagentOutcome>
   agents: AgentCatalog
+  /** Writes a new specialist to the user's agents folder and registers it now. */
+  createAgent(input: CreateAgentInput): Promise<{ path: string; agent: AgentDefinition }>
   services: {
     browser: BrowserLayer
     computer: ComputerLayer
     skills: SkillLibrary
     memory: MemoryStore
+    projectMemory: ProjectMemory
   }
   log(level: 'info' | 'warn' | 'error', message: string): void
 }

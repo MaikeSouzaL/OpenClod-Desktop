@@ -22,6 +22,8 @@ foram conferidos individualmente.
 | Claw Code Local | github.com/codetwentyfive/claw-code-local | **sem licença** | Rust | 314 | ativo (push 2026-09-17) | **não reutilizável** (all rights reserved) |
 | Mcp.ComputerUse | github.com/tdav/Mcp.ComputerUse | **sem licença** | C# | 52 | v0.1.0, 0 estrelas | **não reutilizável** (all rights reserved) |
 | open-computer-use | github.com/opensymph/open-computer-use | MIT | Swift/Go/TS | 271 | ativo (push 2026-10-17), v1.3.0 | **integrado** (backend de Computer Use) |
+| ai-memory | github.com/akitaonrails/ai-memory | MIT | Rust | 1.257 | ativo (v3.2.2, commit `1bd8663`) | **modelo implementado nativamente** (wiki markdown + handoffs por projeto); binário oficial opcional por MCP |
+| Wispr Flow | wisprflow.ai (instalador + payload) | proprietário | Electron + .NET | 963 no payload | v1.6.1253 | **só comportamento observável** via REA; nenhum código copiado |
 
 ## Detalhes por projeto
 
@@ -247,6 +249,39 @@ anterior estão marcadas com **(corrige)**.
 - Integração recomendada no Forja: MCP stdio pelo `McpClient` existente, com
   filtro de ferramentas (leitura liberada; `capture_electron_scenario` só com
   aprovação) e timeout maior (≥ 180 s).
+
+### F. ai-memory (`akitaonrails/ai-memory`)
+
+- **O que é:** binário Rust único de memória de longo prazo para agentes, com
+  wiki markdown em git como fonte da verdade, SQLite FTS5 como índice derivado,
+  captura por hooks, 24 ferramentas MCP, handoffs claim-once e isolamento por
+  `(workspace, project, path)`. MIT, v3.2.2.
+- **O que foi aproveitado:** o *modelo* (wiki markdown por projeto, índice
+  reconstruível, briefing limitado, busca, páginas e handoffs claim-once) foi
+  implementado em TypeScript em `src/core/memory/project.ts` e
+  `src/core/memory/tools.ts`; a UI está em Configurações → Memória.
+- **O que não foi copiado:** o código Rust, o servidor HTTP, o SQLite/FTS5, o
+  aging por decay e a consolidação por LLM. O binário oficial pode ser ligado
+  como servidor MCP (`ai-memory mcp-bridge`), documentado em
+  [`AI_MEMORY.md`](AI_MEMORY.md).
+- **Limitação registrada:** a busca do Forja é lexical (sem BM25/vetores) e não
+  há captura automática de cada tool call nesta versão.
+
+### G. Wispr Flow (`wispr-flow` / `WisprFlowInstaller.exe`)
+
+- **O que é:** app proprietário de ditado (Electron 42 + helper .NET), com
+  atalho global, pílula flutuante, transcrição em streaming (Opus/WebSocket),
+  polish por LLM e inserção via UI Automation/clipboard. Distribuição Squirrel;
+  instalador .NET NativeAOT baixa o payload de `dl.wisprflow.com`.
+- **Como foi estudado:** REA 6.4.0 (artefato/PE), 7-Zip, leitura estática do
+  `app.asar` (131 MB) e strings do helper. Evidências em
+  [`WISPR_FLOW.md`](WISPR_FLOW.md).
+- **O que foi implementado:** atalho global configurável, pílula always-on-top,
+  microfone + Whisper local, inserção no compositor ou em qualquer app
+  (clipboard + Ctrl+V), polish opcional e o mesmo fluxo no botão de microfone.
+- **O que foi descartado:** código/ícones/prompts proprietários, backend em
+  nuvem, telemetria Sentry/PostHog, auth Supabase/WorkOS e o helper .NET. O
+  modo "segurar" fica pendente de um hook nativo de teclado.
 
 ## O que foi deliberadamente descartado
 

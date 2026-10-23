@@ -78,6 +78,36 @@ redistribuição das fontes. O texto integral está em
 <https://openfontlicense.org/open-font-license-official-text/>. As fontes são
 usadas apenas na interface do Forja e não foram modificadas.
 
+## 4.1 Runtime de voz embarcado (`resources/`)
+
+Distribuído para o ditado local (Whisper) e ferramentas nativas. Versões,
+tamanhos e hashes estão em `resources/MANIFEST.json`.
+
+| Componente | Licença | Uso |
+|---|---|---|
+| Python 3.10 embutido | **PSF-2.0** | Runtime do sidecar de reconhecimento de voz. |
+| faster-whisper 1.2.1 | **MIT** | Inferência Whisper em CTranslate2. |
+| CTranslate2 4.7.1 | **MIT** | Backend de inferência. |
+| Silero VAD (ONNX, via faster-whisper) | **MIT** | Detecção de fala no streaming. |
+| Modelos `tiny`, `base`, `small` (Systran/faster-whisper-*) | **MIT** | Pesos locais; nenhum áudio é enviado a terceiros. |
+| PyAV, onnxruntime, tokenizers, huggingface-hub, numpy e demais dependências | Licenças declaradas no `MANIFEST.json` (MIT/Apache/BSD) | Dependências do sidecar. |
+| open-computer-use 1.3.0 | **MIT** | Backend de Computer Use (Go). |
+| ripgrep 14.1.1 | **MIT OR Unlicense** | Busca de arquivos. |
+
+## 4.2 Projetos estudados sem código incorporado
+
+| Projeto | Licença | Como foi usado |
+|---|---|---|
+| [ai-memory](https://github.com/akitaonrails/ai-memory) | **MIT** | Estudo do modelo (wiki markdown por projeto, índice derivado, briefing, handoffs claim-once). A implementação do Forja é independente, em TypeScript; nenhum código Rust foi copiado. O binário oficial pode ser ligado como MCP. |
+| [Wispr Flow](https://wisprflow.ai) | **Proprietário** | Análise de comportamento com REA (instalador, `app.asar`, helper .NET). Nenhum código, ícone, fonte, prompt ou artefato foi copiado; o ditado do Forja é uma implementação independente. |
+| [opencode](https://github.com/anomalyco/opencode) | MIT | Referência de padrões; trechos adaptados estão identificados no código. |
+| [openharness](https://github.com/pokkai/openharness) | MIT | Referência de hooks, permissões e compactação; sem código copiado. |
+| [cdesktop](https://github.com/cdesktop-ai/cdesktop) | Apache-2.0 | Referência de UX e executores; sem código copiado. |
+| [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | MIT | Referência de plugins/eventos; sem código copiado. |
+| [REA](https://github.com/morluto/rea) | MIT | Ferramenta de análise usada no estudo; preset MCP opcional. |
+| [claw-code-local](https://github.com/codetwentyfive/claw-code-local) | Sem licença | Apenas conceitos (hooks exit 2/JSON, deny > ask > allow); nenhum código. |
+| [Mcp.ComputerUse](https://github.com/tdav/Mcp.ComputerUse) | Sem licença | Apenas ideias de DPI/coordenadas; nenhum código. |
+
 ## 5. Marcas e código proprietário
 
 - **Nenhum código-fonte, logo, ícone ou arquivo de fonte proprietário da

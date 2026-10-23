@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { applyPatch } from 'diff'
 import { z } from 'zod'
 import type { FileChange, ToolResult } from '../../shared/types.js'
 import type { ToolDef } from './types.js'
@@ -221,6 +222,67 @@ export const editFileTool: ToolDef = {
   }
 }
 
+/**
+ * Applies a unified diff to one existing file. This is the surgical path for
+ * fixes: the model quotes only the hunks that change, instead of rewriting the
+ * whole file. The patch is applied atomically and only when it applies cleanly.
+ */
+export const patchFileTool: ToolDef = {
+  name: 'patch_file',
+  description:
+    'Aplica um diff unificado (---/+++/@@) a um arquivo existente, alterando apenas os trechos do patch. Use para corrigir erros sem reescrever o arquivo inteiro. Leia o arquivo antes. dry_run valida sem gravar.',
+  risk: 'write',
+  parallelSafe: false,
+  schema: z.object({
+    path: z.string().describe('Arquivo existente'),
+    patch: z.string().min(10).max(500_000).describe('Diff unificado com cabeçalhos ---/+++ e hunks @@'),
+    dry_run: z.boolean().optional().describe('Só valida o patch, sem gravar')
+  }),
+  describe(a) {
+    const args = a as { path?: string; patch?: string }
+    const firstHunk = (args.patch ?? '').split('\n').find((line) => line.startsWith('@@')) ?? ''
+    return { title: 'Aplicar patch', detail: `${args.path ?? ''} ${firstHunk}`.trim(), preview: args.path }
+  },
+  async execute(raw, ctx): Promise<ToolResult> {
+    const args = this.schema.parse(raw) as { path: string; patch: string; dry_run?: boolean }
+    const target = ctx.workspace.resolve(args.path, ctx.cwd)
+    if (!fs.existsSync(target)) return { ok: false, text: `arquivo não encontrado: ${args.path}` }
+    if (!ctx.tracker.hasRead(target)) return { ok: false, text: `leia ${args.path} antes de aplicar o patch` }
+    const before = await fs.promises.readFile(target, 'utf8')
+    let after: string | false
+    try {
+      after = applyPatch(before, args.patch)
+    } catch (err) {
+      return { ok: false, text: `patch inválido: ${(err as Error).message}` }
+    }
+    if (after === false) {
+      return {
+        ok: false,
+        text: `o patch não se aplica a ${args.path}. Confira os cabeçalhos e o contexto (o arquivo pode ter mudado); leia o trecho e gere um patch novo.`
+      }
+    }
+    if (after === before) return { ok: false, text: 'o patch não altera o arquivo (mesmo conteúdo).' }
+    if (args.dry_run) {
+      return {
+        ok: true,
+        text: `patch válido para ${args.path}; prévia:\n${after.slice(0, 4000)}`,
+        summary: 'patch validado (dry-run)',
+        data: { path: target, dryRun: true }
+      }
+    }
+    await fs.promises.writeFile(target, after, 'utf8')
+    ctx.tracker.recordChange(target, before, after)
+    const changed = after.split('\n').filter((line, index) => line !== before.split('\n')[index]).length
+    return {
+      ok: true,
+      text: `patch aplicado em ${args.path} (${changed} linha(s) alterada(s))`,
+      files: [target],
+      summary: `patch em ${path.basename(target)}`,
+      data: { path: target, changed }
+    }
+  }
+}
+
 export const listDirTool: ToolDef = {
   name: 'list_dir',
   description: 'Lista arquivos e diretórios. Ignora node_modules, .git e diretórios de build.',
@@ -304,7 +366,7 @@ export const deletePathTool: ToolDef = {
   }
 }
 
-export const fsTools: ToolDef[] = [readFileTool, writeFileTool, editFileTool, listDirTool, deletePathTool]
+export const fsTools: ToolDef[] = [readFileTool, writeFileTool, editFileTool, patchFileTool, listDirTool, deletePathTool]
 
 /** Utility shared with tests. */
 export function diffStat(changes: FileChange[]): string {

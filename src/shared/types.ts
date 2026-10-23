@@ -543,6 +543,8 @@ export interface AppSettings {
   limits: HarnessLimits
   theme: 'dark' | 'light'
   telemetry: false
+  /** Team mode: split work across specialist agents (also on at max effort). */
+  autoAgents?: boolean
   mcpServers: McpServerSettings[]
   /** User-level hooks (Claude Code format). */
   hooks?: HooksConfig
@@ -552,8 +554,19 @@ export interface AppSettings {
    * because project hooks run commands.
    */
   importClaudeSettings?: boolean
-  /** Dictation: Whisper model size and language ("auto" detects it). */
-  voice?: { model: string; language: string }
+  /** Dictation: Whisper model size, language and the Wispr-Flow-style behavior. */
+  voice?: {
+    model: string
+    language: string
+    /** Electron accelerator; default Control+Alt+Space. */
+    shortcut?: string
+    /** toggle = press to start, press again to insert; hold is reserved for a native key hook. */
+    mode?: 'toggle' | 'hold'
+    /** Send the final text through the current model to fix punctuation/filler (costs tokens). */
+    polish?: boolean
+    /** Where the final text goes when Forja is not focused. */
+    insert?: 'composer' | 'focused'
+  }
   /** Settings schema version, used for one-time migrations. */
   settingsVersion?: number
 }

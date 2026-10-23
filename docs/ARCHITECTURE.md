@@ -53,6 +53,8 @@ src/
       tracker.ts             arquivos lidos/alterados + diffs
     skills/library.ts        SKILL.md sob demanda
     memory/store.ts          fatos explícitos por projeto
+    memory/project.ts        wiki markdown + índice + briefing + handoffs por projeto
+    memory/tools.ts          memory_brief, memory_page, memory_handoff
     mcp/client.ts            cliente MCP stdio (filtros, aprovações, timeouts)
     mcp/presets.ts           preset do REA
     browser/layer.ts         Playwright (Chrome/Edge instalado)
@@ -60,7 +62,9 @@ src/
   shared/reasoning.ts        esforço de raciocínio por família de modelo
   main/                      Electron: janela, IPC, segredos, orquestração,
                              terminal PTY (terminal.ts), preview de dev server
-                             (preview.ts), arquivos do projeto, agendador
+                             (preview.ts), arquivos do projeto, agendador,
+                             voz (stt.ts: supervisor do Python/Whisper) e
+                             ditado global (dictation.ts: atalho + pílula)
   preload/                   ponte mínima (contextBridge)
   renderer/                  React 19 + Vite
 tests/                       Vitest (núcleo) + scripts de aceitação
@@ -122,10 +126,12 @@ interface ToolDef {
 `describe()` existe para que a aprovação mostre **exatamente** o que será feito
 (comando, caminho, URL) — e é esse `preview` que a política avalia.
 
-Catálogo atual: leitura/escrita/edição/listagem/remoção, grep/glob, execução de
-comando, processos em background, portas, git (status/diff/log/commit/checkout),
-web (fetch/search/download), browser (10 ferramentas), computer (12), plano,
-skills, memória e `task` (subagente).
+Catálogo atual: leitura/escrita/edição cirúrgica (`edit_file`, `patch_file`),
+listagem/remoção, grep/glob, execução de comando, processos em background,
+portas, git (status/diff/log/commit/checkout), web (fetch/search/research/
+download), browser (10 ferramentas), computer (14), plano, skills, memória
+(fatos + wiki + handoffs), `task` (subagente), `agent`/`list_agents` e
+`create_agent` (Agent Smith).
 
 ## 5. Permissões
 
@@ -149,8 +155,11 @@ não existe ferramenta que escreva em `PolicyConfig`.
 
 - **Contexto de trabalho:** histórico da sessão, truncado por ferramenta
   (saída de shell limitada, diff limitado, árvore de acessibilidade limitada).
-- **Contexto de projeto:** `AGENTS.md`/`FORJA.md`/`CLAUDE.md`, skills instaladas,
-  branch git, fatos de memória.
+- **Contexto de projeto:** `CLAUDE.md` é o arquivo canônico (lido primeiro);
+  `AGENTS.md`, `FORJA.md` e `.forja/AGENTS.md` continuam suportados e conteúdo
+  idêntico não é duplicado. `ensureProjectInstructions` cria um `CLAUDE.md`
+  modelo quando ele não existe, sem sobrescrever o arquivo do usuário. Também
+  entram skills instaladas, branch git, fatos e a wiki de memória do projeto.
 - **Compactação:** quando a estimativa ultrapassa 75% da janela, as mensagens
   antigas são resumidas por uma chamada sem ferramentas; se falhar, há fallback
   determinístico que preserva a última troca e os arquivos alterados. O corte
@@ -185,6 +194,22 @@ histórico e continua de onde parou, sinalizando que houve interrupção.
 
 Eventos `subagent` aparecem na UI. Escritas concorrentes no mesmo arquivo são
 serializadas por trava por caminho no processo principal.
+
+### 8.1 Modo equipe e criação dinâmica de agentes
+
+- Com `effort === 'max'` **ou** `settings.autoAgents === true`, o system prompt
+  recebe a seção "Modo equipe": dividir em subtarefas independentes, chamar
+  vários agentes no mesmo turno e consolidar/verificar o resultado.
+- `agent-smith` é um agente visível que estuda o caso e, quando nenhum agente
+  existente cobre o assunto, chama `create_agent`. A ferramenta grava um
+  arquivo markdown em `<userData>/agents/<nome>.md` (ou `.forja/agents` com
+  `scope: project`), valida a definição e a registra **no registry da sessão**
+  imediatamente; o agente criado pode ser chamado no passo seguinte.
+- O registro é o mesmo objeto compartilhado pelo runner e pelo runtime de
+  subagentes; criar um agente não derruba a sessão. Outras sessões o veem ao
+  reconstruir o registry (próximo turno/runner).
+- O catálogo é limitado por `canCall`, profundidade (`maxAgentDepth`), caps de
+  concorrência e repetição (`agents/limits.ts`).
 
 ## 9. Computer Use
 
@@ -248,7 +273,50 @@ simular um modelo real.
 - Execução de código não confiável em sandbox de SO (VM/container). O isolamento
   atual é de política + diretório, documentado como limitação.
 
-## 14. Build & packaging
+## 14. Voz e memória
+
+### 14.1 Ditado (Whisper local + fluxo Wispr Flow)
+
+```
+atalho global (main) ─┐
+botão de microfone ───┤→ dictation-toggle → DictationHost (renderer)
+                      │      ├─ getUserMedia + AudioWorklet 16 kHz
+                      │      ├─ window.forja.stt.audio() → SttService (main)
+                      │      │      └─ Python embutido + faster-whisper + Silero VAD
+                      │      └─ partial/final → dictation-store (UI) + pílula
+                      └─ stop → dictation:insert
+                             ├─ Forja em foco: dictation:composer → inserção no caret
+                             └─ outro app: clipboard + Ctrl+V (Sendable via PowerShell)
+```
+
+- `src/main/stt.ts` é o supervisor: resolve `resources/runtime/python`,
+  `resources/stt/forja_stt.py` e `resources/models/whisper`, fala JSON-line com
+  o sidecar e repassa eventos. O sidecar carrega o modelo uma vez e mantém
+  decoder/áudio em threads separadas.
+- A pílula é uma `BrowserWindow` transparente, always-on-top, `focusable:false`,
+  que não rouba o foco de quem está digitando.
+- O mesmo motor atende atalho e botão de microfone (`dictation-store.ts`), para
+  não existirem dois comportamentos.
+- Áudio e transcrição ficam na máquina. O "polish" é opt-in e usa o provedor
+  padrão; sem ele, nenhum texto sai do processo por causa do ditado.
+
+### 14.2 Memória por projeto
+
+- `ProjectMemory` (uma instância por `projectId`): `wiki/<slug>.md` é a fonte da
+  verdade; `index.json` é derivado e reconstruído quando a pasta muda;
+  `handoffs.json` guarda handoffs claim-once.
+- O briefing (páginas fixadas + recentes + handoffs abertos, limitado a ~7k
+  caracteres) entra no system prompt e pode ser pedido com `memory_brief`.
+- Ferramentas: `memory_brief`, `memory_page` (write/read/list/delete) e
+  `memory_handoff` (begin/list/accept/cancel). `memory_search` consulta fatos e
+  páginas.
+- Isolamento: o diretório inclui o `projectId`; nenhuma leitura cruza projetos.
+  Conteúdo de página é dado não confiável, igual a qualquer resultado de
+  ferramenta.
+- O binário oficial `ai-memory` (Rust, MIT) pode ser ligado como MCP
+  (`ai-memory mcp-bridge`) para FTS5/vetores/decay; o Forja não depende dele.
+
+## 15. Build & packaging
 
 - `electron-vite build` gera `out/main` (Node/Electron), `out/preload` e
   `out/renderer` (React). O main externiza as dependências de produção, que vão
