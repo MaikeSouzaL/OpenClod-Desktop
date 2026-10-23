@@ -44,7 +44,7 @@ win:
   # automaticamente (buildResources: build). Descomente para EXIGIR o ícone —
   # nesse caso o build falha se o arquivo não existir.
   # icon: build/icon.ico
-  artifactName: Forja-Setup-${version}.${ext}
+  artifactName: Forja-${version}-setup.${ext}
 
 # Ícone da janela em produção: src/main/index.ts procura
 # process.resourcesPath/icon.png. Descomente quando build/icon.png existir.

@@ -323,8 +323,9 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
   em `node_modules` dentro do `asar`.
 - `electron-builder.yml` define o pacote: `appId com.forja.desktop`, produto
   `Forja`, alvo NSIS x64, saída em `release/` e artefato
-  `Forja-Setup-<versão>.exe`. O YAML tem precedência sobre o bloco `build` do
-  `package.json`.
+  `Forja-<versão>-setup.exe`. O electron-builder lê o bloco `build` do
+  `package.json`; o `electron-builder.yml` repete os mesmos campos para
+  referência (mantenha os dois em sincronia).
 - Ícones (`build/icon.ico`, `build/icon.png`) são opcionais: sem eles o build usa
   o ícone padrão do Electron e não falha (ver `build/README.md`).
 - Não há assinatura de código nem auto-update configurados; o instalador é por

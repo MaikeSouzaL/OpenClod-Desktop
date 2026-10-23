@@ -288,7 +288,7 @@ npm run dist:dir
 
 - `npm run build` executa `typecheck` antes do bundle. Se o typecheck falhar, o
   build para.
-- O instalador sai em `release/Forja-Setup-0.1.0.exe` com a configuração atual
+- O instalador sai em `release/Forja-0.1.0-setup.exe` com a configuração atual
   (`electron-builder.yml`).
 - Passo a passo detalhado, incluindo instalação limpa e desinstalação limpa:
   [`docs/INSTALL.md`](docs/INSTALL.md).
@@ -716,7 +716,7 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 
 - Build do código: `npm run build` → `out/main`, `out/preload`, `out/renderer`.
 - Empacotamento: `electron-builder.yml` (NSIS x64, `appId com.forja.desktop`,
-  artefato `release/Forja-Setup-<versão>.exe`).
+  artefato `release/Forja-<versão>-setup.exe`).
 - Ícones são opcionais: `build/icon.ico` (executável/instalador) e
   `build/icon.png` (janela). Sem eles, o build usa o ícone padrão do Electron.
   Veja `build/README.md`.
