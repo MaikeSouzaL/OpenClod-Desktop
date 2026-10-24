@@ -290,6 +290,10 @@ export interface MemoryPageInfo {
   pinned: boolean
   updated: string
   summary: string
+  /** `wiki` (native markdown) or `ai-memory` (indexed page). */
+  source?: 'wiki' | 'ai-memory'
+  /** AI-Memory page path when `source` is `ai-memory`. */
+  path?: string
 }
 
 export interface MemoryStatsInfo {
@@ -298,6 +302,10 @@ export interface MemoryStatsInfo {
   pinned: number
   openHandoffs: number
   updatedAt?: string
+  /** Pages currently returned by the AI-Memory index (native + transcripts). */
+  indexed?: number
+  /** Whether the AI-Memory sidecar answered. */
+  aiRunning?: boolean
 }
 
 export interface MemoryPageContent {
@@ -344,6 +352,7 @@ export const CH = {
   projectsList: 'projects:list',
   projectsAdd: 'projects:add',
   projectsRemove: 'projects:remove',
+  projectsDelete: 'projects:delete',
   projectsPick: 'projects:pick',
   projectsEnsureDefault: 'projects:ensureDefault',
 
@@ -361,6 +370,10 @@ export const CH = {
   sessionsImport: 'sessions:import',
   sessionsArchive: 'sessions:archive',
   sessionsCompact: 'sessions:compact',
+  inboxList: 'inbox:list',
+  inboxAdd: 'inbox:add',
+  inboxRemove: 'inbox:remove',
+  inboxClear: 'inbox:clear',
 
   filesTree: 'files:tree',
   filesRead: 'files:read',
@@ -397,6 +410,8 @@ export const CH = {
   memoryOpen: 'memory:open',
   memoryExport: 'memory:export',
   memoryImport: 'memory:import',
+  memoryRecall: 'memory:recall',
+  memoryAiStatus: 'memory:aiStatus',
   powerState: 'power:state',
 
   schedulesList: 'schedules:list',
@@ -461,6 +476,8 @@ export interface OpenclodApi {
     list(): Promise<IpcResult<Project[]>>
     add(folder: string, name?: string): Promise<IpcResult<Project>>
     remove(projectId: string): Promise<IpcResult<boolean>>
+    /** Deletes sessions, native wiki and the AI-Memory index (not the folder). */
+    delete(projectId: string): Promise<IpcResult<boolean>>
     pick(): Promise<IpcResult<string | null>>
     /** Returns the default workspace project used by Home when no project is open. */
     ensureDefault(): Promise<IpcResult<Project>>
@@ -471,7 +488,7 @@ export interface OpenclodApi {
     get(sessionId: string): Promise<IpcResult<SessionState>>
     delete(sessionId: string): Promise<IpcResult<boolean>>
     rename(sessionId: string, title: string): Promise<IpcResult<SessionState>>
-    send(sessionId: string, text: string, images?: ImagePart[]): Promise<IpcResult<boolean>>
+    send(sessionId: string, text: string, images?: ImagePart[], mode?: 'steer' | 'queue' | 'auto'): Promise<IpcResult<boolean>>
     abort(sessionId: string): Promise<IpcResult<boolean>>
     setMode(sessionId: string, mode: AgentMode): Promise<IpcResult<boolean>>
     setModel(sessionId: string, providerId: string, model: string): Promise<IpcResult<boolean>>
@@ -531,6 +548,10 @@ export interface OpenclodApi {
     delete(projectId: string, slug: string): Promise<IpcResult<boolean>>
     /** Opens the project's memory folder in Explorer. */
     open(projectId: string): Promise<IpcResult<boolean>>
+    /** Bounded recall from the project's AI-Memory index. */
+    recall(projectId: string, query: string, limit?: number): Promise<IpcResult<{ text: string; hits: number }>>
+    /** Sidecar status (binary, server, port, last error). */
+    aiStatus(): Promise<IpcResult<{ available: boolean; running: boolean; root: string; port?: number; error?: string }>>
     /** Saves every page as one Markdown bundle; returns the chosen path. */
     exportMarkdown(projectId: string): Promise<IpcResult<string | null>>
     /** Imports all .md files from a chosen folder as memory pages. */
@@ -548,7 +569,13 @@ export interface OpenclodApi {
     runNow(taskId: string): Promise<IpcResult<ScheduledTaskInfo>>
   }
   approvals: {
-    resolve(approvalId: string, approved: boolean, always?: boolean): Promise<IpcResult<boolean>>
+    resolve(approvalId: string, approved: boolean, always?: boolean, reason?: string): Promise<IpcResult<boolean>>
+  }
+  inbox: {
+    list(sessionId: string): Promise<IpcResult<Array<{ id: string; text: string; images: ImagePart[]; mode: 'steer' | 'queue'; origin: 'ui' | 'agent'; createdAt: number }>>>
+    add(sessionId: string, text: string, images?: ImagePart[], mode?: 'steer' | 'queue', origin?: 'ui' | 'agent'): Promise<IpcResult<{ id: string; text: string; images: ImagePart[]; mode: 'steer' | 'queue'; origin: 'ui' | 'agent'; createdAt: number }>>
+    remove(sessionId: string, itemId: string): Promise<IpcResult<boolean>>
+    clear(sessionId: string): Promise<IpcResult<boolean>>
   }
   mcp: {
     restart(): Promise<IpcResult<boolean>>

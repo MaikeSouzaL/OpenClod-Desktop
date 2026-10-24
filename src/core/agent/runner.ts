@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type {
   AgentMode,
+  ApprovalDecision,
   ApprovalRequest,
   HarnessEvent,
   HarnessLimits,
@@ -19,7 +20,7 @@ import type {
   Usage
 } from '../../shared/types.js'
 import type { ToolRegistry } from '../tools/registry.js'
-import type { AgentCatalog, CreateAgentInput, SubagentOutcome, SubagentSpec, ToolContext } from '../tools/types.js'
+import type { AgentCatalog, AiMemoryToolService, CreateAgentInput, SubagentOutcome, SubagentSpec, ToolContext } from '../tools/types.js'
 import type { FileTracker } from '../session/tracker.js'
 import { WorkspaceGuard } from '../security/policy.js'
 import type { BrowserLayer } from '../browser/layer.js'
@@ -200,12 +201,16 @@ export interface RunnerDeps {
     projectMemory: ProjectMemory
     /** Self-installation of MCP servers; absent in isolated harness tests. */
     mcp?: import('../tools/types.js').McpToolService
+    /** Project long-term index (AI-Memory); absent in isolated harness tests. */
+    aiMemory?: AiMemoryToolService
   }
   project: ProjectMeta
+  /** Id of the owning project, used as the AI-Memory scope. */
+  projectId?: string
   /** Lifecycle hooks (Claude Code settings format). */
   hooks?: HookRunner
   emit: (event: HarnessEvent) => void
-  approve: (request: ApprovalRequest) => Promise<boolean>
+  approve: (request: ApprovalRequest) => Promise<ApprovalDecision | boolean>
   /** Starts a subagent for the `agent` / `task` tools; `caller` describes this runner (see agents/runtime.ts). */
   runSubagent?: (spec: SubagentSpec, caller: SubagentCaller) => Promise<SubagentOutcome>
   /** Agent definitions this runner may delegate to. Without it the `agent` and `list_agents` tools are not offered. */
@@ -355,6 +360,8 @@ export class SessionRunner {
   private memoryFacts: MemoryFact[] = []
   /** Bounded wiki briefing from the project memory (pages + open handoffs). */
   private projectMemoryBrief = ''
+  /** Bounded recall from the project's AI-Memory index (recent + matches). */
+  private aiMemoryBrief = ''
   private sessionStartContext: string[] | null = null
   /** Directories holding spilled tool output; read-only tools may open files there. */
   private readonly spillRoots: string[] = []
@@ -399,6 +406,27 @@ export class SessionRunner {
 
   abort(): void {
     this.controller?.abort()
+  }
+
+  /**
+   * Injects a user instruction into the turn that is already running. The
+   * model sees it on the next iteration, without losing the work in progress.
+   */
+  steer(text: string): boolean {
+    if (!this.busy || !text.trim()) return false
+    this.addMessage({
+      id: id('msg'),
+      role: 'user',
+      ts: Date.now(),
+      parts: [{ type: 'text', text: `[instrução do usuário durante o turno]\n${text.trim()}` }]
+    })
+    this.emit({
+      type: 'audit',
+      sessionId: this.deps.sessionId,
+      level: 'info',
+      message: 'instrução injetada no turno em execução'
+    })
+    return true
   }
 
   /** Manual compaction triggered from the context panel. */
@@ -528,7 +556,8 @@ export class SessionRunner {
       hooks: deps.hooks,
       workspace: deps.workspace,
       tracker: deps.tracker,
-      project: deps.project,
+      project: { ...deps.project, name: deps.project.name },
+      projectId: deps.projectId,
       services: deps.services,
       autoAgents: deps.autoAgents,
       createAgent: deps.createAgent
@@ -547,6 +576,7 @@ export class SessionRunner {
       skills: this.deps.services.skills.list().map((s) => ({ name: s.name, description: s.description })),
       memory: this.memoryFacts,
       projectMemory: this.projectMemoryBrief,
+      longTermMemory: this.aiMemoryBrief,
       agentsMd: loadProjectInstructions(this.deps.cwd),
       projectName: this.deps.project.name,
       gitBranch: this.deps.project.branch,
@@ -556,7 +586,7 @@ export class SessionRunner {
     })
   }
 
-  private async refreshMemory(): Promise<void> {
+  private async refreshMemory(query = ''): Promise<void> {
     try {
       this.memoryFacts = await this.deps.services.memory.all()
     } catch {
@@ -566,6 +596,15 @@ export class SessionRunner {
       this.projectMemoryBrief = (await this.deps.services.projectMemory.brief()).text
     } catch {
       this.projectMemoryBrief = '(memória do projeto indisponível nesta sessão)'
+    }
+    try {
+      const projectId = this.deps.projectId
+      this.aiMemoryBrief =
+        projectId && this.deps.services.aiMemory
+          ? (await this.deps.services.aiMemory.recall(projectId, query, 8)).text
+          : ''
+    } catch {
+      this.aiMemoryBrief = ''
     }
   }
 
@@ -671,8 +710,12 @@ export class SessionRunner {
       signal,
       tracker: deps.tracker,
       services: deps.services,
+      projectId: deps.projectId,
       emit: (event) => this.emit(event),
-      approve: async (request) => deps.approve({ ...request, id: id('appr'), sessionId: deps.sessionId }),
+      approve: async (request) => {
+        const decision = await deps.approve({ ...request, id: id('appr'), sessionId: deps.sessionId })
+        return typeof decision === 'boolean' ? decision : decision.approved
+      },
       setPlan: (items) => {
         this.plan = items
         this.emit({ type: 'plan', sessionId: deps.sessionId, items })
@@ -731,7 +774,7 @@ export class SessionRunner {
     let fallbacksUsed = 0
 
     try {
-      await this.refreshMemory()
+      await this.refreshMemory(text)
 
       if (this.sessionStartContext === null) {
         const started = await this.runHook('SessionStart', { source: this.messages.length > 1 ? 'resume' : 'startup' })
@@ -1201,9 +1244,9 @@ export class SessionRunner {
       // A hook may skip the confirmation (allow) or demand one (ask), but it
       // never overrides a deny from the policy (credential locations included).
       if (evaluation.decision !== 'deny' && pre?.permissionDecision === 'allow') {
-        evaluation = { decision: 'allow', reason: 'aprovado por hook PreToolUse' }
+        evaluation = { ...evaluation, decision: 'allow', reason: 'aprovado por hook PreToolUse' }
       } else if (evaluation.decision === 'allow' && pre?.permissionDecision === 'ask') {
-        evaluation = { decision: 'ask', reason: 'hook PreToolUse pediu confirmação' }
+        evaluation = { ...evaluation, decision: 'ask', reason: 'hook PreToolUse pediu confirmação' }
       }
       if (evaluation.decision === 'deny') {
         results.set(call.id, { ok: false, text: `ação negada pela política: ${evaluation.reason}` })
@@ -1233,18 +1276,34 @@ export class SessionRunner {
           title: description.title,
           detail: description.detail || JSON.stringify(args).slice(0, 800),
           risk: tool.risk,
-          preview: description.preview
+          preview: description.preview,
+          action: evaluation.action,
+          resource: evaluation.resource,
+          effect: evaluation.effect
         }
-        const approved = await this.deps.approve(approval)
-        if (!approved) {
-          results.set(call.id, { ok: false, text: 'o usuário negou esta ação. Não tente contornar; proponha uma alternativa.' })
+        const rawDecision = await this.deps.approve(approval)
+        const decision = typeof rawDecision === 'boolean' ? { approved: rawDecision } : rawDecision
+        if (!decision.approved) {
+          const feedback = decision.reason?.trim()
+          results.set(call.id, {
+            ok: false,
+            text: feedback
+              ? `o usuário negou esta ação. Motivo informado: ${feedback}\nNão tente contornar; proponha uma alternativa que respeite o motivo.`
+              : 'o usuário negou esta ação. Não tente contornar; proponha uma alternativa.'
+          })
+          this.emit({
+            type: 'audit',
+            sessionId: this.deps.sessionId,
+            level: 'warn',
+            message: `ação negada: ${call.name}${feedback ? ` — ${feedback}` : ''}`
+          })
           this.emit({
             type: 'tool_end',
             sessionId: this.deps.sessionId,
             toolCallId: call.id,
             name: call.name,
             ok: false,
-            summary: 'negado pelo usuário'
+            summary: feedback ? `negado: ${feedback.slice(0, 120)}` : 'negado pelo usuário'
           })
           this.setState('tool')
           continue

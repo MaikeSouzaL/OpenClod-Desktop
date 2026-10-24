@@ -65,6 +65,20 @@ export const memoryPageTool: ToolDef = {
         pinned: args.pinned,
         source: 'agent'
       })
+      // Mirror curated pages into AI-Memory so their entities, links and
+      // full-text index are available to every model and every project scope.
+      if (ctx.projectId && ctx.services.aiMemory) {
+        await ctx.services.aiMemory
+          .writePage(ctx.projectId, {
+            path: `pages/${page.slug}.md`,
+            title: page.title,
+            body: args.body,
+            tags: page.tags,
+            pinned: page.pinned,
+            tier: 'semantic'
+          })
+          .catch(() => undefined)
+      }
       ctx.log('info', `memória: página ${page.slug} salva`)
       return {
         ok: true,
@@ -180,4 +194,42 @@ export const memoryHandoffTool: ToolDef = {
   }
 }
 
-export const projectMemoryTools: ToolDef[] = [memoryBriefTool, memoryPageTool, memoryHandoffTool]
+export const memoryRecallTool: ToolDef = {
+  name: 'memory_recall',
+  description: `${PAGE_INTRO} Busca no índice de longo prazo do projeto (AI-Memory): páginas, sessões antigas, decisões e links. Use antes de pedir contexto ao usuário.`,
+  risk: 'read',
+  parallelSafe: true,
+  schema: z.object({
+    query: z.string().min(1).max(300).describe('O que você precisa lembrar (assunto, arquivo, erro, decisão)'),
+    limit: z.number().int().min(1).max(20).optional().describe('Máximo de trechos (padrão 8)')
+  }),
+  describe(raw) {
+    const args = raw as { query?: string }
+    return { title: 'Lembrar do projeto', detail: args.query ?? '' }
+  },
+  async execute(raw, ctx): Promise<ToolResult> {
+    const args = this.schema.parse(raw) as { query: string; limit?: number }
+    const limit = args.limit ?? 8
+    if (ctx.projectId && ctx.services.aiMemory) {
+      const recall = await ctx.services.aiMemory.recall(ctx.projectId, args.query, limit)
+      if (recall.text) return { ok: true, text: recall.text, summary: `${recall.hits} trechos` }
+    }
+    // Fallback: the native lexical index still works when the sidecar is down.
+    const hits = await ctx.services.projectMemory.search(args.query, limit)
+    if (!hits.length) return { ok: true, text: 'Nada encontrado na memória deste projeto.', summary: '0 trechos' }
+    return {
+      ok: true,
+      text: hits
+        .map((hit) => `- ${hit.title} [${hit.slug}] ${hit.snippet.replace(/\s+/g, ' ').slice(0, 400)}`)
+        .join('\n'),
+      summary: `${hits.length} trechos`
+    }
+  }
+}
+
+export const projectMemoryTools: ToolDef[] = [
+  memoryBriefTool,
+  memoryPageTool,
+  memoryHandoffTool,
+  memoryRecallTool
+]

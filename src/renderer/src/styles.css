@@ -2242,6 +2242,18 @@ a {
   gap: 7px;
 }
 
+.approval-reason {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+}
+
 /* ------------------------------------------------------------------ */
 /* Session panel                                                      */
 /* ------------------------------------------------------------------ */

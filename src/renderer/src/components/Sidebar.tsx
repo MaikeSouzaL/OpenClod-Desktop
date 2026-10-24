@@ -39,6 +39,7 @@ interface SidebarProps {
   onNewSession(project: Project): void
   onAddProject(): void
   onRemoveProject(project: Project): void
+  onDeleteProject(project: Project): void
   onDeleteSession(sessionId: string): void
   onRenameSession(sessionId: string, title: string): void
   onArchiveSession(sessionId: string, archived: boolean): void
@@ -69,6 +70,7 @@ export function Sidebar({
   onNewSession,
   onAddProject,
   onRemoveProject,
+  onDeleteProject,
   onDeleteSession,
   onRenameSession,
   onArchiveSession,
@@ -97,7 +99,15 @@ export function Sidebar({
   // shared pages. Projects, Agendados, Dispatch and Design belong to Início.
   const pages =
     navMode === 'code'
-      ? PAGES.filter((item) => item.id === 'artifacts' || item.id === 'scheduled' || item.id === 'customize' || item.id === 'more')
+      ? PAGES.filter(
+          (item) =>
+            item.id === 'artifacts' ||
+            item.id === 'scheduled' ||
+            item.id === 'customize' ||
+            item.id === 'more' ||
+            // Claude Code shows the project memory only when a project exists.
+            (item.id === 'memory' && projects.length > 0)
+        )
       : PAGES
   const pageLabel = (id: SidebarPage, label: string): string => (navMode === 'code' && id === 'scheduled' ? 'Rotinas' : label)
 
@@ -186,6 +196,21 @@ export function Sidebar({
           onSelect: () => {
             if (window.confirm(`Remover "${projectSession.name}" da lista? As sessões continuam no disco.`)) {
               onRemoveProject(projectSession)
+            }
+          }
+        },
+        {
+          id: 'delete',
+          label: 'Excluir projeto e memória',
+          icon: 'trash',
+          danger: true,
+          onSelect: () => {
+            if (
+              window.confirm(
+                `Excluir "${projectSession.name}" permanentemente?\n\nSessões, memória nativa e índice AI-Memory serão apagados. Os arquivos da pasta do projeto não são tocados.`
+              )
+            ) {
+              onDeleteProject(projectSession)
             }
           }
         }

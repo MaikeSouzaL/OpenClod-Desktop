@@ -204,6 +204,20 @@ export interface ApprovalRequest {
   /** Machine-readable preview (command line, path, url...). */
   preview?: string
   sessionId: string
+  /** Permission engine: what the action does (tool name). */
+  action?: string
+  /** Permission engine: the concrete resource (path, command, URL). */
+  resource?: string
+  /** Permission engine: read | write | execute | network | control | destructive. */
+  effect?: PermissionEffect
+}
+
+export type PermissionEffect = 'read' | 'write' | 'execute' | 'network' | 'control' | 'destructive'
+
+/** What the user decided; the reason is fed back to the model verbatim. */
+export interface ApprovalDecision {
+  approved: boolean
+  reason?: string
 }
 
 export interface ApprovalResponse {

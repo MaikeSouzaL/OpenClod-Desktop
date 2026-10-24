@@ -16,9 +16,10 @@ interface ProjectsPageProps {
   onAdd(): void
   onReveal(path: string): void
   onRemove(project: Project): void
+  onDelete(project: Project): void
 }
 
-export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove }: ProjectsPageProps): ReactElement {
+export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove, onDelete }: ProjectsPageProps): ReactElement {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'recent' | 'name'>('recent')
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -56,6 +57,21 @@ export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, 
           danger: true,
           onSelect: () => {
             if (window.confirm(`Remover "${menuProject.name}" da lista? Os arquivos e as sessões continuam no disco.`)) onRemove(menuProject)
+          }
+        },
+        {
+          id: 'delete',
+          label: 'Excluir projeto e memória',
+          icon: 'trash',
+          danger: true,
+          onSelect: () => {
+            if (
+              window.confirm(
+                `Excluir "${menuProject.name}" permanentemente?\n\nSessões, memória nativa e índice AI-Memory serão apagados. Os arquivos da pasta do projeto não são tocados.`
+              )
+            ) {
+              onDelete(menuProject)
+            }
           }
         }
       ]

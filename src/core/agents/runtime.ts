@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type {
   AgentDefinition,
+  ApprovalDecision,
   ApprovalRequest,
   HarnessEvent,
   Message,
@@ -52,7 +53,7 @@ export interface AgentRuntimeEnv {
   /** Receives every event of the tree (subagent lifecycle, forwarded tool events, notices), already addressed to the root session. */
   emit(event: HarnessEvent): void
   /** Routes a child's approval request to the user. Its `sessionId` is the root session. */
-  approve(request: ApprovalRequest): Promise<boolean>
+  approve(request: ApprovalRequest): Promise<ApprovalDecision | boolean>
   /** One browser per child so parallel children do not fight over a page. Defaults to a new BrowserLayer. */
   createBrowser?(): BrowserLayer
   /** Facts about the machine (installed toolchains...) appended to every child's system prompt. */
@@ -356,6 +357,7 @@ export async function spawnAgent(
     allowedTools: tools,
     services,
     project: { ...caller.project, name: `${caller.project.name} / ${spec.label}`.slice(0, 120) },
+    projectId: caller.projectId,
     hooks: caller.hooks,
     emit: (event) => {
       switch (event.type) {

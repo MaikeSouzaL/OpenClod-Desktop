@@ -7,6 +7,12 @@ import type { ImagePart, McpServerSettings, RiskLevel, ToolResult } from '../../
  */
 export interface McpServerConfig extends Omit<McpServerSettings, 'enabled'> {
   enabled?: boolean
+  /** Access token obtained by the interactive OAuth flow (in-memory only). */
+  oauthToken?: string
+  /** Called on 401; returns a fresh token or null when login was refused. */
+  onUnauthorized?: (challenge?: string) => Promise<string | null>
+  /** Called when the server announces `notifications/tools/list_changed`. */
+  onToolsChanged?: () => void
 }
 
 export interface McpToolInfo {
@@ -146,6 +152,13 @@ interface Pending {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
   timer: NodeJS.Timeout
+}
+
+class McpUnauthorizedError extends Error {
+  constructor(message: string, readonly challenge?: string) {
+    super(message)
+    this.name = 'McpUnauthorizedError'
+  }
 }
 
 /**
@@ -291,11 +304,32 @@ export class McpClient {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       ...(this.httpSession ? { 'mcp-session-id': this.httpSession } : {}),
+      ...(this.config.oauthToken ? { authorization: `Bearer ${this.config.oauthToken}` } : {}),
       ...(this.config.headers ?? {})
     }
   }
 
   private async requestRemote(
+    method: string,
+    params: unknown,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    try {
+      return await this.requestRemoteOnce(method, params, timeoutMs, signal)
+    } catch (err) {
+      if (err instanceof McpUnauthorizedError && this.config.onUnauthorized) {
+        const token = await this.config.onUnauthorized(err.challenge)
+        if (token) {
+          this.config.oauthToken = token
+          return this.requestRemoteOnce(method, params, timeoutMs, signal)
+        }
+      }
+      throw err
+    }
+  }
+
+  private async requestRemoteOnce(
     method: string,
     params: unknown,
     timeoutMs: number,
@@ -318,6 +352,12 @@ export class McpClient {
       const session = response.headers.get('mcp-session-id')
       if (session) this.httpSession = session
       const body = await response.text()
+      if (response.status === 401) {
+        throw new McpUnauthorizedError(
+          `HTTP 401 em ${method}: ${body.slice(0, 300)}`,
+          response.headers.get('www-authenticate') ?? undefined
+        )
+      }
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} em ${method}: ${body.slice(0, 400)}`)
       }
@@ -415,6 +455,9 @@ export class McpClient {
         else pending.resolve(message.result)
       }
       // Server-initiated requests/notifications are acknowledged implicitly.
+      if (message.method === 'notifications/tools/list_changed') {
+        this.config.onToolsChanged?.()
+      }
     }
   }
 

@@ -113,6 +113,19 @@ export interface McpToolService {
   list(): Array<{ name: string; state: string; transport: string; tools: string[]; error?: string }>
 }
 
+/**
+ * The project's long-term memory index (AI-Memory sidecar). The native
+ * markdown wiki stays the source of truth; this interface lets tools recall
+ * and mirror pages without importing the main-process class.
+ */
+export interface AiMemoryToolService {
+  recall(projectId: string, query: string, limit?: number): Promise<{ text: string; hits: number }>
+  writePage(
+    projectId: string,
+    input: { path: string; title: string; body: string; tags?: string[]; pinned?: boolean; tier?: string }
+  ): Promise<{ path: string; pageId: string }>
+}
+
 export interface ToolContext {
   sessionId: string
   cwd: string
@@ -135,7 +148,10 @@ export interface ToolContext {
     memory: MemoryStore
     projectMemory: ProjectMemory
     mcp?: McpToolService
+    aiMemory?: AiMemoryToolService
   }
+  /** Project scope used by the long-term memory index. */
+  projectId?: string
   log(level: 'info' | 'warn' | 'error', message: string): void
 }
 

@@ -1,4 +1,4 @@
-import type { AgentMode, Decision, PolicyConfig } from '../../shared/types.js'
+import type { AgentMode, Decision, PermissionEffect, PolicyConfig } from '../../shared/types.js'
 import type { ToolDef } from '../tools/types.js'
 import { evaluateRules } from './rules.js'
 import { checkSensitiveAccess, sensitiveReason } from './sensitive.js'
@@ -29,6 +29,48 @@ const ALWAYS_CONFIRM = new Set([
 export interface Evaluation {
   decision: Decision
   reason: string
+  /** Tool/action name. */
+  action: string
+  /** Concrete subject the tool will touch (command, path, URL, element). */
+  resource: string
+  /** Effect on the machine or on external systems. */
+  effect: PermissionEffect
+  /** Rule that decided it, when a rule matched. */
+  rule?: string
+}
+
+const EXECUTE_TOOLS = new Set([
+  'run_command',
+  'start_process',
+  'stop_process',
+  'git_commit',
+  'git_checkout',
+  'computer_launch',
+  'computer_activate'
+])
+
+const CONTROL_TOOLS = new Set([
+  'browser_click',
+  'browser_type',
+  'browser_press',
+  'computer_click',
+  'computer_mouse_move',
+  'computer_mouse_button',
+  'computer_set_value',
+  'computer_type_text',
+  'computer_press_key',
+  'computer_scroll',
+  'computer_drag',
+  'computer_secondary_action'
+])
+
+export function effectOf(tool: ToolDef): PermissionEffect {
+  if (CONTROL_TOOLS.has(tool.name)) return 'control'
+  if (tool.risk === 'destructive') return 'destructive'
+  if (tool.risk === 'read') return 'read'
+  if (tool.risk === 'network') return 'network'
+  if (EXECUTE_TOOLS.has(tool.name)) return 'execute'
+  return 'write'
 }
 
 /**
@@ -47,6 +89,22 @@ export function evaluateTool(
   cwd: string = process.cwd(),
   args?: unknown
 ): Evaluation {
+  const base = evaluateToolBase(tool, preview, policy, cwd, args)
+  return {
+    ...base,
+    action: tool.name,
+    resource: preview,
+    effect: effectOf(tool)
+  }
+}
+
+function evaluateToolBase(
+  tool: ToolDef,
+  preview: string,
+  policy: PolicyConfig,
+  cwd: string = process.cwd(),
+  args?: unknown
+): { decision: Decision; reason: string } {
   // Not a rule: it cannot be overridden by an allow rule, a hook or any mode.
   const sensitive = checkSensitiveAccess(tool.name, preview, args, { cwd })
   if (sensitive) return { decision: 'deny', reason: sensitiveReason(sensitive, tool.name) }
@@ -176,7 +234,7 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
 // Long-term project memory is orthogonal to the mode: every mode can read the
 // briefing; writes still go through the normal risk/policy decision.
 for (const tools of Object.values(MODE_TOOLS)) {
-  for (const name of ['memory_brief', 'memory_page', 'memory_handoff']) {
+  for (const name of ['memory_brief', 'memory_page', 'memory_handoff', 'memory_recall']) {
     if (!tools.includes(name)) tools.push(name)
   }
   if (!tools.includes('web_research')) tools.push('web_research')

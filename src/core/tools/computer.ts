@@ -35,8 +35,20 @@ function label(target: Target): string {
   return target.window != null ? `janela ${target.window}` : (target.app ?? 'tela')
 }
 
+/** Accepts `element_index` or a stable `ref` such as `e12` from a snapshot. */
+function elementIndex(args: { element_index?: number; ref?: string }): number {
+  if (args.element_index != null) return args.element_index
+  const match = /^e?(\d+)$/i.exec(args.ref ?? '')
+  return match ? Number(match[1]) : -1
+}
+
+const elementShape = {
+  element_index: z.number().int().min(0).optional().describe('Índice do elemento na última árvore de acessibilidade'),
+  ref: z.string().regex(/^e?\d+$/i).optional().describe('Referência estável do snapshot (ex.: e12)')
+}
+
 const computerNote =
-  'Percepção híbrida: primeiro a árvore de UI Automation (com element_index), depois screenshot. Verifique o estado após cada ação.'
+  'Percepção híbrida: primeiro a árvore de UI Automation (com element_index/ref), depois screenshot. Cada ação de elemento retorna snapshot_id, generation e state_changed; verifique o estado após cada ação.'
 
 export const computerListWindowsTool: ToolDef = {
   name: 'computer_list_windows',
@@ -81,10 +93,10 @@ export const computerSnapshotTool: ToolDef = {
     const text = snap.text || '(árvore vazia — o app pode não expor UI Automation; use screenshot)'
     return {
       ok: true,
-      text: `<ax_tree target="${label(target)}">\n${text}\n</ax_tree>`,
+      text: `<ax_tree target="${label(target)}" snapshot="${(snap.data as { snapshot_id?: string } | undefined)?.snapshot_id ?? ''}">\n${text}\n</ax_tree>`,
       images: snap.images,
       summary: `${label(target)} · ${text.split('\n').length} linhas`,
-      data: { app: args.app, window: args.window }
+      data: { app: args.app, window: args.window, ...(snap.data as Record<string, unknown> | undefined) }
     }
   }
 }
@@ -125,18 +137,22 @@ export const computerClickTool: ToolDef = {
   schema: z
     .object({
       ...targetShape,
-      element_index: z.number().int().min(0).optional(),
+      ...elementShape,
       x: z.number().min(0).optional(),
       y: z.number().min(0).optional(),
       double: z.boolean().optional(),
       button: z.enum(['left', 'right', 'middle']).optional()
     })
-    .refine((v) => (v.element_index != null && (v.app || v.window != null)) || (v.x != null && v.y != null), {
-      message: 'informe app/window + element_index, ou x + y'
-    }),
+    .refine(
+      (v) =>
+        ((v.element_index != null || v.ref) && (v.app || v.window != null)) ||
+        (v.x != null && v.y != null),
+      { message: 'informe app/window + element_index/ref, ou x + y' }
+    ),
   describe(a) {
-    const args = a as { app?: string; window?: number; element_index?: number; x?: number; y?: number }
-    const where = args.element_index != null ? `${label(targetOf(args))} elemento ${args.element_index}` : `(${args.x}, ${args.y})`
+    const args = a as { app?: string; window?: number; element_index?: number; ref?: string; x?: number; y?: number }
+    const index = elementIndex(args)
+    const where = index >= 0 ? `${label(targetOf(args))} elemento ${index}` : `(${args.x}, ${args.y})`
     return { title: 'Clique', detail: where, preview: where }
   },
   async execute(raw, ctx) {
@@ -144,6 +160,7 @@ export const computerClickTool: ToolDef = {
       app?: string
       window?: number
       element_index?: number
+      ref?: string
       x?: number
       y?: number
       double?: boolean
@@ -155,9 +172,10 @@ export const computerClickTool: ToolDef = {
     if (isResult(layer)) return layer
     const count = args.double ? 2 : 1
     const target = targetOf(args)
-    if (args.element_index != null && (args.app || args.window != null)) {
-      const result = await layer.clickElement(target, args.element_index, count, args.button)
-      return { ...result, summary: `${label(target)}#${args.element_index}${result.ok ? '' : ' (falhou)'}` }
+    const index = elementIndex(args)
+    if (index >= 0 && (args.app || args.window != null)) {
+      const result = await layer.clickElement(target, index, count, args.button)
+      return { ...result, summary: `${label(target)}#${index}${result.ok ? '' : ' (falhou)'}` }
     }
     if (args.window != null) {
       const result = await layer.clickInWindow(args.window, args.x!, args.y!, count, args.button)
@@ -258,23 +276,25 @@ export const computerSetValueTool: ToolDef = {
   parallelSafe: false,
   requires: 'computer',
   schema: z
-    .object({ ...targetShape, element_index: z.number().int().min(0), value: z.string() })
-    .refine((v) => v.app || v.window != null, { message: 'informe app ou window' }),
+    .object({ ...targetShape, ...elementShape, value: z.string() })
+    .refine((v) => (v.element_index != null || v.ref) && (v.app || v.window != null), {
+      message: 'informe app/window + element_index/ref'
+    }),
   describe(a) {
-    const args = a as { app?: string; window?: number; element_index: number; value: string }
+    const args = a as { app?: string; window?: number; element_index?: number; ref?: string; value: string }
     return {
       title: 'Definir valor',
-      detail: `${label(targetOf(args))}#${args.element_index} ← ${args.value.slice(0, 60)}`,
+      detail: `${label(targetOf(args))}#${elementIndex(args)} ← ${args.value.slice(0, 60)}`,
       preview: label(targetOf(args))
     }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index: number; value: string }
+    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index?: number; ref?: string; value: string }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.setValue(targetOf(args), args.element_index, args.value)
+    const result = await layer.setValue(targetOf(args), elementIndex(args), args.value)
     return { ...result, summary: result.ok ? args.value.slice(0, 40) : 'falhou' }
   }
 }
@@ -289,7 +309,7 @@ export const computerTypeTool: ToolDef = {
   schema: z.object({
     text: z.string(),
     ...targetShape,
-    element_index: z.number().int().min(0).optional()
+    ...elementShape
   }),
   describe(a) {
     const args = a as { text: string; app?: string; window?: number }
@@ -297,15 +317,16 @@ export const computerTypeTool: ToolDef = {
     return { title: 'Digitar', detail: `${prefix}${args.text.slice(0, 60)}`, preview: args.text.slice(0, 60) }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { text: string; app?: string; window?: number; element_index?: number }
+    const args = this.schema.parse(raw) as { text: string; app?: string; window?: number; element_index?: number; ref?: string }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
     const target = targetOf(args)
+    const index = elementIndex(args)
     if (args.app || args.window != null) {
-      if (args.element_index != null) {
-        const focus = await layer.clickElement(target, args.element_index)
+      if (index >= 0) {
+        const focus = await layer.clickElement(target, index)
         if (!focus.ok) return { ...focus, text: `não foi possível focar o elemento: ${focus.text}` }
       }
       const result = await layer.typeIn(target, args.text)
@@ -461,19 +482,21 @@ export const computerSecondaryActionTool: ToolDef = {
   parallelSafe: false,
   requires: 'computer',
   schema: z
-    .object({ ...targetShape, element_index: z.number().int().min(0), action: z.string().min(1) })
-    .refine((v) => v.app || v.window != null, { message: 'informe app ou window' }),
+    .object({ ...targetShape, ...elementShape, action: z.string().min(1) })
+    .refine((v) => (v.element_index != null || v.ref) && (v.app || v.window != null), {
+      message: 'informe app/window + element_index/ref'
+    }),
   describe(a) {
-    const args = a as { app?: string; window?: number; element_index: number; action: string }
-    return { title: 'Ação secundária', detail: `${label(targetOf(args))}#${args.element_index} ${args.action}`, preview: args.action }
+    const args = a as { app?: string; window?: number; element_index?: number; ref?: string; action: string }
+    return { title: 'Ação secundária', detail: `${label(targetOf(args))}#${elementIndex(args)} ${args.action}`, preview: args.action }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index: number; action: string }
+    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index?: number; ref?: string; action: string }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.secondaryAction(targetOf(args), args.element_index, args.action)
+    const result = await layer.secondaryAction(targetOf(args), elementIndex(args), args.action)
     return { ...result, summary: `${args.action}${result.ok ? '' : ' (falhou)'}` }
   }
 }

@@ -30,6 +30,9 @@ export function MemoryPage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [aiStatus, setAiStatus] = useState<{ available: boolean; running: boolean; port?: number; error?: string } | null>(null)
+  const [recallText, setRecallText] = useState('')
+  const [recalling, setRecalling] = useState(false)
 
   const project = useMemo(
     () => projects.find((item) => item.id === projectId) ?? null,
@@ -52,12 +55,14 @@ export function MemoryPage({
     setLoading(true)
     setError('')
     try {
-      const [list, status] = await Promise.all([
+      const [list, status, ai] = await Promise.all([
         unwrap(window.forja.memory.list(projectId)),
-        unwrap(window.forja.memory.status(projectId))
+        unwrap(window.forja.memory.status(projectId)),
+        window.forja.memory.aiStatus().catch(() => null)
       ])
       setPages(list)
       setStats(status)
+      setAiStatus(ai?.ok ? ai.value : null)
       setSelected((current) => (current && list.some((page) => page.slug === current.slug) ? current : null))
     } catch (err) {
       setError(errorMessage(err))
@@ -80,8 +85,21 @@ export function MemoryPage({
     }
   }
 
-  const removePage = async (slug: string): Promise<void> => {
-    if (!projectId || !window.confirm('Apagar esta página da memória do projeto? Não pode ser desfeito.')) return
+  const recall = async (): Promise<void> => {
+    if (!projectId || !query.trim()) return
+    setRecalling(true)
+    setError('')
+    try {
+      const result = await unwrap(window.forja.memory.recall(projectId, query.trim(), 10))
+      setRecallText(result.text || 'Nada encontrado no índice deste projeto.')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setRecalling(false)
+    }
+  }
+
+  const removePage = async (slug: string): Promise<void> => {    if (!projectId || !window.confirm('Apagar esta página da memória do projeto? Não pode ser desfeito.')) return
     try {
       await unwrap(window.forja.memory.delete(projectId, slug))
       setSelected(null)
@@ -111,6 +129,15 @@ export function MemoryPage({
             A memória de longo prazo deste projeto. Cada modelo e cada agente lê e grava na mesma wiki, para que nada
             se perca quando você troca de IA.
           </p>
+          {aiStatus ? (
+            <p className="page-sub">
+              {aiStatus.running
+                ? `Índice AI-Memory ativo na porta ${aiStatus.port} — busca full-text, entidades e links.`
+                : aiStatus.available
+                  ? 'AI-Memory disponível; o índice inicia no primeiro uso.'
+                  : 'AI-Memory indisponível; a wiki nativa continua funcionando.'}
+            </p>
+          ) : null}
         </div>
         <div className="page-actions">
           <button type="button" className="btn ghost small" onClick={() => void load()} disabled={!project || loading}>
@@ -199,7 +226,7 @@ export function MemoryPage({
         <>
           <div className="memory-stats">
             <div className="memory-stat">
-              <span className="memory-stat-value">{stats?.pages ?? pages.length}</span>
+              <span className="memory-stat-value">{pages.length}</span>
               <span className="memory-stat-label">páginas</span>
             </div>
             <div className="memory-stat">
@@ -209,6 +236,10 @@ export function MemoryPage({
             <div className="memory-stat">
               <span className="memory-stat-value">{stats?.openHandoffs ?? 0}</span>
               <span className="memory-stat-label">handoffs abertos</span>
+            </div>
+            <div className="memory-stat">
+              <span className="memory-stat-value">{stats?.indexed ?? 0}</span>
+              <span className="memory-stat-label">no índice AI-Memory</span>
             </div>
             <div className="memory-stat path">
               <span className="memory-stat-value small">{project.name}</span>
@@ -256,8 +287,25 @@ export function MemoryPage({
                   />
                 </div>
                 <span className="page-tools-spacer" />
+                <button type="button" className="btn ghost small" onClick={() => void recall()} disabled={!query.trim() || recalling}>
+                  <Icon name="search" size={13} /> {recalling ? 'Buscando…' : 'Buscar no índice'}
+                </button>
                 <span className="muted">{filtered.length} página(s)</span>
               </div>
+
+              {recallText ? (
+                <div className="memory-detail">
+                  <div className="memory-detail-head">
+                    <strong>Resultado do índice AI-Memory</strong>
+                    <button type="button" className="btn ghost small" onClick={() => setRecallText('')}>
+                      Fechar
+                    </button>
+                  </div>
+                  <article className="memory-detail-body">
+                    <Markdown text={recallText} />
+                  </article>
+                </div>
+              ) : null}
 
               {loading && !pages.length ? <div className="page-empty compact">Carregando memória…</div> : null}
               {!loading && !filtered.length ? (
@@ -285,6 +333,7 @@ export function MemoryPage({
                       <p>{page.summary || 'Sem resumo.'}</p>
                       <div className="memory-card-foot">
                         <span>{new Date(page.updated).toLocaleDateString('pt-BR')}</span>
+                        {page.source === 'ai-memory' ? <span className="memory-tag">índice</span> : null}
                         {page.tags.slice(0, 3).map((tag) => (
                           <span key={tag} className="memory-tag">
                             {tag}

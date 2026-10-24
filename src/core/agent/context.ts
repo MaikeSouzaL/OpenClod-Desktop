@@ -15,6 +15,8 @@ export interface SystemPromptInput {
   memory: MemoryFact[]
   /** Bounded project wiki briefing (pages + open handoffs). */
   projectMemory?: string
+  /** Bounded recall from the project's AI-Memory index. */
+  longTermMemory?: string
   agentsMd?: string
   projectName?: string
   gitBranch?: string
@@ -248,6 +250,8 @@ ${memoryList}
 
 # Wiki do projeto (memória de longo prazo, por projeto)
 ${input.projectMemory ?? '(vazia)'}
+
+${input.longTermMemory ? `# Memória indexada do projeto (AI-Memory)\n${input.longTermMemory}\n` : ''}
 
 ${input.agentsMd ? `# Instruções do projeto (AGENTS.md)\n${input.agentsMd}\n` : ''}${input.extra ? `# Instruções adicionais\n${input.extra}\n` : ''}
 # Estilo de resposta

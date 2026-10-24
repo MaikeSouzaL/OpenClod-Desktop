@@ -33,6 +33,7 @@ const api: OpenclodApi = {
     list: () => call(CH.projectsList),
     add: (folder, name) => call(CH.projectsAdd, folder, name),
     remove: (projectId) => call(CH.projectsRemove, projectId),
+    delete: (projectId) => call(CH.projectsDelete, projectId),
     pick: () => call(CH.projectsPick),
     ensureDefault: () => call(CH.projectsEnsureDefault)
   },
@@ -42,7 +43,7 @@ const api: OpenclodApi = {
     get: (sessionId) => call(CH.sessionsGet, sessionId),
     delete: (sessionId) => call(CH.sessionsDelete, sessionId),
     rename: (sessionId, title) => call(CH.sessionsRename, sessionId, title),
-    send: (sessionId, text, images) => call(CH.sessionsSend, sessionId, text, images),
+    send: (sessionId, text, images, mode) => call(CH.sessionsSend, sessionId, text, images, mode),
     abort: (sessionId) => call(CH.sessionsAbort, sessionId),
     setMode: (sessionId, mode) => call(CH.sessionsSetMode, sessionId, mode),
     setModel: (sessionId, providerId, model) => call(CH.sessionsSetModel, sessionId, providerId, model),
@@ -107,6 +108,8 @@ const api: OpenclodApi = {
     read: (projectId, slug) => call(CH.memoryRead, projectId, slug),
     delete: (projectId, slug) => call(CH.memoryDelete, projectId, slug),
     open: (projectId) => call(CH.memoryOpen, projectId),
+    recall: (projectId, query, limit) => call(CH.memoryRecall, projectId, query, limit),
+    aiStatus: () => call(CH.memoryAiStatus),
     exportMarkdown: (projectId) => call(CH.memoryExport, projectId),
     importMarkdown: (projectId) => call(CH.memoryImport, projectId)
   },
@@ -122,7 +125,13 @@ const api: OpenclodApi = {
     runNow: (taskId) => call(CH.schedulesRunNow, taskId)
   },
   approvals: {
-    resolve: (approvalId, approved, always) => call(CH.approvalsResolve, approvalId, approved, always)
+    resolve: (approvalId, approved, always, reason) => call(CH.approvalsResolve, approvalId, approved, always, reason)
+  },
+  inbox: {
+    list: (sessionId) => call(CH.inboxList, sessionId),
+    add: (sessionId, text, images, mode, origin) => call(CH.inboxAdd, sessionId, text, images, mode, origin),
+    remove: (sessionId, itemId) => call(CH.inboxRemove, sessionId, itemId),
+    clear: (sessionId) => call(CH.inboxClear, sessionId)
   },
   mcp: {
     restart: () => call(CH.mcpRestart)

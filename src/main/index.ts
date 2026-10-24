@@ -677,6 +677,10 @@ function registerIpc(): void {
     await need().store.removeProject(str(projectId, 'projectId', 80))
     return true
   })
+  handle(CH.projectsDelete, async (projectId) => {
+    await need().deleteProject(str(projectId, 'projectId', 80))
+    return true
+  })
   handle(CH.projectsPick, async () => {
     const options = {
       title: 'Escolha a pasta do projeto',
@@ -736,12 +740,12 @@ function registerIpc(): void {
     if (!state) throw new Error('sessão não encontrada')
     return state
   })
-  handle(CH.sessionsSend, async (sessionId, text, images) => {
+  handle(CH.sessionsSend, async (sessionId, text, images, mode) => {
     const id = str(sessionId, 'sessionId', 80)
     const message = typeof text === 'string' ? text.slice(0, 200_000) : ''
     const parts = toImages(images)
     if (!message.trim() && !parts?.length) throw new Error('mensagem vazia')
-    await need().startSend(id, message, parts)
+    await need().startSend(id, message, parts, mode === 'steer' || mode === 'queue' ? mode : 'auto')
     return true
   })
   handle(CH.sessionsAbort, async (sessionId) => {
@@ -873,8 +877,16 @@ function registerIpc(): void {
     need().memoryRead(str(projectId, 'projectId', 80), str(slug, 'slug', 80))
   )
   handle(CH.memoryDelete, async (projectId, slug) =>
-    need().memoryDelete(str(projectId, 'projectId', 80), str(slug, 'slug', 80))
+    need().memoryDelete(str(projectId, 'projectId', 80), str(slug, 'slug', 200))
   )
+  handle(CH.memoryRecall, async (projectId, query, limit) =>
+    need().memoryRecall(
+      str(projectId, 'projectId', 80),
+      str(query, 'query', 300),
+      typeof limit === 'number' ? Math.min(20, Math.max(1, limit)) : 8
+    )
+  )
+  handle(CH.memoryAiStatus, async () => need().aiMemoryStatus())
   handle(CH.memoryExport, async (projectId) => {
     const id = str(projectId, 'projectId', 80)
     const bundle = await need().memoryExportMarkdown(id)
@@ -939,8 +951,30 @@ function registerIpc(): void {
     return keepAwakeId !== null
   })
 
-  handle(CH.approvalsResolve, async (approvalId, approved, always) => {
-    need().resolveApproval(str(approvalId, 'approvalId', 80), Boolean(approved), Boolean(always))
+  handle(CH.approvalsResolve, async (approvalId, approved, always, reason) => {
+    need().resolveApproval(
+      str(approvalId, 'approvalId', 80),
+      Boolean(approved),
+      Boolean(always),
+      typeof reason === 'string' ? reason.slice(0, 1_000) : ''
+    )
+    return true
+  })
+  handle(CH.inboxList, async (sessionId) => need().inboxList(str(sessionId, 'sessionId', 80)))
+  handle(CH.inboxAdd, async (sessionId, text, images, mode, origin) =>
+    need().inboxAdd(
+      str(sessionId, 'sessionId', 80),
+      str(text, 'texto', 200_000),
+      toImages(images),
+      mode === 'steer' ? 'steer' : 'queue',
+      origin === 'ui' ? 'ui' : 'agent'
+    )
+  )
+  handle(CH.inboxRemove, async (sessionId, itemId) =>
+    need().inboxRemove(str(sessionId, 'sessionId', 80), str(itemId, 'itemId', 80))
+  )
+  handle(CH.inboxClear, async (sessionId) => {
+    need().inboxClear(str(sessionId, 'sessionId', 80))
     return true
   })
   handle(CH.mcpRestart, async () => {

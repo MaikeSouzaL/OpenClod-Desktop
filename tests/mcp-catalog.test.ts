@@ -45,10 +45,11 @@ describe('MCP catalog', () => {
     expect(built.server?.args).toEqual(['-y', '@modelcontextprotocol/server-filesystem', 'C:\\Users\\me\\Desktop'])
   })
 
-  it('marks OAuth-only connectors as needing a login instead of pretending they work', () => {
+  it('installs OAuth-only connectors and flags that the first call opens a login', () => {
     const built = buildCatalogServer(catalogEntry('notion')!)
-    expect(built.server).toBeNull()
+    expect(built.server).not.toBeNull()
     expect(built.needsOAuth).toBe(true)
+    expect(built.missing).toEqual([])
   })
 })
 

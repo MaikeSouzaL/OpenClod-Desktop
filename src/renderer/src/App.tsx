@@ -605,6 +605,28 @@ export default function App(): ReactElement {
     [activeProjectId, clearSession]
   )
 
+  const deleteProject = useCallback(
+    async (project: Project): Promise<void> => {
+      try {
+        await unwrap(window.forja.projects.delete(project.id))
+        const [list, sessionList] = await Promise.all([
+          unwrap(window.forja.projects.list()),
+          unwrap(window.forja.sessions.list())
+        ])
+        setProjects(list)
+        setSessions(sessionList)
+        if (activeProjectId === project.id) {
+          clearSession()
+          setActiveProjectId(list[0]?.id ?? null)
+        }
+        setToast({ level: 'info', text: `Projeto ${project.name} excluído com sessões e memória.` })
+      } catch (err) {
+        setError(errorMessage(err))
+      }
+    },
+    [activeProjectId, clearSession]
+  )
+
   const selectProject = useCallback(
     async (project: Project): Promise<void> => {
       setActiveProjectId(project.id)
@@ -773,11 +795,23 @@ export default function App(): ReactElement {
 
   const enqueue = useCallback((text: string, images: ImagePart[]): void => {
     if (!text.trim() && !images.length) return
-    setQueued((current) => [...current.slice(-24), { id: logId(), text, images }])
+    const localId = logId()
+    setQueued((current) => [...current.slice(-24), { id: localId, text, images }])
+    const sessionId = activeSessionRef.current
+    if (!sessionId) return
+    void window.forja.inbox
+      .add(sessionId, text, images, 'queue', 'ui')
+      .then((result) => {
+        if (!result.ok) return
+        setQueued((current) => current.map((item) => (item.id === localId ? { ...item, id: result.value.id } : item)))
+      })
+      .catch(() => undefined)
   }, [])
 
   const removeQueued = useCallback((id: string): void => {
     setQueued((current) => current.filter((item) => item.id !== id))
+    const sessionId = activeSessionRef.current
+    if (sessionId) void window.forja.inbox.remove(sessionId, id).catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -787,6 +821,7 @@ export default function App(): ReactElement {
     if (!next || !activeSessionRef.current) return
     drainingRef.current = true
     setQueued((current) => current.filter((item) => item.id !== next.id))
+    void window.forja.inbox.remove(activeSessionRef.current, next.id).catch(() => undefined)
     void send(next.text, next.images)
       .then((ok) => {
         if (!ok) setQueued((current) => [next, ...current])
@@ -795,6 +830,22 @@ export default function App(): ReactElement {
         drainingRef.current = false
       })
   }, [runState, send])
+
+  // Reinicia a fila da interface que sobreviveu a um fechamento do app.
+  useEffect(() => {
+    const sessionId = activeSessionId
+    if (!sessionId) return
+    void window.forja.inbox
+      .list(sessionId)
+      .then((result) => {
+        if (!result.ok) return
+        const pending = result.value
+          .filter((item) => item.origin === 'ui' && item.mode === 'queue')
+          .map((item) => ({ id: item.id, text: item.text, images: item.images }))
+        if (pending.length) setQueued(pending)
+      })
+      .catch(() => undefined)
+  }, [activeSessionId])
 
   const changeMode = useCallback(async (agentMode: AgentMode): Promise<void> => {
     const id = activeSessionRef.current
@@ -830,10 +881,10 @@ export default function App(): ReactElement {
   }, [])
 
   const resolveApproval = useCallback(
-    async (approvalId: string, approved: boolean, always: boolean): Promise<void> => {
+    async (approvalId: string, approved: boolean, always: boolean, reason = ''): Promise<void> => {
       setApprovals((current) => current.filter((item) => item.id !== approvalId))
       try {
-        await unwrap(window.forja.approvals.resolve(approvalId, approved, always))
+        await unwrap(window.forja.approvals.resolve(approvalId, approved, always, reason))
         pushLog('info', `aprovação ${approved ? 'concedida' : 'negada'}${always ? ' (sempre nesta sessão)' : ''}`)
       } catch (err) {
         setError(errorMessage(err))
@@ -1203,6 +1254,7 @@ export default function App(): ReactElement {
         onAdd={() => void addProject()}
         onReveal={(path) => void revealPath(path)}
         onRemove={(project) => void removeProject(project)}
+        onDelete={(project) => void deleteProject(project)}
       />
     ) : page === 'memory' ? (
       <MemoryPage
@@ -1323,7 +1375,7 @@ export default function App(): ReactElement {
         />
       </div>
 
-      <ApprovalDock approvals={approvals} onResolve={(id, approved, always) => void resolveApproval(id, approved, always)} />
+      <ApprovalDock approvals={approvals} onResolve={(id, approved, always, reason) => void resolveApproval(id, approved, always, reason)} />
       <PlanDock plan={session.plan} running={BUSY_STATES.includes(runState)} />
       {composerNode}
     </div>
@@ -1438,6 +1490,7 @@ export default function App(): ReactElement {
             onNewSession={(project) => void createSession(project, surface)}
             onAddProject={() => void addProject()}
             onRemoveProject={(project) => void removeProject(project)}
+            onDeleteProject={(project) => void deleteProject(project)}
             onDeleteSession={(id) => void deleteSession(id)}
             onRenameSession={(id, title) => void renameSession(id, title)}
             onArchiveSession={(id, archived) => void archiveSession(id, archived)}

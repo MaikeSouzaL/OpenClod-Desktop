@@ -86,4 +86,9 @@ export class ApprovalStore {
     fs.writeFileSync(`${target}.tmp`, JSON.stringify({ allow: rules }, null, 2), 'utf8')
     fs.renameSync(`${target}.tmp`, target)
   }
+
+  /** Removes every remembered "always allow" rule of a deleted project. */
+  clear(projectId: string): void {
+    fs.rmSync(this.file(projectId), { force: true })
+  }
 }

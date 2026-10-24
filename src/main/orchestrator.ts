@@ -1,9 +1,11 @@
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { z } from 'zod'
 import type {
   AppSettings,
+  ApprovalDecision,
   ApprovalRequest,
   CapabilityReport,
   FileChange,
@@ -60,12 +62,15 @@ import { resourcePath } from '../core/util/resources.js'
 import { listMcpPresets, type McpPresetInfo } from '../core/mcp/presets.js'
 import { discoverForProvider, type DiscoveryResult } from '../core/providers/discovery.js'
 import { importClaudeCatalog, type ClaudeImportReport } from './claude-import.js'
+import { AiMemoryService } from './ai-memory.js'
+import { InboxStore } from './inbox.js'
+import { McpOAuthManager } from './mcp-oauth.js'
 import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/external-agent.js'
 import { id } from '../core/util/ids.js'
 import type { AgentDefinition, AgentsListing, PolicyConfig, ReasoningEffort } from '../shared/types.js'
 
 interface PendingApproval {
-  resolve: (approved: boolean) => void
+  resolve: (decision: ApprovalDecision) => void
   timer: NodeJS.Timeout
   sessionId: string
   signature: string
@@ -84,9 +89,13 @@ export class Orchestrator {
   readonly settings: SettingsStore
   readonly computer: ComputerLayer
   readonly skills: SkillLibrary
+  readonly aiMemory: AiMemoryService
+  readonly inbox: InboxStore
+  private readonly oauth: McpOAuthManager
   private baseRegistry: ToolRegistry
   private mcpClients = new Map<string, McpClient>()
   private mcpTools: ToolDef[] = []
+  private mcpReloadAt = new Map<string, number>()
   private runners = new Map<string, SessionRunner>()
   private trackers = new Map<string, FileTracker>()
   private browsers = new Map<string, BrowserLayer>()
@@ -109,6 +118,9 @@ export class Orchestrator {
     this.approvals = new ApprovalStore(path.join(userDataPath(options.userData, 'data'), 'permissions'))
     this.computer = new ComputerLayer()
     this.skills = new SkillLibrary([])
+    this.aiMemory = new AiMemoryService(path.join(userDataPath(options.userData, 'data'), 'ai-memory'))
+    this.inbox = new InboxStore(path.join(userDataPath(options.userData, 'data'), 'inbox'))
+    this.oauth = new McpOAuthManager(path.join(userDataPath(options.userData, 'data'), 'oauth'))
     this.baseRegistry = buildBaseRegistry()
   }
 
@@ -167,6 +179,9 @@ export class Orchestrator {
     }
 
     await this.startMcpServers()
+    // The AI-Memory sidecar indexes every project's wiki. Start it in the
+    // background: a missing binary or a slow model must never delay the UI.
+    void this.aiMemory.start().catch((err) => this.options.log?.(`ai-memory: ${(err as Error).message}`))
     void toolchains() // warm the cache; the probes spawn processes
   }
 
@@ -191,7 +206,29 @@ export class Orchestrator {
 
     for (const config of this.settings.get().mcpServers ?? []) {
       if (!config.enabled) continue
-      const client = new McpClient(config as McpServerConfig)
+      const client = new McpClient({
+        ...(config as McpServerConfig),
+        onUnauthorized: async (challenge) => {
+          if (!config.url) return null
+          this.onEvent({
+            type: 'notice',
+            sessionId: '',
+            level: 'info',
+            text: `MCP ${config.name}: abrindo login OAuth no navegador`
+          })
+          return this.oauth.authorize(config.name, config.url, challenge).catch((err) => {
+            this.options.log?.(`OAuth de MCP ${config.name} falhou: ${(err as Error).message}`)
+            return null
+          })
+        },
+        onToolsChanged: () => {
+          const now = Date.now()
+          if (now - (this.mcpReloadAt.get(config.name) ?? 0) < 5_000) return
+          this.mcpReloadAt.set(config.name, now)
+          this.options.log?.(`MCP ${config.name}: tools/list_changed; recarregando servidores`)
+          void this.restartMcp()
+        }
+      })
       try {
         await client.start()
         this.mcpClients.set(config.name, client)
@@ -296,8 +333,10 @@ export class Orchestrator {
         skills: this.skills,
         memory,
         projectMemory,
-        mcp: this.mcpToolService()
+        mcp: this.mcpToolService(),
+        aiMemory: this.aiMemory
       },
+      projectId: state.meta.projectId,
       project: {
         name: project?.name ?? path.basename(state.meta.cwd),
         branch: branch ?? undefined,
@@ -527,16 +566,33 @@ export class Orchestrator {
    * wait for the whole turn (which can take minutes); progress arrives as
    * events. Failures before the turn starts are thrown here.
    */
-  async startSend(sessionId: string, text: string, images?: ImagePart[]): Promise<void> {
+  async startSend(sessionId: string, text: string, images?: ImagePart[], mode: 'steer' | 'queue' | 'auto' = 'auto'): Promise<void> {
     const runner = await this.ensureRunner(sessionId)
-    if (runner.busy) throw new Error('já existe um turno em execução nesta sessão')
+    if (runner.busy) {
+      const item = this.inbox.add(sessionId, { text, images, mode: mode === 'steer' ? 'steer' : 'queue' })
+      if (item.mode === 'steer') runner.steer(text)
+      this.onEvent({
+        type: 'notice',
+        sessionId,
+        level: 'info',
+        text:
+          item.mode === 'steer'
+            ? 'instrução enviada ao turno em execução'
+            : 'mensagem na fila; será enviada quando o turno atual terminar'
+      })
+      return
+    }
+    if (mode === 'queue') this.inbox.add(sessionId, { text, images, mode: 'queue' })
     if (runner.messages.length === 0) {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
       await this.store.patchMeta(sessionId, { title })
     }
     void runner
       .send(text, { images })
-      .then(() => this.captureTurnMemory(sessionId, runner, text))
+      .then(async () => {
+        await this.captureTurnMemory(sessionId, runner, text)
+        await this.drainInbox(sessionId)
+      })
       .catch((err) => {
         this.onEvent({
           type: 'notice',
@@ -545,6 +601,45 @@ export class Orchestrator {
           text: `falha ao iniciar turno: ${(err as Error).message}`
         })
       })
+  }
+
+  /** Sends the next durable inbox item, one at a time, until empty. */
+  private async drainInbox(sessionId: string): Promise<void> {
+    for (let guard = 0; guard < 20; guard++) {
+      const runner = this.runners.get(sessionId)
+      if (!runner || runner.busy) return
+      const next = this.inbox.list(sessionId).find((item) => item.mode === 'queue' && item.origin === 'agent')
+      if (!next) return
+      this.inbox.remove(sessionId, next.id)
+      try {
+        await runner.send(next.text, { images: next.images })
+        await this.captureTurnMemory(sessionId, runner, next.text)
+      } catch (err) {
+        this.onEvent({
+          type: 'notice',
+          sessionId,
+          level: 'error',
+          text: `falha ao enviar item da fila: ${(err as Error).message}`
+        })
+        return
+      }
+    }
+  }
+
+  inboxList(sessionId: string): ReturnType<InboxStore['list']> {
+    return this.inbox.list(sessionId)
+  }
+
+  inboxAdd(sessionId: string, text: string, images?: ImagePart[], mode: 'steer' | 'queue' = 'queue', origin: 'ui' | 'agent' = 'agent'): ReturnType<InboxStore['add']> {
+    return this.inbox.add(sessionId, { text, images, mode, origin })
+  }
+
+  inboxRemove(sessionId: string, itemId: string): boolean {
+    return this.inbox.remove(sessionId, itemId)
+  }
+
+  inboxClear(sessionId: string): void {
+    this.inbox.clear(sessionId)
   }
 
   /**
@@ -574,6 +669,45 @@ export class Orchestrator {
         tools,
         files
       })
+
+      // Full turn in AI-Memory: request, answer, tool calls and their real
+      // output. One page per turn keeps writes idempotent and avoids a
+      // read-modify-write race between concurrent sessions.
+      const turnId = lastUser?.id ?? `turn_${Date.now()}`
+      const stamp = new Date().toISOString()
+      const transcript = renderTurnTranscript(after)
+      const body = [
+        `# ${state.meta.title || 'Sessão'}`,
+        '',
+        `- **Projeto:** ${state.meta.projectId}`,
+        `- **Sessão:** ${sessionId}`,
+        `- **Turno:** ${turnId}`,
+        `- **Data:** ${stamp}`,
+        `- **Modelo:** ${state.meta.providerId}/${state.meta.model}`,
+        '',
+        '## Pedido',
+        '',
+        userText.trim().slice(0, 12_000) || '(sem texto)',
+        '',
+        '## Resposta',
+        '',
+        assistantText.trim().slice(0, 20_000) || '(sem resposta textual)',
+        '',
+        '## Execução',
+        '',
+        transcript || '(nenhuma ferramenta usada)',
+        '',
+        '## Arquivos alterados',
+        '',
+        files.length ? files.map((file) => `- ${file}`).join('\n') : '(nenhum)'
+      ].join('\n')
+      await this.aiMemory.writePage(state.meta.projectId, {
+        path: `s/${shortHash(sessionId)}/${Date.now().toString(36)}.md`,
+        title: `Sessão ${state.meta.title || sessionId} — ${new Date().toLocaleString('pt-BR')}`,
+        body,
+        tags: ['sessao', 'automatico', 'turno'],
+        tier: 'episodic'
+      })
     } catch (err) {
       this.options.log?.(`memória automática da sessão ${sessionId} falhou: ${(err as Error).message}`)
     }
@@ -590,7 +724,7 @@ export class Orchestrator {
       clearTimeout(pending.timer)
       this.pending.delete(approvalId)
       this.onEvent({ type: 'approval_resolved', sessionId, id: approvalId, approved: false })
-      pending.resolve(false)
+      pending.resolve({ approved: false, reason: 'turno cancelado' })
     }
     this.onEvent({ type: 'status', sessionId, state: 'cancelled' })
   }
@@ -682,21 +816,22 @@ export class Orchestrator {
     // Sessions whose runner was dropped by a settings change still get SessionEnd.
     for (const sessionId of new Set([...this.runners.keys(), ...this.sessionHooks.keys()])) await this.dispose(sessionId, 'app_quit')
     for (const client of this.mcpClients.values()) await client.stop()
+    await this.aiMemory.stop()
     await this.computer.close()
   }
 
   /* ------------------------------- approvals ----------------------------- */
 
-  async approve(request: ApprovalRequest): Promise<boolean> {
+  async approve(request: ApprovalRequest): Promise<ApprovalDecision> {
     const signature = `${request.tool}::${request.preview ?? request.detail}`
-    if (this.sessionAllow.get(request.sessionId)?.has(signature)) return true
+    if (this.sessionAllow.get(request.sessionId)?.has(signature)) return { approved: true }
 
     this.onEvent({ type: 'approval_request', sessionId: request.sessionId, request })
     void this.sessionHooks
       .get(request.sessionId)
       ?.run('Notification', { message: `O Openclod precisa de aprovação: ${request.title} — ${request.detail}`.slice(0, 500) })
       .catch(() => undefined)
-    return new Promise<boolean>((resolve) => {
+    return new Promise<ApprovalDecision>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(request.id)
         this.onEvent({
@@ -705,17 +840,18 @@ export class Orchestrator {
           id: request.id,
           approved: false
         })
-        resolve(false)
+        resolve({ approved: false, reason: 'tempo de aprovação esgotado' })
       }, 5 * 60 * 1000)
       this.pending.set(request.id, { resolve, timer, sessionId: request.sessionId, signature, request })
     })
   }
 
-  resolveApproval(approvalId: string, approved: boolean, always = false): void {
+  resolveApproval(approvalId: string, approved: boolean, always = false, reason = ''): void {
     const pending = this.pending.get(approvalId)
     if (!pending) return
     clearTimeout(pending.timer)
     this.pending.delete(approvalId)
+    const feedback = reason.replace(/\s+/g, ' ').trim().slice(0, 1_000)
     if (approved && always) {
       const set = this.sessionAllow.get(pending.sessionId) ?? new Set<string>()
       set.add(pending.signature)
@@ -735,13 +871,21 @@ export class Orchestrator {
         }
       }
     }
+    if (!approved && feedback) {
+      this.onEvent({
+        type: 'audit',
+        sessionId: pending.sessionId,
+        level: 'warn',
+        message: `aprovação negada com feedback: ${feedback}`
+      })
+    }
     this.onEvent({
       type: 'approval_resolved',
       sessionId: pending.sessionId,
       id: approvalId,
       approved
     })
-    pending.resolve(approved)
+    pending.resolve(feedback ? { approved, reason: feedback } : { approved })
   }
 
   /* ------------------------------- events -------------------------------- */
@@ -980,6 +1124,7 @@ export class Orchestrator {
           name: server.name,
           state: client?.state ?? 'stopped',
           tools: client?.toolsList().map((tool) => tool.name) ?? [],
+          needsOAuth,
           error: client?.lastError ?? undefined
         }
       },
@@ -1149,24 +1294,104 @@ export class Orchestrator {
     return project
   }
 
-  memoryStats(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['stats']>>> {
+  async memoryStats(
+    projectId: string
+  ): Promise<Awaited<ReturnType<ProjectMemory['stats']>> & { indexed?: number; aiRunning?: boolean }> {
     this.requireProject(projectId)
-    return this.memoryForProject(projectId).stats()
+    const stats = await this.memoryForProject(projectId).stats()
+    const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
+    return { ...stats, indexed: indexed.length, aiRunning: this.aiMemory.status().running }
   }
 
-  memoryList(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['listPages']>>> {
+  /**
+   * Native wiki pages plus AI-Memory pages that are not a session transcript
+   * and have no native twin. Session transcripts stay out of the page grid (a
+   * long project would drown it); they are still searchable by the agent and
+   * available through `memory_recall`.
+   */
+  async memoryList(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['listPages']>>> {
     this.requireProject(projectId)
-    return this.memoryForProject(projectId).listPages()
+    const native = await this.memoryForProject(projectId).listPages()
+    const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
+    const known = new Set(native.map((page) => page.title.trim().toLowerCase()))
+    const extra = indexed
+      .filter(
+        (hit) =>
+          !hit.path.startsWith('sessions/') &&
+          !hit.path.startsWith('s/') &&
+          !known.has(hit.title.trim().toLowerCase())
+      )
+      .map((hit) => ({
+        slug: aiPageId(hit.path),
+        title: hit.title,
+        tags: ['ai-memory'],
+        pinned: false,
+        updated: hit.updated ?? new Date().toISOString(),
+        summary: hit.snippet.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').slice(0, 220),
+        terms: [] as string[],
+        source: 'ai-memory' as const,
+        path: hit.path
+      }))
+    return [...native.map((page) => ({ ...page, source: 'wiki' as const })), ...extra]
   }
 
-  memoryRead(projectId: string, slug: string): Promise<Awaited<ReturnType<ProjectMemory['readPage']>>> {
+  async memoryRead(projectId: string, slug: string): Promise<Awaited<ReturnType<ProjectMemory['readPage']>>> {
     this.requireProject(projectId)
+    if (slug.startsWith(AI_PAGE_PREFIX)) {
+      const page = await this.aiMemory.readPage(projectId, slug.slice(AI_PAGE_PREFIX.length))
+      if (!page) return null
+      return {
+        slug,
+        title: page.title,
+        body: page.body,
+        tags: page.tags,
+        pinned: page.pinned,
+        created: page.updated,
+        updated: page.updated,
+        source: 'ai-memory'
+      }
+    }
     return this.memoryForProject(projectId).readPage(slug)
   }
 
-  memoryDelete(projectId: string, slug: string): Promise<boolean> {
+  async memoryDelete(projectId: string, slug: string): Promise<boolean> {
     this.requireProject(projectId)
-    return this.memoryForProject(projectId).deletePage(slug)
+    if (slug.startsWith(AI_PAGE_PREFIX)) {
+      return this.aiMemory.deletePage(projectId, slug.slice(AI_PAGE_PREFIX.length))
+    }
+    const deleted = await this.memoryForProject(projectId).deletePage(slug)
+    // Curated pages are mirrored into AI-Memory; remove both copies.
+    await this.aiMemory.deletePage(projectId, `pages/${slug}.md`).catch(() => false)
+    return deleted
+  }
+
+  /** A bounded, ranked view of the project's long-term memory for the agent. */
+  async memoryRecall(projectId: string, query: string, limit = 10): Promise<{ text: string; hits: number }> {
+    this.requireProject(projectId)
+    return this.aiMemory.recall(projectId, query, limit)
+  }
+
+  /** Public status used by Configurações → Memória. */
+  aiMemoryStatus(): import('./ai-memory.js').AiMemoryStatus {
+    return { ...this.aiMemory.status(), root: this.aiMemory.root }
+  }
+
+  /** Deletes a project's sessions, native wiki and AI-Memory index. */
+  async deleteProject(projectId: string): Promise<void> {
+    const project = this.requireProject(projectId)
+    const sessions = (await this.store.listSessions()).filter((session) => session.meta.projectId === projectId)
+    for (const session of sessions) await this.deleteSession(session.meta.id)
+    await this.store.removeProject(projectId)
+    this.projectMemories.delete(projectId)
+    this.approvals.clear(projectId)
+    await fs.promises
+      .rm(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', projectId), {
+        recursive: true,
+        force: true
+      })
+      .catch(() => undefined)
+    await this.aiMemory.purgeProject(projectId)
+    this.options.log?.(`projeto ${project.name} (${projectId}) excluído com memória e sessões`)
   }
 
   memoryRoot(projectId: string): string {
@@ -1178,10 +1403,10 @@ export class Orchestrator {
   async memoryExportMarkdown(projectId: string): Promise<{ path: string; markdown: string; pages: number }> {
     this.requireProject(projectId)
     const memory = this.memoryForProject(projectId)
-    const pages = await memory.listPages()
+    const pages = await this.memoryList(projectId)
     const chunks: string[] = [`# AI-Memory — ${projectId}`, '']
     for (const page of pages) {
-      const full = await memory.readPage(page.slug)
+      const full = await this.memoryRead(projectId, page.slug)
       if (!full) continue
       chunks.push(`<!-- slug: ${full.slug} -->`, `# ${full.title}`, '', full.body.trim(), '')
     }
@@ -1199,7 +1424,16 @@ export class Orchestrator {
       const heading = /^#\s+(.+)$/m.exec(raw)?.[1]?.trim()
       const title = heading || file.name.replace(/\.md$/i, '').replace(/[-_]+/g, ' ').trim() || 'Memória importada'
       const body = heading ? raw.replace(/^#\s+.+\n?/, '').trim() : raw.trim()
-      await memory.writePage({ title, body, tags: ['importado'], source: 'import' })
+      const page = await memory.writePage({ title, body, tags: ['importado'], source: 'import' })
+      await this.aiMemory
+        .writePage(projectId, {
+          path: `pages/${page.slug}.md`,
+          title: page.title,
+          body,
+          tags: page.tags,
+          tier: 'semantic'
+        })
+        .catch(() => undefined)
       imported++
     }
     return imported
@@ -1207,6 +1441,33 @@ export class Orchestrator {
 }
 
 /* ------------------------------- helpers -------------------------------- */
+
+const AI_PAGE_PREFIX = 'ai:'
+
+function aiPageId(pagePath: string): string {
+  return `${AI_PAGE_PREFIX}${pagePath}`
+}
+
+function shortHash(value: string): string {
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 10)
+}
+
+/** Human-readable execution log of one turn, used in the AI-Memory page. */
+function renderTurnTranscript(messages: Message[]): string {
+  const lines: string[] = []
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'tool_call') {
+        const args = JSON.stringify(part.args ?? {}).replace(/\s+/g, ' ').slice(0, 900)
+        lines.push(`### Ferramenta: ${part.name}`, '', '```json', args, '```', '')
+      } else if (part.type === 'tool_result') {
+        const text = (part.text ?? '').replace(/```/g, '``\u200b`').slice(0, 4_000)
+        lines.push(`**Resultado de ${part.name}:** ${part.ok ? 'ok' : 'falhou'}`, '', text || '(vazio)', '')
+      }
+    }
+  }
+  return lines.join('\n').trim()
+}
 
 function userDataPath(base: string, child: string): string {
   return path.join(base, child)

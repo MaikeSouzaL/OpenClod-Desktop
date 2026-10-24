@@ -458,10 +458,22 @@ export function buildCatalogServer(
     }
   }
 
-  if (entry.oauth && !Object.keys(headers).length) {
-    return { server: null, missing: ['login OAuth'], needsOAuth: true }
-  }
   if (missing.length) return { server: null, missing, needsOAuth: false }
+  if (entry.oauth && !Object.keys(headers).length) {
+    // OAuth is interactive: the server is installed without a token and the
+    // client starts the browser flow on the first 401.
+    const server: McpServerSettings = {
+      name: (values.name || entry.id).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60),
+      type: entry.transport,
+      command: entry.command ?? '',
+      args: (entry.args ?? []).map((arg) => substitute(arg, env)),
+      enabled: true
+    }
+    if (entry.url) server.url = entry.url
+    if (Object.keys(env).length) server.env = env
+    if (entry.approvalTools?.length) server.approvalTools = [...entry.approvalTools]
+    return { server, missing: [], needsOAuth: true }
+  }
 
   if (entry.basicAuth) {
     const user = env[entry.basicAuth.user]

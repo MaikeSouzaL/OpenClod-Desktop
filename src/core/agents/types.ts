@@ -48,12 +48,15 @@ export interface SubagentCaller {
   workspace: WorkspaceGuard
   tracker: Tracker
   project: { name: string; branch?: string; isGitRepo: boolean }
+  /** Owning project id, shared by every agent in the tree (AI-Memory scope). */
+  projectId?: string
   services: {
     browser: BrowserLayer
     computer: ComputerLayer
     skills: SkillLibrary
     memory: MemoryStore
     projectMemory: ProjectMemory
+    aiMemory?: import('../tools/types.js').AiMemoryToolService
   }
   /** Team mode toggle (also forced by effort "max"). */
   autoAgents?: boolean

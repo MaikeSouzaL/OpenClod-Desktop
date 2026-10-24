@@ -1,14 +1,24 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import type { ApprovalRequest } from '../../../shared/types'
 import { Icon } from './Icons'
 import { RISK_LABELS, toolLabel } from '../lib/format'
 
 interface ApprovalDockProps {
   approvals: ApprovalRequest[]
-  onResolve(id: string, approved: boolean, always: boolean): void
+  onResolve(id: string, approved: boolean, always: boolean, reason?: string): void
+}
+
+const EFFECT_LABELS: Record<string, string> = {
+  read: 'leitura',
+  write: 'escrita',
+  execute: 'execução',
+  network: 'rede',
+  control: 'controle de interface',
+  destructive: 'destrutivo'
 }
 
 export function ApprovalDock({ approvals, onResolve }: ApprovalDockProps): ReactElement | null {
+  const [reasons, setReasons] = useState<Record<string, string>>({})
   if (!approvals.length) return null
 
   return (
@@ -23,12 +33,26 @@ export function ApprovalDock({ approvals, onResolve }: ApprovalDockProps): React
               <strong>{approval.title}</strong>
               <span>
                 {toolLabel(approval.tool)} · risco {RISK_LABELS[approval.risk] ?? approval.risk}
+                {approval.effect ? ` · efeito: ${EFFECT_LABELS[approval.effect] ?? approval.effect}` : ''}
               </span>
             </div>
           </div>
-          <pre className="approval-detail">{approval.preview || approval.detail}</pre>
+          <pre className="approval-detail">{approval.resource || approval.preview || approval.detail}</pre>
+          <input
+            className="approval-reason"
+            value={reasons[approval.id] ?? ''}
+            onChange={(event) =>
+              setReasons((current) => ({ ...current, [approval.id]: event.target.value }))
+            }
+            placeholder="Motivo ou instrução para o agente (opcional, enviado no feedback)"
+            spellCheck={false}
+          />
           <div className="approval-actions">
-            <button type="button" className="btn ghost" onClick={() => onResolve(approval.id, false, false)}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => onResolve(approval.id, false, false, reasons[approval.id] ?? '')}
+            >
               Negar
             </button>
             <button type="button" className="btn subtle" onClick={() => onResolve(approval.id, true, true)}>
@@ -37,7 +61,7 @@ export function ApprovalDock({ approvals, onResolve }: ApprovalDockProps): React
             <button
               type="button"
               className={`btn ${approval.risk === 'destructive' ? 'danger' : 'primary'}`}
-              onClick={() => onResolve(approval.id, true, false)}
+              onClick={() => onResolve(approval.id, true, false, reasons[approval.id] ?? '')}
             >
               Aprovar
             </button>

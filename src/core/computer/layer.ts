@@ -118,6 +118,10 @@ export class ComputerLayer {
   private starting: Promise<McpClient> | null = null
   private lastCapture: CaptureInfo | null = null
   private allowControl = false
+  /** Incremented on every successful accessibility snapshot. */
+  private generation = 0
+  /** Last successful snapshot, used to verify that an action changed the UI. */
+  private lastSnapshot: { id: string; target: string; signature: string } | null = null
 
   constructor(ocuPath?: string | null) {
     const found = resolveOcu(ocuPath)
@@ -198,8 +202,29 @@ export class ComputerLayer {
    */
   private async elementAction(tool: string, target: Target, args: Record<string, unknown>): Promise<ToolResult> {
     const full = { ...targetArgs(target), ...args }
+    const targetKey = targetSignature(target)
+    const before = this.lastSnapshot?.target === targetKey ? this.lastSnapshot.signature : null
     const first = await this.call(tool, full)
-    if (first.ok || !NO_STATE.test(first.text)) return first
+    if (first.ok || !NO_STATE.test(first.text)) {
+      if (!first.ok) return first
+      // Formal post-action verification: every element action leaves a fresh
+      // accessibility snapshot and reports whether the UI actually changed.
+      const snap = await this.snapshot(target, false)
+      if (snap.ok) {
+        const after = this.lastSnapshot
+        return {
+          ...first,
+          text: `${first.text}\n[verificação: ${before == null ? 'sem linha de base' : before === after?.signature ? 'estado não mudou' : 'estado mudou'} · snapshot ${after?.id}]`,
+          data: {
+            ...(typeof first.data === 'object' && first.data ? (first.data as Record<string, unknown>) : {}),
+            snapshot_id: after?.id,
+            generation: this.generation,
+            state_changed: before == null ? null : before !== after?.signature
+          }
+        }
+      }
+      return first
+    }
     const snap = await this.snapshot(target, false)
     if (!snap.ok) return first
     return this.call(tool, full)
@@ -215,16 +240,30 @@ export class ComputerLayer {
 
   /** UI Automation tree (with element indices) of an app or a window. */
   async snapshot(target: Target, includeScreenshot = false): Promise<ToolResult> {
-    if (target.window != null) {
-      return this.call('get_window_state', {
-        ...targetArgs(target),
-        include_text: true,
-        ...(includeScreenshot ? { include_screenshot: true } : {})
-      })
+    let result =
+      target.window != null
+        ? await this.call('get_window_state', {
+            ...targetArgs(target),
+            include_text: true,
+            ...(includeScreenshot ? { include_screenshot: true } : {})
+          })
+        : target.app
+          ? await this.call('get_app_state', { app: target.app })
+          : ({ ok: false, text: 'informe app ou window' } as ToolResult)
+    if (!includeScreenshot && result.images) result = { ...result, images: undefined }
+    if (result.ok) {
+      this.generation++
+      const id = `snap_${this.generation.toString(36)}_${Date.now().toString(36)}`
+      this.lastSnapshot = { id, target: targetSignature(target), signature: signatureOf(result.text) }
+      return {
+        ...result,
+        data: {
+          ...(typeof result.data === 'object' && result.data ? (result.data as Record<string, unknown>) : {}),
+          snapshot_id: id,
+          generation: this.generation
+        }
+      }
     }
-    if (!target.app) return { ok: false, text: 'informe app ou window' }
-    const result = await this.call('get_app_state', { app: target.app })
-    if (!includeScreenshot && result.images) return { ...result, images: undefined }
     return result
   }
 
@@ -471,4 +510,18 @@ export class ComputerLayer {
 export function pngSize(buffer: Buffer): { width: number; height: number } {
   if (buffer.length < 24 || buffer.toString('ascii', 1, 4) !== 'PNG') return { width: 0, height: 0 }
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) }
+}
+
+function targetSignature(target: Target): string {
+  return target.window != null ? `window:${target.window}` : `app:${target.app ?? ''}`
+}
+
+/** Stable, cheap fingerprint of an accessibility tree (FNV-1a). */
+function signatureOf(text: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return `${text.length.toString(36)}:${(hash >>> 0).toString(36)}`
 }
