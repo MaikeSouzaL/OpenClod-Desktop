@@ -875,6 +875,41 @@ function registerIpc(): void {
   handle(CH.memoryDelete, async (projectId, slug) =>
     need().memoryDelete(str(projectId, 'projectId', 80), str(slug, 'slug', 80))
   )
+  handle(CH.memoryExport, async (projectId) => {
+    const id = str(projectId, 'projectId', 80)
+    const bundle = await need().memoryExportMarkdown(id)
+    const options = {
+      title: 'Exportar AI-Memory',
+      defaultPath: `openclod-memory-${id}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    }
+    const chosen =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showSaveDialog(mainWindow, options)
+        : await dialog.showSaveDialog(options)
+    if (chosen.canceled || !chosen.filePath) return null
+    fs.writeFileSync(chosen.filePath, bundle.markdown, 'utf8')
+    return chosen.filePath
+  })
+  handle(CH.memoryImport, async (projectId) => {
+    const id = str(projectId, 'projectId', 80)
+    const options = {
+      title: 'Importar memória (pasta com arquivos .md)',
+      properties: ['openDirectory'] as Array<'openDirectory'>
+    }
+    const chosen =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options)
+    if (chosen.canceled || !chosen.filePaths[0]) return 0
+    const dir = chosen.filePaths[0]
+    const files: Array<{ name: string; content: string }> = []
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue
+      files.push({ name: entry.name, content: fs.readFileSync(path.join(dir, entry.name), 'utf8') })
+    }
+    return need().memoryImportMarkdown(id, files)
+  })
   handle(CH.memoryOpen, async (projectId) => {
     const root = need().memoryRoot(str(projectId, 'projectId', 80))
     fs.mkdirSync(root, { recursive: true })

@@ -395,6 +395,8 @@ export const CH = {
   memoryRead: 'memory:read',
   memoryDelete: 'memory:delete',
   memoryOpen: 'memory:open',
+  memoryExport: 'memory:export',
+  memoryImport: 'memory:import',
   powerState: 'power:state',
 
   schedulesList: 'schedules:list',
@@ -529,6 +531,10 @@ export interface OpenclodApi {
     delete(projectId: string, slug: string): Promise<IpcResult<boolean>>
     /** Opens the project's memory folder in Explorer. */
     open(projectId: string): Promise<IpcResult<boolean>>
+    /** Saves every page as one Markdown bundle; returns the chosen path. */
+    exportMarkdown(projectId: string): Promise<IpcResult<string | null>>
+    /** Imports all .md files from a chosen folder as memory pages. */
+    importMarkdown(projectId: string): Promise<IpcResult<number>>
   }
   power: {
     keepAwake(enabled: boolean): Promise<IpcResult<boolean>>

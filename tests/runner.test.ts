@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { SessionRunner, type RunnerDeps } from '../src/core/agent/runner'
+import { SessionRunner, repairOrphanToolCalls, trimInlineImages, type RunnerDeps } from '../src/core/agent/runner'
 import { ScriptedProvider } from '../src/core/providers/mock'
 import { buildRegistry } from '../src/core/tools/registry'
 import { FileTracker } from '../src/core/session/tracker'
@@ -276,8 +276,7 @@ describe('MCP tools and effort reach the model', () => {
   })
 })
 
-describe('model fallback', () => {
-  const backupConfig = {
+describe('model fallback', () => {  const backupConfig = {
     id: 'mock-backup',
     kind: 'mock' as const,
     label: 'Backup',
@@ -358,5 +357,92 @@ describe('model fallback', () => {
 
     expect(runner.state).toBe('error')
     expect(runner.messages.at(-1)?.error).toContain('401')
+  })
+})
+
+describe('crash recovery', () => {  it('repairs tool calls left without a result after a forced quit', () => {
+    const assistant = {
+      id: 'msg_a',
+      role: 'assistant' as const,
+      ts: 1,
+      parts: [
+        { type: 'tool_call' as const, id: 'call_1', name: 'read_file', args: { path: 'a' } },
+        { type: 'tool_call' as const, id: 'call_2', name: 'run_command', args: { command: 'npm test' } }
+      ]
+    }
+    const tool = {
+      id: 'msg_t',
+      role: 'tool' as const,
+      ts: 2,
+      parts: [
+        { type: 'tool_result' as const, toolCallId: 'call_1', name: 'read_file', ok: true, text: 'conteúdo' }
+      ]
+    }
+    const { messages, repaired } = repairOrphanToolCalls([assistant, tool])
+    expect(repaired).toBe(1)
+    const results = messages.flatMap((message) => message.parts).filter((part) => part.type === 'tool_result')
+    expect(results.map((part) => part.toolCallId).sort()).toEqual(['call_1', 'call_2'])
+    const interrupted = results.find((part) => part.toolCallId === 'call_2')
+    expect(interrupted).toMatchObject({ ok: false })
+    expect(interrupted?.text).toMatch(/interrompida/i)
+  })
+
+  it('leaves a complete conversation untouched', () => {
+    const assistant = {
+      id: 'msg_a',
+      role: 'assistant' as const,
+      ts: 1,
+      parts: [{ type: 'tool_call' as const, id: 'call_1', name: 'read_file', args: {} }]
+    }
+    const tool = {
+      id: 'msg_t',
+      role: 'tool' as const,
+      ts: 2,
+      parts: [{ type: 'tool_result' as const, toolCallId: 'call_1', name: 'read_file', ok: true, text: 'ok' }]
+    }
+    const { messages, repaired } = repairOrphanToolCalls([assistant, tool])
+    expect(repaired).toBe(0)
+    expect(messages).toHaveLength(2)
+  })
+})
+
+describe('inline image budget', () => {
+  it('keeps the newest images and explains the removed ones', () => {
+    const data = 'A'.repeat(100)
+    const image = { type: 'image' as const, mediaType: 'image/png' as const, data }
+    const toolResult = (id: string) => ({
+      id: `msg_${id}`,
+      role: 'tool' as const,
+      ts: 1,
+      parts: [
+        {
+          type: 'tool_result' as const,
+          toolCallId: id,
+          name: 'computer_screenshot',
+          ok: true,
+          text: 'captura',
+          images: [image]
+        }
+      ]
+    })
+    const trimmed = trimInlineImages([toolResult('old'), toolResult('middle'), toolResult('new')], 160, 80)
+    expect(trimmed).toHaveLength(3)
+    const images = trimmed.flatMap((message) => message.parts).filter((part) => part.type === 'tool_result')
+    expect(images[0].images).toBeUndefined()
+    expect(images[1].images).toBeUndefined()
+    expect(images[2].images).toHaveLength(1)
+    expect(images[0].text).toMatch(/removida/i)
+  })
+
+  it('does not touch a conversation under the trigger', () => {
+    const messages = [
+      {
+        id: 'm',
+        role: 'user' as const,
+        ts: 1,
+        parts: [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'A'.repeat(40) }]
+      }
+    ]
+    expect(trimInlineImages(messages, 1000, 500)).toBe(messages)
   })
 })

@@ -106,7 +106,9 @@ const api: OpenclodApi = {
     list: (projectId) => call(CH.memoryList, projectId),
     read: (projectId, slug) => call(CH.memoryRead, projectId, slug),
     delete: (projectId, slug) => call(CH.memoryDelete, projectId, slug),
-    open: (projectId) => call(CH.memoryOpen, projectId)
+    open: (projectId) => call(CH.memoryOpen, projectId),
+    exportMarkdown: (projectId) => call(CH.memoryExport, projectId),
+    importMarkdown: (projectId) => call(CH.memoryImport, projectId)
   },
   power: {
     keepAwake: (enabled) => call(CH.powerKeepAwake, enabled),

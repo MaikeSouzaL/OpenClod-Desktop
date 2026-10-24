@@ -1137,6 +1137,37 @@ export class Orchestrator {
     this.requireProject(projectId)
     return this.memoryForProject(projectId).root
   }
+
+  /** One Markdown bundle with every memory page; used by the Exportar button. */
+  async memoryExportMarkdown(projectId: string): Promise<{ path: string; markdown: string; pages: number }> {
+    this.requireProject(projectId)
+    const memory = this.memoryForProject(projectId)
+    const pages = await memory.listPages()
+    const chunks: string[] = [`# AI-Memory — ${projectId}`, '']
+    for (const page of pages) {
+      const full = await memory.readPage(page.slug)
+      if (!full) continue
+      chunks.push(`<!-- slug: ${full.slug} -->`, `# ${full.title}`, '', full.body.trim(), '')
+    }
+    return { path: memory.root, markdown: chunks.join('\n'), pages: pages.length }
+  }
+
+  /** Imports Markdown files as memory pages (one page per file). */
+  async memoryImportMarkdown(projectId: string, files: Array<{ name: string; content: string }>): Promise<number> {
+    this.requireProject(projectId)
+    const memory = this.memoryForProject(projectId)
+    let imported = 0
+    for (const file of files) {
+      const raw = file.content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+      if (!raw.trim()) continue
+      const heading = /^#\s+(.+)$/m.exec(raw)?.[1]?.trim()
+      const title = heading || file.name.replace(/\.md$/i, '').replace(/[-_]+/g, ' ').trim() || 'Memória importada'
+      const body = heading ? raw.replace(/^#\s+.+\n?/, '').trim() : raw.trim()
+      await memory.writePage({ title, body, tags: ['importado'], source: 'import' })
+      imported++
+    }
+    return imported
+  }
 }
 
 /* ------------------------------- helpers -------------------------------- */

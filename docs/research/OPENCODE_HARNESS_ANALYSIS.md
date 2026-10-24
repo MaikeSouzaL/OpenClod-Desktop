@@ -2,7 +2,9 @@
 
 > **Objeto analisado:** `sst/opencode`, commit `20a6cc72917586eb5314be075f96dbb21d16c480`
 > (24/10/2026), pacote `@opencode/core` versão **2.1.4**, licença **MIT**.
-> Clone em `%TEMP%\opencode-repo` (somente leitura; o repositório do Openclod não foi alterado).
+> O clone de `sst/opencode` entrega o código atual; o README e o `package.json` apontam
+> para `anomalyco/opencode`. Clone em `%TEMP%\opencode-repo` (somente leitura; o
+> repositório do Openclod não foi alterado).
 >
 > **Método:** leitura direta do código de `packages/core`, `packages/ai`, `packages/plugin`,
 > `packages/plugin-browser`, `packages/gui-extensions`, `packages/desktop` e `packages/cli`.
@@ -11,7 +13,10 @@
 > arquitetura e nos protocolos**, não em copiar arquivos.
 >
 > **Legenda:** caminhos sem prefixo são do repositório do OpenCode. Caminhos `src/...` são
-> do Openclod (`C:\Users\Administrator\Desktop\Openclaudedescktop`).
+> do Openclod (`C:\Users\Administrator\Desktop\Openclaudedescktop`). Citações curtas como
+> `runner/llm.ts`, `tool/...`, `permission/...` são relativas a `packages/core/src/`;
+> `schema/...` é `packages/schema/src/...`; `config/plugin/...` é
+> `packages/core/src/config/plugin/...`.
 >
 > A licença MIT permite reutilizar ideias e trechos com atribuição. As propostas abaixo
 > assumem **reimplementação** no estilo do Openclod, não cópia de arquivos.
@@ -45,9 +50,10 @@
    85% e só o troca quando a compactação é devida, além de validar o template e dar um
    “nudge” quando o modelo não o segue.
 8. O OpenCode **não faz fallback de modelo**. Ele repete o mesmo modelo com política de
-   retry (2s→10s, 10 tentativas, jitter, `Retry-After` limitado a 15 min, no máximo 3
-   retries de timeout). O Openclod já tem fallback (`MAX_MODEL_FALLBACKS = 8`), então aqui
-   estamos à frente; o que vale portar é a política de retry e a continuação de stream.
+   retry (2s→10s, até 10 retries, jitter, `Retry-After` limitado a 15 min, no máximo 3
+   retries de timeout). O Openclod já tem fallback (`MAX_MODEL_FALLBACKS = 8`, quando
+   `useAllModels` está ligado), então aqui estamos à frente; o que vale portar é a política
+   de retry e a continuação de stream.
 9. Em MCP, o OpenCode tem OAuth completo (loopback 127.0.0.1, PKCE, state, DCR/CIMD,
    credencial persistida), máquina de estados (`pending/connected/failed/needs_auth/disabled`),
    reconexão em sessão expirada, `tools/list_changed`, timeouts separados e instruções do
@@ -97,7 +103,7 @@ settlement).
 
 O detalhe importante é que `runStep` **não** reinicia o passo a cada retry: ele reusa o
 mesmo `assistantMessageID` e só o troca em compactação, continuação de output ou stream
-interrompido com output (`llm.ts:208-221`, `:290-335`). O Openclod hoje usa `iteration` como
+interrompido com output (`runner/llm.ts:208-221`, `:290-335`). O Openclod hoje usa `iteration` como
 unidade de tudo (`src/core/agent/runner.ts:661-707`), o que dificulta distinguir “tentativa
 que falhou” de “passo que produziu efeitos”.
 
@@ -107,7 +113,7 @@ que falhou” de “passo que produziu efeitos”.
   retomada, UI e contabilização de custo.
 - **Eventos duráveis** de início/fim de passo e de ferramenta, com settlement explícito
   (`Step.Started`, `Step.Ended`, `Tool.Called`, `Tool.Success`, `Tool.Failed`). O OpenCode
-  trata ferramenta não liquidada no boot (`llm.ts:371-394`) — o Openclod não tem essa
+  trata ferramenta não liquidada no boot (`runner/llm.ts:371-394`) — o Openclod não tem essa
   recuperação.
 - **Inbox durável** com `steer`/`queue` (seção 3.6).
 
@@ -149,6 +155,10 @@ Browser.Operations.forEach((operation) => {
 })
 ```
 
+Por padrão essas ferramentas entram no catálogo do **Code Mode** (`codemode: true` em
+`tools.ts:47`), então o modelo as chama dentro de `execute`; um agente pode recebê-las
+diretamente se o plugin optar por `codemode: false`.
+
 Operações disponíveis (nomes reais):
 
 | Grupo | Operações |
@@ -184,7 +194,17 @@ Pontos de design que valem ouro:
 9. **Timeout e desconexão produzem “resultado desconhecido”**, com instrução explícita de
    inspecionar antes de repetir ação mutável (`connection.ts:203-251`).
 10. **Permissão `browser` é negada por padrão** em todos os agentes e só é concedida à
-    sessão enquanto o desktop está anexado (`connection.ts:24-53`, `:85-105`).
+    sessão enquanto o desktop está anexado (`connection.ts:24-53`, `:85-105`). A concessão
+    não é um “ask” por chamada: ela inclui ou remove as ferramentas do catálogo
+    (`whollyDisabled` em `tool.ts:293-296`); sem a regra, a ferramenta nem aparece para o
+    modelo.
+
+O ciclo recomendado é **dirigido pelo modelo**, não por um verificador separado:
+`tabs.list`/`tabs.open` → `tabs.focus` → `snapshot` (obtém refs) → `click`/`fill`/`press`
+→ `wait` por `load`/`text` → novo `snapshot` (ou `screenshot`). Cada `snapshot` invalida
+os refs anteriores; cada navegação incrementa a geração. Se a ação não produz a mudança
+esperada, o modelo deve reler o estado e mudar de abordagem, não repetir o mesmo clique
+(`rpc.ts:300-328`; `chromium.ts:1164-1170`).
 
 ### 2.3 Como o desktop e o servidor conversam
 
@@ -250,7 +270,10 @@ Após `click`, `type`, `press`, `set_value`, `drag`, `scroll`, a ferramenta deve
 4. se nada mudou, devolver `changed: false` com instrução para não repetir o mesmo clique.
 
 Isso transforma a regra “verifique o estado após cada ação”, hoje só no prompt, em
-comportamento do harness. É a maior melhoria de confiabilidade do Computer Use.
+comportamento do harness. É a maior melhoria de confiabilidade do Computer Use. O
+`BrowserLayer` do Openclod já faz algo parecido: `browser_click` e `browser_type` tiram um
+novo snapshot e o devolvem ao modelo (`src/core/tools/browser.ts:101-105`, `:136-138`); o
+Computer Use deveria seguir o mesmo contrato.
 
 **P0 — Taxonomia de erro e “outcome unknown”**
 
@@ -307,7 +330,7 @@ needsContinuation: Iterable.some(
 
 Se houve ferramenta local chamada ou liquidada, o passo precisa de continuação; se não,
 o turno termina. O `runStep` então retorna `needsContinuation` e o `drain` decide se chama
-outro passo (`llm.ts:275-337`). Isso é mais robusto do que olhar `finish_reason`, porque o
+outro passo (`runner/llm.ts:275-337`). Isso é mais robusto do que olhar `finish_reason`, porque o
 provedor pode devolver `stop` com tool calls pendentes ou `tool_calls` sem execução.
 
 **Portar:** formalizar `needsContinuation` no `SessionRunner` do Openclod, calculado a
@@ -318,12 +341,12 @@ facilita retomada e testes.
 ### 3.2 Limite de output e continuações
 
 - Máximo de **2 continuações** após `finish === "length"`; na terceira resposta truncada
-  consecutiva, falha com `output-limit` (`llm.ts:299-328`).
+  consecutiva, falha com `output-limit` (`runner/llm.ts:299-328`).
 - Cada continuação é uma mensagem sintética: “sua resposta anterior foi cortada; continue
-  sem repetir; quebre o restante em partes menores” (`llm.ts:37-38`).
+  sem repetir; quebre o restante em partes menores” (`runner/llm.ts:37-38`).
 - O passo final de um agente com `steps` definido mantém as **definições de ferramentas**
   (para preservar o prefixo do cache), mas envia `toolChoice: "none"` e um prompt
-  `MAX_STEPS_PROMPT` que proíbe ferramentas e pede resumo (`llm.ts:224-243`;
+  `MAX_STEPS_PROMPT` que proíbe ferramentas e pede resumo (`runner/llm.ts:224-243`;
   `runner/max-steps.ts:1-16`).
 
 O Openclod já tem `MAX_LENGTH_CONTINUATIONS = 2` (`src/core/agent/runner.ts:58`), o prompt
@@ -336,7 +359,7 @@ explícito. Vale alinhar para o usuário saber que o resultado está incompleto.
 **Retry do OpenCode** (`packages/core/src/model-retry.ts:11-59`):
 
 - backoff exponencial de 2s, limitado a 10s por gap, com jitter;
-- 10 tentativas (cerca de 84s no pior caso);
+- até 10 retries (cerca de 84s de espera no pior caso);
 - `Retry-After` do provedor respeitado, mas **limitado a 15 minutos**;
 - no máximo **3 retries de timeout**, porque uma tentativa que já esperou minutos não pode
   segurar o turno por quase uma hora;
@@ -346,7 +369,7 @@ explícito. Vale alinhar para o usuário saber que o resultado está incompleto.
 
 - se **nada** foi emitido, `RecoverFull` refaz a requisição inteira;
 - se **algo** já foi emitido e o stream caiu, `Continue` mantém o output e injeta
-  “a resposta anterior foi interrompida; continue de onde parou” (`llm.ts:290-298`);
+  “a resposta anterior foi interrompida; continue de onde parou” (`runner/llm.ts:290-298`);
 - isso evita duplicar texto já mostrado ao usuário.
 
 **Fallback de modelo: o OpenCode não tem.** A busca por fallback em `packages/core/src`
@@ -354,7 +377,8 @@ encontra apenas fallback de seleção de agente, de rota WebSocket→HTTP
 (`packages/ai/src/protocols/open-responses.ts:195-219`) e de valores de configuração. Não
 há cadeia “modelo A falhou → modelo B”. O Openclod tem
 `MAX_MODEL_FALLBACKS = 8` e troca de provedor em `quota/rate_limit/overloaded/auth/
-bad_request/server/network/timeout` (`src/core/agent/runner.ts:66-77`, `:797-813`).
+bad_request/server/network/timeout` quando `useAllModels` está ligado
+(`src/core/agent/runner.ts:66-77`, `:797-813`; `src/main/orchestrator.ts:248`).
 
 **Recomendação para o Openclod:** manter o fallback (é um diferencial), mas:
 - não trocar de modelo em `auth` e `bad_request` — são erros de configuração do provedor
@@ -441,7 +465,7 @@ cancelar e sem perder o trabalho, e o agente vê a correção no próximo passo.
 
 No boot de uma sessão, o OpenCode varre mensagens de assistant com ferramentas em
 `streaming`/`running` e publica `Tool.Failed` com “Tool execution interrupted”
-(`llm.ts:371-394`). Também liquida compactações órfãs (`:341-369`).
+(`runner/llm.ts:371-394`). Também liquida compactações órfãs (`:341-369`).
 
 O Openclod persiste o transcript, mas não tem essa varredura. Se o app cair no meio de uma
 ferramenta, a UI pode mostrar um spinner eterno. **P1 barato:** no `ensureRunner`, varrer
@@ -546,8 +570,8 @@ respostas ambíguas e mantém o turno vivo.
 2. **Permissão por subagente** no runtime: antes de `spawnAgent`, avaliar
    `subagent:<agentName>` contra o ruleset do chamador; devolver erro textual claro.
 3. **Continuar subagente** por `sessionID`: hoje `spawnAgent` sempre cria `childId` novo
-   (`runtime.ts:310-340`). Guardar o transcript da criança e permitir `resume` com o mesmo
-   `childId`, validando que o pai é o mesmo.
+   (`src/core/agents/runtime.ts:310-340`). Guardar o transcript da criança e permitir
+   `resume` com o mesmo `childId`, validando que o pai é o mesmo.
 4. **Background**: executar `spawnAgent` em promessa destacada, retornar `sessionId` e
    injetar `<subagent ...>` no pai ao terminar. O `AgentTree` já tem contadores; falta o
    registro de jobs e a notificação.
@@ -556,6 +580,29 @@ respostas ambíguas e mantém o turno vivo.
    e `.forja/agents` com debounce, como o OpenCode faz.
 6. **Plan mode**: manter a regra de deny no motor de regras e reinjetar o lembrete após
    compactação, em vez de confiar só no system prompt.
+
+### 4.5 Montagem do prompt de sistema
+
+O OpenCode monta o system prompt em camadas:
+
+1. **Base**: `runner/prompt/system.txt` (harness, comunicação, regras de codebase), com
+   `OPENCODE_TOOL_GUIDANCE` substituído por instruções condicionais: só fala de `shell` se
+   `shell` está no catálogo; só fala de `write`/`edit` se existem (`session/system-prompt.ts:5-27`;
+   `runner/prompt/system.txt:1-15`).
+2. **Override do agente**: se o agente tem `system`, ele substitui a base inteira
+   (`session/model-request.ts:102-109`).
+3. **Instruções iniciais**: `history.initial`, que carrega a data, ambiente e os blocos de
+   instrução (Code Mode, MCP, skills, AGENTS.md etc.) na ordem estável→volátil
+   (`session/context.ts:126-166`).
+4. **Lembretes de modo**: Plan mode injeta `<system-reminder>` como mensagem sintética,
+   não como parte do system prompt (`plugin/plan.ts:55-72`).
+
+O Openclod hoje tem um prompt único e monolítico (`src/core/agent/context.ts:165-234`), com
+todas as seções e listas dentro dele. Vale portar pelo menos:
+
+- **tool guidance condicional** (não descrever ferramentas que o modo não oferece);
+- **ordem estável→volátil** (regras, ambiente, projeto, memória, skills);
+- **lembretes de modo como mensagens sintéticas**, não como reescrita do prompt.
 
 ---
 
@@ -756,8 +803,8 @@ app desktop sem expor porta.
   `SessionExpiredError`; o lifecycle reconecta e **reexecuta a chamada uma vez**
   (`client.ts:238-258`; `mcp/index.ts:362-389`).
 - `tools/list_changed`, `prompts/list_changed`, `resources/list_changed` são assinados e
-  atualizam o catálogo com debounce de 100ms (`client.ts:167-172`, `:407-415`;
-  `tool/mcp.ts:127-139`).
+  atualizam o catálogo (tools com debounce de 100ms; prompts/resources na hora)
+  (`client.ts:167-172`, `:407-415`; `tool/mcp.ts:127-139`).
 - Status: `pending`, `connected`, `failed`, `needs_auth`, `disabled`
   (`schema/mcp.ts:69-88`). A conexão inicial é assíncrona; um servidor lento não bloqueia
   o startup (`mcp/index.ts:660-704`).
@@ -1023,7 +1070,7 @@ ao desligar/fechar, remover a regra.
 | Skill embutida | Sim, plugin registra skills builtin | `plugin/skill.ts:23-48` | Não |
 | Plugin npm | Sim, `npm.add` no load | `plugin/module.ts:98-124`; `packages/util/src/npm.ts:207-277` | Não há plugins |
 | Atualização de plugin | Check a cada 24h | `plugin/update.ts:11-68` | Não |
-| MCP pelo agente | **Não**; só CLI `mcp add`/`mcp auth` | `packages/cli/.../mcp/add.ts:10-37` | **Sim**, catálogo + registro (`src/core/mcp/registry.ts:145-238`, `src/core/tools/mcp.ts:57-144`) |
+| MCP pelo agente | **Não**; só CLI `mcp add`/`mcp auth` | `packages/cli/src/commands/handlers/mcp/add.ts:10-37` | **Sim**, catálogo + registro (`src/core/mcp/registry.ts:145-238`, `src/core/tools/mcp.ts:57-144`) |
 | MCP OAuth | Sim, fluxo completo | `mcp/oauth.ts:332-543` | **Não**; retorna “peça um token” (`src/core/tools/mcp.ts:111-116`) |
 | Integração well-known | Sim, `/.well-known/opencode` | `wellknown.ts:65-102`, `:119-163` | Não |
 | Agente que cria agente | Não no v2 | — | **Sim**, `create_agent` (`src/core/agents/tools.ts:10-73`) |
@@ -1080,7 +1127,7 @@ um engenheiro familiarizado com o código, incluindo testes.
 | # | Item | Impacto | Esforço | Onde mexer | Critério de pronto |
 |---|---|---|---|---|---|
 | P1.1 | MCP OAuth + status individual + reconexão + timeouts separados | Alto | L (6-10d) | `src/core/mcp/client.ts`, `src/main/orchestrator.ts:187-211`, settings, janela de auth | Servidor remoto com OAuth conecta, guarda refresh em `safeStorage`, reconecta sozinho; um servidor lento não bloqueia os outros |
-| P1.2 | Compactação: `usage` real, precompute, validação de template, modelo separado, shrink ladder | Alto | M (4-6d) | `src/core/agent/compaction.ts`, `runner.ts:941-964` | Contexto de 200k compacta sem estourar; resumo inválido é corrigido; latência do resumo sai do caminho crítico |
+| P1.2 | Compactação: `usage` real, precompute, validação de template, modelo separado, shrink ladder | Alto | M (4-6d) | `src/core/agent/compaction.ts`, `src/core/agent/runner.ts:941-964` | Contexto de 200k compacta sem estourar; resumo inválido é corrigido; latência do resumo sai do caminho crítico |
 | P1.3 | Retry: `Retry-After`, jitter, limite de timeout, continuação de stream parcial | Médio/Alto | S (1-2d) | `src/core/agent/runner.ts:769-813`, providers/http | 429 com `Retry-After` é respeitado; stream que caiu após output continua em vez de duplicar |
 | P1.4 | Orçamento dinâmico de output e de imagens | Médio/Alto | S (1-2d) | `src/core/providers/*`, `src/core/agent/runner.ts:890-895` | Requests não estouram por `max_tokens` fixo; sessão com muitas screenshots não cresce sem limite |
 | P1.5 | Shell por comando + `external_directory` para `cd` | Alto | L (5-8d) | `src/core/security/rules.ts`, `src/core/tools/shell.ts`, novo parser | `cd` fora do projeto pede aprovação; pipeline avalia cada comando; “sempre” salva prefixo seguro |
@@ -1125,7 +1172,7 @@ um engenheiro familiarizado com o código, incluindo testes.
 | Uma tentativa de provedor | `packages/core/src/session/runner/step.ts:52-300` |
 | `needsContinuation` | `packages/core/src/session/runner/publish-llm-event.ts:645-654` |
 | Limite de output | `packages/core/src/session/runner/llm.ts:34-38`, `:299-328` |
-| Max steps | `packages/core/src/session/runner/max-steps.ts:1-16`; `llm.ts:224-243` |
+| Max steps | `packages/core/src/session/runner/max-steps.ts:1-16`; `runner/llm.ts:224-243` |
 | Retry | `packages/core/src/model-retry.ts:11-59`; `runner/retry.ts:35-54` |
 | Compactação | `packages/core/src/session/compaction.ts:118-157`, `:284-349`, `:570-650`, `:954-999`, `:1072-1098` |
 | Orçamento de output | `packages/core/src/session/model-request.ts:47-90` |
@@ -1189,7 +1236,39 @@ um engenheiro familiarizado com o código, incluindo testes.
 
 ---
 
-## 13. Nota final
+## 13. Lista priorizada (resumo)
+
+| Prioridade | Item | Impacto | Esforço |
+|---|---|---|---|
+| **P0** | Aprovação com `deny + feedback`, `always` em lote, regras salvas por ação+recurso | Alto | M (3-4d) |
+| **P0** | Motor de regras `action/resource/effect` com wildcard e último-match | Alto | M (4-5d) |
+| **P0** | Computer Use com refs/geração, verificação pós-ação, erros estruturados e “outcome unknown” | Alto | L (5-7d) |
+| **P0** | Inbox `steer`/`queue` e retomada de turno | Alto | M (3-5d) |
+| **P0** | Concessão efêmera de Computer Use por sessão + overlay | Alto | S/M (2-3d) |
+| **P1** | MCP OAuth + status individual + reconexão + timeouts separados | Alto | L (6-10d) |
+| **P1** | Compactação com `usage` real, precompute, validação e modelo separado | Alto | M (4-6d) |
+| **P1** | Retry com `Retry-After`/jitter/limite de timeout + continuação de stream parcial | Médio/Alto | S (1-2d) |
+| **P1** | Orçamento dinâmico de output e de imagens | Médio/Alto | S (1-2d) |
+| **P1** | Shell por comando + `external_directory` para `cd` | Alto | L (5-8d) |
+| **P1** | Skills com permissão, `autoinvoke`, base dir/arquivos e fonte URL | Médio | M (3-5d) |
+| **P1** | Agentes com permissões/modelo/request no markdown, hot reload, subagente background/resume | Médio/Alto | M/L (5-8d) |
+| **P1** | Remover ferramentas negadas do schema + varrer tool calls órfãs no boot | Médio | S (1d) |
+| **P1** | `ask_user` estruturado | Médio | S (1-2d) |
+| **P2** | MCP instructions/resources/prompts + `list_changed` | Médio | M |
+| **P2** | Code Mode (`execute` com catálogo de tools) | Médio | L |
+| **P2** | API de plugins restrita e isolada | Médio | L |
+| **P2** | MCP attached (transporte do cliente) | Baixo/Médio | M |
+| **P2** | Paridade de browser: frames, network, trace, dialog, upload | Médio | M |
+| **P2** | Plan mode com regra deny + lembrete reinjetado | Baixo/Médio | S |
+| **P2** | Job durável de subagente (retomar após restart) | Médio | L |
+| **P2** | Retenção/limpeza de spill de ferramentas | Baixo | S |
+
+A ordem de execução recomendada está na seção 11; os critérios de pronto estão nas
+tabelas detalhadas de P0 e P1.
+
+---
+
+## 14. Nota final
 
 O maior ganho não está em copiar uma feature isolada, e sim em **separar responsabilidades
 que hoje estão no mesmo laço**: decisão de continuar, tentativa de provedor, aprovação,

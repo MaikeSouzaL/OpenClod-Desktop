@@ -29,6 +29,7 @@ export function MemoryPage({
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const project = useMemo(
     () => projects.find((item) => item.id === projectId) ?? null,
@@ -123,6 +124,39 @@ export function MemoryPage({
           >
             <Icon name="folderOpen" size={13} /> Abrir pasta
           </button>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={!projectId}
+            onClick={async () => {
+              if (!projectId) return
+              try {
+                const saved = await unwrap(window.forja.memory.exportMarkdown(projectId))
+                if (saved) setNotice(`Memória exportada para ${saved}`)
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="download" size={13} /> Exportar
+          </button>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={!projectId}
+            onClick={async () => {
+              if (!projectId) return
+              try {
+                const count = await unwrap(window.forja.memory.importMarkdown(projectId))
+                setNotice(count ? `${count} página(s) importada(s).` : 'Nenhum arquivo .md encontrado.')
+                await load()
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="archive" size={13} /> Importar
+          </button>
           <button type="button" className="btn small" onClick={onOpenSettings}>
             <Icon name="settings" size={13} /> Configurar
           </button>
@@ -159,6 +193,7 @@ export function MemoryPage({
       )}
 
       {error ? <div className="inline-error">{error}</div> : null}
+      {notice ? <div className="panel-note">{notice}</div> : null}
 
       {project ? (
         <>

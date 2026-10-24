@@ -76,6 +76,96 @@ function isFallbackKind(kind: ProviderErrorKind | undefined): boolean {
   )
 }
 
+/**
+ * A crash or a forced quit can leave a tool_call without its tool_result. On
+ * resume, providers reject that shape and the UI can keep a spinner forever.
+ * Insert an explicit "interrupted" result for every missing call.
+ */
+export function repairOrphanToolCalls(messages: Message[]): { messages: Message[]; repaired: number } {
+  const results = new Set<string>()
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'tool_result') results.add(part.toolCallId)
+    }
+  }
+  let repaired = 0
+  const out: Message[] = []
+  for (const message of messages) {
+    out.push(message)
+    if (message.role !== 'assistant') continue
+    const missing = message.parts.filter(
+      (part): part is Extract<Message['parts'][number], { type: 'tool_call' }> =>
+        part.type === 'tool_call' && !results.has(part.id)
+    )
+    if (!missing.length) continue
+    for (const call of missing) results.add(call.id)
+    repaired += missing.length
+    out.push({
+      id: `msg_repair_${message.id}`,
+      role: 'tool',
+      ts: Date.now(),
+      parts: missing.map((call) => ({
+        type: 'tool_result' as const,
+        toolCallId: call.id,
+        name: call.name,
+        ok: false,
+        text: 'Ação interrompida: o aplicativo foi encerrado antes de a ferramenta concluir. O estado do computador é desconhecido; verifique antes de repetir.'
+      }))
+    })
+  }
+  return { messages: out, repaired }
+}
+
+const MAX_INLINE_IMAGE_BYTES = 25 * 1024 * 1024
+const TARGET_INLINE_IMAGE_BYTES = 15 * 1024 * 1024
+
+/**
+ * Screen captures accumulate fast. Before a request, keep the newest images up
+ * to a 15 MB target (trimming only after a 25 MB trigger) and replace the older
+ * ones with an explicit note, so the model never claims to have seen them.
+ */
+export function trimInlineImages(
+  messages: Message[],
+  triggerBytes = MAX_INLINE_IMAGE_BYTES,
+  targetBytes = TARGET_INLINE_IMAGE_BYTES
+): Message[] {
+  const bytesOf = (data: string): number => Math.ceil((data.length * 3) / 4)
+  let total = 0
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'image') total += bytesOf(part.data)
+      if (part.type === 'tool_result' && part.images) {
+        for (const image of part.images) total += bytesOf(image.data)
+      }
+    }
+  }
+  if (total <= triggerBytes) return messages
+
+  const out = messages.map((message) => ({
+    ...message,
+    parts: message.parts.map((part) => ({ ...part })) as Message['parts']
+  }))
+  for (let m = 0; m < out.length && total > targetBytes; m++) {
+    const parts = out[m].parts
+    for (let p = 0; p < parts.length && total > targetBytes; p++) {
+      const part = parts[p]
+      if (part.type === 'image') {
+        total -= bytesOf(part.data)
+        parts[p] = {
+          type: 'text',
+          text: '[captura de tela antiga removida para poupar contexto; não afirme nada sobre ela]'
+        }
+      } else if (part.type === 'tool_result' && part.images?.length) {
+        const removed = part.images.length
+        for (const image of part.images) total -= bytesOf(image.data)
+        part.images = undefined
+        part.text = `${part.text ?? ''}\n[${removed} imagem(ns) antiga(s) removida(s) para poupar contexto; não afirme nada sobre elas]`.trim()
+      }
+    }
+  }
+  return out
+}
+
 const CONTINUE_PROMPT =
   'Sua resposta anterior foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir o que já escreveu.'
 const FINAL_STEP_PROMPT =
@@ -274,7 +364,9 @@ export class SessionRunner {
     this.provider = deps.provider
     this.providerConfig = deps.providerConfig
     this.fallback = [...(deps.fallback ?? [])]
-    this.messages = deps.initial?.messages ? [...deps.initial.messages] : []
+    this.messages = deps.initial?.messages
+      ? repairOrphanToolCalls(deps.initial.messages).messages
+      : []
     this.plan = deps.initial?.plan ? [...deps.initial.plan] : []
     this.usage = deps.initial?.usage ?? { input: 0, output: 0 }
   }
@@ -686,12 +778,18 @@ export class SessionRunner {
 
         const assistantId = id('msg')
         const toolNames = this.availableTools()
+        const requestMessages = trimInlineImages(this.messages)
+        const contextUsed = estimateContextTokens(system, requestMessages)
+        const requestedOutput = this.providerConfig.maxOutputTokens ?? 32_000
+        const outputRoom = this.providerConfig.contextWindow - contextUsed - Math.ceil(contextUsed * 0.15)
+        const maxTokens = Math.max(1_024, Math.min(requestedOutput, outputRoom))
         const request = {
           system,
-          messages: this.messages,
+          messages: requestMessages,
           tools: this.toolSpecs(toolNames),
           toolChoice: finalStep ? ('none' as const) : undefined,
           effort: this.deps.effort,
+          maxTokens,
           signal
         }
 
