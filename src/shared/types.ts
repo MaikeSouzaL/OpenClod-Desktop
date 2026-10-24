@@ -547,6 +547,8 @@ export interface AppSettings {
   policy: PolicyConfig
   limits: HarnessLimits
   theme: 'dark' | 'light'
+  /** How the assistant should address the user (Home greeting). */
+  profileName?: string
   telemetry: false
   /** Team mode: split work across specialist agents (also on at max effort). */
   autoAgents?: boolean

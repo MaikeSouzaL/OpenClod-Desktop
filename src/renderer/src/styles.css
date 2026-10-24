@@ -8025,3 +8025,49 @@ button.env-row:hover {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.cowork-controls {
+  width: min(var(--thread), 100%);
+  margin: 8px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cowork-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: var(--text, #f1efe8);
+  background: var(--elevated, #1f1f1f);
+  font-size: 12px;
+}
+
+.cowork-select select {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.cowork-select option {
+  background: #1f1f1f;
+  color: #f1efe8;
+}
+
+.cowork-recent-agent {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: var(--hover, #232323);
+  color: var(--text-2, #b7b4ab);
+  flex: 0 0 auto;
+}

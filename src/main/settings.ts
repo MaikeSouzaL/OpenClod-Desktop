@@ -75,6 +75,7 @@ export function defaultSettings(): AppSettings {
     policy: DEFAULT_POLICY,
     limits: { ...DEFAULT_LIMITS },
     theme: 'dark',
+    profileName: '',
     telemetry: false,
     autoAgents: false,
     useAllModels: false,

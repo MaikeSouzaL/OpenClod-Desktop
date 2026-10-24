@@ -83,6 +83,7 @@ export function SettingsDialog({
   const [providers, setProviders] = useState<ProviderConfig[]>([])
   const [defaultId, setDefaultId] = useState('')
   const [theme, setTheme] = useState<'dark' | 'light'>(settings.theme)
+  const [profileName, setProfileName] = useState(settings.profileName ?? '')
   const [policy, setPolicy] = useState<PolicyConfig>(settings.policy)
   const [autoAgents, setAutoAgents] = useState(Boolean(settings.autoAgents))
   const [useAllModels, setUseAllModels] = useState(Boolean(settings.useAllModels))
@@ -126,6 +127,7 @@ export function SettingsDialog({
     setProviders(structuredClone(settings.providers))
     setDefaultId(settings.defaultProviderId)
     setTheme(settings.theme)
+    setProfileName(settings.profileName ?? '')
     setPolicy(structuredClone(settings.policy))
     setAutoAgents(Boolean(settings.autoAgents))
     setUseAllModels(Boolean(settings.useAllModels))
@@ -336,6 +338,7 @@ export function SettingsDialog({
         providers,
         defaultProviderId: defaultId,
         theme,
+        profileName,
         policy: nextPolicy,
         autoAgents,
         useAllModels,
@@ -641,6 +644,16 @@ export function SettingsDialog({
 
           {tab === 'appearance' ? (
             <div className="appearance">
+              <h3>Como o Claude deve chamar você?</h3>
+              <p className="field-help">Aparece na saudação do Início. Deixe vazio para usar só o horário.</p>
+              <label className="field">
+                <input
+                  value={profileName}
+                  maxLength={80}
+                  onChange={(event) => setProfileName(event.target.value)}
+                  placeholder="Seu nome ou apelido"
+                />
+              </label>
               <h3>Tema</h3>
               <p className="field-help">
                 O tema vale para toda a interface e é salvo nas configurações. A prévia muda imediatamente ao salvar.

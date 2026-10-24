@@ -284,6 +284,7 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   }
 
   if (input.theme === 'light' || input.theme === 'dark') patch.theme = input.theme
+  if (typeof input.profileName === 'string') patch.profileName = input.profileName.trim().slice(0, 80)
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
   if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
 

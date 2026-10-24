@@ -1,5 +1,5 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
-import type { CapabilityReport, Project, SessionSummary } from '../../../shared/types'
+import type { CapabilityReport, PermissionMode, Project, SessionSummary } from '../../../shared/types'
 import { relativeTime } from '../lib/format'
 import { Icon } from './Icons'
 
@@ -12,9 +12,12 @@ interface CoworkViewProps {
   hasRealProvider: boolean
   composer: ReactNode
   recent?: SessionSummary[]
+  permissionMode?: PermissionMode
   onAddProject(): void
   onPickProject(project: Project): void
+  onPermissionChange?(mode: PermissionMode): void
   onOpenSession?(sessionId: string): void
+  onClearActive?(): void
   onSuggestion(text: string): void
   onOpenSettings(): void
 }
@@ -55,9 +58,12 @@ export function CoworkView({
   hasRealProvider,
   composer,
   recent = [],
+  permissionMode = 'auto',
   onAddProject,
   onPickProject,
+  onPermissionChange,
   onOpenSession,
+  onClearActive,
   onSuggestion,
   onOpenSettings
 }: CoworkViewProps): ReactElement {
@@ -137,12 +143,52 @@ export function CoworkView({
 
         <div className="cowork-composer">{composer}</div>
 
+        <div className="cowork-controls">
+          <label className="cowork-select">
+            <Icon name="folder" size={13} />
+            <select
+              value={project?.id ?? ''}
+              onChange={(event) => {
+                if (event.target.value === '__add') {
+                  onAddProject()
+                  return
+                }
+                const picked = projects.find((item) => item.id === event.target.value)
+                if (picked) onPickProject(picked)
+              }}
+            >
+              <option value="" disabled>
+                Projeto ou pasta
+              </option>
+              {projects.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+              <option value="__add">Adicionar pasta…</option>
+            </select>
+          </label>
+          <label className="cowork-select">
+            <Icon name="shield" size={13} />
+            <select
+              value={permissionMode}
+              onChange={(event) => onPermissionChange?.(event.target.value as PermissionMode)}
+            >
+              <option value="ask">Aprovar manualmente</option>
+              <option value="auto">Aprovar automaticamente</option>
+            </select>
+          </label>
+          <button type="button" className="side-mini" title="O Cowork usa as mesmas permissões e a mesma auditoria do Code.">
+            <Icon name="info" size={13} />
+          </button>
+        </div>
+
         {recent.length ? (
           <div className="cowork-recent">
             <div className="cowork-recent-head">
               <span>Em andamento</span>
-              <button type="button" className="link-btn" onClick={() => onOpenSession?.(recent[0].meta.id)}>
-                Continuar
+              <button type="button" className="link-btn" onClick={onClearActive}>
+                Limpar ativo
               </button>
             </div>
             {recent.slice(0, 4).map((session) => (
@@ -152,7 +198,9 @@ export function CoworkView({
                 className="cowork-recent-row"
                 onClick={() => onOpenSession?.(session.meta.id)}
               >
-                <span className="cowork-recent-dot" />
+                <span className="cowork-recent-agent">
+                  <Icon name="bot" size={11} />
+                </span>
                 <span className="cowork-recent-title">{session.meta.title}</span>
                 <span className="cowork-recent-time">{relativeTime(session.meta.updatedAt)}</span>
               </button>

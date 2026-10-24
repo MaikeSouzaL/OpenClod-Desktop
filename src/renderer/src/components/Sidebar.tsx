@@ -93,6 +93,13 @@ export function Sidebar({
   const archived = useMemo(() => sessions.filter((session) => session.meta.archived), [sessions])
   // Cowork lives inside Início now: the sidebar only has Início and Code.
   const navMode: 'chat' | 'code' = mode === 'code' ? 'code' : 'chat'
+  // Claude Code keeps the Code sidebar focused on the projects and the few
+  // shared pages. Projects, Agendados, Dispatch and Design belong to Início.
+  const pages =
+    navMode === 'code'
+      ? PAGES.filter((item) => item.id === 'artifacts' || item.id === 'scheduled' || item.id === 'customize' || item.id === 'more')
+      : PAGES
+  const pageLabel = (id: SidebarPage, label: string): string => (navMode === 'code' && id === 'scheduled' ? 'Rotinas' : label)
 
   const visibleSessions = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -333,7 +340,7 @@ export function Sidebar({
           <span className="side-label">Criar</span>
         </button>
         <nav className="side-nav" aria-label="Páginas">
-          {PAGES.map((item) => (
+          {pages.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -344,7 +351,7 @@ export function Sidebar({
               <span className="side-leading">
                 <Icon name={item.icon} size={15} />
               </span>
-              <span className="side-label">{item.label}</span>
+              <span className="side-label">{pageLabel(item.id, item.label)}</span>
             </button>
           ))}
         </nav>

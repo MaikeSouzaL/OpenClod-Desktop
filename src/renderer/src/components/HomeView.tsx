@@ -10,6 +10,7 @@ interface HomeViewProps {
   providerLabel: string
   model: string
   hasRealProvider: boolean
+  profileName?: string
   composer: ReactNode
   onAddProject(): void
   onOpenSettings(): void
@@ -24,6 +25,7 @@ export function HomeView({
   providerLabel,
   model,
   hasRealProvider,
+  profileName,
   composer,
   onAddProject,
   onOpenSettings,
@@ -36,6 +38,7 @@ export function HomeView({
   const hour = new Date().getHours()
   const greeting =
     hour < 5 ? 'coruja noturna' : hour < 12 ? 'bom dia' : hour < 18 ? 'boa tarde' : 'boa noite'
+  const name = profileName?.trim() || greeting
 
   return (
     <div className="home">
@@ -45,7 +48,7 @@ export function HomeView({
             <OpenclodMark size={34} />
           </span>
           <span>
-            Olá, <em>{greeting}</em>
+            Olá, <em>{name}</em>
           </span>
         </h1>
 

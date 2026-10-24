@@ -1277,6 +1277,7 @@ export default function App(): ReactElement {
       providerLabel={provider?.label ?? 'nenhum provedor'}
       model={provider?.model ?? ''}
       hasRealProvider={providerConfigured}
+      profileName={settings?.profileName}
       composer={composerNode}
       onAddProject={() => void addProject()}
       onOpenSettings={() => setSettingsOpen(true)}
@@ -1293,6 +1294,8 @@ export default function App(): ReactElement {
       hasRealProvider={providerConfigured}
       composer={composerNode}
       recent={sessions.filter((item) => (item.meta.surface ?? 'code') === 'cowork' && !item.meta.archived)}
+      permissionMode={settings?.policy.mode ?? 'auto'}
+      onPermissionChange={(mode) => void changePermission(mode)}
       onAddProject={() => void addProject()}
       onPickProject={(project) => {
         setActiveProjectId(project.id)
@@ -1302,6 +1305,7 @@ export default function App(): ReactElement {
         setPage(null)
         void selectSession(id)
       }}
+      onClearActive={() => clearSession()}
       onSuggestion={(text) => setComposerSeed({ id: logId(), text })}
       onOpenSettings={() => setSettingsOpen(true)}
     />
