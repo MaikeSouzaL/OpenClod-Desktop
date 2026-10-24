@@ -370,7 +370,7 @@ export function SettingsDialog({
         <header className="modal-head">
           <div>
             <h2>Configurações</h2>
-            <p>Provedores, permissões e integrações do Forja.</p>
+            <p>Provedores, permissões e integrações do Openclod.</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} title="Fechar">
             <Icon name="x" size={16} />
@@ -401,7 +401,7 @@ export function SettingsDialog({
               <Icon name="spark" size={15} /> Sobre
             </button>
             <div className="settings-nav-foot">
-              <span>Forja Desktop</span>
+              <span>Openclod Desktop</span>
               <em>v{versions?.app ?? '0.1.0'}</em>
             </div>
           </nav>
@@ -707,7 +707,7 @@ export function SettingsDialog({
               <h3>Ditado por voz</h3>
               <p className="field-help">
                 O botão de microfone do compositor escreve o que você fala enquanto você fala. O reconhecimento roda
-                <strong> neste computador</strong>, com o Whisper embutido no Forja: nenhum áudio sai da máquina.
+                <strong> neste computador</strong>, com o Whisper embutido no Openclod: nenhum áudio sai da máquina.
               </p>
               {voiceStatus ? (
                 voiceStatus.available ? (
@@ -776,7 +776,7 @@ export function SettingsDialog({
                     }
                   >
                     <option value="focused">Qualquer aplicativo em foco (estilo Wispr Flow)</option>
-                    <option value="composer">Somente no compositor do Forja</option>
+                    <option value="composer">Somente no compositor do Openclod</option>
                   </select>
                   <small>
                     Em “qualquer aplicativo”, o texto é colado com o clipboard e Ctrl+V. Em campos que bloqueiam colagem, use o
@@ -843,6 +843,19 @@ export function SettingsDialog({
                 <label className="check-line">
                   <input
                     type="checkbox"
+                    checked={policy.fullAccess !== false}
+                    onChange={(event) => setPolicy((current) => ({ ...current, fullAccess: event.target.checked }))}
+                  />
+                  Acesso total ao computador (qualquer pasta, não só o projeto)
+                </label>
+                <p className="field-help">
+                  Ligado por padrão: o agente abre arquivos e trabalha em qualquer pasta do computador, como um
+                  operador humano. Comandos destrutivos e arquivos de segredo continuam pedindo confirmação. Desligue
+                  para confinar leituras e escritas às raízes abaixo.
+                </p>
+                <label className="check-line">
+                  <input
+                    type="checkbox"
                     checked={autoAgents}
                     onChange={(event) => setAutoAgents(event.target.checked)}
                   />
@@ -852,7 +865,7 @@ export function SettingsDialog({
                   Com o controle desligado, o agente pode listar janelas, ler a árvore de acessibilidade e capturar
                   tela, mas não pode clicar, digitar ou arrastar. Com o modo equipe ligado, o agente principal pode
                   chamar especialistas em paralelo; se não houver um especialista para o assunto, ele chama
-                  <code> agent-smith</code> para criar um novo agente permanente em <code>%APPDATA%\Forja\agents</code>.
+                  <code> agent-smith</code> para criar um novo agente permanente em <code>%APPDATA%\Openclod\agents</code>.
                 </p>
               </div>
 
@@ -1149,7 +1162,7 @@ export function SettingsDialog({
               <div className="about-mark">
                 <Icon name="hammer" size={28} />
               </div>
-              <h3>Forja Desktop</h3>
+              <h3>Openclod Desktop</h3>
               <p>
                 Harness próprio em TypeScript, com ferramentas de código, navegador Playwright e Computer Use real no
                 Windows. Interface e marca originais; algumas partes foram adaptadas de projetos MIT/Apache-2.0 (veja THIRD_PARTY_NOTICES.md). Nenhum código proprietário foi copiado.
@@ -1184,7 +1197,7 @@ export function SettingsDialog({
                 <li>
                   <Icon name="code" size={13} /> Toolchains da máquina:{' '}
                   {capabilities?.toolchains?.length ? capabilities.toolchains.map((item) => `${item.label} ${item.version}`).join(' · ') : 'nenhuma detectada'}
-                  <em>Compiladores e runtimes dos seus projetos; o Forja usa os que estiverem instalados.</em>
+                  <em>Compiladores e runtimes dos seus projetos; o Openclod usa os que estiverem instalados.</em>
                 </li>
                 <li>
                   <Icon name="plug" size={13} /> Servidores MCP:{' '}
@@ -1192,7 +1205,7 @@ export function SettingsDialog({
                 </li>
               </ul>
               <p className="field-help">
-                Dados e sessões ficam em <code>%APPDATA%\Forja</code> (sessions, config, logs). O código-fonte do projeto
+                Dados e sessões ficam em <code>%APPDATA%\Openclod</code> (sessions, config, logs). O código-fonte do projeto
                 aberto nunca é copiado para fora dele, exceto o que o modelo recebe nas ferramentas.
               </p>
             </div>

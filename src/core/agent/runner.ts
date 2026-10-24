@@ -35,7 +35,7 @@ import { evaluateTool, toolsForMode } from '../security/permissions.js'
 import { scanForInjection } from '../security/policy.js'
 import { errorKindOf, isRetryableKind } from '../providers/http.js'
 import { id, sleep, truncate, truncateMiddle } from '../util/ids.js'
-import type { ProviderBlocks, ProviderErrorKind, ReasoningEffort, ToolSpec } from '../../shared/types.js'
+import type { ProviderBlocks, ProviderErrorKind, ReasoningEffort, SessionSurface, ToolSpec } from '../../shared/types.js'
 import type { AgentRegistry } from '../agents/registry.js'
 import type { SubagentCaller } from '../agents/types.js'
 import { DEFAULT_MAX_AGENT_DEPTH } from '../agents/limits.js'
@@ -51,7 +51,7 @@ const READ_FILE_MAX_BYTES = 512 * 1024
 /** Size cap for the summary handed to PostCompact hooks. */
 const COMPACT_SUMMARY_HOOK_CHARS = 20_000
 /** Modes that may use MCP server tools (read-only modes never do: every MCP tool is at least `exec` risk). */
-const MCP_MODES = new Set<string>(['code', 'debug', 'autonomous', 'web', 'computer'])
+const MCP_MODES = new Set<string>(['ask', 'code', 'debug', 'autonomous', 'web', 'computer'])
 /** Delegation tools: offered only when this runner has someone to delegate to. */
 const AGENT_TOOLS = new Set<string>(['agent', 'list_agents'])
 /** Automatic "continue" requests after the model hits its output cap. */
@@ -108,6 +108,8 @@ export interface RunnerDeps {
     skills: SkillLibrary
     memory: MemoryStore
     projectMemory: ProjectMemory
+    /** Self-installation of MCP servers; absent in isolated harness tests. */
+    mcp?: import('../tools/types.js').McpToolService
   }
   project: ProjectMeta
   /** Lifecycle hooks (Claude Code settings format). */
@@ -122,6 +124,8 @@ export interface RunnerDeps {
   createAgent?: (input: CreateAgentInput) => Promise<{ path: string; agent: import('../../shared/types.js').AgentDefinition }>
   /** Team mode: the system prompt tells the model to split work across agents (also on at max effort). */
   autoAgents?: boolean
+  /** UI surface; Cowork and Chat get their own operating guidance. */
+  surface?: SessionSurface
   /** Ordered alternatives to switch to when the active model is exhausted or unavailable. */
   fallback?: Array<{ provider: Provider; config: ProviderConfig }>
   persist?: (state: RunnerSnapshot) => void
@@ -447,6 +451,7 @@ export class SessionRunner {
       policy: this.deps.policy,
       model: this.providerConfig.model,
       provider: this.providerConfig.label,
+      surface: this.deps.surface,
       skills: this.deps.services.skills.list().map((s) => ({ name: s.name, description: s.description })),
       memory: this.memoryFacts,
       projectMemory: this.projectMemoryBrief,
@@ -506,6 +511,9 @@ export class SessionRunner {
 
   /** The session's workspace, widened to the spill folders once something was spilled so read_file can open them. */
   private toolWorkspace(): WorkspaceGuard {
+    if (this.deps.workspace.unrestricted) {
+      return new WorkspaceGuard([...this.deps.workspace.rootList, ...this.spillRoots], true)
+    }
     if (!this.spillRoots.length) return this.deps.workspace
     return new WorkspaceGuard([...this.deps.workspace.rootList, ...this.spillRoots])
   }

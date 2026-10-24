@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * embed-stt.mjs - builds the fully embedded speech-to-text runtime of Forja.
+ * embed-stt.mjs - builds the fully embedded speech-to-text runtime of Openclod.
  *
  * Nothing the app needs at runtime may come from the user's global Python, PATH,
  * pip packages or the Hugging Face cache. This script assembles, inside the
@@ -28,7 +28,7 @@
  *    (%APPDATA%\Python\...) on 3.10.0, which the run also proves; therefore the engine must
  *    start the interpreter with -I (verified here to block it).
  *  - PyAV ("av") ships FFmpeg DLLs built with libx264/libx265 (GPL). faster_whisper only
- *    imports av for decode_audio(), which Forja never calls. --stub-av ships a tiny
+ *    imports av for decode_audio(), which Openclod never calls. --stub-av ships a tiny
  *    placeholder "av" package instead (-67 MB, no GPL binaries); the default keeps the
  *    real wheel because that is what the project asked for.
  *  - Native dependencies of every .dll/.pyd are checked with a small PE import reader;
@@ -427,9 +427,9 @@ function keepSiteFile(rel) {
 }
 
 /** Placeholder for PyAV: faster_whisper imports "av" at module level but only uses it in decode_audio(). */
-const AV_STUB = `"""Forja placeholder for PyAV (the real wheel bundles GPL FFmpeg builds).
+const AV_STUB = `"""Openclod placeholder for PyAV (the real wheel bundles GPL FFmpeg builds).
 
-faster_whisper imports \`av\` at import time but only calls it from decode_audio(); Forja feeds raw
+faster_whisper imports \`av\` at import time but only calls it from decode_audio(); Openclod feeds raw
 PCM and never decodes media files, so this module only has to be importable.
 """
 
@@ -437,7 +437,7 @@ __version__ = "0.0.0+forja-stub"
 
 
 def open(*_args, **_kwargs):  # noqa: A001 - mirrors av.open
-    raise RuntimeError("PyAV nao esta embarcado nesta build do Forja; decodificacao de arquivos de midia indisponivel")
+    raise RuntimeError("PyAV nao esta embarcado nesta build do Openclod; decodificacao de arquivos de midia indisponivel")
 `
 
 function buildRuntime(opts, plan, stageDir) {
@@ -657,12 +657,12 @@ function writeLicenses(opts, plan, deps) {
     ...(opts.stubAv
       ? [
           '* "av" is a tiny placeholder module (no FFmpeg is shipped): faster_whisper imports it at module',
-          '  level but Forja only feeds raw PCM and never decodes media files.'
+          '  level but Openclod only feeds raw PCM and never decodes media files.'
         ]
       : [
           '* PyAV (package "av") bundles FFmpeg shared libraries in site-packages/av.libs. That FFmpeg build',
           '  includes libx264/libx265 (GPL) besides LGPL components: review the licensing / source-offer',
-          '  obligations before redistributing the installer, or rebuild with --stub-av (Forja only needs',
+          '  obligations before redistributing the installer, or rebuild with --stub-av (Openclod only needs',
           '  "av" because faster_whisper imports it; audio is fed as raw PCM).'
         ]),
     '* Whisper models: MIT (OpenAI), CTranslate2 conversions by Systran - see resources/models/whisper/LICENSE.txt.',

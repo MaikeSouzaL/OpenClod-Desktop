@@ -15,7 +15,7 @@ import { CH, type DictationState } from '../shared/api.js'
 export interface DictationDeps {
   getSettings(): AppSettings
   sendToRenderer(channel: string, payload: unknown): void
-  isForjaFocused(): boolean
+  isOpenclodFocused(): boolean
   polish(text: string): Promise<string>
   log(scope: string, message: unknown): void
 }
@@ -78,7 +78,7 @@ export class DictationController {
       text: (state.text ?? '').slice(0, 240),
       error: (state.error ?? '').slice(0, 240)
     })
-    overlay.webContents.executeJavaScript(`window.forjaOverlay && window.forjaOverlay(${payload})`).catch(() => undefined)
+    overlay.webContents.executeJavaScript(`window.openclodOverlay && window.openclodOverlay(${payload})`).catch(() => undefined)
 
     if (state.phase === 'idle' || state.phase === 'error') {
       if (this.hideTimer) clearTimeout(this.hideTimer)
@@ -90,7 +90,7 @@ export class DictationController {
   }
 
   /**
-   * Inserts the final text. If Forja is focused (or the user chose "composer"),
+   * Inserts the final text. If Openclod is focused (or the user chose "composer"),
    * the renderer puts it at the caret; otherwise it is pasted into the window
    * that had focus, using the clipboard so Unicode survives.
    */
@@ -99,7 +99,7 @@ export class DictationController {
     if (!text) return false
     const target = this.deps.getSettings().voice?.insert ?? 'focused'
 
-    if (target === 'composer' || this.deps.isForjaFocused()) {
+    if (target === 'composer' || this.deps.isOpenclodFocused()) {
       this.deps.sendToRenderer(CH.dictationComposer, { text })
       return true
     }
@@ -200,7 +200,7 @@ export class DictationController {
       this.overlay = overlay
       overlay.showInactive()
       overlay.webContents.executeJavaScript(
-        `window.forjaOverlay && window.forjaOverlay(${JSON.stringify(this.lastState)})`
+        `window.openclodOverlay && window.openclodOverlay(${JSON.stringify(this.lastState)})`
       ).catch(() => undefined)
       return overlay
     } catch (err) {
@@ -280,7 +280,7 @@ const OVERLAY_HTML = `<!doctype html>
     const status = document.getElementById('status')
     const text = document.getElementById('text')
     const labels = { idle: 'Pronto', loading: 'Carregando modelo', listening: 'Ouvindo', processing: 'Inserindo', error: 'Erro' }
-    window.forjaOverlay = function (state) {
+    window.openclodOverlay = function (state) {
       const phase = state && state.phase ? state.phase : 'idle'
       document.body.className = 'phase-' + phase
       status.textContent = labels[phase] || 'Pronto'

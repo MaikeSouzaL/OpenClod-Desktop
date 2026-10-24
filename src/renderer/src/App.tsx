@@ -33,7 +33,9 @@ import { SettingsDialog } from './components/SettingsDialog'
 import { DictationHost } from './components/DictationHost'
 import { HomeView } from './components/HomeView'
 import { CoworkView } from './components/CoworkView'
-import { ForjaMark, MenuPopover, Titlebar, type MenuItem, type PanelTab } from './components/Chrome'
+import { MemoryPage } from './components/MemoryPage'
+import { ArtifactsPage, DesignPage, DispatchPage, MorePage } from './components/MorePages'
+import { OpenclodMark, MenuPopover, Titlebar, type MenuItem, type PanelTab } from './components/Chrome'
 import { Icon } from './components/Icons'
 import { errorMessage, unwrap } from './lib/api'
 import { shortPath } from './lib/format'
@@ -290,7 +292,7 @@ export default function App(): ReactElement {
           window.forja.sessions.create({
             projectId: project.id,
             cwd: project.path,
-            mode: targetSurface === 'chat' ? 'ask' : 'code',
+            mode: targetSurface === 'chat' ? 'ask' : targetSurface === 'cowork' ? 'autonomous' : 'code',
             surface: targetSurface,
             providerId: provider.id,
             model
@@ -456,7 +458,7 @@ export default function App(): ReactElement {
         case 'approval_request':
           setApprovals((current) => [...current.filter((item) => item.id !== event.request.id), event.request])
           if (document.hidden) {
-            void window.forja.app.notify('Forja — aprovação necessária', event.request.title)
+            void window.forja.app.notify('Openclod Desktop - aprovação necessária', event.request.title)
           }
           break
         case 'approval_resolved':
@@ -473,9 +475,9 @@ export default function App(): ReactElement {
           setRunState(event.stopReason === 'error' ? 'error' : 'done')
           void refreshSessions()
           if (document.hidden) {
-            const title = sessionsRef.current.find((item) => item.meta.id === event.sessionId)?.meta.title ?? 'Forja'
+            const title = sessionsRef.current.find((item) => item.meta.id === event.sessionId)?.meta.title ?? 'Openclod Desktop'
             void window.forja.app.notify(
-              event.stopReason === 'error' ? 'Forja — turno com erro' : 'Forja — turno concluído',
+              event.stopReason === 'error' ? 'Openclod Desktop - turno com erro' : 'Openclod Desktop - turno concluído',
               event.error || title
             )
           }
@@ -719,17 +721,20 @@ export default function App(): ReactElement {
     async (text: string, images: ImagePart[], options?: { fresh?: boolean }): Promise<boolean> => {
       let target = activeSessionRef.current
       if (!target || options?.fresh) {
-        let project =
-          projectsRef.current.find((item) => item.id === activeProjectId) ?? projectsRef.current[0] ?? null
+        let project = projectsRef.current.find((item) => item.id === activeProjectId) ?? null
+        if (!project && surface === 'code') project = projectsRef.current[0] ?? null
+        if (!project && surface === 'code') {
+          setError('Abra uma pasta de projeto para começar no modo Code. O Chat e o Cowork funcionam sem projeto.')
+          return false
+        }
         if (!project) {
-          // Home/Cowork work without a chosen project; Code still needs one.
-          if (surface === 'code') {
-            setError('Abra uma pasta de projeto para começar no modo Code. O Home funciona sem projeto.')
-            return false
-          }
+          // Home/Cowork work without a chosen project. The fallback root is the
+          // user's Desktop (never Openclod's own data folder), and full access lets
+          // the agent reach the rest of the computer.
           try {
-            project = await unwrap(window.forja.projects.ensureDefault())
-            setProjects((current) => (current.some((item) => item.id === project.id) ? current : [project, ...current]))
+            const ensured = await unwrap(window.forja.projects.ensureDefault())
+            project = ensured
+            setProjects((current) => (current.some((item) => item.id === ensured.id) ? current : [ensured, ...current]))
           } catch (err) {
             setError(errorMessage(err))
             return false
@@ -959,7 +964,7 @@ export default function App(): ReactElement {
             level: 'info',
             text: skills.length
               ? `${skills.length} skill(s): ${skills.map((skill) => skill.name).join(', ')}`
-              : 'Nenhuma skill instalada em %APPDATA%\\Forja\\skills.'
+              : 'Nenhuma skill instalada em %APPDATA%\\Openclod Desktop\\skills.'
           })
           break
         default:
@@ -1050,7 +1055,11 @@ export default function App(): ReactElement {
     : 0
 
   const surfaceSessions = useMemo(
-    () => sessions.filter((item) => (item.meta.surface ?? 'code') === surface),
+    () =>
+      sessions.filter((item) => {
+        const itemSurface = item.meta.surface ?? 'code'
+        return surface === 'chat' ? itemSurface === 'chat' || itemSurface === 'cowork' : itemSurface === 'code'
+      }),
     [sessions, surface]
   )
 
@@ -1080,6 +1089,10 @@ export default function App(): ReactElement {
       onModelChange={(providerId, model) => void changeModel(providerId, model)}
       onEffortChange={(next) => void changeEffort(next)}
       onPermissionChange={(mode) => void changePermission(mode)}
+      onSurfaceChange={(next) => {
+        setPage(null)
+        setSurface(next)
+      }}
       onOpenSettings={() => setSettingsOpen(true)}
       onAddProject={() => void addProject()}
     />
@@ -1191,6 +1204,46 @@ export default function App(): ReactElement {
         onReveal={(path) => void revealPath(path)}
         onRemove={(project) => void removeProject(project)}
       />
+    ) : page === 'memory' ? (
+      <MemoryPage
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={(project) => void selectProject(project)}
+        onAddProject={() => void addProject()}
+        onOpenSettings={() => openSettingsAt('memory')}
+      />
+    ) : page === 'artifacts' ? (
+      <ArtifactsPage
+        sessions={sessions}
+        onCreate={(prompt) => {
+          setPage(null)
+          setSurface('chat')
+          setComposerSeed({ id: logId(), text: prompt })
+        }}
+      />
+    ) : page === 'design' ? (
+      <DesignPage
+        onCreate={(prompt) => {
+          setPage(null)
+          setSurface('chat')
+          setComposerSeed({ id: logId(), text: prompt })
+        }}
+      />
+    ) : page === 'dispatch' ? (
+      <DispatchPage
+        projects={projects}
+        activeProjectId={activeProjectId}
+        keepAwake={keepAwake}
+        onToggleKeepAwake={() => void toggleKeepAwake()}
+        onOpenSettings={() => openSettingsAt('policy')}
+      />
+    ) : page === 'more' ? (
+      <MorePage
+        version={versions?.app ?? '0.1.0'}
+        archivedCount={sessions.filter((session) => session.meta.archived).length}
+        onOpenSettings={() => openSettingsAt('appearance')}
+        onOpenMemory={() => setPage('memory')}
+      />
     ) : page === 'scheduled' ? (
       <ScheduledPage
         projects={projects}
@@ -1238,10 +1291,15 @@ export default function App(): ReactElement {
       model={provider?.model ?? ''}
       hasRealProvider={providerConfigured}
       composer={composerNode}
+      recent={sessions.filter((item) => (item.meta.surface ?? 'code') === 'cowork' && !item.meta.archived)}
       onAddProject={() => void addProject()}
       onPickProject={(project) => {
         setActiveProjectId(project.id)
         clearSession()
+      }}
+      onOpenSession={(id) => {
+        setPage(null)
+        void selectSession(id)
       }}
       onSuggestion={(text) => setComposerSeed({ id: logId(), text })}
       onOpenSettings={() => setSettingsOpen(true)}
@@ -1267,7 +1325,7 @@ export default function App(): ReactElement {
   ) : (
     <div className="workspace-empty">
       <span className="we-mark">
-        <ForjaMark size={34} />
+        <OpenclodMark size={34} />
       </span>
       <h1>Pronto para forjar</h1>
       <p className="we-tagline">Código, terminal, navegador e Computer Use no Windows real.</p>
@@ -1315,7 +1373,7 @@ export default function App(): ReactElement {
         canBack={canBack}
         canForward={canForward}
         maximized={maximized}
-        title={session?.meta.title ?? 'Forja'}
+        title={session?.meta.title ?? 'Openclod Desktop'}
         panelTab={panelTab}
         panelAvailable={Boolean(session)}
         menuOpen={menuOpen}

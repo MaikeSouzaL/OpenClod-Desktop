@@ -1,0 +1,235 @@
+# Modelo de replay/passos.yaml — o passo a passo executável de cada fluxo testado.
+#
+# Para quem: uma LLM com visão + browser-use, Playwright, um executor de API, um terminal (CLI,
+# biblioteca, job) ou um emulador (mobile), que NUNCA viu o projeto. Critério de pronto: ela
+# executa lendo só a pasta da rodada (este arquivo, as notas e as evidências). Se precisar abrir
+# o código, falta escrever algo aqui.
+#
+# Regras:
+# - Um fluxo por caminho. Cada bifurcação percorrida (aprovar x rejeitar, mensal x anual,
+#   com permissão x sem) é uma entrada NOVA na lista, não um "se" dentro da mesma.
+# - Valores REAIS da execução de referência (códigos, quantidades, preços), não placeholders.
+# - Esperas são condições observáveis (texto aparece, requisição responde). Nunca "dormir N s".
+# - timeout_s = tempo medido na execução de referência + folga. O medido vai na nota da fase.
+# - Seletores (campo alvo), em ordem de preferência:
+#     testid=<data-testid>            role=<papel>[nome=<nome acessível>]
+#     rotulo=<texto do label>         texto=<texto visível estável>
+#     css=<seletor estável>           url=<endereço>            (coordenada: NUNCA)
+#   Fora do navegador:
+#     testID=<testID do app mobile>   a11yid=<accessibility id do app nativo ou desktop>
+#     cmd=<comando de terminal>       funcao=<modulo.funcao da biblioteca>
+#     fila=<fila ou tópico de teste>
+# - Ações (campo acao):
+#     navegar    abre o alvo (url=...)
+#     clicar     clique real no alvo
+#     digitar    digita valor no alvo, tecla a tecla (não use setter sintético)
+#     selecionar escolhe valor num select/combo/lista
+#     esperar    aguarda a condição do campo espera
+#     asserir    confere o resultado_esperado na tela (texto, estado, atributo)
+#     api        chamada HTTP direta ou asserção sobre a requisição que a tela fez
+#     banco      consulta SOMENTE LEITURA (SELECT); nunca UPDATE/DELETE
+#     executar   roda um comando (cmd, stdin, env, cwd); asserir codigo_saida, stdout, stderr e
+#                arquivos gerados. Variável de ambiente com segredo entra só pelo nome (ex.: QA_TOKEN_ADMIN).
+#                Campo executor: a linha do scripts/executar_caso.py cmd que roda o passo com pasta e
+#                HOME/APPDATA temporários e grava a transcrição no print (mesmo nome de arquivo)
+#     chamar     chama uma função pública (funcao, args); asserir retorno ou excecao. executor:
+#                scripts/executar_caso.py chamar ... --modulo <pacote.modulo> --funcao <nome> --args '<json>'
+#     disparar   dispara um job ou publica uma mensagem numa fila DE TESTE; esperar a execução por
+#                condição (linha na tabela de execuções, fila vazia, DLQ com N), nunca por tempo
+#     sistema    ação do sistema operacional no mobile ou desktop: rotacionar, segundo-plano,
+#                permissao (conceder ou revogar), deep-link, matar-processo
+#     prompt     manda uma entrada a um app com modelo de linguagem (entrada, repeticoes,
+#                criterio, limiar); asserir a taxa de acerto nas N execuções, não uma resposta só
+# - print: caminho relativo à pasta da rodada; mesmo nome usado nas notas.
+# - cria_efeito_externo: true se grava dado, envia e-mail/notificação ou toca sistema de terceiros.
+#   Quem for executar precisa de autorização para esses efeitos.
+# - Segredo nunca entra aqui: token, senha e connection string são referências (ex.: "ver PERFIL").
+
+- id: cliente-criar-cnpj-obrigatorio
+  titulo: "Cadastro de cliente: CNPJ vazio bloqueia, CNPJ válido grava"
+  objetivo: "Provar que o salvar sem CNPJ não envia requisição e que, com CNPJ válido, o cliente é gravado com os dados da Receita"
+  casos_ledger: [C-0004, C-0005, C-0006]
+  codigo_testado: "develop @ a1b2c3d"
+  ambiente: "front http://localhost:3000 -> API https://localhost:7112 -> banco de desenvolvimento"
+  precondicao: "sessão do papel 'parceiro-admin' aberta pelo usuário; CNPJ 11.222.333/0001-81 ainda não cadastrado (conferido no banco)"
+  sessao: parceiro-admin
+  troca_de_sessao: false
+  cria_efeito_externo: true
+
+  dados:
+    # CNPJ e razão social fictícios, só deste modelo (DV válido). No replay real vão os valores da
+    # execução de referência: CNPJ público conferido no banco (execucao-e-evidencias.md §7).
+    cnpj_valido: "11.222.333/0001-81"
+    cnpj_invalido: "11.111.111/1111-11"
+    razao_social_esperada: "EMPRESA DE TESTE QA LTDA"
+    email_contato: "qa+cliente01@exemplo.com"
+
+  passos:
+    - n: 1
+      acao: navegar
+      alvo: "url=http://localhost:3000/clientes/novo"
+      espera: "título 'Novo cliente' visível e campo CNPJ habilitado"
+      resultado_esperado: "formulário vazio, botão Salvar habilitado"
+      print: "evidencias/01-cliente-novo-vazio.png"
+      timeout_s: 20
+
+    - n: 2
+      acao: clicar
+      alvo: "testid=cliente-save-button"
+      espera: "mensagem de erro sob o campo CNPJ"
+      resultado_esperado: "erro 'CNPJ é obrigatório' sob o campo, campo destacado, nenhuma requisição POST /cliente"
+      print: "evidencias/02-cliente-salvar-sem-cnpj.png"
+      timeout_s: 5
+      nota: "conferir no espião de rede: zero chamadas para /cliente"
+
+    - n: 3
+      acao: digitar
+      alvo: "rotulo=CNPJ"
+      valor: "11.111.111/1111-11"
+      espera: "o campo perde o foco (Tab) e a validação roda"
+      resultado_esperado: "mensagem 'CNPJ inválido'; consulta à Receita não é feita"
+      print: "evidencias/03-cliente-cnpj-invalido.png"
+      timeout_s: 10
+
+    - n: 4
+      acao: digitar
+      alvo: "rotulo=CNPJ"
+      valor: "11.222.333/0001-81"
+      espera: "campo Razão social preenchido automaticamente"
+      resultado_esperado: "Razão social = EMPRESA DE TESTE QA LTDA; endereço preenchido"
+      print: "evidencias/04-cliente-dados-da-receita.png"
+      timeout_s: 20
+      nota: "a consulta externa levou 7 s na execução de referência"
+
+    - n: 5
+      acao: selecionar
+      alvo: "rotulo=Segmento"
+      valor: "Indústria"
+      espera: "o combo fecha e mostra 'Indústria'"
+      resultado_esperado: "valor selecionado é o mesmo exibido (conferir depois da busca limpa)"
+      timeout_s: 10
+
+    - n: 6
+      acao: clicar
+      alvo: "testid=cliente-save-button"
+      espera: "requisição POST /api/v1/cliente responde"
+      resultado_esperado: "botão mostra 'Salvando…' e fica desabilitado durante a requisição; toast de sucesso"
+      print: "evidencias/06-cliente-salvo.png"
+      timeout_s: 60
+      nota: "não clicar de novo enquanto a requisição corre; clique duplo é outro caso (C-0007)"
+
+    - n: 7
+      acao: api
+      alvo: "POST /api/v1/cliente"
+      resultado_esperado: "status 201; corpo enviado contém cnpj '11222333000181' e segmento 'Industria'; corpo recebido contém o id do cliente"
+      print: "rede/06-post-cliente.json"
+      timeout_s: 60
+
+    - n: 8
+      acao: banco
+      alvo: "SELECT codigo, razao_social, cnpj FROM clientes WHERE cnpj = '11222333000181'"
+      resultado_esperado: "exatamente 1 linha, razao_social = 'EMPRESA DE TESTE QA LTDA'"
+      timeout_s: 15
+      nota: "somente leitura; a conexão está descrita no PERFIL, sem senha neste arquivo"
+
+    - n: 9
+      acao: asserir
+      alvo: "url=http://localhost:3000/clientes"
+      espera: "listagem carregada (esqueleto some)"
+      resultado_esperado: "o cliente novo aparece na listagem e o contador total subiu 1, sem F5"
+      print: "evidencias/09-cliente-na-listagem.png"
+      timeout_s: 40
+
+  verificacoes_finais:
+    - "nenhum outro registro foi alterado (conferir o total de clientes antes e depois: +1)"
+    - "aba Atividades do cliente mostra o evento de criação com o usuário do teste"
+
+  erros_esperados:
+    - situacao: "CNPJ já cadastrado por outro parceiro"
+      efeito: "resposta 422 com a mensagem 'CNPJ já cadastrado' sob o campo; não é bug"
+    - situacao: "consulta à Receita fora do ar"
+      efeito: "campos ficam editáveis para preenchimento manual; não é bug"
+
+  limpeza:
+    - "o cliente criado permanece no banco de desenvolvimento (listado em sujeira no cobertura.json)"
+
+- id: api-cliente-sem-permissao
+  titulo: "API: criar cliente sem permissão é barrado no servidor"
+  objetivo: "Provar que o backend recusa a ação mesmo quando a tela é contornada"
+  casos_ledger: [C-0031]
+  codigo_testado: "develop @ a1b2c3d"
+  ambiente: "API https://localhost:7112"
+  precondicao: "token de um papel sem permissão de criar cliente, obtido pela sessão aberta pelo usuário"
+  sessao: parceiro-leitura
+  troca_de_sessao: false
+  cria_efeito_externo: false
+
+  dados:
+    corpo:
+      cnpj: "11222333000181"
+      razaoSocial: "TESTE QA"
+
+  passos:
+    - n: 1
+      acao: api
+      alvo: "POST /api/v1/cliente"
+      valor: "corpo de dados.corpo, com o token do papel parceiro-leitura"
+      espera: "resposta HTTP"
+      resultado_esperado: "status 403 (ou 401) e nenhuma linha nova no banco"
+      print: "rede/31-post-cliente-sem-permissao.json"
+      timeout_s: 30
+
+    - n: 2
+      acao: banco
+      alvo: "SELECT COUNT(*) FROM clientes WHERE razao_social = 'TESTE QA'"
+      resultado_esperado: "0"
+      timeout_s: 15
+
+  verificacoes_finais:
+    - "a tela do mesmo papel também esconde ou desabilita o botão (caso C-0030)"
+
+  erros_esperados: []
+
+  limpeza:
+    - "nenhuma"
+
+- id: cli-exportar-csv-arquivo-inexistente
+  titulo: "CLI: exportar com arquivo de entrada inexistente falha com código e mensagem claros"
+  objetivo: "Provar que o comando sai com código diferente de 0, escreve o erro em stderr e não cria o arquivo de saída"
+  casos_ledger: [C-0050, C-0051]
+  codigo_testado: "main @ abc1234"
+  ambiente: "terminal bash, binário instalado em modo de desenvolvimento"
+  precondicao: "pasta de trabalho vazia criada para o teste; nenhuma variável de ambiente da ferramenta definida"
+  sessao: nenhuma
+  troca_de_sessao: false
+  cria_efeito_externo: false
+
+  passos:
+    - n: 1
+      acao: executar
+      alvo: "cmd=ferramenta exportar --entrada nao-existe.json --saida saida.csv"
+      valor: "stdin vazio; cwd = pasta de trabalho do teste"
+      executor: "python <skill>/scripts/executar_caso.py cmd .qa/<rodada> --slug 50-cli-entrada-inexistente --esperado-rc 2 --contem nao-existe.json -- ferramenta exportar --entrada nao-existe.json --saida saida.csv"
+      espera: "o processo termina"
+      resultado_esperado: "codigo_saida 2; stderr contém 'nao-existe.json'; stdout vazio; saida.csv não existe"
+      print: "evidencias/50-cli-entrada-inexistente.txt"
+      timeout_s: 10
+      nota: "o executor grava esse print (transcrição com comando, código de saída, stdout e stderr) e sai 1 se o código ou o texto não baterem"
+
+    - n: 2
+      acao: executar
+      alvo: "cmd=ferramenta exportar --entrada exemplo.json --saida saida.csv"
+      valor: "exemplo.json copiado da pasta de exemplos do projeto"
+      executor: "python <skill>/scripts/executar_caso.py cmd .qa/<rodada> --slug 51-cli-exportar-ok --cwd <pasta de trabalho com o exemplo.json> --esperado-rc 0 -- ferramenta exportar --entrada exemplo.json --saida saida.csv"
+      espera: "o processo termina"
+      resultado_esperado: "codigo_saida 0; saida.csv com cabeçalho e 3 linhas; stderr vazio"
+      print: "evidencias/51-cli-exportar-ok.txt"
+      timeout_s: 20
+
+  verificacoes_finais:
+    - "nenhum arquivo foi criado fora da pasta de trabalho do teste"
+
+  erros_esperados: []
+
+  limpeza:
+    - "apagar a pasta de trabalho do teste"

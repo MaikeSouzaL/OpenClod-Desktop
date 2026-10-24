@@ -92,7 +92,7 @@ export const computerSnapshotTool: ToolDef = {
 export const computerScreenshotTool: ToolDef = {
   name: 'computer_screenshot',
   description:
-    'Captura a tela real do Windows (todos os monitores, reduzida para visão). Coordenadas desta imagem podem ser passadas direto a computer_click/computer_drag: o Forja converte para a tela real.',
+    'Captura a tela real do Windows (todos os monitores, reduzida para visão). Coordenadas desta imagem podem ser passadas direto a computer_click/computer_drag: o Openclod converte para a tela real.',
   risk: 'read',
   parallelSafe: false,
   requires: 'computer',
@@ -174,6 +174,79 @@ export const computerClickTool: ToolDef = {
           ? `clique em (${args.x}, ${args.y}) da captura → tela (${result.screen.x}, ${result.screen.y})`
           : result.stderr || 'falha no clique',
       summary: `(${args.x}, ${args.y})`
+    }
+  }
+}
+
+export const computerMouseMoveTool: ToolDef = {
+  name: 'computer_mouse_move',
+  description:
+    'Move o ponteiro real do mouse para um ponto da última computer_screenshot, sem clicar. Use para posicionar antes de rolar, arrastar ou abrir um menu.',
+  risk: 'exec',
+  parallelSafe: false,
+  requires: 'computer',
+  schema: z.object({ x: z.number().min(0), y: z.number().min(0) }),
+  describe(a) {
+    const args = a as { x: number; y: number }
+    return { title: 'Mover mouse', detail: `(${args.x}, ${args.y})`, preview: 'move' }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { x: number; y: number }
+    const blocked = requireControl(ctx)
+    if (blocked) return { ok: false, text: blocked }
+    const layer = layerFor(ctx)
+    if (isResult(layer)) return layer
+    const result = await layer.moveMouse({ x: args.x, y: args.y })
+    const actual = result.actual ? `; cursor em (${result.actual.x}, ${result.actual.y})` : ''
+    return {
+      ok: result.code === 0,
+      text:
+        result.code === 0
+          ? `ponteiro em (${args.x}, ${args.y}) da captura → tela (${result.screen.x}, ${result.screen.y})${actual}`
+          : result.stderr || 'falha ao mover o mouse',
+      summary: result.actual ? `(${result.actual.x}, ${result.actual.y})` : `(${args.x}, ${args.y})`
+    }
+  }
+}
+
+export const computerMouseButtonTool: ToolDef = {
+  name: 'computer_mouse_button',
+  description:
+    'Pressiona (down) ou solta (up) um botão do mouse — esquerdo, direito ou do meio — opcionalmente num ponto da última screenshot. Combine com computer_mouse_move para arrastar, selecionar texto ou abrir menus de contexto.',
+  risk: 'exec',
+  parallelSafe: false,
+  requires: 'computer',
+  schema: z.object({
+    action: z.enum(['down', 'up']),
+    button: z.enum(['left', 'right', 'middle']).optional(),
+    x: z.number().min(0).optional(),
+    y: z.number().min(0).optional()
+  }),
+  describe(a) {
+    const args = a as { action: string; button?: string; x?: number; y?: number }
+    const where = args.x != null && args.y != null ? ` em (${args.x}, ${args.y})` : ''
+    return { title: 'Botão do mouse', detail: `${args.action} ${args.button ?? 'left'}${where}`, preview: args.action }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as {
+      action: 'down' | 'up'
+      button?: 'left' | 'right' | 'middle'
+      x?: number
+      y?: number
+    }
+    const blocked = requireControl(ctx)
+    if (blocked) return { ok: false, text: blocked }
+    const layer = layerFor(ctx)
+    if (isResult(layer)) return layer
+    const point = args.x != null && args.y != null ? { x: args.x, y: args.y } : undefined
+    const result = await layer.mouseButton(args.action, args.button ?? 'left', point)
+    return {
+      ok: result.code === 0,
+      text:
+        result.code === 0
+          ? `${args.action} ${args.button ?? 'left'}${point ? ` em (${point.x}, ${point.y})` : ''}`
+          : result.stderr || 'falha no botão do mouse',
+      summary: `${args.action} ${args.button ?? 'left'}`
     }
   }
 }
@@ -278,19 +351,22 @@ export const computerScrollTool: ToolDef = {
   requires: 'computer',
   schema: z.object({
     direction: z.enum(['up', 'down', 'left', 'right']),
-    amount: z.number().int().min(1).max(20).optional()
+    amount: z.number().int().min(1).max(20).optional(),
+    x: z.number().min(0).optional().describe('Ponto da última screenshot onde rolar (opcional)'),
+    y: z.number().min(0).optional()
   }),
   describe(a) {
     const args = a as { direction: string; amount?: number }
     return { title: 'Rolar', detail: `${args.direction} x${args.amount ?? 3}`, preview: args.direction }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { direction: 'up' | 'down' | 'left' | 'right'; amount?: number }
+    const args = this.schema.parse(raw) as { direction: 'up' | 'down' | 'left' | 'right'; amount?: number; x?: number; y?: number }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.scroll(args.direction, args.amount ?? 3)
+    const point = args.x != null && args.y != null ? { x: args.x, y: args.y } : undefined
+    const result = await layer.scroll(args.direction, args.amount ?? 3, point)
     return { ok: result.code === 0, text: result.code === 0 ? 'rolagem executada' : result.stderr, summary: args.direction }
   }
 }
@@ -305,7 +381,8 @@ export const computerDragTool: ToolDef = {
     from_x: z.number().min(0),
     from_y: z.number().min(0),
     to_x: z.number().min(0),
-    to_y: z.number().min(0)
+    to_y: z.number().min(0),
+    button: z.enum(['left', 'right', 'middle']).optional().describe('Botão usado no arrasto (padrão: left)')
   }),
   describe(a) {
     const args = a as { from_x: number; from_y: number; to_x: number; to_y: number }
@@ -316,12 +393,17 @@ export const computerDragTool: ToolDef = {
     }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { from_x: number; from_y: number; to_x: number; to_y: number }
+    const args = this.schema.parse(raw) as { from_x: number; from_y: number; to_x: number; to_y: number; button?: 'left' | 'right' | 'middle' }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.drag({ x: args.from_x, y: args.from_y }, { x: args.to_x, y: args.to_y })
+    const result = await layer.drag(
+      { x: args.from_x, y: args.from_y },
+      { x: args.to_x, y: args.to_y },
+      'screenshot',
+      args.button ?? 'left'
+    )
     return { ok: result.code === 0, text: result.code === 0 ? 'arrasto executado' : result.stderr, summary: 'drag' }
   }
 }
@@ -462,6 +544,8 @@ export const computerTools: ToolDef[] = [
   computerSnapshotTool,
   computerScreenshotTool,
   computerClickTool,
+  computerMouseMoveTool,
+  computerMouseButtonTool,
   computerSetValueTool,
   computerTypeTool,
   computerKeyTool,

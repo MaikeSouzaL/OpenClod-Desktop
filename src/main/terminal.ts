@@ -67,7 +67,7 @@ function terminalEnv(): Record<string, string> {
   }
   env.TERM = 'xterm-256color'
   env.COLORTERM = 'truecolor'
-  env.TERM_PROGRAM = 'Forja'
+  env.TERM_PROGRAM = 'Openclod'
   return env
 }
 

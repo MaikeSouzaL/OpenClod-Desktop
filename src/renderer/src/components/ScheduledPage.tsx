@@ -154,7 +154,7 @@ function TaskDialog({
         <header className="modal-head">
           <div>
             <h2>{form.id ? 'Editar tarefa' : 'Nova tarefa agendada'}</h2>
-            <p>O Forja abre uma sessão nova no projeto e envia a instrução no horário marcado, enquanto o app estiver aberto.</p>
+            <p>O Openclod abre uma sessão nova no projeto e envia a instrução no horário marcado, enquanto o app estiver aberto.</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} title="Fechar">
             <Icon name="x" size={16} />
@@ -343,7 +343,7 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
         </span>
       </header>
       <p className="page-lead">
-        Rode instruções do agente em horários fixos: revisões, testes, relatórios. As execuções acontecem enquanto o Forja estiver aberto; uma execução
+        Rode instruções do agente em horários fixos: revisões, testes, relatórios. As execuções acontecem enquanto o Openclod estiver aberto; uma execução
         perdida com o app fechado roda uma vez ao abrir.
       </p>
       <div className="page-tools">

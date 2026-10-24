@@ -32,9 +32,9 @@ Data: **2026-10-23**. Repositório: `https://github.com/akitaonrails/ai-memory`
 O README é explícito: a memória é **deste repositório**, não um cofre geral; o
 perfil cross-project é um complemento.
 
-## 2. Decisão para o Forja
+## 2. Decisão para o Openclod
 
-O Forja é um app Electron/TypeScript com um núcleo puro; adicionar um binário
+O Openclod é um app Electron/TypeScript com um núcleo puro; adicionar um binário
 Rust de 20 MB + servidor HTTP + SQLite + hooks para a memória básica aumentaria
 a superfície de instalação e criaria dois runtimes. A decisão foi:
 
@@ -63,7 +63,7 @@ a superfície de instalação e criaria dois runtimes. A decisão foi:
 Layout em disco (por projeto):
 
 ```
-%APPDATA%\Forja\data\memory\projects\<projectId>\
+%APPDATA%\Openclod\data\memory\projects\<projectId>\
   wiki/<slug>.md       fonte da verdade, editável à mão
   index.json           índice derivado (reconstruído quando a wiki muda)
   handoffs.json        handoffs abertos/reivindicados/cancelados
@@ -75,7 +75,7 @@ qualquer conteúdo de ferramenta.
 
 ## 4. Equivalências e diferenças
 
-| ai-memory | Forja |
+| ai-memory | Openclod |
 |---|---|
 | Wiki markdown em git | Wiki markdown em `%APPDATA%` (sem git por projeto; o projeto pode versionar se quiser) |
 | SQLite FTS5 + entidades + links + vetores | Índice lexical em JSON (título/tags/corpo); sem vetores |
@@ -107,14 +107,14 @@ Instale o release `ai-memory-windows-x86_64.zip` (v3.2.2) e adicione em
 
 O `cwd` é o que define o projeto para o servidor; use um servidor por projeto
 ou um `.ai-memory.toml` na raiz. As ferramentas aparecem como
-`mcp__ai-memory__*` e passam pela mesma política de aprovação do Forja. O
+`mcp__ai-memory__*` e passam pela mesma política de aprovação do Openclod. O
 bridge exige o servidor `ai-memory serve` em execução (HTTP local) ou o modo
 suportado pela sua instalação; consulte `ai-memory install-mcp` e
 `docs/install.md` do projeto.
 
 ## 6. Limitações honestas
 
-- A busca do Forja é lexical (título, tags, corpo), não FTS5/BM25 nem vetorial.
+- A busca do Openclod é lexical (título, tags, corpo), não FTS5/BM25 nem vetorial.
 - Não há captura automática de cada prompt/tool call; a memória cresce por
   páginas explícitas e pelo briefing.
 - Não há decay, dedup, contradição ou consolidação por LLM.

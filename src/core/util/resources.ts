@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 /**
- * Everything Forja needs at runtime ships inside the project (nothing is taken
+ * Everything Openclod needs at runtime ships inside the project (nothing is taken
  * from the user's global Python, PATH or caches):
  *
  *   resources/

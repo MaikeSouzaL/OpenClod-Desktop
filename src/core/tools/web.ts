@@ -7,7 +7,7 @@ import { scanForInjection } from '../security/policy.js'
 import { truncateMiddle } from '../util/ids.js'
 
 const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 Forja/0.1'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 Openclod/0.1'
 
 function assertFetchable(rawUrl: string): URL {
   let url: URL

@@ -1,5 +1,6 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
-import type { CapabilityReport, Project } from '../../../shared/types'
+import type { CapabilityReport, Project, SessionSummary } from '../../../shared/types'
+import { relativeTime } from '../lib/format'
 import { Icon } from './Icons'
 
 interface CoworkViewProps {
@@ -10,8 +11,10 @@ interface CoworkViewProps {
   model: string
   hasRealProvider: boolean
   composer: ReactNode
+  recent?: SessionSummary[]
   onAddProject(): void
   onPickProject(project: Project): void
+  onOpenSession?(sessionId: string): void
   onSuggestion(text: string): void
   onOpenSettings(): void
 }
@@ -51,8 +54,10 @@ export function CoworkView({
   model,
   hasRealProvider,
   composer,
+  recent = [],
   onAddProject,
   onPickProject,
+  onOpenSession,
   onSuggestion,
   onOpenSettings
 }: CoworkViewProps): ReactElement {
@@ -73,7 +78,7 @@ export function CoworkView({
         </h1>
 
         <p className="cowork-sub">
-          O Forja assume uma pasta e trabalha nela: lê arquivos, roda comandos, navega e reporta cada passo. Tudo que
+          O Openclod assume uma pasta e trabalha nela: lê arquivos, roda comandos, navega e reporta cada passo. Tudo que
           for sensível passa pela sua aprovação.
         </p>
 
@@ -132,6 +137,29 @@ export function CoworkView({
 
         <div className="cowork-composer">{composer}</div>
 
+        {recent.length ? (
+          <div className="cowork-recent">
+            <div className="cowork-recent-head">
+              <span>Em andamento</span>
+              <button type="button" className="link-btn" onClick={() => onOpenSession?.(recent[0].meta.id)}>
+                Continuar
+              </button>
+            </div>
+            {recent.slice(0, 4).map((session) => (
+              <button
+                key={session.meta.id}
+                type="button"
+                className="cowork-recent-row"
+                onClick={() => onOpenSession?.(session.meta.id)}
+              >
+                <span className="cowork-recent-dot" />
+                <span className="cowork-recent-title">{session.meta.title}</span>
+                <span className="cowork-recent-time">{relativeTime(session.meta.updatedAt)}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <div className="cowork-suggestions">
           {SUGGESTIONS.map((item) => (
             <button key={item.title} type="button" className="cowork-card" onClick={() => onSuggestion(item.prompt)}>
@@ -147,8 +175,8 @@ export function CoworkView({
         </div>
 
         <p className="cowork-note">
-          Tarefas agendadas e conectores ainda não estão disponíveis nesta versão. O Cowork usa o mesmo harness, as
-          mesmas permissões e a mesma auditoria do Code.
+          O Cowork usa o mesmo harness, as mesmas permissões e a mesma auditoria do Code. Ele pode abrir qualquer
+          pasta do computador, navegar e instalar conectores MCP quando a tarefa precisar.
         </p>
       </div>
     </div>

@@ -17,7 +17,7 @@ export interface LoadedAgents {
 }
 
 export interface LoadAgentsOptions {
-  /** Forja's per-user folder (the app uses %APPDATA%\Forja\agents). */
+  /** Openclod's per-user folder (the app uses %APPDATA%\Openclod\agents). */
   userDir?: string
   /** Project root: `.forja/agents` is read from it, and `.claude/agents` when `importClaude` is set. */
   cwd?: string
@@ -268,7 +268,7 @@ function scalarOf(text: string): Scalar {
 
 const SHELL_TOOLS = ['run_command', 'start_process', 'read_process_output', 'list_processes', 'stop_process']
 
-/** Claude Code tool names (lowercase) and the Forja tools that cover them. */
+/** Claude Code tool names (lowercase) and the Openclod tools that cover them. */
 const CLAUDE_TOOLS: Record<string, string[]> = {
   read: ['read_file'],
   write: ['write_file'],
@@ -286,11 +286,11 @@ const CLAUDE_TOOLS: Record<string, string[]> = {
   notebookedit: []
 }
 
-/** Claude Code accepts aliases (sonnet, opus, haiku) that no Forja provider understands. */
+/** Claude Code accepts aliases (sonnet, opus, haiku) that no Openclod provider understands. */
 function normalizeModel(raw: string, imported: boolean): string {
   const model = raw.trim()
   if (!model || model.toLowerCase() === 'inherit') return 'inherit'
-  // Explicit `providerId/model` is Forja's own syntax and always kept.
+  // Explicit `providerId/model` is Openclod's own syntax and always kept.
   if (model.includes('/')) return model
   // Bare names in Claude folders name Claude models; they only make sense on a Claude provider.
   if (imported) return 'inherit'
@@ -320,7 +320,7 @@ function stringList(value: FrontValue | undefined): string[] {
 }
 
 /**
- * Tool lists accept Forja names, globs (`browser_*`) and Claude Code names.
+ * Tool lists accept Openclod names, globs (`browser_*`) and Claude Code names.
  * `Task` / `Agent` entries are not tools here: `Task(a, b)` becomes canCall
  * [a, b] and a bare `Task` becomes '*'.
  */
@@ -494,7 +494,7 @@ export function loadAgentsFromDir(dir: string, source: AgentSource, imported = f
  * Built-ins first, then each folder; a later definition replaces an earlier one
  * with the same name. Order (later wins): built-ins, ~/.claude/agents, the user
  * folder, <project>/.claude/agents, <project>/.forja/agents. So the project
- * beats the user, and Forja's own files beat imported Claude ones at the same
+ * beats the user, and Openclod's own files beat imported Claude ones at the same
  * level. Claude folders are read only when `importClaude` is set.
  */
 export function loadAgents(options: LoadAgentsOptions = {}): LoadedAgents {
@@ -586,7 +586,7 @@ export function writeAgentFile(dir: string, def: AgentDefinition, options: Write
   const file = path.resolve(root, `${def.name}.md`)
   if (path.dirname(file) !== root) throw new Error('nome de agente inválido: o arquivo ficaria fora da pasta de agentes')
   if (path.basename(root).toLowerCase() === 'agents' && path.basename(path.dirname(root)).toLowerCase() === '.claude') {
-    throw new Error('o Forja não grava na pasta .claude/agents; ela é só leitura')
+    throw new Error('o Openclod não grava na pasta .claude/agents; ela é só leitura')
   }
   fs.mkdirSync(root, { recursive: true })
   try {

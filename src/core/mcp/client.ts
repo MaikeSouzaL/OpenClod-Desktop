@@ -113,6 +113,23 @@ export function normalizeMcpServerSettings(raw: unknown): McpServerSettings {
     env,
     enabled: server.enabled !== false
   }
+  const url = typeof server.url === 'string' ? server.url.trim().slice(0, 2000) : ''
+  const type = server.type === 'http' || server.type === 'sse' || server.type === 'stdio' ? server.type : url ? 'http' : 'stdio'
+  if (type !== 'stdio') {
+    if (!/^https?:\/\//i.test(url)) throw new Error(`servidor MCP "${out.name}": url http(s) obrigatória`)
+    out.type = type
+    out.url = url
+    out.command = ''
+    out.args = []
+  }
+  if (server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)) {
+    const headers = Object.fromEntries(
+      Object.entries(server.headers as Record<string, unknown>)
+        .slice(0, 30)
+        .map(([key, value]) => [key.slice(0, 120), String(value).slice(0, 4000)])
+    )
+    if (Object.keys(headers).length) out.headers = headers
+  }
   if (typeof server.cwd === 'string' && server.cwd.trim()) out.cwd = server.cwd.trim().slice(0, 500)
   const timeoutMs = clampMs(server.timeoutMs, 1000, 3_600_000)
   if (timeoutMs !== undefined) out.timeoutMs = timeoutMs
@@ -143,6 +160,7 @@ export class McpClient {
   private pending = new Map<number, Pending>()
   private tools: McpToolInfo[] = []
   private hidden = 0
+  private httpSession: string | null = null
   state: 'stopped' | 'starting' | 'ready' | 'error' = 'stopped'
   lastError: string | null = null
 
@@ -150,6 +168,10 @@ export class McpClient {
 
   get name(): string {
     return this.config.name
+  }
+
+  private get remote(): boolean {
+    return this.config.type === 'http' || this.config.type === 'sse' || Boolean(this.config.url)
   }
 
   /** Tools the server offers but the include/exclude filter hides. */
@@ -160,9 +182,15 @@ export class McpClient {
   async start(timeoutMs = positiveMs(this.config.startTimeoutMs, DEFAULT_START_TIMEOUT_MS)): Promise<void> {
     if (this.state === 'ready') return
     this.state = 'starting'
+    if (this.remote) {
+      await this.startRemote(timeoutMs)
+      return
+    }
     const command = process.platform === 'win32' && /\.(cmd|bat)$/i.test(this.config.command)
       ? 'cmd.exe'
-      : this.config.command
+      : process.platform === 'win32' && ['npx', 'npm', 'pnpm', 'yarn', 'bunx', 'uvx', 'uv', 'deno'].includes(this.config.command)
+        ? 'cmd.exe'
+        : this.config.command
     const args =
       command === 'cmd.exe' ? ['/d', '/s', '/c', this.config.command, ...this.config.args] : this.config.args
 
@@ -216,7 +244,100 @@ export class McpClient {
     this.state = 'ready'
   }
 
-  /** Tools exposed to the harness: the server's list after include/exclude filtering. */
+  /**
+   * Streamable HTTP (and legacy SSE) MCP transport. The server may answer a
+   * POST with JSON or with an SSE stream; both are accepted. A session id
+   * returned on initialize is echoed on every later request.
+   */
+  private async startRemote(timeoutMs: number): Promise<void> {
+    try {
+      this.lastError = null
+      const init = (await this.request('initialize', {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'forja', version: '0.1.0' }
+      }, timeoutMs)) as { protocolVersion?: string }
+      void init
+      this.notify('notifications/initialized', {})
+
+      const collected: McpToolInfo[] = []
+      let cursor: string | undefined
+      for (let page = 0; page < 20; page++) {
+        const list = (await this.request('tools/list', cursor ? { cursor } : {}, timeoutMs)) as {
+          tools?: McpToolInfo[]
+          nextCursor?: string
+        }
+        collected.push(...(list.tools ?? []))
+        cursor = list.nextCursor
+        if (!cursor) break
+      }
+      const all = collected.map((tool) => ({
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema ?? { type: 'object', properties: {} }
+      }))
+      this.tools = filterMcpTools(all, this.config)
+      this.hidden = all.length - this.tools.length
+      this.state = 'ready'
+    } catch (err) {
+      this.state = 'error'
+      this.lastError = (err as Error).message.slice(0, 800)
+      throw err
+    }
+  }
+
+  private remoteHeaders(): Record<string, string> {
+    return {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      ...(this.httpSession ? { 'mcp-session-id': this.httpSession } : {}),
+      ...(this.config.headers ?? {})
+    }
+  }
+
+  private async requestRemote(
+    method: string,
+    params: unknown,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<unknown> {
+    if (!this.config.url) throw new Error(`servidor MCP ${this.name} sem url`)
+    if (this.state !== 'ready' && this.state !== 'starting') throw new Error('servidor MCP não iniciado')
+    const id = this.nextId++
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const onAbort = (): void => controller.abort()
+    signal?.addEventListener('abort', onAbort, { once: true })
+    try {
+      const response = await fetch(this.config.url, {
+        method: 'POST',
+        headers: this.remoteHeaders(),
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        signal: controller.signal
+      })
+      const session = response.headers.get('mcp-session-id')
+      if (session) this.httpSession = session
+      const body = await response.text()
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} em ${method}: ${body.slice(0, 400)}`)
+      }
+      if (!body.trim()) return null
+      const message = parseRpcResponse(body, id)
+      if (!message) throw new Error(`resposta MCP inválida para ${method}`)
+      if (message.error) throw new Error(`MCP ${message.error.code}: ${message.error.message}`)
+      return message.result
+    } catch (err) {
+      if (controller.signal.aborted && !signal?.aborted) {
+        throw new Error(`timeout de MCP ${this.name}.${method} (${timeoutMs}ms)`)
+      }
+      throw err
+    } finally {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    }
+  }
+
+
   toolsList(): McpToolInfo[] {
     return [...this.tools]
   }
@@ -298,6 +419,7 @@ export class McpClient {
   }
 
   private request(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    if (this.remote) return this.requestRemote(method, params, timeoutMs, signal)
     if (!this.child) return Promise.reject(new Error('servidor MCP não iniciado'))
     if (signal?.aborted) return Promise.reject(new Error(`chamada MCP ${this.name}.${method} cancelada`))
     const id = this.nextId++
@@ -338,10 +460,32 @@ export class McpClient {
   }
 
   private notify(method: string, params: unknown): void {
+    if (this.remote) {
+      if (!this.config.url) return
+      void fetch(this.config.url, {
+        method: 'POST',
+        headers: this.remoteHeaders(),
+        body: JSON.stringify({ jsonrpc: '2.0', method, params })
+      }).catch(() => undefined)
+      return
+    }
     this.child?.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`)
   }
 
   async stop(): Promise<void> {
+    if (this.remote) {
+      if (this.httpSession && this.config.url) {
+        void fetch(this.config.url, {
+          method: 'DELETE',
+          headers: this.remoteHeaders()
+        }).catch(() => undefined)
+      }
+      this.httpSession = null
+      this.state = 'stopped'
+      this.tools = []
+      this.hidden = 0
+      return
+    }
     if (!this.child) return
     try {
       this.child.stdin.end()
@@ -354,4 +498,40 @@ export class McpClient {
     this.tools = []
     this.hidden = 0
   }
+}
+
+interface RpcMessage {
+  id?: number
+  result?: unknown
+  error?: { code: number; message: string }
+}
+
+/**
+ * Reads a JSON-RPC response from either a plain JSON body or an SSE stream
+ * (`data: {...}` lines). Returns the message matching `id`, then falls back to
+ * the first response without an error.
+ */
+export function parseRpcResponse(body: string, id: number): RpcMessage | null {
+  const trimmed = body.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      return JSON.parse(trimmed) as RpcMessage
+    } catch {
+      return null
+    }
+  }
+  const messages: RpcMessage[] = []
+  for (const block of trimmed.split(/\r?\n\r?\n/)) {
+    for (const line of block.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
+      if (!data || data === '[DONE]') continue
+      try {
+        messages.push(JSON.parse(data) as RpcMessage)
+      } catch {
+        /* ignore malformed events */
+      }
+    }
+  }
+  return messages.find((message) => message.id === id) ?? messages.find((message) => !message.error) ?? messages[0] ?? null
 }

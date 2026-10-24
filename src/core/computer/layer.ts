@@ -216,7 +216,11 @@ export class ComputerLayer {
   /** UI Automation tree (with element indices) of an app or a window. */
   async snapshot(target: Target, includeScreenshot = false): Promise<ToolResult> {
     if (target.window != null) {
-      return this.call('get_window_state', { ...targetArgs(target), include_screenshot: includeScreenshot })
+      return this.call('get_window_state', {
+        ...targetArgs(target),
+        include_text: true,
+        ...(includeScreenshot ? { include_screenshot: true } : {})
+      })
     }
     if (!target.app) return { ok: false, text: 'informe app ou window' }
     const result = await this.call('get_app_state', { app: target.app })
@@ -301,25 +305,71 @@ export class ComputerLayer {
     return this.run(['input', ...args], timeoutMs, { OPEN_COMPUTER_USE_WINDOWS_ALLOW_FOREGROUND_INPUT: '1' })
   }
 
+  /** Converts a point from the last screenshot's pixel space to screen coordinates. */
+  private toScreen(point: { x: number; y: number }, space: 'screenshot' | 'screen'): { x: number; y: number } {
+    if (space === 'screen') return point
+    const capture = this.lastCapture
+    if (capture) {
+      if (point.x < 0 || point.y < 0 || point.x >= capture.width || point.y >= capture.height) {
+        throw new Error(
+          `coordenada (${point.x}, ${point.y}) fora da última captura ${capture.width}x${capture.height}; ` +
+            'use computer_screenshot e escolha um ponto dentro da imagem'
+        )
+      }
+    }
+    return screenshotToScreen(point, capture)
+  }
+
   /** Clicks a point given in screenshot pixels (default) or raw screen pixels. */
   async clickAt(point: { x: number; y: number }, count = 1, space: 'screenshot' | 'screen' = 'screenshot'): Promise<OcuResult & { screen: { x: number; y: number } }> {
-    const screen = space === 'screenshot' ? screenshotToScreen(point, this.lastCapture) : point
+    const screen = this.toScreen(point, space)
     const result = await this.input(['click', '--x', String(screen.x), '--y', String(screen.y), '--count', String(count)])
+    return { ...result, screen }
+  }
+
+  /** Moves the real pointer without clicking. Coordinates follow the last screenshot by default. */
+  async moveMouse(point: { x: number; y: number }, space: 'screenshot' | 'screen' = 'screenshot'): Promise<OcuResult & { screen: { x: number; y: number }; actual: { x: number; y: number } | null }> {
+    const screen = this.toScreen(point, space)
+    const result = await this.input(['move', String(screen.x), String(screen.y)])
+    const actual = await this.cursorPosition()
+    return { ...result, screen, actual }
+  }
+
+  /** Presses or releases a mouse button, optionally at a point (for drags and context menus). */
+  async mouseButton(
+    action: 'down' | 'up',
+    button: 'left' | 'right' | 'middle' = 'left',
+    point?: { x: number; y: number },
+    space: 'screenshot' | 'screen' = 'screenshot'
+  ): Promise<OcuResult & { screen?: { x: number; y: number } }> {
+    const args = [`mouse_${action}`, '--button', button]
+    let screen: { x: number; y: number } | undefined
+    if (point) {
+      screen = this.toScreen(point, space)
+      args.push('--x', String(screen.x), '--y', String(screen.y))
+    }
+    const result = await this.input(args)
     return { ...result, screen }
   }
 
   async drag(
     from: { x: number; y: number },
     to: { x: number; y: number },
-    space: 'screenshot' | 'screen' = 'screenshot'
+    space: 'screenshot' | 'screen' = 'screenshot',
+    button: 'left' | 'right' | 'middle' = 'left'
   ): Promise<OcuResult> {
-    const a = space === 'screenshot' ? screenshotToScreen(from, this.lastCapture) : from
-    const b = space === 'screenshot' ? screenshotToScreen(to, this.lastCapture) : to
-    return this.input(['drag', String(a.x), String(a.y), String(b.x), String(b.y)], 45_000)
+    const a = this.toScreen(from, space)
+    const b = this.toScreen(to, space)
+    return this.input(['drag', String(a.x), String(a.y), String(b.x), String(b.y), '--button', button], 45_000)
   }
 
-  async scroll(direction: 'up' | 'down' | 'left' | 'right', amount = 3): Promise<OcuResult> {
-    return this.input(['scroll', direction, '--amount', String(amount)])
+  async scroll(direction: 'up' | 'down' | 'left' | 'right', amount = 3, point?: { x: number; y: number }): Promise<OcuResult> {
+    const args = ['scroll', direction, '--amount', String(amount)]
+    if (point) {
+      const screen = this.toScreen(point, 'screenshot')
+      args.push('--x', String(screen.x), '--y', String(screen.y))
+    }
+    return this.input(args)
   }
 
   async typeText(text: string): Promise<OcuResult> {

@@ -15,11 +15,11 @@ import { killTree } from './shell.js'
  *
  * Safety rules:
  * - The tool asks for approval like run_command (risk `exec`).
- * - The child's own permission mode follows Forja's, and never goes beyond
+ * - The child's own permission mode follows Openclod's, and never goes beyond
  *   "accept edits": no bypassPermissions, no --dangerously-*, no full-access sandbox.
  * - The prompt travels over stdin, never argv: argv would be re-parsed by
  *   cmd.exe for the npm `.cmd` shims on Windows.
- * - The child gets the sanitized environment (no API keys/tokens from Forja)
+ * - The child gets the sanitized environment (no API keys/tokens from Openclod)
  *   and its whole process tree is killed on abort or timeout.
  */
 
@@ -49,7 +49,7 @@ export interface ExternalAgentOptions {
 /* Permission mapping                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Forja permission mode → `claude --permission-mode`. Never bypassPermissions. */
+/** Openclod permission mode → `claude --permission-mode`. Never bypassPermissions. */
 export function claudePermissionMode(mode: PermissionMode): 'plan' | 'default' | 'acceptEdits' {
   switch (mode) {
     case 'ask':
@@ -62,7 +62,7 @@ export function claudePermissionMode(mode: PermissionMode): 'plan' | 'default' |
   }
 }
 
-/** Forja permission mode → `codex exec -s`. Never danger-full-access. */
+/** Openclod permission mode → `codex exec -s`. Never danger-full-access. */
 export function codexSandbox(mode: PermissionMode): 'read-only' | 'workspace-write' {
   return mode === 'accept-edits' || mode === 'auto' ? 'workspace-write' : 'read-only'
 }
@@ -189,7 +189,7 @@ function claudeParser(): StreamParser {
         sessionId,
         usage: usage
           ? {
-              // Forja counts cached tokens as input, like the Anthropic provider does.
+              // Openclod counts cached tokens as input, like the Anthropic provider does.
               input: (num(usage.input_tokens) ?? 0) + cacheRead + cacheWrite,
               output: num(usage.output_tokens) ?? 0,
               cachedInput: cacheRead || undefined,
@@ -608,7 +608,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
   return {
     name: 'external_agent',
     description:
-      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code ou Codex CLI). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Forja: em "perguntar" ele só lê; editar exige "aceitar edições" ou "automático"; nunca roda sem proteções. Escreva o prompt completo, pois ele não vê esta conversa.',
+      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code ou Codex CLI). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Openclod: em "perguntar" ele só lê; editar exige "aceitar edições" ou "automático"; nunca roda sem proteções. Escreva o prompt completo, pois ele não vê esta conversa.',
     risk: 'exec',
     parallelSafe: false,
     requires: 'network',
@@ -700,7 +700,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
       }
       if (outcome.denials.length) {
         parts.push(
-          `Ações negadas pelo modo de permissão do agente (${claudePermissionMode(mode)}): ${outcome.denials.join(', ')}. Mude o modo do Forja para "aceitar edições" ou "automático" se elas forem necessárias.`
+          `Ações negadas pelo modo de permissão do agente (${claudePermissionMode(mode)}): ${outcome.denials.join(', ')}. Mude o modo do Openclod para "aceitar edições" ou "automático" se elas forem necessárias.`
         )
       }
       parts.push(`[${meta.join(' · ')}]`)

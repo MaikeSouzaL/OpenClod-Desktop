@@ -3,7 +3,7 @@ import type { Decision, PermissionRules } from '../../shared/types.js'
 
 /**
  * Claude Code tool names accepted in rules, hooks and matchers, mapped to the
- * Forja tools they cover. A rule may use either name.
+ * Openclod tools they cover. A rule may use either name.
  */
 const CLAUDE_ALIASES: Record<string, string[]> = {
   run_command: ['Bash', 'PowerShell'],

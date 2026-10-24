@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Relatório de QA — {{RODADA_NOME}}</title>
+<!--
+COMO PREENCHER
+1. Copie para .qa/<rodada>/relatorio/relatorio.html.
+2. Troque cada {{...}}. Ao terminar, procure "{{" no arquivo: não pode sobrar nenhum.
+3. Blocos entre <!- - REPETIR: x - -> e <!- - /REPETIR: x - -> se repetem uma vez por item.
+4. Nunca apague uma seção. Se não houver conteúdo, deixe o parágrafo class="vazio" com "Nenhum" e o porquê.
+5. Imagens por caminho relativo à pasta relatorio/: ../evidencias/NN-...-circulado.png.
+6. Gere o PDF com scripts/gerar_pdf.py. O rodapé (nome da rodada + página) vem do @page abaixo
+   e precisa de Chrome/Edge 131 ou mais novo.
+7. Severidade usa as classes sev-critico, sev-alto, sev-medio, sev-baixo.
+   Status usa st-ok (retestado-ok, passou, resolveu), st-aberto (aberto, falhou, precisa de ajuste),
+   st-pendente (nao-corrigido, bloqueado, nao-validado) e st-neutro (nao-aplicavel, retratado).
+   O texto do selo sempre diz o status por escrito: cor nunca é o único sinal.
+8. Defeito sem print (só de API, de banco, de CLI): use a variante "prova textual" indicada no
+   comentário VARIANTE de cada bloco de defeito — um <pre><code> com o trecho de rede ou banco no
+   lugar do <figure>. Nunca deixe um <img> apontando para print que não existe. Rodada sem front-web,
+   full-stack nem api (CLI, biblioteca, job): a linha "Prova:" do ANTES usa a variante "prova de comando"
+   (comando e código de saída da transcrição), e papel sem item papel: no ledger é "sem papel".
+9. Caminho padrão (os itens 1 e 2 são o plano B, sem ledger): scripts/cobertura.py relatorio <rodada>
+   --modelo templates/relatorio.html --saida <rodada>/relatorio/relatorio.html preenche do ledger o
+   resumo, os números, a cobertura, o crítico, as linhas de defeitos (figura ou prova textual, conforme a
+   evidência; data do achado, esperado × obtido, método/URL/status do primeiro rede/*.json do ANTES,
+   regressões no DEPOIS), as linhas MA/MO, os gates dos casos estatico:, os retestes, o replay, a sujeira e
+   o "não validado"; tabela do ledger sem linha recebe o texto do SE_NENHUM. Mascara segredos e deixa
+   [PREENCHA] só no texto que exige pessoa: troque cada um por texto. O fechar reprova relatório com "{{"
+   ou "[PREENCHA" fora de comentário.
+-->
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 14mm 18mm 14mm;
+    @bottom-left {
+      content: "{{RODADA_NOME}}";
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      color: #5C6B7F;
+    }
+    @bottom-right {
+      content: "página " counter(page) " de " counter(pages);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      color: #5C6B7F;
+    }
+  }
+  @page capa {
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+  :root {
+    --texto: #181B21;
+    --suave: #5C6B7F;
+    --borda: #D5DBE2;
+    --fundo: #F0F2F4;
+    --zebra: #F9FAFB;
+    --vermelho: #B91C1C;
+    --vermelho-fundo: #FEF2F2;
+    --verde: #047857;
+    --verde-fundo: #ECFDF5;
+    --ambar: #B45309;
+    --ambar-fundo: #FFFBEB;
+    --azul: #0369A1;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.45;
+    color: var(--texto);
+    background: #FFFFFF;
+  }
+  h1, h2, h3, h4 { line-height: 1.25; margin: 0 0 6px; break-after: avoid; }
+  h1 { font-size: 22pt; }
+  h2 { font-size: 15pt; margin-top: 18px; padding-bottom: 4px; border-bottom: 2px solid var(--texto); }
+  h3 { font-size: 11.5pt; margin-top: 12px; }
+  h4 { font-size: 10pt; margin-top: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
+  p { margin: 0 0 8px; }
+  ul, ol { margin: 0 0 8px; padding-left: 18px; }
+  li { margin: 2px 0; }
+  a { color: var(--azul); text-decoration: none; }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 8.8pt; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th, td { border: 1px solid var(--borda); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: var(--fundo); font-weight: 600; }
+  tbody tr:nth-child(even) td { background: var(--zebra); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  code, pre, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 8.6pt; }
+  code { background: var(--fundo); padding: 0 3px; border-radius: 3px; }
+  pre {
+    background: var(--fundo);
+    padding: 8px 10px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 6px 0 10px;
+    break-inside: avoid;
+  }
+  pre code { background: none; padding: 0; }
+
+  img { max-width: 100%; height: auto; display: block; border: 1px solid var(--borda); }
+  figure { margin: 6px 0 10px; break-inside: avoid; }
+  figcaption { font-size: 8.5pt; color: var(--suave); margin-top: 3px; }
+
+  .capa {
+    page: capa;
+    break-after: page;
+    min-height: 240mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .capa .sobretitulo { font-size: 10pt; letter-spacing: .12em; text-transform: uppercase; color: var(--suave); margin-bottom: 4px; }
+  .capa .subtitulo { font-size: 13pt; color: var(--suave); margin-bottom: 18px; }
+  .capa table { font-size: 9.5pt; margin-top: 8px; }
+  .capa th { width: 32%; }
+  .veredito {
+    margin-top: 18px;
+    padding: 10px 12px;
+    border-left: 4px solid var(--texto);
+    background: var(--fundo);
+    font-size: 11pt;
+  }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px; }
+  .kpi { border: 1px solid var(--borda); border-radius: 6px; padding: 8px 10px; break-inside: avoid; }
+  .kpi .valor { font-size: 18pt; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .kpi .rotulo { font-size: 8.5pt; color: var(--suave); }
+
+  .selo {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    font-size: 7.8pt;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .sev-critico { color: var(--vermelho); background: var(--vermelho-fundo); }
+  .sev-alto { color: var(--vermelho); }
+  .sev-medio { color: var(--ambar); }
+  .sev-baixo { color: var(--suave); }
+  .st-ok { color: var(--verde); background: var(--verde-fundo); }
+  .st-aberto { color: var(--vermelho); background: var(--vermelho-fundo); }
+  .st-pendente { color: var(--ambar); background: var(--ambar-fundo); }
+  .st-neutro { color: var(--suave); background: var(--fundo); }
+
+  .defeito { break-before: page; }
+  .defeito .cabecalho { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+  .defeito .cabecalho h3 { margin: 0; flex: 1 1 100%; }
+  .parte { margin: 10px 0; padding: 6px 0 2px 10px; border-left: 3px solid var(--borda); }
+  .parte.antes { border-left-color: var(--vermelho); }
+  .parte.porque { border-left-color: var(--suave); }
+  .parte.depois { border-left-color: var(--verde); }
+  .parte.status { border-left-color: var(--texto); }
+  .parte > h4 { margin-top: 0; }
+  .parte img { width: auto; max-height: 85mm; }
+
+  .nota { font-size: 8.5pt; color: var(--suave); }
+  .vazio { color: var(--suave); font-style: italic; }
+  .aviso { padding: 8px 10px; border-left: 4px solid var(--ambar); background: var(--ambar-fundo); margin: 8px 0; }
+  .sumario ol { columns: 2; column-gap: 24px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ CAPA -->
+<section class="capa">
+  <p class="sobretitulo">Relatório de QA</p>
+  <h1>{{ALVO}}</h1>
+  <p class="subtitulo">{{PROJETO}}</p>
+  <table>
+    <tbody>
+      <tr><th>Rodada</th><td><code>{{RODADA_NOME}}</code></td></tr>
+      <tr><th>Período</th><td>{{INICIO}} a {{FIM}}</td></tr>
+      <tr><th>Ambiente</th><td>{{AMBIENTE}}</td></tr>
+      <tr><th>Papéis usados</th><td>{{PAPEIS}}</td></tr>
+      <tr><th>Código testado</th><td><code>{{REPOSITORIO}}</code> · <code>{{BRANCH}}</code> @ <code>{{COMMIT}}</code></td></tr>
+      <tr><th>Autorizações da rodada</th><td>{{AUTORIZACOES}}</td></tr>
+      <tr><th>Executado por</th><td>{{EXECUTOR}}</td></tr>
+    </tbody>
+  </table>
+  <p class="veredito">{{VEREDITO_EM_UMA_FRASE}}</p>
+</section>
+
+<!-- ============================================================ SUMÁRIO -->
+<section class="sumario">
+  <h2>Sumário</h2>
+  <ol>
+    <li><a href="#resumo">Resumo executivo</a></li>
+    <li><a href="#escopo">Escopo, ambiente e método</a></li>
+    <li><a href="#cobertura">Cobertura</a></li>
+    <li><a href="#corrigidos">Defeitos corrigidos</a></li>
+    <li><a href="#retestes">Retestes de correções de terceiros</a></li>
+    <li><a href="#nao-corrigidos">Defeitos não corrigidos</a></li>
+    <li><a href="#decisoes">Decisões do time</a></li>
+    <li><a href="#retratacoes">Retratações</a></li>
+    <li><a href="#melhorias">Melhorias</a></li>
+    <li><a href="#qualidade">Qualidade de código</a></li>
+    <li><a href="#modulos">Módulos avançados e opcionais</a></li>
+    <li><a href="#sujeira">Sujeira deixada</a></li>
+    <li><a href="#nao-validado">O que não foi validado</a></li>
+    <li><a href="#arquivos">Arquivos alterados e verificações</a></li>
+    <li><a href="#entrega">Entrega: branch e commit</a></li>
+    <li><a href="#replay">Replay e evidências</a></li>
+  </ol>
+</section>
+
+<!-- ============================================================ 1. RESUMO -->
+<section id="resumo">
+  <h2>1. Resumo executivo</h2>
+
+  <div class="kpis">
+    <div class="kpi"><div class="valor">{{N_ITENS}}</div><div class="rotulo">itens da superfície enumerados</div></div>
+    <div class="kpi"><div class="valor">{{N_CASOS}}</div><div class="rotulo">casos executados</div></div>
+    <div class="kpi"><div class="valor">{{N_DEFEITOS}}</div><div class="rotulo">defeitos encontrados</div></div>
+    <div class="kpi"><div class="valor">{{N_RETESTADOS_OK}}</div><div class="rotulo">corrigidos e retestados</div></div>
+  </div>
+
+  <h3>Casos por status</h3>
+  <table>
+    <thead><tr><th>Status</th><th class="num">Casos</th><th class="num">%</th><th>Observação</th></tr></thead>
+    <tbody>
+      <tr><td><span class="selo st-ok">passou</span></td><td class="num">{{N_PASSOU}}</td><td class="num">{{P_PASSOU}}</td><td>{{OBS_PASSOU}}</td></tr>
+      <tr><td><span class="selo st-aberto">falhou</span></td><td class="num">{{N_FALHOU}}</td><td class="num">{{P_FALHOU}}</td><td>{{OBS_FALHOU}}</td></tr>
+      <tr><td><span class="selo st-pendente">bloqueado</span></td><td class="num">{{N_BLOQUEADO}}</td><td class="num">{{P_BLOQUEADO}}</td><td>{{OBS_BLOQUEADO}}</td></tr>
+      <tr><td><span class="selo st-pendente">não validado</span></td><td class="num">{{N_NAO_VALIDADO}}</td><td class="num">{{P_NAO_VALIDADO}}</td><td>{{OBS_NAO_VALIDADO}}</td></tr>
+      <tr><td><span class="selo st-neutro">não aplicável</span></td><td class="num">{{N_NAO_APLICAVEL}}</td><td class="num">{{P_NAO_APLICAVEL}}</td><td>{{OBS_NAO_APLICAVEL}}</td></tr>
+      <tr><td><span class="selo st-neutro">retratado</span></td><td class="num">{{N_RETRATADO}}</td><td class="num">{{P_RETRATADO}}</td><td>{{OBS_RETRATADO}}</td></tr>
+      <tr><td><span class="selo st-aberto">pendente</span></td><td class="num">{{N_PENDENTE}}</td><td class="num">{{P_PENDENTE}}</td><td>Tem que ser 0 para a rodada fechar.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Defeitos por severidade</h3>
+  <table>
+    <thead><tr><th>Severidade</th><th class="num">Encontrados</th><th class="num">Corrigidos e retestados</th><th class="num">Corrigidos sem reteste</th><th class="num">Não corrigidos</th></tr></thead>
+    <tbody>
+      <tr><td><span class="selo sev-critico">crítico</span></td><td class="num">{{SEV_CRITICO_N}}</td><td class="num">{{SEV_CRITICO_OK}}</td><td class="num">{{SEV_CRITICO_SEM_RETESTE}}</td><td class="num">{{SEV_CRITICO_NC}}</td></tr>
+      <tr><td><span class="selo sev-alto">alto</span></td><td class="num">{{SEV_ALTO_N}}</td><td class="num">{{SEV_ALTO_OK}}</td><td class="num">{{SEV_ALTO_SEM_RETESTE}}</td><td class="num">{{SEV_ALTO_NC}}</td></tr>
+      <tr><td><span class="selo sev-medio">médio</span></td><td class="num">{{SEV_MEDIO_N}}</td><td class="num">{{SEV_MEDIO_OK}}</td><td class="num">{{SEV_MEDIO_SEM_RETESTE}}</td><td class="num">{{SEV_MEDIO_NC}}</td></tr>
+      <tr><td><span class="selo sev-baixo">baixo</span></td><td class="num">{{SEV_BAIXO_N}}</td><td class="num">{{SEV_BAIXO_OK}}</td><td class="num">{{SEV_BAIXO_SEM_RETESTE}}</td><td class="num">{{SEV_BAIXO_NC}}</td></tr>
+    </tbody>
+  </table>
+  <p class="nota">Melhorias: {{N_MELHORIAS_APLICADAS}} aplicadas e retestadas, {{N_MELHORIAS_PROPOSTAS}} propostas. Decisões de produto pendentes: {{N_DECISOES_PENDENTES}}.</p>
+
+  <h3>Em poucas linhas</h3>
+  <ul>
+    <li>{{DESTAQUE_1 — o achado mais importante e o que foi feito}}</li>
+    <li>{{DESTAQUE_2}}</li>
+    <li>{{DESTAQUE_3 — o principal que ficou sem validar}}</li>
+  </ul>
+  <p><strong>Gate de cobertura:</strong> {{GATE_RESULTADO — saída de scripts/cobertura.py gate}}</p>
+</section>
+
+<!-- ============================================================ 2. ESCOPO -->
+<section id="escopo">
+  <h2>2. Escopo, ambiente e método</h2>
+  <h3>O que foi testado</h3>
+  <table>
+    <thead><tr><th>Tela, fluxo ou endpoint</th><th>Papéis</th><th>Caminhos percorridos</th><th class="num">Casos</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: area -->
+      <tr><td>{{AREA}}</td><td>{{AREA_PAPEIS}}</td><td>{{AREA_CAMINHOS}}</td><td class="num">{{AREA_N_CASOS}}</td></tr>
+      <!-- /REPETIR: area -->
+    </tbody>
+  </table>
+  <h3>Ambiente</h3>
+  <p>{{AMBIENTE_DETALHE — URLs, banco, como o ambiente foi confirmado antes de qualquer escrita}}</p>
+  <h3>Método</h3>
+  <p>{{METODO — leitura do código antes de clicar, enumeração da superfície, os 5 resultados de cada ação (acerto, erro, limite, bloqueio, risco), prova por rede e banco, print de cada passo}}</p>
+  <h3>Fora do escopo</h3>
+  <p class="vazio">{{FORA_DO_ESCOPO — o que não foi testado de propósito e por quê, ou "Nenhum"}}</p>
+</section>
+
+<!-- ============================================================ 3. COBERTURA -->
+<section id="cobertura">
+  <h2>3. Cobertura</h2>
+  <p>Saída de <code>scripts/cobertura.py relatorio</code>:</p>
+  <pre><code>{{SAIDA_COBERTURA_RELATORIO}}</code></pre>
+  <table>
+    <thead><tr><th>Item</th><th class="num">Casos</th><th class="num">Passou</th><th class="num">Falhou</th><th class="num">Outros</th><th>Observação</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: item -->
+      <tr><td><code>{{ITEM_ID}}</code></td><td class="num">{{ITEM_CASOS}}</td><td class="num">{{ITEM_PASSOU}}</td><td class="num">{{ITEM_FALHOU}}</td><td class="num">{{ITEM_OUTROS}}</td><td>{{ITEM_OBS}}</td></tr>
+      <!-- /REPETIR: item -->
+    </tbody>
+  </table>
+  <h3>Crítico de completude</h3>
+  <p class="nota">Passadas registradas com cobertura.py rodada --critica (rodada.criticas). O gate exige as duas últimas sem item nem caso novo.</p>
+  <table>
+    <thead><tr><th class="num">Passada</th><th class="num">Itens novos</th><th class="num">Casos novos</th><th>Origem (o que foi conferido)</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: critica -->
+      <tr><td class="num">{{PASSADA}}</td><td class="num">{{NOVOS_ITENS}}</td><td class="num">{{NOVOS_CASOS}}</td><td>{{ORIGEM}}</td></tr>
+      <!-- /REPETIR: critica -->
+    </tbody>
+  </table>
+  <h3>Seções do catálogo e dimensões</h3>
+  <p>Saída de <code>scripts/cobertura.py secoes</code>:</p>
+  <pre><code>{{SAIDA_COBERTURA_SECOES}}</code></pre>
+  <p class="nota">O que o gate aceitou como não aplicável, para quem lê o PDF auditar o motivo.</p>
+  <table>
+    <thead><tr><th>Seção ou módulo</th><th>Caso ou não aplicável</th><th>Motivo</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: secao -->
+      <tr><td><code>{{SECAO}}</code></td><td>{{SECAO_CASO}}</td><td>{{SECAO_MOTIVO}}</td></tr>
+      <!-- /REPETIR: secao -->
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ 4. CORRIGIDOS -->
+<section id="corrigidos">
+  <h2>4. Defeitos corrigidos</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Severidade</th><th>Sintoma</th><th>Onde</th><th>Status</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: linha-corrigido -->
+      <tr><td>D-{{NNN}}</td><td><span class="selo sev-{{SEVERIDADE}}">{{SEVERIDADE}}</span></td><td>{{SINTOMA}}</td><td><code>{{ARQUIVO_LINHA}}</code></td><td><span class="selo {{CLASSE_STATUS}}">{{STATUS}}</span></td></tr>
+      <!-- /REPETIR: linha-corrigido -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhum defeito foi corrigido nesta rodada" e por quê (ex.: pedido foi só testar)}}</p>
+</section>
+
+<!-- REPETIR: defeito-corrigido -->
+<article class="defeito">
+  <div class="cabecalho">
+    <h3>D-{{NNN}} — {{SINTOMA_EM_UMA_FRASE}}</h3>
+    <span class="selo sev-{{SEVERIDADE}}">{{SEVERIDADE}}</span>
+    <span class="selo st-neutro">{{TIPO}}</span>
+    <span class="selo {{CLASSE_STATUS}}">{{STATUS}}</span>
+  </div>
+  <p class="nota">Item <code>{{ITEM_ID}}</code> · casos {{CASOS}} · papel {{PAPEL}} · achado em {{DATA_ACHADO}}</p>
+
+  <div class="parte antes">
+    <h4>Antes — o que estava errado</h4>
+    <p>{{ANTES_TEXTO — como quem usa veria, com o valor real}}</p>
+    <figure>
+      <img src="../evidencias/{{NN}}-{{O_QUE_MOSTRA}}-ANTES-circulado.png" alt="{{ALT_ANTES}}" />
+      <figcaption>{{NN}} — {{LEGENDA_ANTES: o que o print mostra}}</figcaption>
+    </figure>
+    <!-- VARIANTE: prova textual (defeito sem print): no lugar do <figure> acima, use
+    <pre><code>{{PROVA_TEXTUAL_ANTES}}</code></pre> com o trecho de rede, banco ou saída de comando do ANTES -->
+    <p><strong>Prova:</strong> <code>{{METODO_URL}}</code> → {{STATUS_HTTP}} · {{PROVA_ANTES — trecho do corpo, consulta ao banco e resultado}}</p>
+    <!-- VARIANTE: prova de comando (CLI, biblioteca, job: rodada sem front-web, full-stack nem api; o relatorio
+    --modelo troca sozinho): no lugar da linha "Prova:" acima, use
+    <p><strong>Prova:</strong> <code>{{COMANDO}}</code> → código de saída {{RC}} · {{PROVA_ANTES}}</p>
+    com o comando e o código de saída tirados da transcrição do ANTES -->
+  </div>
+
+  <div class="parte porque">
+    <h4>Por que — a causa no código</h4>
+    <p><code>{{ARQUIVO_LINHA}}</code></p>
+    <p>{{CAUSA — 1 a 3 frases}}</p>
+    <pre><code>{{TRECHO_DA_CAUSA}}</code></pre>
+    <p class="nota">Alcance: {{ALCANCE — outros usos, cópias e caminhos verificados}}</p>
+  </div>
+
+  <div class="parte depois">
+    <h4>Depois — o que mudou</h4>
+    <p>{{MUDANCA — o que foi feito e em quais arquivos}}</p>
+    <figure>
+      <img src="../evidencias/{{NN}}-{{O_QUE_MOSTRA}}-CORRIGIDO-circulado.png" alt="{{ALT_DEPOIS}}" />
+      <figcaption>{{NN}} — {{LEGENDA_DEPOIS: o que o print mostra agora, no mesmo enquadramento}}</figcaption>
+    </figure>
+    <!-- VARIANTE: prova textual (defeito sem print): no lugar do <figure> acima, use
+    <pre><code>{{PROVA_TEXTUAL_DEPOIS}}</code></pre> com o mesmo trecho de rede, banco ou comando, agora certo -->
+    <p><strong>Prova:</strong> {{PROVA_DEPOIS — rede e banco}}</p>
+    <p><strong>Par de controle e regressão:</strong> {{CONTROLE_E_REGRESSAO}}</p>
+  </div>
+
+  <div class="parte status">
+    <h4>Status</h4>
+    <p><span class="selo {{CLASSE_STATUS}}">{{STATUS}}</span> {{STATUS_DETALHE — reteste feito, ou por que não foi retestado}}</p>
+    <p class="nota">Não validado neste item: {{NAO_VALIDADO_ITEM — ou "nada"}}</p>
+  </div>
+</article>
+<!-- /REPETIR: defeito-corrigido -->
+
+<!-- ============================================================ 5. RETESTES DE TERCEIROS -->
+<section id="retestes" class="defeito">
+  <h2>5. Retestes de correções feitas por outras pessoas</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Correção de</th><th>Commit ou versão testada</th><th>Veredito</th><th>Evidência</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: reteste -->
+      <tr><td>{{RETESTE_ITEM}}</td><td>{{RETESTE_AUTOR}}</td><td><code>{{RETESTE_COMMIT}}</code></td><td><span class="selo {{RETESTE_CLASSE}}">{{RESOLVEU_OU_PRECISA_DE_AJUSTE}}</span> {{RETESTE_DETALHE}}</td><td>{{NN}}-...-RETESTE</td></tr>
+      <!-- /REPETIR: reteste -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhum reteste de correção de terceiros nesta rodada"}}</p>
+  <p class="nota">Cada reteste com veredito "precisa de ajuste" tem também o bloco completo nas 4 partes, com o print -RETESTE no lugar do -CORRIGIDO.</p>
+</section>
+
+<!-- ============================================================ 6. NÃO CORRIGIDOS -->
+<section id="nao-corrigidos" class="defeito">
+  <h2>6. Defeitos não corrigidos</h2>
+  <table>
+    <thead><tr><th>Id</th><th>Severidade</th><th>Sintoma</th><th>Onde</th><th>Por que não foi corrigido</th><th>Quem precisa agir</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: linha-nao-corrigido -->
+      <tr><td>D-{{NNN}}</td><td><span class="selo sev-{{SEVERIDADE}}">{{SEVERIDADE}}</span></td><td>{{SINTOMA}}</td><td><code>{{ARQUIVO_LINHA}}</code></td><td>{{MOTIVO — outro time, decisão de produto, fora do escopo, sem autorização}}</td><td>{{QUEM}}</td></tr>
+      <!-- /REPETIR: linha-nao-corrigido -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhum"}}</p>
+</section>
+
+<!-- REPETIR: defeito-nao-corrigido -->
+<article class="defeito">
+  <div class="cabecalho">
+    <h3>D-{{NNN}} — {{SINTOMA_EM_UMA_FRASE}}</h3>
+    <span class="selo sev-{{SEVERIDADE}}">{{SEVERIDADE}}</span>
+    <span class="selo st-neutro">{{TIPO}}</span>
+    <span class="selo st-pendente">não corrigido</span>
+  </div>
+  <div class="parte antes">
+    <h4>Antes — o que está errado</h4>
+    <p>{{ANTES_TEXTO}}</p>
+    <figure>
+      <img src="../evidencias/{{NN}}-{{O_QUE_MOSTRA}}-ANTES-circulado.png" alt="{{ALT_ANTES}}" />
+      <figcaption>{{NN}} — {{LEGENDA_ANTES}}</figcaption>
+    </figure>
+    <!-- VARIANTE: prova textual (defeito sem print): no lugar do <figure> acima, use
+    <pre><code>{{PROVA_TEXTUAL_ANTES}}</code></pre> com o trecho de rede, banco ou saída de comando -->
+    <p><strong>Prova:</strong> {{PROVA_ANTES}}</p>
+  </div>
+  <div class="parte porque">
+    <h4>Por que — a causa</h4>
+    <p><code>{{ARQUIVO_LINHA}}</code> — {{CAUSA}}</p>
+  </div>
+  <div class="parte depois">
+    <h4>O que precisa acontecer</h4>
+    <p>{{PROPOSTA — a correção sugerida, ou a pergunta exata para quem decide, com as opções e o efeito de cada uma}}</p>
+  </div>
+  <div class="parte status">
+    <h4>Status</h4>
+    <p><span class="selo st-pendente">não corrigido</span> {{MOTIVO_E_QUEM_PRECISA_AGIR}}</p>
+  </div>
+</article>
+<!-- /REPETIR: defeito-nao-corrigido -->
+
+<!-- ============================================================ 7. DECISÕES -->
+<section id="decisoes">
+  <h2>7. Decisões do time sem código</h2>
+  <table>
+    <thead><tr><th>Assunto</th><th>Decisão (fala literal)</th><th>Quem</th><th>Data</th><th>Canal</th><th>Efeito</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: decisao -->
+      <tr><td>{{ASSUNTO}}</td><td>“{{FALA_LITERAL}}”</td><td>{{QUEM_DECIDIU}}</td><td>{{DATA_DECISAO}}</td><td>{{CANAL}}</td><td>{{EFEITO — ex.: manter, nada a corrigir}}</td></tr>
+      <!-- /REPETIR: decisao -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma decisão do time nesta rodada"}}</p>
+</section>
+
+<!-- ============================================================ 8. RETRATAÇÕES -->
+<section id="retratacoes">
+  <h2>8. Retratações</h2>
+  <p class="nota">Achados que pareciam defeito e caíram ao serem reproduzidos por outro caminho.</p>
+  <table>
+    <thead><tr><th>Achado</th><th>O que parecia</th><th>O que era</th><th>Como se descobriu</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: retratacao -->
+      <tr><td>{{ACHADO}}</td><td>{{O_QUE_PARECIA}}</td><td>{{O_QUE_ERA}}</td><td>{{COMO_DESCOBRIU}}</td></tr>
+      <!-- /REPETIR: retratacao -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma"}}</p>
+</section>
+
+<!-- ============================================================ 9. MELHORIAS -->
+<section id="melhorias">
+  <h2>9. Melhorias</h2>
+  <h3>Aplicadas e retestadas</h3>
+  <table>
+    <thead><tr><th>#</th><th>Onde</th><th>Antes</th><th>Depois</th><th>Evidência</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: melhoria-aplicada -->
+      <tr><td>{{N}}</td><td>{{ONDE}}</td><td>{{ANTES}}</td><td>{{DEPOIS}}</td><td>{{NN}}-...-CORRIGIDO</td></tr>
+      <!-- /REPETIR: melhoria-aplicada -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma"}}</p>
+  <h3>Propostas</h3>
+  <table>
+    <thead><tr><th>#</th><th>Onde</th><th>O que melhorar</th><th>Por quê</th><th>Depende de</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: melhoria-proposta -->
+      <tr><td>{{N}}</td><td>{{ONDE}}</td><td>{{O_QUE}}</td><td>{{POR_QUE}}</td><td>{{DEPENDE — decisão de produto, autorização, outro time}}</td></tr>
+      <!-- /REPETIR: melhoria-proposta -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma"}}</p>
+</section>
+
+<!-- ============================================================ 10. QUALIDADE DE CÓDIGO -->
+<section id="qualidade">
+  <h2>10. Qualidade de código</h2>
+  <p class="nota">Estudo do projeto e checklist QC (references/qualidade-e-refatoracao.md). Achado só com medição; refatoração aplicada só com caracterização IGUAL antes e depois.</p>
+  <h3>Mapa resumido</h3>
+  <p>{{MAPA_RESUMO — módulos estudados; endpoints: no código × chamados × sem chamador × chamados sem rota; onde moram as regras; divergências entre camadas. Arquivo: .qa/MAPA.md}}</p>
+  <h3>Achados QC</h3>
+  <table>
+    <thead><tr><th>Código</th><th>Onde</th><th>Sinal e medição</th><th>Risco</th><th>Severidade</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: achado-qc -->
+      <tr><td>{{QC-NN}}</td><td><code>{{ARQUIVO:LINHA}}</code></td><td>{{SINAL_E_NUMERO}}</td><td>{{RISCO}}</td><td>{{SEVERIDADE}}</td></tr>
+      <!-- /REPETIR: achado-qc -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhum"}}</p>
+  <h3>Refatorações aplicadas</h3>
+  <table>
+    <thead><tr><th>O que mudou</th><th>Prova de igualdade</th><th>Gates</th><th>Bloco de entrega</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: refatoracao -->
+      <tr><td>{{O_QUE}}</td><td>{{CARACTERIZACAO — IGUAL, prints idênticos}}</td><td>{{GATES — ≤ baseline, fim de linha ok}}</td><td>{{BLOCO}}</td></tr>
+      <!-- /REPETIR: refatoracao -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma"}}</p>
+  <h3>Propostas (R-n)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Problema medido</th><th>Passos</th><th>Custo</th><th>Quem decide</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: proposta-r -->
+      <tr><td>R-{{N}}</td><td>{{PROBLEMA}}</td><td>{{PASSOS}}</td><td>{{CUSTO}}</td><td>{{QUEM_DECIDE}}</td></tr>
+      <!-- /REPETIR: proposta-r -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma"}}</p>
+  <h3>Candidatos a componente</h3>
+  <table>
+    <thead><tr><th>Intenção</th><th>Usos</th><th>Diferenças</th><th>API proposta</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: candidato-componente -->
+      <tr><td>{{INTENCAO}}</td><td>{{USOS}}</td><td>{{DIFERENCAS}}</td><td>{{API}}</td></tr>
+      <!-- /REPETIR: candidato-componente -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhum"}}</p>
+  <h3>O que não foi analisado</h3>
+  <p>{{NAO_ANALISADO — e por quê (backend fora do escopo, repositório sem acesso), ou "Nada"}}</p>
+</section>
+
+<!-- ============================================================ 11. MÓDULOS -->
+<section id="modulos">
+  <h2>11. Módulos avançados e opcionais</h2>
+  <p class="nota">Avançados entram sempre que o projeto permite (references/modulos-avancados.md); opcionais, só quando ligados no PERFIL (references/modulos-opcionais.md). O que não se aplica aparece com o motivo.</p>
+  <table>
+    <thead><tr><th>Módulo</th><th>Aplicado?</th><th>Resultado</th><th>Evidência ou motivo</th></tr></thead>
+    <tbody>
+      <tr><td>MA-1 Log do servidor</td><td>{{SIM_NAO}}</td><td>{{MA1_RESULTADO — causas achadas no log, erros engolidos}}</td><td>{{MA1_EVIDENCIA}}</td></tr>
+      <tr><td>MA-2 Front × back</td><td>{{SIM_NAO}}</td><td>{{MA2_RESULTADO — divergências de enum, campo, tipo, precisão}}</td><td>{{MA2_EVIDENCIA}}</td></tr>
+      <tr><td>MA-3 Integridade do banco</td><td>{{SIM_NAO}}</td><td>{{MA3_RESULTADO — violações pré-existentes × criadas pela rodada}}</td><td>{{MA3_EVIDENCIA}}</td></tr>
+      <tr><td>MA-4 Modo PR/diff</td><td>{{SIM_NAO}}</td><td>{{MA4_RESULTADO — quadro "mudou × testado"}}</td><td>{{MA4_EVIDENCIA}}</td></tr>
+      <tr><td>MA-5 Regressão automática</td><td>{{SIM_NAO}}</td><td>{{MA5_RESULTADO — testes gerados, executados, onde estão, como rodar}}</td><td>{{MA5_EVIDENCIA}}</td></tr>
+      <tr><td>MA-6 Segurança funda</td><td>{{SIM_NAO}}</td><td>{{MA6_RESULTADO — dependências, segredos, cabeçalhos, autorização no back, IDOR}}</td><td>{{MA6_EVIDENCIA}}</td></tr>
+      <tr><td>MO-7 Comparação visual</td><td>{{LIGADO_DESLIGADO}}</td><td>{{MO7_RESULTADO}}</td><td>{{MO7_EVIDENCIA}}</td></tr>
+      <tr><td>MO-8 Acessibilidade (axe)</td><td>{{LIGADO_DESLIGADO}}</td><td>{{MO8_RESULTADO}}</td><td>{{MO8_EVIDENCIA}}</td></tr>
+      <tr><td>MO-9 Fuzz</td><td>{{LIGADO_DESLIGADO}}</td><td>{{MO9_RESULTADO}}</td><td>{{MO9_EVIDENCIA}}</td></tr>
+      <tr><td>MO-10 Desempenho</td><td>{{LIGADO_DESLIGADO}}</td><td>{{MO10_RESULTADO — chamadas acima de 3 s e 10 s, N+1, vitais}}</td><td>{{MO10_EVIDENCIA}}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ 12. SUJEIRA -->
+<section id="sujeira">
+  <h2>12. Sujeira deixada</h2>
+  <p class="nota">Tudo que o teste criou ou alterou em qualquer ambiente, inclusive dado mudado só para um caso passar.</p>
+  <table>
+    <thead><tr><th>Ambiente</th><th>O quê</th><th>Identificador</th><th>Estado final</th><th>Quem limpa e como</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: sujeira -->
+      <tr><td>{{AMBIENTE}}</td><td>{{O_QUE}}</td><td><code>{{IDENTIFICADOR}}</code></td><td>{{ESTADO_FINAL}}</td><td>{{LIMPEZA}}</td></tr>
+      <!-- /REPETIR: sujeira -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nenhuma: os testes só leram dados"}}</p>
+</section>
+
+<!-- ============================================================ 13. NÃO VALIDADO -->
+<section id="nao-validado">
+  <h2>13. O que não foi validado, e por quê</h2>
+  <div class="aviso">Esta seção nunca se corta. A ausência de prova é informação para quem vai agir.</div>
+  <table>
+    <thead><tr><th>O quê</th><th>Por quê</th><th>O que falta para validar</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: nao-validado -->
+      <tr><td>{{O_QUE}}</td><td>{{POR_QUE — falta o papel X, efeito externo não autorizado, ambiente fora do ar}}</td><td>{{O_QUE_FALTA}}</td></tr>
+      <!-- /REPETIR: nao-validado -->
+    </tbody>
+  </table>
+  <p class="vazio">{{SE_NENHUM: "Nada: todo item enumerado teve prova"}}</p>
+</section>
+
+<!-- ============================================================ 14. ARQUIVOS -->
+<section id="arquivos">
+  <h2>14. Arquivos alterados e verificações</h2>
+  <p class="nota">Só os arquivos desta rodada. O que já estava alterado no início (outras sessões) ficou de fora: {{ARQUIVOS_DE_OUTRAS_SESSOES — ou "nenhum"}}.</p>
+
+  <!-- REPETIR: repositorio -->
+  <h3>{{REPOSITORIO}}</h3>
+  <table>
+    <thead><tr><th>Arquivo</th><th class="num">+</th><th class="num">−</th><th>O que mudou</th><th>Defeito</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: arquivo -->
+      <tr><td><code>{{ARQUIVO}}</code></td><td class="num">{{MAIS}}</td><td class="num">{{MENOS}}</td><td>{{RESUMO_DA_MUDANCA}}</td><td>D-{{NNN}}</td></tr>
+      <!-- /REPETIR: arquivo -->
+    </tbody>
+  </table>
+  <pre><code>{{SAIDA_GIT_DIFF_STAT}}</code></pre>
+  <!-- /REPETIR: repositorio -->
+
+  <h3>Verificações</h3>
+  <table>
+    <thead><tr><th>Verificação</th><th>Resultado</th><th>Baseline</th></tr></thead>
+    <tbody>
+      <tr><td><code>git diff --stat</code> = <code>git diff --ignore-cr-at-eol --stat</code></td><td>{{EOL_RESULTADO}}</td><td>—</td></tr>
+      <tr><td>Typecheck</td><td>{{TYPECHECK_RESULTADO}}</td><td>{{TYPECHECK_BASELINE}}</td></tr>
+      <tr><td>Lint</td><td>{{LINT_RESULTADO}}</td><td>{{LINT_BASELINE}}</td></tr>
+      <tr><td>Build</td><td>{{BUILD_RESULTADO}}</td><td>{{BUILD_BASELINE}}</td></tr>
+      <tr><td>Testes automatizados</td><td>{{TESTES_RESULTADO}}</td><td>{{TESTES_BASELINE}}</td></tr>
+      <tr><td>Chaves de idioma iguais em todos os arquivos</td><td>{{I18N_RESULTADO}}</td><td>—</td></tr>
+      <tr><td>Reinício de serviço pedido ao usuário</td><td>{{REINICIO — não / sim, em DATA, validado com o binário novo}}</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ 15. ENTREGA -->
+<section id="entrega">
+  <h2>15. Entrega: branch e commit</h2>
+  <p><strong>Nada foi commitado, enviado ou mesclado.</strong> Quem versiona é o responsável pelo repositório.</p>
+  <h3>Branch sugerida</h3>
+  <pre><code>{{BRANCH_SUGERIDA}}</code></pre>
+  <h3>Mensagem de commit</h3>
+  <pre><code>{{MENSAGEM_DE_COMMIT — assunto no imperativo, no estilo do git log do repositório; corpo com o porquê, o que mudou e o que não foi validado}}</code></pre>
+  <h3>Descrição para o pull request</h3>
+  <pre><code>{{DESCRICAO_PR — opcional}}</code></pre>
+</section>
+
+<!-- ============================================================ 16. REPLAY -->
+<section id="replay">
+  <h2>16. Replay e evidências</h2>
+  <table>
+    <thead><tr><th>Fluxo (id em replay/passos.yaml)</th><th>Objetivo</th><th class="num">Passos</th><th>Efeito externo</th></tr></thead>
+    <tbody>
+      <!-- REPETIR: fluxo -->
+      <tr><td><code>{{FLUXO_ID}}</code></td><td>{{FLUXO_OBJETIVO}}</td><td class="num">{{FLUXO_N_PASSOS}}</td><td>{{FLUXO_EFEITO — não / sim: o quê}}</td></tr>
+      <!-- /REPETIR: fluxo -->
+    </tbody>
+  </table>
+  <p>Pasta da rodada: <code>{{PASTA_DA_RODADA}}</code> — ledger em <code>cobertura.json</code>, notas em <code>notas/</code>, prints em <code>evidencias/</code>, requisições em <code>rede/</code>, replay em <code>replay/passos.yaml</code>.</p>
+  <p class="nota">Critério de pronto do replay: quem nunca viu o projeto executa cada fluxo lendo só essa pasta.</p>
+</section>
+
+</body>
+</html>

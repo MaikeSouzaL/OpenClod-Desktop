@@ -2,7 +2,7 @@
 
 Data: **2026-10-23**. Ferramenta: REA 6.4.0 (`Desktop\REA\rea`), 7-Zip 21.04,
 leitura estática do `app.asar` e inspeção do helper nativo. Nenhum código
-proprietário foi copiado para o Forja; o que segue é comportamento observável e
+proprietário foi copiado para o Openclod; o que segue é comportamento observável e
 uma implementação independente.
 
 ## 1. Cadeia de distribuição (fatos)
@@ -85,9 +85,9 @@ Fluxo reconstruído:
 10. **Extensão de navegador**: `extensionBootstrap.js`, `chrome-native-host`-like
     indicators, bolhas de status da extensão.
 
-## 4. O que o Forja implementa (equivalente independente)
+## 4. O que o Openclod implementa (equivalente independente)
 
-| Capacidade | Forja | Onde |
+| Capacidade | Openclod | Onde |
 |---|---|---|
 | Atalho global configurável | `Control+Alt+Space` por padrão; `Control+Alt+J` nos testes | `src/main/dictation.ts`, `src/main/index.ts` |
 | Botão de microfone com o mesmo fluxo | clicar no mic chama o mesmo motor global | `src/renderer/src/lib/dictation-store.ts`, `Composer.tsx`, `DictationHost.tsx` |

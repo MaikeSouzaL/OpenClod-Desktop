@@ -1,23 +1,23 @@
-# Claude Desktop × Forja — comparação de interface (2026-10-23)
+# Claude Desktop × Openclod — comparação de interface (2026-10-23)
 
 Base: 20 capturas de tela do Claude Desktop em `prints/` (fornecidas pelo
 usuário; o Claude não consegue abrir a própria janela por design). Cada linha
-diz o que a tela mostra, o que o Forja tem agora e **como foi verificado**.
+diz o que a tela mostra, o que o Openclod tem agora e **como foi verificado**.
 "Verificado" significa que o recurso foi exercitado no app real (Electron, com
 `--remote-debugging-port` e um projeto de teste descartável) ou por teste
 automatizado; "implementado, não exercitado" significa que o código existe,
 compila e tem cobertura parcial, mas não foi acionado numa sessão real.
 
-Capturas do Forja geradas pelo roteiro `scripts/ui-panes.cjs`
+Capturas do Openclod geradas pelo roteiro `scripts/ui-panes.cjs`
 (`tmp/ui-panes/*.png`, ignorado pelo git; rode o roteiro para regerar).
 
 ## Painel da sessão (barra de título: sessão · terminal · alterações · navegador · arquivos · ⋮)
 
-| Tela (print) | Claude Desktop | Forja | Verificação |
+| Tela (print) | Claude Desktop | Openclod | Verificação |
 |---|---|---|---|
 | Terminal (`copy 12`) | PowerShell, abas, ⋮, maximizar, fechar | **PTY real** (ConPTY via `@lydell/node-pty`) + xterm; abas, PowerShell/cmd/Git Bash, histórico restaurado ao remontar, processos encerrados em árvore ao fechar o app | `echo FORJA_TERM_OK` digitado no xterm apareceu na saída do shell (2×); `FORJA_TERM_$((6*7))` → `FORJA_TERM_42` |
 | Alterações (`copy 13`) | Lista/árvore; estado vazio "precisam de um repositório Git" | `git status` v2 + diff por arquivo (preparado/não preparado/não rastreado), lista/árvore, filtro, ramo e ahead/behind; sem Git, mostra o que o agente alterou na sessão | repositório de teste: `M README.md +2 −1`, `U src/novo.ts`, diff com 13 linhas adicionadas renderizado; 55 testes do serviço Git |
-| Navegador (`copy 14`) | Abas, voltar/avançar/recarregar, URL, detecção de servidor de dev, "Usar esta", `launch.json` | `<webview>` isolado (partição própria, sem preload, sem Node, permissões negadas), abas, DevTools, "abrir no navegador padrão"; detecta `package.json` (dev/start/serve/preview…) e `.claude/launch.json`; "Usar esta" roda num terminal da sessão, espera a URL/porta e grava `.forja/launch.json` | página local abriu (`título: Forja preview OK`); servidor `npm run dev` do projeto de teste subiu e foi aberto (`Fixture dev server`, `http://localhost:5174/`); `launch.json` gravado; porta 5174 fechada ao final |
+| Navegador (`copy 14`) | Abas, voltar/avançar/recarregar, URL, detecção de servidor de dev, "Usar esta", `launch.json` | `<webview>` isolado (partição própria, sem preload, sem Node, permissões negadas), abas, DevTools, "abrir no navegador padrão"; detecta `package.json` (dev/start/serve/preview…) e `.claude/launch.json`; "Usar esta" roda num terminal da sessão, espera a URL/porta e grava `.forja/launch.json` | página local abriu (`título: Openclod preview OK`); servidor `npm run dev` do projeto de teste subiu e foi aberto (`Fixture dev server`, `http://localhost:5174/`); `launch.json` gravado; porta 5174 fechada ao final |
 | Arquivos (`copy 15–17`) | Árvore, filtro/`?` busca, editor com abas, ⋮ de opções | árvore com pastas recolhíveis, `?termo` busca no conteúdo, **CodeMirror 6** (TS/JS/JSON/MD/CSS/HTML/Python), abas de visualização, Ctrl+S, salvar com checagem de alteração externa, autosave, Tab, quebra de linha, espaços em branco, rolar além do fim, tabulação 2/4/8, árvore à esquerda/direita, Ctrl+Shift+Y | editor abriu `README.md` (5 linhas); digitei no CodeMirror, Ctrl+S, o arquivo **mudou no disco** e o status virou "Salvo"; menu de opções renderizado. Autosave: **implementado, não exercitado** |
 | Layout do painel (`copy 18`) | Mover, preencher, nova janela | maximizar/restaurar, esquerda/direita, largura arrastável (lembrada) | maximizar ocultou o chat (`workspace` com `display:none`) e restaurou. "Preencher e organizar" e "nova janela": **não implementados** |
 | ⋮ superior (`copy 19`) | Chat lateral, tarefas em segundo plano, manter computador ativo | **Tarefas em segundo plano** (lista processos do agente, lê saída, encerra), **Manter computador ativo** (`powerSaveBlocker`), atalhos para os painéis | diálogo de tarefas abriu; "Manter computador ativo": `keepAwake(true)` → estado `true` → `keepAwake(false)` → `false`. Encerrar um processo do agente: **não exercitado**. **Chat lateral: não implementado** |
@@ -25,7 +25,7 @@ Capturas do Forja geradas pelo roteiro `scripts/ui-panes.cjs`
 
 ## Páginas da barra lateral
 
-| Tela | Forja | Verificação |
+| Tela | Openclod | Verificação |
 |---|---|---|
 | Projetos (`copy`) | cartões com caminho, nº de sessões e última atividade; pesquisa; ordenar por atividade/nome; novo projeto; menu (nova sessão, abrir no Explorer, remover) | 2 cartões renderizados |
 | Tarefas agendadas (`copy 3–5`) | **Agendador real** no processo principal (a cada hora, diário, dias úteis, semanal, uma vez; execução perdida roda uma vez ao abrir; sem sobreposição), persistido em `schedules.json`; "Nova tarefa" → manual ou 6 modelos para desenvolvedores; ordenar por próxima execução/nome; executar agora/editar/pausar/apagar | criei a tarefa a partir de um modelo (`weekdays 09:00`, próxima `seg 26/10 09:00`) e usei "executar agora": estado `ok`, sessão "Agendada: …" criada e listada na barra lateral; 85 testes do agendador com relógio injetado. **A sessão rodou com o provedor Scripted** (não há modelo real nesta máquina) |
@@ -35,9 +35,9 @@ Capturas do Forja geradas pelo roteiro `scripts/ui-panes.cjs`
 ## Fora de escopo (são serviços de nuvem da Anthropic, não do app)
 
 Artefatos, Design, Dispatch, o banner de uso/limites, Remote Control, Chat vs
-Cowork em VM do Claude. O Forja tem a aba Cowork, mas ela usa o mesmo harness
+Cowork em VM do Claude. O Openclod tem a aba Cowork, mas ela usa o mesmo harness
 local, sem VM (ver `GAP_ANALYSIS.md` §8). Não foram simulados com telas
-vazias: **o Forja não finge ter esses recursos**.
+vazias: **o Openclod não finge ter esses recursos**.
 
 ## Defeitos encontrados nesta rodada (e corrigidos)
 
@@ -104,9 +104,9 @@ título — o conteúdo é renderizado sem UIA —, então a comparação é vis
 por automação de elementos. A captura fica fora do repositório, em
 `%TEMP%\opencode\claude-main.png`, para não versionar conversas privadas.
 
-O que a tela mostra, e o estado do Forja depois desta rodada:
+O que a tela mostra, e o estado do Openclod depois desta rodada:
 
-| Elemento do Claude Desktop | Observação na captura | Forja agora |
+| Elemento do Claude Desktop | Observação na captura | Openclod agora |
 |---|---|---|
 | Barra lateral estreita com "Novo chat" no topo | ícone quadrado, rótulo curto, lista de conversas abaixo | mesma estrutura; "Novo chat" e busca de sessões |
 | Abas no topo (`Chat`, `Cowork`, `Code`) | três abas, a ativa com sublinhado; `Code` abre o ambiente de projeto | `Home` (chat sem projeto), `Cowork` e `Code`; `Home` não exige pasta |
@@ -119,12 +119,12 @@ O que a tela mostra, e o estado do Forja depois desta rodada:
 Decisões que vieram da comparação:
 
 1. **Home sem projeto**: o aviso "Abra uma pasta de projeto" ficou restrito ao
-   `Code`. No `Home`, o Forja cria `%APPDATA%\Forja\workspace` na primeira
+   `Code`. No `Home`, o Openclod cria `%APPDATA%\Openclod\workspace` na primeira
    mensagem e responde normalmente.
 2. **Contexto visível sem poluir**: o número só aparece no hover; em repouso
    fica o anel, como no Claude.
 3. **Fallback explícito**: quando o modelo escolhido esgota cota ou fica
-   indisponível, o Forja avisa qual modelo assumiu em vez de mostrar uma faixa
+   indisponível, o Openclod avisa qual modelo assumiu em vez de mostrar uma faixa
    de limite sem saída.
 4. **Modelo lembrado**: a escolha sobrevive ao reinício (`lastModel` em
    `settings.json`), algo que a captura não permite verificar no Claude.

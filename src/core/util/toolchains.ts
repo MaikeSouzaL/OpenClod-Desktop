@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 
 /**
- * Which language toolchains the machine has (Go, Rust, Python, Node…). Forja does
+ * Which language toolchains the machine has (Go, Rust, Python, Node…). Openclod does
  * not ship these compilers — they belong to the user's projects — but the agent
  * must know what it can run, and the user what is missing.
  */

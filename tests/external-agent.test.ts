@@ -249,7 +249,7 @@ function alive(pid: number): boolean {
 }
 
 describe('permission mapping', () => {
-  it('maps Forja modes to Claude Code modes, never bypassing permissions', () => {
+  it('maps Openclod modes to Claude Code modes, never bypassing permissions', () => {
     expect(claudePermissionMode('readonly')).toBe('plan')
     expect(claudePermissionMode('ask')).toBe('default')
     expect(claudePermissionMode('accept-edits')).toBe('acceptEdits')
@@ -258,7 +258,7 @@ describe('permission mapping', () => {
     expect(claudePermissionMode('whatever' as PermissionMode)).toBe('plan')
   })
 
-  it('maps Forja modes to Codex sandboxes, never full access', () => {
+  it('maps Openclod modes to Codex sandboxes, never full access', () => {
     expect(codexSandbox('readonly')).toBe('read-only')
     expect(codexSandbox('ask')).toBe('read-only')
     expect(codexSandbox('accept-edits')).toBe('workspace-write')

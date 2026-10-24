@@ -1,9 +1,9 @@
 {
-  "name": "forja-desktop",
+  "name": "openclod-desktop",
   "version": "0.1.0",
-  "description": "Forja - ambiente desktop de desenvolvimento autonomo com harness proprio, Computer Use e navegacao web.",
+  "description": "Openclod Desktop - ambiente desktop de desenvolvimento autonomo com harness proprio, Computer Use e navegacao web.",
   "main": "./out/main/index.js",
-  "author": "Forja",
+  "author": "Openclod",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -55,9 +55,9 @@
     "vitest": "^3.0.5"
   },
   "build": {
-    "appId": "com.forja.desktop",
-    "productName": "Forja",
-    "copyright": "Forja",
+    "appId": "com.openclod.desktop",
+    "productName": "Openclod Desktop",
+    "copyright": "Openclod",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -90,7 +90,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Forja-${version}-setup.${ext}"
+      "artifactName": "Openclod Desktop-${version}-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -98,8 +98,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Forja",
+      "shortcutName": "Openclod Desktop",
       "deleteAppDataOnUninstall": false
-    }
-  }
+    },
+    "executableName": "Openclod Desktop",
+    "artifactName": "Openclod Desktop-${version}-setup.${ext}"
+  },
+  "productName": "Openclod Desktop"
 }

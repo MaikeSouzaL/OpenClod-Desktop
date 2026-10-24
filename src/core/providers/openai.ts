@@ -134,7 +134,7 @@ export class OpenAICompatibleProvider implements Provider {
     const headers: Record<string, string> = {
       authorization: `Bearer ${apiKey || 'local'}`,
       ...(this.config.baseUrl.includes('openrouter.ai')
-        ? { 'http-referer': 'https://forja.local', 'x-title': 'Forja' }
+        ? { 'http-referer': 'https://forja.local', 'x-title': 'Openclod' }
         : {})
     }
 

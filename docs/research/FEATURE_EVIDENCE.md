@@ -4,7 +4,7 @@ Cada linha liga uma capacidade a uma evidência concreta e ao grau de confiança
 Confiança: **alta** (verificado por execução ou arquivo), **média**
 (estrutura/contagem), **baixa** (inferência).
 
-| Capacidade | Evidência | Confiança | Como o Forja cobre |
+| Capacidade | Evidência | Confiança | Como o Openclod cobre |
 |---|---|---|---|
 | App Electron com processo principal e renderer | 573 fontes, 93 `contextBridge`, 534 `ipcRenderer`, 45 fronteiras | alta | mesma topologia, com preload mínimo |
 | IPC extenso entre main e UI | 153 endpoints, 469 rotas | alta | IPC tipado por canal (`session:*`, `settings:*`, `approval:*`) |

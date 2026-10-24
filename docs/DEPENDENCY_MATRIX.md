@@ -10,7 +10,7 @@ repositÃ³rio em **2026-10-23**, com versÃµes resolvidas em `package-lock.jso
 | `diff` | `^5.2.0` | 5.2.2 | BSD-3-Clause | Diff textual de arquivos para a UI e o rastreador de mudanÃ§as | Sim (JavaScript puro) | API sÃ­ncrona; sem binÃ¡rios nativos. |
 | `dompurify` | `^3.2.4` | 3.4.17 | MPL-2.0 OR Apache-2.0 | Sanitizar o HTML gerado pelo markdown | Sim (executa no renderer) | Esta distribuiÃ§Ã£o usa a opÃ§Ã£o Apache-2.0. |
 | `marked` | `^15.0.7` | 15.0.12 | MIT | Markdown â†’ HTML | Sim (JavaScript puro) | SaÃ­da sempre passa pelo DOMPurify. |
-| `playwright` | `^1.64.1` | 1.64.1 | Apache-2.0 | AutomaÃ§Ã£o de navegador (Chrome/Edge/Chromium) | Sim (win32 x64) | Inclui `playwright-core` (Apache-2.0). O Forja nÃ£o baixa navegador em runtime: usa Chrome/Edge instalados ou um Chromium instalado manualmente com `npx playwright install chromium`. |
+| `playwright` | `^1.64.1` | 1.64.1 | Apache-2.0 | AutomaÃ§Ã£o de navegador (Chrome/Edge/Chromium) | Sim (win32 x64) | Inclui `playwright-core` (Apache-2.0). O Openclod nÃ£o baixa navegador em runtime: usa Chrome/Edge instalados ou um Chromium instalado manualmente com `npx playwright install chromium`. |
 | `zod` | `^3.24.1` | 3.25.76 | MIT | ValidaÃ§Ã£o de entrada das ferramentas | Sim (JavaScript puro) | Schemas Zod tambÃ©m geram JSON Schema. |
 | `zod-to-json-schema` | `^3.24.1` | 3.25.2 | ISC | Converter Zod â†’ JSON Schema para o modelo | Sim (JavaScript puro) | Usa `$refStrategy: 'none'` e `jsonSchema7`. |
 | `react` | `^19.0.0` | 19.3.1 | MIT | Biblioteca da interface | Sim (renderer) | Declarado em `devDependencies`, mas empacotado no bundle final. |
@@ -73,8 +73,8 @@ DependÃªncia transitiva de runtime: `playwright-core` 1.64.1 (Apache-2.0).
 | Electron | 45.0.0 (`^45.0.0`) | Fixado no lockfile |
 | Chromium | Embutido no Electron 45 | Sem download separado para o app |
 | electron-builder | 26.15.3 | Configurado por `electron-builder.yml` |
-| Alvo | NSIS, `x64` | `release/Forja-Setup-<versÃ£o>.exe` |
-| InstalaÃ§Ã£o | Por usuÃ¡rio (`perMachine: false`) | `%LOCALAPPDATA%\Programs\Forja` |
+| Alvo | NSIS, `x64` | `release/Openclod-Setup-<versÃ£o>.exe` |
+| InstalaÃ§Ã£o | Por usuÃ¡rio (`perMachine: false`) | `%LOCALAPPDATA%\Programs\Openclod` |
 | Assinatura | Nenhuma | SmartScreen pode alertar |
 | Auto-update | Nenhum | AtualizaÃ§Ã£o manual |
 

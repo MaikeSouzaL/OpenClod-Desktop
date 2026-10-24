@@ -1,0 +1,117 @@
+{
+  "_ajuda": "Modelo de spec do scripts/provas.py. Chaves que comecam com _ sao ignoradas. Copie com: provas.py exemplo <destino>. Gere com: provas.py gerar <destino> --pr --aplicar --conferir. Formato completo em references/provas-antes-depois.md.",
+  "id": "01",
+  "titulo": "Cadastro de cliente: CNPJ inválido barrado na tela e 500 genérico mapeado",
+  "rotulo": "Bloco 01 · branch",
+  "branch": "fix/cliente-cnpj-validacao",
+  "subtitulo": "Rodada .qa/2026-09-30-clientes-novo",
+  "resumo": "A tela aceitava CNPJ com dígito verificador errado e mandava para a API, que respondia **500** com a mensagem do ORM. A validação passou a barrar no formulário; o 500 da API fica relatado para o time do backend.",
+  "rodape": "fix/cliente-cnpj-validacao · bloco 01",
+  "repos": ["front"],
+  "base": "`develop` — front `a1b2c3d`",
+  "depende": [],
+  "ordem": "Pode subir sozinho: só front, sem chave nova de API.",
+  "_ajuda_arquivos": "Use 'patches' (o script conta +/- de cada arquivo lendo o patch) OU 'arquivos' com os numeros prontos.",
+  "arquivos": [
+    {"repo": "front", "arquivo": "src/app/clientes/novo/schema.ts", "mais": 6, "menos": 1},
+    {"repo": "front", "arquivo": "src/shared/i18n/pt-BR.ts", "mais": 1, "menos": 0}
+  ],
+  "base_imagens": "..",
+  "_ajuda_base": "Caminhos de imagem relativos a base_imagens (relativa a este arquivo). Aqui o JSON fica em <rodada>/relatorio/ e as imagens em <rodada>/evidencias/.",
+  "itens": [
+    {
+      "cod": "1.1",
+      "titulo": "CNPJ com dígito verificador inválido ia para a API",
+      "status": "retestado-ok",
+      "severidade": "medio",
+      "onde": "`src/app/clientes/novo/schema.ts:14`",
+      "antes": "Com `11.222.333/0001-00` (DV errado) o Salvar enviava o POST e a tela mostrava só “Erro inesperado”. Nenhum aviso no campo.",
+      "causa": "O schema só exigia 14 dígitos por regex e não conferia o dígito verificador.",
+      "depois": "O schema usa `validarCnpj()` (o mesmo de outra tela de cadastro) num `.refine`, com mensagem traduzida. O Salvar não chama a API e o campo mostra “CNPJ inválido”.",
+      "status_detalhe": "retestado na tela real, mesmo papel e mesmo estado; par de controle: CNPJ válido continua gravando (201).",
+      "provas": [
+        {
+          "tipo": "par",
+          "antes": "evidencias/07-cnpj-dv-invalido-ANTES.png",
+          "depois": "evidencias/07-cnpj-dv-invalido-CORRIGIDO.png",
+          "rotulo_antes": "ANTES — DV inválido aceito, POST enviado e erro genérico",
+          "rotulo_depois": "DEPOIS — DV inválido barrado no campo, sem requisição",
+          "marcas_antes": {
+            "_ajuda": "unidade css: os numeros vem do getBoundingClientRect() medido no mesmo momento do print; largura_css = innerWidth daquele momento. Use unidade px quando medir na propria imagem.",
+            "largura_css": 1280,
+            "marcas": [
+              {"x": 96, "y": 210, "w": 360, "h": 44, "n": 1, "texto": "DV errado aceito"},
+              {"x": 860, "y": 24, "w": 380, "h": 64, "n": 2, "texto": "500 virou 'Erro inesperado'"}
+            ]
+          },
+          "marcas_depois": {
+            "largura_css": 1280,
+            "marcas": [
+              {"x": 96, "y": 210, "w": 360, "h": 70, "n": 1, "texto": "barrado no campo"}
+            ]
+          },
+          "legenda": "Mesmo registro, mesmo papel, mesma rolagem. As caixas foram medidas com getBoundingClientRect na mesma chamada do print."
+        },
+        {
+          "tipo": "cod",
+          "texto": "ANTES  POST /api/v1/cliente  ->  500 em 412 ms  {\"message\":\"An error occurred while saving the entity changes.\"}\nDEPOIS clique em Salvar com o mesmo CNPJ  ->  nenhuma requisicao (espiao de rede vazio por 10 s)",
+          "legenda": "Rede: payload em `rede/07-post-cliente-500.json`; o espião ficou instalado antes do clique."
+        }
+      ]
+    },
+    {
+      "cod": "1.2",
+      "titulo": "A API responde 500 genérico para CNPJ inválido",
+      "status": "nao-corrigido",
+      "severidade": "medio",
+      "onde": "`ClienteService.Criar` (backend) · `POST /api/v1/cliente`",
+      "antes": "Quem chama a API direto recebe **500** e a mensagem do ORM, sem dizer qual campo está errado.",
+      "causa": "O log do servidor no mesmo minuto mostra a causa real que a mensagem genérica esconde: violação do CHECK do CNPJ na tabela, sem validação antes do salvar.",
+      "depois": "Proposta: validar o DV no serviço e responder **422** com `{campo: \"cnpj\"}`. Backend fora da autorização desta rodada: relatado ao time, não alterado.",
+      "status_detalhe": "quem precisa agir: time do backend; pergunta fechada enviada com este print e o trecho do log.",
+      "provas": [
+        {
+          "tipo": "cod",
+          "texto": "2026-09-30 14:21:07 POST /api/v1/cliente  500  412 ms  usuario=vendedor-teste\nDbUpdateException: An error occurred while saving the entity changes.\n  ---> SqlException: The INSERT statement conflicted with the CHECK constraint \"CK_cliente_cnpj\".",
+          "legenda": "Log do servidor lido durante o teste (trecho; tokens e senhas mascarados pelo script)."
+        },
+        {
+          "tipo": "tab",
+          "linhas": [
+            ["Chamada", "Antes", "Esperado"],
+            {"celulas": ["POST /cliente com DV inválido", "500", "422"], "classe": "ruim"},
+            {"celulas": ["POST /cliente com CNPJ válido", "201", "201"], "classe": "bom"}
+          ],
+          "legenda": "Números medidos na API local contra o banco de desenvolvimento (só leitura no banco)."
+        }
+      ]
+    }
+  ],
+  "nao_validado": [
+    "A mensagem traduzida em zh-CN e fr-FR: chave criada nos 6 idiomas, tela vista só em pt-BR e en-US."
+  ],
+  "atencao": [
+    "A regra do DV agora vive em `validarCnpj()`, usada por duas telas: mudar a função muda as duas."
+  ],
+  "fora": [
+    "O 500 da API (item 1.2) depende do backend."
+  ],
+  "comandos": [
+    "git checkout develop",
+    "git pull",
+    "git checkout -b fix/cliente-cnpj-validacao",
+    "git apply --index --check front.patch",
+    "git apply --index front.patch",
+    "git diff --cached --stat",
+    "git commit -F COMMIT-front.txt"
+  ],
+  "commit": {
+    "front": "fix(clientes): barrar CNPJ com digito verificador invalido no formulario\n\nO schema so exigia 14 digitos e o CNPJ errado ia para a API, que\nrespondia 500 generico. Passa a usar validarCnpj() num refine.\n\nNao validado: mensagem em zh-CN e fr-FR vista so no dicionario."
+  },
+  "verificacao": [
+    "`git apply --check front.patch` sobre a develop limpa: OK.",
+    "`git diff --stat` igual a `--ignore-cr-at-eol --stat` (sem CRLF).",
+    "typecheck: 308 erros, igual ao baseline da rodada."
+  ],
+  "pr": {"destino": "develop"}
+}

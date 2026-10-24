@@ -1,4 +1,4 @@
-# Funcionalidades dos repositórios × código do Forja (2026-10-23)
+# Funcionalidades dos repositórios × código do Openclod (2026-10-23)
 
 Pergunta: *"rodas as possíveis funcionalidades dos repositórios estão dentro do
 nosso projeto? embarcado no nosso código?"* — **Não todas.** Esta tabela diz,
@@ -25,7 +25,7 @@ falsos locais, CLIs falsos ou o app real com o provedor de teste (Scripted).
 | Descoberta de modelos locais (Ollama `/api/tags`+`/api/show`, LM Studio) e de servidores OpenAI/Anthropic | **Embarcado** | `discovery.ts`, botão "Detectar modelos" em Configurações → Provedores. Testado contra servidores HTTP falsos; **não** contra um Ollama/LM Studio real (nenhum instalado aqui) |
 | Catálogo models.dev (230 provedores, 8.848 modelos com custo e limites) | **Não** | termos de uso dos dados não verificados; a descoberta ao vivo cobre o caso local |
 | Continuação quando a saída é cortada; último passo sem ferramentas | **Embarcado** | `runner.ts` |
-| Ferramentas começam a rodar durante o stream | **Não** | o Forja executa depois do fim do stream |
+| Ferramentas começam a rodar durante o stream | **Não** | o Openclod executa depois do fim do stream |
 | Edição tolerante (aspas, travessões, CRLF) | **Parcial** | sem tolerância a espaço no fim da linha |
 | Regras `Tool(padrão)` deny > ask > allow, salvas por projeto | **Embarcado** | arquivo JSON, não SQLite. **Não**: análise do shell com tree-sitter |
 | Compactação com modelo estruturado (Objective, Requirements, Decisions, Work State, Next Move, Relevant Files) | **Embarcado** | `compaction.ts`; os turnos mantidos perdem os blocos de raciocínio (assinaturas) |

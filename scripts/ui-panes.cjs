@@ -1,4 +1,4 @@
-// Drives the running Forja (started with --remote-debugging-port=9333) through
+// Drives the running Openclod (started with --remote-debugging-port=9333) through
 // the side-panel panes and saves screenshots. Usage: node scripts/ui-panes.cjs <outDir>
 const http = require('node:http')
 const fs = require('node:fs')
@@ -12,7 +12,7 @@ function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((_req, res) => {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      res.end('<!doctype html><title>Forja preview OK</title><h1 style="font-family:sans-serif">Forja preview OK</h1>')
+      res.end('<!doctype html><title>Openclod preview OK</title><h1 style="font-family:sans-serif">Openclod preview OK</h1>')
     })
     server.listen(0, '127.0.0.1', () => resolve(server))
   })
@@ -46,7 +46,7 @@ async function main() {
   )
   fs.writeFileSync(path.join(fixture, 'README.md'), '# UI fixture\n\nLinha original.\n')
   fs.writeFileSync(path.join(fixture, 'src', 'index.ts'), 'export const answer = 42\n')
-  const git = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=Forja', '-c', 'user.email=forja@example.invalid', ...args], { cwd: fixture, stdio: 'pipe' })
+  const git = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=Openclod', '-c', 'user.email=forja@example.invalid', ...args], { cwd: fixture, stdio: 'pipe' })
   git('init', '-q')
   git('add', '.')
   git('commit', '-q', '-m', 'fixture')
@@ -136,7 +136,7 @@ async function main() {
   results.browser = await page.evaluate(() => {
     const view = document.querySelector('webview.browser-webview.active')
     if (!view) return { ok: false, reason: 'sem webview ativo' }
-    return { ok: view.getTitle() === 'Forja preview OK', title: view.getTitle(), url: view.getURL() }
+    return { ok: view.getTitle() === 'Openclod preview OK', title: view.getTitle(), url: view.getURL() }
   })
   await shot('14-navegador-pagina')
 
@@ -295,7 +295,7 @@ async function main() {
     const list = await window.forja.app.skills()
     return { ok: created.ok, error: created.ok ? null : created.error, listed: list.ok && list.value.some((item) => item.name === name) }
   }, skillName)
-  const skillDir = path.join(process.env.APPDATA, 'Forja', 'skills', skillName)
+  const skillDir = path.join(process.env.APPDATA, 'Openclod', 'skills', skillName)
   results.skillFile = fs.existsSync(path.join(skillDir, 'SKILL.md')) ? fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8') : null
   fs.rmSync(skillDir, { recursive: true, force: true })
 

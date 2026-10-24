@@ -24,9 +24,12 @@ export class WorkspaceGuard {
   private readonly roots: string[]
   /** Real paths of the roots, so 8.3/symlinked roots still compare correctly. */
   private readonly realRoots: string[]
+  /** When true, any absolute path is accepted (personal workstation mode). */
+  readonly unrestricted: boolean
 
-  constructor(roots: string[]) {
+  constructor(roots: string[], unrestricted = false) {
     this.roots = roots.map((r) => normalize(r))
+    this.unrestricted = unrestricted
     this.realRoots = roots.map((root) => {
       try {
         return normalize(fs.realpathSync.native(root))
@@ -52,6 +55,10 @@ export class WorkspaceGuard {
   resolve(input: string, base?: string): string {
     if (!input || typeof input !== 'string') throw new SecurityError('caminho vazio', 'invalid')
     const absolute = path.isAbsolute(input) ? input : path.resolve(base ?? this.roots[0] ?? process.cwd(), input)
+
+    // Personal workstation mode: the agent may work anywhere the user can,
+    // which is what Computer Use needs for real files outside the project.
+    if (this.unrestricted) return absolute
 
     let probe = absolute
     while (!fs.existsSync(probe)) {

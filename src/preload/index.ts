@@ -1,12 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { CH, type ForjaApi, type IpcResult, type SttEvent, type TerminalEvent } from '../shared/api.js'
+import { CH, type OpenclodApi, type IpcResult, type SttEvent, type TerminalEvent } from '../shared/api.js'
 import type { HarnessEvent } from '../shared/types.js'
 
 function call<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
   return ipcRenderer.invoke(channel, ...args) as Promise<IpcResult<T>>
 }
 
-const api: ForjaApi = {
+const api: OpenclodApi = {
   app: {
     capabilities: () => call(CH.appCapabilities),
     presets: () => call(CH.appPresets),
@@ -22,6 +22,11 @@ const api: ForjaApi = {
     discoverModels: (providerId) => call(CH.appDiscoverModels, providerId),
     rememberModel: (providerId, model) => call(CH.appRememberModel, providerId, model),
     mcpPresets: () => call(CH.appMcpPresets),
+    mcpCatalog: () => call(CH.appMcpCatalog),
+    installMcp: (id, env, headers) => call(CH.appMcpInstall, id, env, headers),
+    importClaude: () => call(CH.appImportClaude),
+    pluginCatalog: () => call(CH.appPluginCatalog),
+    agents: (cwd) => call(CH.appAgents, cwd),
     openSkillsFolder: () => call(CH.appOpenSkills)
   },
   projects: {

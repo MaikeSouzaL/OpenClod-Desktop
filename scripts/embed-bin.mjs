@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Bundles the native helpers Forja ships with into `resources/bin/`.
+ * Bundles the native helpers Openclod ships with into `resources/bin/`.
  *
  *   rg.exe                 ripgrep (Rust, MIT OR Unlicense) - copied, never built here
  *   open-computer-use.exe  open-computer-use Windows backend (Go, MIT) - built from

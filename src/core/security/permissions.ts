@@ -113,7 +113,10 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot'
+    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_mouse_move', 'computer_mouse_button',
+    'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
+    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
   ],
   debug: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob',
@@ -123,7 +126,10 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot'
+    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_mouse_move', 'computer_mouse_button',
+    'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
+    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
   ],
   review: [
     'read_file', 'list_dir', 'grep', 'glob', 'git_status', 'git_diff', 'git_log',
@@ -131,8 +137,14 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_screenshot', 'update_plan', 'list_skills', 'use_skill', 'memory_search', 'task', 'agent', 'list_agents'
   ],
   computer: [
-    'read_file', 'list_dir', 'grep', 'glob',
+    'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
+    'run_command', 'start_process', 'read_process_output', 'list_processes', 'stop_process', 'list_ports',
+    'git_status', 'git_diff', 'git_log',
+    'fetch_url', 'web_search', 'download_file',
+    'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
+    'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents'
@@ -154,6 +166,7 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
     'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for',
     'computer_secondary_action'
@@ -168,6 +181,9 @@ for (const tools of Object.values(MODE_TOOLS)) {
   }
   if (!tools.includes('web_research')) tools.push('web_research')
   for (const name of ['browser_tabs', 'browser_new_tab', 'browser_switch_tab', 'browser_close_tab']) {
+    if (!tools.includes(name)) tools.push(name)
+  }
+  for (const name of ['mcp_search', 'mcp_servers', 'mcp_install']) {
     if (!tools.includes(name)) tools.push(name)
   }
 }

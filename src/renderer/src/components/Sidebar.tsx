@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import type { Project, SessionSummary, SessionSurface } from '../../../shared/types'
 import { Icon } from './Icons'
-import { ForjaMark, MenuPopover, type MenuItem } from './Chrome'
+import { OpenclodMark, MenuPopover, type MenuItem } from './Chrome'
 import { relativeTime } from '../lib/format'
 
 function normalize(path: string): string {
@@ -9,12 +9,17 @@ function normalize(path: string): string {
 }
 
 export type SidebarMode = SessionSurface
-export type SidebarPage = 'projects' | 'scheduled' | 'customize'
+export type SidebarPage = 'projects' | 'memory' | 'artifacts' | 'scheduled' | 'dispatch' | 'design' | 'customize' | 'more'
 
-const PAGES: Array<{ id: SidebarPage; label: string; icon: 'folder' | 'clock' | 'sliders' }> = [
+const PAGES: Array<{ id: SidebarPage; label: string; icon: 'folder' | 'archive' | 'image' | 'clock' | 'terminal' | 'sparkles' | 'sliders' | 'more' }> = [
   { id: 'projects', label: 'Projetos', icon: 'folder' },
+  { id: 'memory', label: 'Memória', icon: 'archive' },
+  { id: 'artifacts', label: 'Artefatos', icon: 'image' },
   { id: 'scheduled', label: 'Agendados', icon: 'clock' },
-  { id: 'customize', label: 'Personalização', icon: 'sliders' }
+  { id: 'dispatch', label: 'Dispatch', icon: 'terminal' },
+  { id: 'design', label: 'Design', icon: 'sparkles' },
+  { id: 'customize', label: 'Personalização', icon: 'sliders' },
+  { id: 'more', label: 'Mais', icon: 'more' }
 ]
 
 interface SidebarProps {
@@ -43,9 +48,8 @@ interface SidebarProps {
   onOpenMenu(): void
 }
 
-const MODES: Array<{ id: SidebarMode; label: string; icon: 'home' | 'briefcase' | 'code' }> = [
+const MODES: Array<{ id: SidebarMode; label: string; icon: 'home' | 'code' }> = [
   { id: 'chat', label: 'Início', icon: 'home' },
-  { id: 'cowork', label: 'Cowork', icon: 'briefcase' },
   { id: 'code', label: 'Code', icon: 'code' }
 ]
 
@@ -80,12 +84,15 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [showArchived, setShowArchived] = useState(false)
+  const [oldestFirst, setOldestFirst] = useState(false)
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [projectMenu, setProjectMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [userMenu, setUserMenu] = useState<{ x: number; y: number } | null>(null)
 
   const live = useMemo(() => sessions.filter((session) => !session.meta.archived), [sessions])
   const archived = useMemo(() => sessions.filter((session) => session.meta.archived), [sessions])
+  // Cowork lives inside Início now: the sidebar only has Início and Code.
+  const navMode: 'chat' | 'code' = mode === 'code' ? 'code' : 'chat'
 
   const visibleSessions = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -102,8 +109,11 @@ export function Sidebar({
       .sort((a, b) => b.meta.updatedAt - a.meta.updatedAt)
 
   const recent = useMemo(
-    () => [...visibleSessions].sort((a, b) => b.meta.updatedAt - a.meta.updatedAt).slice(0, 60),
-    [visibleSessions]
+    () =>
+      [...visibleSessions]
+        .sort((a, b) => (oldestFirst ? a.meta.updatedAt - b.meta.updatedAt : b.meta.updatedAt - a.meta.updatedAt))
+        .slice(0, 60),
+    [visibleSessions, oldestFirst]
   )
 
   const commitRename = (): void => {
@@ -293,8 +303,8 @@ export function Sidebar({
               key={item.id}
               type="button"
               role="tab"
-              aria-selected={mode === item.id}
-              className={mode === item.id ? 'active' : ''}
+              aria-selected={navMode === item.id}
+              className={navMode === item.id ? 'active' : ''}
               onClick={() => onMode(item.id)}
               title={item.label}
             >
@@ -313,14 +323,14 @@ export function Sidebar({
           }}
           title={
             activeProject
-              ? `${mode === 'chat' ? 'Nova conversa' : 'Nova sessão'} em ${activeProject.name}`
+              ? `${navMode === 'chat' ? 'Nova conversa' : 'Nova sessão'} em ${activeProject.name}`
               : 'Abrir uma pasta de projeto'
           }
         >
           <span className="side-leading">
             <Icon name="plus" size={16} />
           </span>
-          <span className="side-label">{mode === 'chat' ? 'Nova conversa' : 'Criar'}</span>
+          <span className="side-label">Criar</span>
         </button>
         <nav className="side-nav" aria-label="Páginas">
           {PAGES.map((item) => (
@@ -370,14 +380,32 @@ export function Sidebar({
           </div>
         ) : null}
 
-        {mode === 'chat' ? (
-          <div className="side-recent">
-            {recent.length ? (
-              recent.map((session) => sessionRow(session))
-            ) : (
-              <div className="side-none">Nenhuma conversa ainda</div>
-            )}
-          </div>
+        {navMode === 'chat' ? (
+          <>
+            <div className="side-section-head">
+              <span>Conversas e tarefas</span>
+              <span className="side-section-actions">
+                <button type="button" className="side-mini" title="Pesquisar" onClick={() => setSearching(true)}>
+                  <Icon name="search" size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="side-mini"
+                  title={oldestFirst ? 'Mais recentes primeiro' : 'Mais antigas primeiro'}
+                  onClick={() => setOldestFirst((value) => !value)}
+                >
+                  <Icon name="filter" size={13} />
+                </button>
+              </span>
+            </div>
+            <div className="side-recent">
+              {recent.length ? (
+                recent.map((session) => sessionRow(session))
+              ) : (
+                <div className="side-none">Nenhuma conversa ainda</div>
+              )}
+            </div>
+          </>
         ) : (
           <>
             {!projects.length ? (
@@ -409,9 +437,9 @@ export function Sidebar({
           title="Conta e preferências"
         >
           <span className="side-avatar">
-            <ForjaMark size={15} />
+            <OpenclodMark size={15} />
           </span>
-          <span className="side-user-name">Forja</span>
+          <span className="side-user-name">Openclod Desktop</span>
           <span className="side-version">v{version}</span>
           <Icon name="chevronDown" size={12} className="side-user-chevron" />
         </button>

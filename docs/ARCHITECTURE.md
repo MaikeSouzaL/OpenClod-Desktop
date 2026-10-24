@@ -1,4 +1,4 @@
-# Arquitetura do Forja
+# Arquitetura do Openclod
 
 > Documento de decisão. Reflete o código em `src/`. Onde a implementação ainda
 > não cobre o desenho, isso é dito explicitamente.
@@ -170,7 +170,7 @@ não existe ferramenta que escreva em `PolicyConfig`.
 ## 7. Persistência
 
 ```
-%APPDATA%/Forja/
+%APPDATA%/Openclod/
   settings.json           provedores, política, limites (sem chaves)
   secrets.bin             chaves cifradas com safeStorage (DPAPI)
   projects.json
@@ -285,7 +285,7 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
                       │      │      └─ Python embutido + faster-whisper + Silero VAD
                       │      └─ partial/final → dictation-store (UI) + pílula
                       └─ stop → dictation:insert
-                             ├─ Forja em foco: dictation:composer → inserção no caret
+                             ├─ Openclod em foco: dictation:composer → inserção no caret
                              └─ outro app: clipboard + Ctrl+V (Sendable via PowerShell)
 ```
 
@@ -314,7 +314,7 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
   Conteúdo de página é dado não confiável, igual a qualquer resultado de
   ferramenta.
 - O binário oficial `ai-memory` (Rust, MIT) pode ser ligado como MCP
-  (`ai-memory mcp-bridge`) para FTS5/vetores/decay; o Forja não depende dele.
+  (`ai-memory mcp-bridge`) para FTS5/vetores/decay; o Openclod não depende dele.
 
 ## 15. Build & packaging
 
@@ -322,16 +322,16 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
   `out/renderer` (React). O main externiza as dependências de produção, que vão
   em `node_modules` dentro do `asar`.
 - `electron-builder.yml` define o pacote: `appId com.forja.desktop`, produto
-  `Forja`, alvo NSIS x64, saída em `release/` e artefato
-  `Forja-<versão>-setup.exe`. O electron-builder lê o bloco `build` do
+  `Openclod`, alvo NSIS x64, saída em `release/` e artefato
+  `Openclod-<versão>-setup.exe`. O electron-builder lê o bloco `build` do
   `package.json`; o `electron-builder.yml` repete os mesmos campos para
   referência (mantenha os dois em sincronia).
 - Ícones (`build/icon.ico`, `build/icon.png`) são opcionais: sem eles o build usa
   o ícone padrão do Electron e não falha (ver `build/README.md`).
 - Não há assinatura de código nem auto-update configurados; o instalador é por
-  usuário (`perMachine: false`) e preserva `%APPDATA%\Forja` ao desinstalar.
-- Dados em runtime: `%APPDATA%\Forja\config` (settings/secrets) e
-  `%APPDATA%\Forja\data` (projetos, sessões, memória), além de `skills` e `logs`.
+  usuário (`perMachine: false`) e preserva `%APPDATA%\Openclod` ao desinstalar.
+- Dados em runtime: `%APPDATA%\Openclod\config` (settings/secrets) e
+  `%APPDATA%\Openclod\data` (projetos, sessões, memória), além de `skills` e `logs`.
   Observação: a árvore mostrada na seção 7 está desatualizada quanto a esse
   layout; a referência correta é o README (§12).
 - Passo a passo reproduzível em `docs/INSTALL.md`; licenças em

@@ -30,7 +30,7 @@ node -v            # v22.x
 npm -v             # 10.x ou 11.x
 
 # Clone/extraia o repositÃ³rio e entre na pasta
-cd C:\caminho\para\Forja
+cd C:\caminho\para\Openclod Desktop
 
 # InstalaÃ§Ã£o reprodutÃ­vel (usa package-lock.json)
 npm ci
@@ -49,7 +49,7 @@ npm run dev
 ```
 
 - O `electron-vite dev` sobe o renderer com recarga e abre a janela do Electron.
-- Log do processo principal: `%APPDATA%\Forja\logs\main.log`.
+- Log do processo principal: `%APPDATA%\Openclod Desktop\logs\main.log`.
 - DevTools: `F12` ou `Ctrl+Shift+I`.
 
 ### 2.2 VerificaÃ§Ãµes antes de empacotar
@@ -90,7 +90,7 @@ Use quando jÃ¡ tiver rodado `npm run build` e quiser apenas reempacotar.
 npm run dist:dir
 ```
 
-Gera `release/win-unpacked/` com `Forja.exe` â€” Ãºtil para testar antes do NSIS.
+Gera `release/win-unpacked/` com `Openclod Desktop.exe` â€” Ãºtil para testar antes do NSIS.
 
 ### 3.4 ConfiguraÃ§Ã£o usada
 
@@ -100,32 +100,32 @@ tem precedÃªncia sobre o bloco `build` do `package.json`.
 | Chave | Valor |
 |---|---|
 | `appId` | `com.forja.desktop` |
-| `productName` | `Forja` |
+| `productName` | `Openclod Desktop` |
 | `directories.output` | `release` |
 | `directories.buildResources` | `build` |
 | `files` | `out/**/*`, `package.json` (+ `node_modules/**/*` de produÃ§Ã£o) |
 | `win.target` | `nsis`, `x64` |
-| `artifactName` | `Forja-${version}-setup.${ext}` |
+| `artifactName` | `Openclod Desktop-${version}-setup.${ext}` |
 | `nsis.oneClick` | `false` (instalador assistido) |
 | `nsis.perMachine` | `false` (instala por usuÃ¡rio) |
 | `nsis.allowToChangeInstallationDirectory` | `true` |
 | `nsis.createDesktopShortcut` | `true` |
-| `nsis.shortcutName` | `Forja` |
-| `nsis.deleteAppDataOnUninstall` | `false` (mantÃ©m `%APPDATA%\Forja`) |
+| `nsis.shortcutName` | `Openclod Desktop` |
+| `nsis.deleteAppDataOnUninstall` | `false` (mantÃ©m `%APPDATA%\Openclod Desktop`) |
 
 ### 3.5 Artefatos esperados
 
 ```
 release\
-  Forja-0.1.0-setup.exe          instalador NSIS
+  Openclod Desktop-0.1.0-setup.exe          instalador NSIS
   win-unpacked\
-    Forja.exe                    executÃ¡vel sem instalador
+    Openclod Desktop.exe                    executÃ¡vel sem instalador
     resources\app.asar           cÃ³digo empacotado
     ...                          runtime Electron/Chromium
   builder-effective-config.yaml  configuraÃ§Ã£o efetiva do build
 ```
 
-- O nome do `.exe` segue `Forja-Setup-<versÃ£o>.exe`; a versÃ£o vem de
+- O nome do `.exe` segue `Openclod Desktop-Setup-<versÃ£o>.exe`; a versÃ£o vem de
   `package.json` (`0.1.0` nesta versÃ£o).
 - `release/` estÃ¡ no `.gitignore`; nÃ£o versione artefatos.
 - `latest.yml` sÃ³ aparece se publicaÃ§Ã£o/auto-update for configurada (nÃ£o Ã© o caso).
@@ -167,11 +167,11 @@ Caches que podem interferir em builds muito antigos:
 
 ## 4. Instalar o resultado
 
-1. Execute `release\Forja-0.1.0-setup.exe`.
+1. Execute `release\Openclod Desktop-0.1.0-setup.exe`.
 2. O NSIS Ã© assistido (`oneClick: false`): escolha o diretÃ³rio de instalaÃ§Ã£o.
-   O padrÃ£o por usuÃ¡rio Ã© `%LOCALAPPDATA%\Programs\Forja`.
-3. Cria atalho na Ã¡rea de trabalho e no Menu Iniciar com o nome **Forja**.
-4. Abra o Forja e confira **ConfiguraÃ§Ãµes â†’ Sobre**: versÃ£o do app, Electron,
+   O padrÃ£o por usuÃ¡rio Ã© `%LOCALAPPDATA%\Programs\Openclod Desktop`.
+3. Cria atalho na Ã¡rea de trabalho e no Menu Iniciar com o nome **Openclod Desktop**.
+4. Abra o Openclod Desktop e confira **ConfiguraÃ§Ãµes â†’ Sobre**: versÃ£o do app, Electron,
    Chromium, Node e plataforma.
 
 ### 4.1 VerificaÃ§Ã£o pÃ³s-instalaÃ§Ã£o
@@ -210,7 +210,7 @@ npm run dist
 - Verifique a assinatura:
 
   ```powershell
-  Get-AuthenticodeSignature .\release\Forja-0.1.0-setup.exe |
+  Get-AuthenticodeSignature .\release\Openclod Desktop-0.1.0-setup.exe |
     Format-List Status, SignerCertificate, TimeStamperCertificate
   ```
 
@@ -221,7 +221,7 @@ npm run dist
 
 ### 6.1 Fechar o aplicativo
 
-Feche a janela e confirme no Gerenciador de Tarefas que nÃ£o hÃ¡ `Forja.exe`
+Feche a janela e confirme no Gerenciador de Tarefas que nÃ£o hÃ¡ `Openclod Desktop.exe`
 (processos filhos de shell/browser podem permanecer se um turno estiver ativo;
 abortar o turno antes de fechar evita isso).
 
@@ -229,22 +229,22 @@ abortar o turno antes de fechar evita isso).
 
 1. **ConfiguraÃ§Ãµes â†’ Aplicativos â†’ Aplicativos instalados** no Windows 11
    (no Windows 10: **ConfiguraÃ§Ãµes â†’ Aplicativos â†’ Aplicativos e recursos**).
-2. Localize **Forja** e escolha **Desinstalar**.
+2. Localize **Openclod Desktop** e escolha **Desinstalar**.
 3. Confirme.
 
 Alternativas:
 
 ```powershell
 # Desinstalador padrÃ£o (instalaÃ§Ã£o por usuÃ¡rio)
-& "$env:LOCALAPPDATA\Programs\Forja\Uninstall Forja.exe"
+& "$env:LOCALAPPDATA\Programs\Openclod Desktop\Uninstall Openclod Desktop.exe"
 
 # Silencioso (sem interface)
-& "$env:LOCALAPPDATA\Programs\Forja\Uninstall Forja.exe" /S
+& "$env:LOCALAPPDATA\Programs\Openclod Desktop\Uninstall Openclod Desktop.exe" /S
 ```
 
 O desinstalador remove:
 
-- `%LOCALAPPDATA%\Programs\Forja` (ou o diretÃ³rio escolhido na instalaÃ§Ã£o);
+- `%LOCALAPPDATA%\Programs\Openclod Desktop` (ou o diretÃ³rio escolhido na instalaÃ§Ã£o);
 - atalho da Ã¡rea de trabalho e do Menu Iniciar;
 - entrada de desinstalaÃ§Ã£o em
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall`.
@@ -254,7 +254,7 @@ O desinstalador remove:
 Como `deleteAppDataOnUninstall: false`, os dados do usuÃ¡rio **permanecem**:
 
 ```
-%APPDATA%\Forja\
+%APPDATA%\Openclod Desktop\
   config\settings.json
   config\secrets.bin        â† chaves cifradas com DPAPI
   data\projects.json
@@ -269,17 +269,17 @@ Para remoÃ§Ã£o completa:
 
 ```powershell
 # 1. Backup opcional antes de apagar
-Copy-Item -Recurse "$env:APPDATA\Forja" "$env:USERPROFILE\Desktop\Forja-backup"
+Copy-Item -Recurse "$env:APPDATA\Openclod Desktop" "$env:USERPROFILE\Desktop\Openclod Desktop-backup"
 
 # 2. Apagar configuraÃ§Ãµes, chaves, sessÃµes, memÃ³ria, skills e logs
-Remove-Item -Recurse -Force "$env:APPDATA\Forja"
+Remove-Item -Recurse -Force "$env:APPDATA\Openclod Desktop"
 
 # 3. Garantir que nÃ£o sobrou pasta de instalaÃ§Ã£o
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\Forja" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\Openclod Desktop" -ErrorAction SilentlyContinue
 
 # 4. Atalhos residuais (se existirem)
-Remove-Item -Force "$env:USERPROFILE\Desktop\Forja.lnk" -ErrorAction SilentlyContinue
-Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Forja.lnk" -ErrorAction SilentlyContinue
+Remove-Item -Force "$env:USERPROFILE\Desktop\Openclod Desktop.lnk" -ErrorAction SilentlyContinue
+Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Openclod Desktop.lnk" -ErrorAction SilentlyContinue
 ```
 
 > As chaves em `secrets.bin` sÃ£o cifradas com DPAPI do usuÃ¡rio. Apagar o arquivo
@@ -288,11 +288,11 @@ Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Forja.lnk
 
 ### 6.4 VerificaÃ§Ã£o de desinstalaÃ§Ã£o limpa
 
-- `Test-Path "$env:LOCALAPPDATA\Programs\Forja"` â†’ `False`.
-- `Test-Path "$env:APPDATA\Forja"` â†’ `False` (se vocÃª removeu os dados).
-- Nenhum `Forja.exe` no Gerenciador de Tarefas.
-- Nenhum atalho **Forja** na Ã¡rea de trabalho/Menu Iniciar.
-- **Aplicativos instalados** sem entrada **Forja**.
+- `Test-Path "$env:LOCALAPPDATA\Programs\Openclod Desktop"` â†’ `False`.
+- `Test-Path "$env:APPDATA\Openclod Desktop"` â†’ `False` (se vocÃª removeu os dados).
+- Nenhum `Openclod Desktop.exe` no Gerenciador de Tarefas.
+- Nenhum atalho **Openclod Desktop** na Ã¡rea de trabalho/Menu Iniciar.
+- **Aplicativos instalados** sem entrada **Openclod Desktop**.
 
 ## 7. Problemas comuns de instalaÃ§Ã£o/build
 
@@ -303,7 +303,7 @@ Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Forja.lnk
 | `Cannot find module ...` ao abrir o app | build incompleto | `npm run build` e reinstale; confira `out/main/index.js` |
 | Build falha em `win.icon` | `build/icon.ico` ausente e `win.icon` descomentado | Gere o Ã­cone ou comente a linha |
 | Instalador nÃ£o abre | bloqueio do SmartScreen/antivÃ­rus | Assine o binÃ¡rio ou use "Executar assim mesmo" em ambiente controlado |
-| App abre em branco | erro no renderer/main | veja `%APPDATA%\Forja\logs\main.log`; rode em dev com DevTools |
+| App abre em branco | erro no renderer/main | veja `%APPDATA%\Openclod Desktop\logs\main.log`; rode em dev com DevTools |
 | Computer Use indisponÃ­vel | binÃ¡rio opcional ausente | `npm i -g @opensymph/open-computer-use` |
 | Navegador indisponÃ­vel | sem Chrome/Edge/Chromium | instale Chrome/Edge ou `npx playwright install chromium` |
 

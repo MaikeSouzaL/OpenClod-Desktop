@@ -1,13 +1,13 @@
-# Forja
+# Openclod
 
-Forja é um ambiente desktop para desenvolvimento assistido por modelos de linguagem,
+Openclod é um ambiente desktop para desenvolvimento assistido por modelos de linguagem,
 com **harness próprio**: loop de agente, ferramentas com classificação de risco,
 aprovação humana, Computer Use no Windows e navegação web via Playwright.
 
 - Versão atual: **0.1.0**
 - Plataforma alvo: **Windows 10/11 x64**
 - Interface em português (pt-BR), tema escuro/claro
-- Código-fonte próprio, licença MIT (o Forja não é afiliado à Anthropic)
+- Código-fonte próprio, licença MIT (o Openclod não é afiliado à Anthropic)
 
 > **Aviso importante sobre o provedor "Scripted" (mock).**
 > O preset **Scripted (autoteste)** **não é um modelo real**. Ele é um provedor
@@ -22,7 +22,7 @@ aprovação humana, Computer Use no Windows e navegação web via Playwright.
 
 ## Sumário
 
-1. [O que é o Forja](#1-o-que-é-o-forja)
+1. [O que é o Openclod](#1-o-que-é-o-forja)
 2. [Recursos que existem hoje](#2-recursos-que-existem-hoje)
 3. [O que não existe nesta versão](#3-o-que-não-existe-nesta-versão)
 4. [Requisitos](#4-requisitos)
@@ -42,9 +42,9 @@ aprovação humana, Computer Use no Windows e navegação web via Playwright.
 
 ---
 
-## 1. O que é o Forja
+## 1. O que é o Openclod
 
-O Forja é um aplicativo Electron (processo principal + preload + renderer React) em
+O Openclod é um aplicativo Electron (processo principal + preload + renderer React) em
 volta de um núcleo TypeScript puro, sem dependência de Electron:
 
 ```
@@ -98,7 +98,7 @@ que a UI finja uma ação que o núcleo não executou.
   Nada é enviado a um serviço de memória; ver Configurações → Memória e
   `docs/research/AI_MEMORY.md`.
 - **Ditado local** com Whisper embutido: atalho global, pílula flutuante,
-  transcrição ao vivo e inserção no campo em foco (inclusive fora do Forja).
+  transcrição ao vivo e inserção no campo em foco (inclusive fora do Openclod).
   O mesmo fluxo abre pelo atalho ou pelo botão de microfone.
 - **Hooks** no formato do Claude Code (§7.8), com 10 eventos e tipos `command` e `http`.
 - **Esforço de raciocínio** por sessão (Automático, Baixo, Médio, Alto, Extra,
@@ -117,7 +117,7 @@ que a UI finja uma ação que o núcleo não executou.
   Permissões, o agente principal divide o trabalho e chama especialistas em
   paralelo. Se não houver especialista para o assunto, ele chama `agent-smith`,
   que estuda o caso, cria um agente permanente com `create_agent` em
-  `%APPDATA%\Forja\agents` e delega a tarefa.
+  `%APPDATA%\Openclod\agents` e delega a tarefa.
 - **CLAUDE.md canônico:** o harness lê `CLAUDE.md` (e `AGENTS.md`/`FORJA.md`
   como fallback) e cria automaticamente um `CLAUDE.md` na raiz de cada projeto
   quando ele não existe, sem sobrescrever o que já está lá.
@@ -158,7 +158,7 @@ que a UI finja uma ação que o núcleo não executou.
   ao parar. Não há dois caminhos diferentes de ditado.
 - **Pílula flutuante** always-on-top, separada da janela principal, com estado
   (carregando/ouvindo/inserindo/erro), medidor e partial text.
-- **Inserção**: no compositor do Forja, no cursor; em outro aplicativo, via
+- **Inserção**: no compositor do Openclod, no cursor; em outro aplicativo, via
   clipboard + `Ctrl+V` (configurável em Configurações → Voz).
 - **Polish opcional**: corrige pontuação/vícios com uma chamada curta ao
   provedor padrão antes de inserir; desligado por padrão, porque envia o texto
@@ -215,10 +215,10 @@ Para evitar expectativas erradas:
   assinatura; o Windows SmartScreen pode avisar. Atualizações são manuais.
 - **Computer Use só no Windows** e depende de um binário opcional instalado à parte.
 - **O navegador depende de Chrome/Edge** ou do Chromium baixado pelo Playwright.
-  O Forja não baixa navegador automaticamente.
+  O Openclod não baixa navegador automaticamente.
 - **MCP suporta ferramentas** (`tools/list`, `tools/call`). Prompts e resources de
   servidores MCP estão fora de escopo.
-- **Só a pasta de skills do usuário é carregada** (`%APPDATA%\Forja\skills`). A
+- **Só a pasta de skills do usuário é carregada** (`%APPDATA%\Openclod\skills`). A
   origem "projeto" existe no modelo de dados, mas nenhuma pasta de projeto é
   registrada nesta versão.
 - **Sem edição colaborativa e sem relay remoto.** As worktrees têm código e
@@ -231,13 +231,13 @@ Para evitar expectativas erradas:
 - **A memória por projeto é local** (wiki markdown em `%APPDATA%`), sem sync
   entre máquinas. Para FTS5/vetores/sync, ligue o binário oficial `ai-memory`
   como MCP.
-- **`create_agent` grava em `%APPDATA%\Forja\agents`** (ou `.forja/agents` com
+- **`create_agent` grava em `%APPDATA%\Openclod\agents`** (ou `.forja/agents` com
   escopo de projeto). O agente criado passa pela mesma política de ferramentas;
   não há sandbox de SO para o que ele executar.
 - **O terminal integrado é o seu shell**: não passa pelas aprovações do agente.
 - **Sem recursos de nuvem do Claude** (Artefatos, Design, Dispatch, Remote Control).
 - **Sem paridade visual com o Claude Desktop.** A identidade visual é própria.
-- **Sem telemetria.** Nenhum dado é enviado ao projeto Forja.
+- **Sem telemetria.** Nenhum dado é enviado ao projeto Openclod.
 
 ## 4. Requisitos
 
@@ -288,7 +288,7 @@ npm run dist:dir
 
 - `npm run build` executa `typecheck` antes do bundle. Se o typecheck falhar, o
   build para.
-- O instalador sai em `release/Forja-0.1.0-setup.exe` com a configuração atual
+- O instalador sai em `release/Openclod-0.1.0-setup.exe` com a configuração atual
   (`electron-builder.yml`).
 - Passo a passo detalhado, incluindo instalação limpa e desinstalação limpa:
   [`docs/INSTALL.md`](docs/INSTALL.md).
@@ -333,11 +333,11 @@ URL base, o modelo e a janela de contexto.
 Alternativas à chave no cofre:
 
 - **Variável de ambiente:** o preset já nasce com `env:NOME_DA_VARIAVEL`. Se a
-  variável estiver definida no processo que inicia o Forja, a credencial é aceita.
+  variável estiver definida no processo que inicia o Openclod, a credencial é aceita.
 - **Provedores locais:** Ollama e LM Studio em `127.0.0.1`/`localhost` são aceitos
   sem chave; o servidor local precisa estar rodando e com um modelo carregado.
 
-> Se a criptografia do sistema não estiver disponível, o Forja **recusa** gravar a
+> Se a criptografia do sistema não estiver disponível, o Openclod **recusa** gravar a
 > chave em texto puro e orienta usar variável de ambiente.
 
 ## 7. Modelo de segurança
@@ -380,7 +380,7 @@ mcp__github               todas as ferramentas do servidor MCP "github"
 ```
 
 Os nomes do Claude Code (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`,
-`WebFetch`, `WebSearch`, `Task`, `TodoWrite`) e os nomes do Forja
+`WebFetch`, `WebSearch`, `Task`, `TodoWrite`) e os nomes do Openclod
 (`run_command`, `read_file`…) são aceitos. Fontes, todas somadas:
 
 - Configurações → Permissões (usuário);
@@ -389,7 +389,7 @@ Os nomes do Claude Code (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`,
 - `<projeto>/.claude/settings.json` e `settings.local.json`, só se "Ler também
   .claude/settings.json" estiver ligado;
 - escolhas "permitir sempre", gravadas por projeto em
-  `%APPDATA%\Forja\data\permissions\<projeto>.json`.
+  `%APPDATA%\Openclod\data\permissions\<projeto>.json`.
 
 O modo somente leitura continua sendo um limite rígido: uma regra `allow` não
 libera escrita nele.
@@ -437,7 +437,7 @@ evento de auditoria com nível `blocked`.
 ### 7.5 Segredos (DPAPI)
 
 - Chaves são cifradas com `safeStorage` do Electron, que no Windows usa **DPAPI** e
-  ficam em `%APPDATA%\Forja\config\secrets.bin`.
+  ficam em `%APPDATA%\Openclod\config\secrets.bin`.
 - O renderer nunca recebe a chave de volta; só um booleano "configurado".
 - `settings.json` guarda apenas referências (`env:NOME` ou `secret:id`), nunca a chave.
 - Processos filhos recebem ambiente sanitizado: variáveis que casam com
@@ -449,7 +449,7 @@ evento de auditoria com nível `blocked`.
 ### 7.6 Auditoria
 
 Cada sessão tem uma trilha append-only em
-`%APPDATA%\Forja\data\sessions\<id>.events.jsonl` com eventos de:
+`%APPDATA%\Openclod\data\sessions\<id>.events.jsonl` com eventos de:
 
 - início/fim de turno, mensagens, plano e diffs;
 - início/fim de ferramenta, arquivos tocados e resumo;
@@ -494,7 +494,7 @@ Mesmo formato do Claude Code. Configure em Configurações → Permissões → H
 - Eventos: `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`,
   `SubagentStop`, `SessionStart`, `PreCompact`, `Notification`.
 - `matcher` é uma expressão regular sobre o nome da ferramenta (nome do Claude
-  Code ou do Forja); vazio vale para todas.
+  Code ou do Openclod); vazio vale para todas.
 - O comando recebe o evento em JSON pela entrada padrão (`session_id`, `cwd`,
   `hook_event_name`, `tool_name`, `tool_input` com `file_path`, `tool_response`,
   `prompt`…) e as variáveis `FORJA_PROJECT_DIR` e `CLAUDE_PROJECT_DIR`.
@@ -523,7 +523,7 @@ Requisitos:
    npm i -g @opensymph/open-computer-use
    ```
 
-   O Forja procura o executável em:
+   O Openclod procura o executável em:
    - `FORJA_OCU_BIN` (caminho explícito), depois `OCU_BIN`;
    - `%APPDATA%\npm\node_modules\@opensymph\open-computer-use\dist\windows\amd64\open-computer-use.exe`.
 
@@ -541,11 +541,11 @@ Ordem de percepção instruída ao agente (prompt + descrições das ferramentas
 4. verificação com `computer_wait_for` (espera um texto ou uma mudança na
    árvore), novo snapshot e/ou `computer_screenshot`;
 5. coordenadas `x/y` apenas quando 1–3 falham: da imagem da janela (com
-   `window`) ou da última `computer_screenshot`, que o Forja converte para a
+   `window`) ou da última `computer_screenshot`, que o Openclod converte para a
    tela real (origem e escala do desktop virtual, multi-monitor).
 
 Como funciona por dentro: o `open-computer-use` guarda a árvore de cada app
-**só na memória do próprio processo**, então o Forja mantém um único processo
+**só na memória do próprio processo**, então o Openclod mantém um único processo
 `open-computer-use mcp` vivo. Se ele reiniciar, a ação por elemento tira um
 novo snapshot e tenta de novo uma vez. Erros do backend chegam ao agente como
 falha (`ok: false`), nunca como sucesso.
@@ -562,7 +562,7 @@ caminho e detalhe do erro.
 
 - Motor: **Playwright** (Apache-2.0). A ordem de lançamento é
   `channel: 'chrome'` → `'msedge'` → Chromium instalado pelo Playwright.
-- O Forja **não baixa navegador automaticamente**. Se não houver Chrome/Edge:
+- O Openclod **não baixa navegador automaticamente**. Se não houver Chrome/Edge:
 
   ```powershell
   npx playwright install chromium
@@ -579,7 +579,7 @@ caminho e detalhe do erro.
 
 ## 10. MCP
 
-O Forja fala **MCP por stdio** (JSON-RPC 2.0 delimitado por linha) e suporta
+O Openclod fala **MCP por stdio** (JSON-RPC 2.0 delimitado por linha) e suporta
 `initialize`, `tools/list` e `tools/call`.
 
 Configure em **Configurações → MCP**, como um array JSON:
@@ -608,7 +608,7 @@ Configure em **Configurações → MCP**, como um array JSON:
 Skills são pastas com um `SKILL.md`:
 
 ```
-%APPDATA%\Forja\skills\
+%APPDATA%\Openclod\skills\
   revisao-de-codigo\
     SKILL.md
   minha-skill\
@@ -628,7 +628,7 @@ description: Quando e como usar esta skill.
 Instruções completas que o agente carrega somente quando chamar `use_skill`.
 ```
 
-- No primeiro início, o Forja cria duas skills de exemplo:
+- No primeiro início, o Openclod cria duas skills de exemplo:
   `revisao-de-codigo` e `depuracao-sistematica`.
 - O agente vê nome/descrição em `list_skills` e carrega o corpo com `use_skill`.
 - O corpo é limitado a 20.000 caracteres por skill.
@@ -637,10 +637,10 @@ Instruções completas que o agente carrega somente quando chamar `use_skill`.
 
 ## 12. Onde ficam os dados
 
-Tudo fica em `%APPDATA%\Forja` (o `userData` do Electron):
+Tudo fica em `%APPDATA%\Openclod` (o `userData` do Electron):
 
 ```
-%APPDATA%\Forja\
+%APPDATA%\Openclod\
   config\
     settings.json              provedores, política, limites, MCP, tema
     secrets.bin                chaves cifradas com DPAPI (safeStorage)
@@ -675,39 +675,39 @@ Tudo fica em `%APPDATA%\Forja` (o `userData` do Electron):
 | "open-computer-use não encontrado" | binário opcional ausente | `npm i -g @opensymph/open-computer-use` e reabra o app |
 | O microfone não inicia | microfone bloqueado, modelo ausente ou build antiga | Configurações → Voz mostra o motivo; confira `resources/models/whisper` e rode `npm run build` (o worklet é um arquivo estático) |
 | O atalho global não responde | outro aplicativo usa o mesmo atalho | Configurações → Voz → mude o atalho (ex.: `Control+Alt+J`) e salve |
-| O texto ditado foi para o app errado | "Inserir em" = qualquer app e o foco mudou | use "Somente no compositor do Forja" ou mantenha o campo em foco |
+| O texto ditado foi para o app errado | "Inserir em" = qualquer app e o foco mudou | use "Somente no compositor do Openclod" ou mantenha o campo em foco |
 | Página nova não aparece em Memória | wiki editada fora do app | Configurações → Memória → **Atualizar** (o índice é reconstruído a partir dos `.md`) |
 | "Controle de mouse/teclado desativado" | política | Configurações → Permissões → habilitar controle real |
 | Aprovação "sumiu" e o turno falhou | expirou em 5 min | responda o painel de aprovação; repita a ação |
-| Janela em branco ou app não abre | erro de inicialização | veja `%APPDATA%\Forja\logs\main.log`; rode `npm run build` e observe o typecheck |
+| Janela em branco ou app não abre | erro de inicialização | veja `%APPDATA%\Openclod\logs\main.log`; rode `npm run build` e observe o typecheck |
 | `npm install` falha ao baixar Electron | proxy/firewall | configure proxy do npm ou `ELECTRON_MIRROR`; tente novamente |
 | SmartScreen bloqueia o instalador | build sem assinatura | "Mais informações" → "Executar assim mesmo"; para distribuir, assine (ver `docs/INSTALL.md`) |
 | Antivírus reclama do instalador NSIS | executável não assinado | assine o binário; não desative a proteção do sistema |
 | Sessão travada em "aguardando aprovação" | pedido pendente | aprove/negue no painel ou aborte o turno |
-| Dados estranhos após atualizar | formato antigo de settings/sessão | feche o app, faça backup e mova `%APPDATA%\Forja\config` para recriar o padrão |
+| Dados estranhos após atualizar | formato antigo de settings/sessão | feche o app, faça backup e mova `%APPDATA%\Openclod\config` para recriar o padrão |
 
-Log principal: `%APPDATA%\Forja\logs\main.log`.
+Log principal: `%APPDATA%\Openclod\logs\main.log`.
 
 ## 14. Desinstalação
 
-O instalador NSIS instala por usuário em `%LOCALAPPDATA%\Programs\Forja` e **não
+O instalador NSIS instala por usuário em `%LOCALAPPDATA%\Programs\Openclod` e **não
 apaga os dados** ao desinstalar (`deleteAppDataOnUninstall: false`).
 
-1. Feche o Forja.
-2. **Configurações → Aplicativos → Aplicativos instalados → Forja → Desinstalar**
-   (ou execute `%LOCALAPPDATA%\Programs\Forja\Uninstall Forja.exe`).
+1. Feche o Openclod.
+2. **Configurações → Aplicativos → Aplicativos instalados → Openclod → Desinstalar**
+   (ou execute `%LOCALAPPDATA%\Programs\Openclod\Uninstall Openclod.exe`).
 3. Confirme. Atalhos do Menu Iniciar e da área de trabalho são removidos.
 4. Para remoção **completa**, apague também:
 
    ```powershell
-   Remove-Item -Recurse -Force "$env:APPDATA\Forja"
+   Remove-Item -Recurse -Force "$env:APPDATA\Openclod"
    ```
 
    Isso remove configurações, chaves cifradas, sessões, memória, skills e logs.
 5. Se restar alguma pasta de instalação:
 
    ```powershell
-   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\Forja"
+   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\Openclod"
    ```
 
 Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INSTALL.md).
@@ -716,7 +716,7 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 
 - Build do código: `npm run build` → `out/main`, `out/preload`, `out/renderer`.
 - Empacotamento: `electron-builder.yml` (NSIS x64, `appId com.forja.desktop`,
-  artefato `release/Forja-<versão>-setup.exe`).
+  artefato `release/Openclod-<versão>-setup.exe`).
 - Ícones são opcionais: `build/icon.ico` (executável/instalador) e
   `build/icon.png` (janela). Sem eles, o build usa o ícone padrão do Electron.
   Veja `build/README.md`.
@@ -735,16 +735,16 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 - Ferramentas de rede (fetch, busca, navegador, download) só funcionam com
   `allowNetwork` habilitado.
 - Navegação e execução de comandos são auditadas localmente em JSONL.
-- O Forja não envia sessões, chaves ou código para servidores do projeto Forja.
+- O Openclod não envia sessões, chaves ou código para servidores do projeto Openclod.
 
 ## 17. Licença e marcas
 
-- Código do Forja: **MIT** (veja `package.json`).
+- Código do Openclod: **MIT** (veja `package.json`).
 - Dependências de terceiros: licenças e obrigações em
   [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - **Nenhum código, logo, ícone ou fonte proprietária da Anthropic/Claude é usado.**
   "Claude" e "Anthropic" são marcas de seus titulares e aparecem apenas para
-  identificar o provedor compatível. O Forja é um projeto independente, sem
+  identificar o provedor compatível. O Openclod é um projeto independente, sem
   afiliação, patrocínio ou endosso.
 - Fontes incluídas: **Inter** e **Source Serif 4**, ambas sob SIL Open Font
   License 1.1.

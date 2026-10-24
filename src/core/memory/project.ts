@@ -130,7 +130,7 @@ export class ProjectMemory {
 
   /**
    * The wiki is the source of truth: a human (or another agent) may edit or add
-   * a `.md` file outside Forja. The derived index is rebuilt when the folder
+   * a `.md` file outside Openclod. The derived index is rebuilt when the folder
    * signature changes, so the UI's "Atualizar" always sees the files on disk.
    */
   private async ensureFresh(): Promise<boolean> {

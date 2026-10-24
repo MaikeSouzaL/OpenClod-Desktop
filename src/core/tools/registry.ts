@@ -20,6 +20,12 @@ export class ToolRegistry {
     return this.tools.get(name)
   }
 
+  /** Replaces the whole toolset in place, preserving references held by runners. */
+  replaceAll(tools: ToolDef[]): this {
+    this.tools.clear()
+    return this.register(...tools)
+  }
+
   names(): string[] {
     return [...this.tools.keys()]
   }

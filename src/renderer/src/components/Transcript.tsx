@@ -4,7 +4,7 @@ import { Icon } from './Icons'
 import { Markdown } from './Markdown'
 import { ToolCard } from './ToolCard'
 import { EditCard } from './EditCard'
-import { ForjaMark } from './Chrome'
+import { OpenclodMark } from './Chrome'
 import { buildAssistantBlocks, isEditCall, isPlanCall, summarizeCalls, type AssistantBlock } from '../lib/groups'
 import { formatDuration, type ActivityEntry } from '../lib/activity'
 import type { LiveTool } from '../lib/types'
@@ -202,7 +202,7 @@ export function Transcript({ messages, streaming, reasoning, tools, runState, ag
         {!visible.length ? (
           <div className="thread-empty">
             <span className="thread-empty-mark">
-              <ForjaMark size={26} />
+              <OpenclodMark size={26} />
             </span>
             <h2>O que vamos forjar?</h2>
             <p>Peça uma tarefa. O agente lê o projeto, edita arquivos, roda comandos, navega ou controla o Windows.</p>
@@ -249,7 +249,7 @@ export function Transcript({ messages, streaming, reasoning, tools, runState, ag
               <details className="reasoning" open>
                 <summary>
                   <span className="reasoning-star spin">
-                    <ForjaMark size={13} />
+                    <OpenclodMark size={13} />
                   </span>
                   Raciocinando…
                 </summary>
@@ -271,7 +271,7 @@ export function Transcript({ messages, streaming, reasoning, tools, runState, ag
         {runState === 'thinking' || runState === 'tool' ? (
           <div className="status-line">
             <span className="status-mark spin">
-              <ForjaMark size={14} />
+              <OpenclodMark size={14} />
             </span>
             <span className="shimmer">{workingLabel}</span>
           </div>

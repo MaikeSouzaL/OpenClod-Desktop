@@ -1,13 +1,13 @@
 # CLAUDE.md
 
 <!-- forja:generated -->
-> Arquivo canônico de instruções do projeto, lido pelo Forja, pelo Claude Code e
-> por agentes compatíveis. O Forja o cria automaticamente quando ele não existe
+> Arquivo canônico de instruções do projeto, lido pelo Openclod, pelo Claude Code e
+> por agentes compatíveis. O Openclod o cria automaticamente quando ele não existe
 > e nunca sobrescreve o seu conteúdo. Edite à vontade.
 
 ## Projeto
 
-- **Forja Desktop**: Electron 45 + React 19 + TypeScript strict, com um núcleo
+- **Openclod Desktop**: Electron 45 + React 19 + TypeScript strict, com um núcleo
   de harness puro em `src/core` (sem Electron).
 - Interface em `src/renderer`, processo principal em `src/main`, contratos em
   `src/shared`.
@@ -57,7 +57,7 @@ node scripts/ui-voice.cjs      # microfone falso + Whisper real
   em paralelo.
 - Se nenhum agente existente cobrir o assunto, chame `agent-smith`: ele estuda
   o caso e cria um especialista permanente com `create_agent` em
-  `%APPDATA%\Forja\agents`.
+  `%APPDATA%\Openclod\agents`.
 - Cada prompt de agente deve ser autocontido; agentes não veem esta conversa.
 - Serialize agentes que mexem no mesmo arquivo e consolide os resultados.
 
@@ -67,7 +67,7 @@ node scripts/ui-voice.cjs      # microfone falso + Whisper real
 - Registre decisões duráveis com `memory_page`.
 - Ao interromper, crie um `memory_handoff` com o próximo passo.
 - A memória é **por projeto** (wiki markdown em
-  `%APPDATA%\Forja\data\memory\projects\<projectId>`); não misture projetos.
+  `%APPDATA%\Openclod\data\memory\projects\<projectId>`); não misture projetos.
 
 ## Voz
 

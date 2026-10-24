@@ -5,7 +5,7 @@ pela presença/ausência do arquivo `LICENSE` no repositório.
 
 ## Projetos avaliados
 
-| Projeto | SPDX | Obrigações | Risco | Uso no Forja |
+| Projeto | SPDX | Obrigações | Risco | Uso no Openclod |
 |---|---|---|---|---|
 | cdesktop | Apache-2.0 | aviso de copyright, NOTICE, indicar alterações, concessão de patente | baixo | referência (sem código copiado) |
 | OpenHarness | MIT | aviso de copyright + texto da licença | baixo | referência (sem código copiado) |
@@ -35,7 +35,7 @@ pela presença/ausência do arquivo `LICENSE` no repositório.
    é obrigatório manter `NOTICE` e indicar as alterações.
 4. **open-computer-use é MIT** e é instalado globalmente pelo usuário
    (`npm i -g @opensymph/open-computer-use`). Não é empacotado no instalador;
-   o Forja o detecta em runtime e degrada graciosamente quando ausente.
+   o Openclod o detecta em runtime e degrada graciosamente quando ausente.
 5. **Nenhum código proprietário foi utilizado.** A análise do Claude Desktop
    com REA produziu identificadores estruturais (contagens de endpoints, rotas,
    binds) e nenhum texto de código-fonte foi copiado para este repositório.

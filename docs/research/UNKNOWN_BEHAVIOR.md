@@ -21,7 +21,7 @@ Status atualizado na rodada 2 (2026-10-23). Detalhes em
 | 11 | APIs internas dos binários nativos | **parcial** | Ghidra 12.1.4 está instalado em `Desktop\REA\ferramentas` e funciona pela CLI do REA com o ambiente de `rea-local.json` (o MCP desta sessão não recebe essas variáveis). Linguagens identificadas por strings: `cowork-svc.exe` Go (VM via HCS), `chrome-native-host.exe` Rust, instalador Go. A 1ª análise Ghidra do `chrome-native-host.exe` estourou o limite de 330 s de inicialização. | repetir com `REA_GHIDRA_STARTUP_TIMEOUT_MS` maior; `Claude.exe` (247 MB) é Electron e tem pouco valor nativo |
 | 12 | Se o Claude Desktop usa o mesmo harness do CLI | **resolvido** | sim: um processo `claude.exe` (CLI 2.1.308) por sessão Code, filho de `Claude.exe` (§2.5) | — |
 | 13 | Fuses do Electron do Claude Desktop (permitem `--inspect`?) | aberto (novo) | determina se `capture_electron_scenario`/`observe_javascript_runtime` funcionam no app real | REA `inspect_electron_fuses` no `Claude.exe` (existe no REA do repositório clonado, `1de720e`; não está no servidor MCP instalado) |
-| 14 | Conteúdo da VM do Cowork (`smol-bin.x64.vhdx`) | aberto (novo) | serviço `CoworkVMService` em localSystem | fora do escopo do Forja por ora |
+| 14 | Conteúdo da VM do Cowork (`smol-bin.x64.vhdx`) | aberto (novo) | serviço `CoworkVMService` em localSystem | fora do escopo do Openclod por ora |
 
 ## Hipóteses explicitamente NÃO adotadas
 
@@ -37,5 +37,5 @@ Status atualizado na rodada 2 (2026-10-23). Detalhes em
 2. Captura de cenário com `rea capture-electron-scenario` em uma instância
    controlada.
 3. Comparação de versões (`rea compare-application-versions`) após update.
-4. Testes comportamentais no Forja, que é o que realmente importa para a
+4. Testes comportamentais no Openclod, que é o que realmente importa para a
    paridade funcional.

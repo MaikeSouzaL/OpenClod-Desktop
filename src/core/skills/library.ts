@@ -74,7 +74,7 @@ export class SkillLibrary {
   }
 
   /** Full body with a hard cap so a skill cannot flood the context. */
-  content(name: string, maxChars = 20_000): string | null {
+  content(name: string, maxChars = 60_000): string | null {
     const skill = this.skills.get(name)
     if (!skill) return null
     return skill.body.length > maxChars ? `${skill.body.slice(0, maxChars)}\n…[skill truncada]` : skill.body

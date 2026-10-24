@@ -246,7 +246,7 @@ anterior estão marcadas com **(corrige)**.
   `inspect_electron_fuses`.
 - O `package.json` do clone pede Node `^22.23.4 || ^24.22.1 || >=26.12.1`; o
   Node desta máquina é 22.22.1.
-- Integração recomendada no Forja: MCP stdio pelo `McpClient` existente, com
+- Integração recomendada no Openclod: MCP stdio pelo `McpClient` existente, com
   filtro de ferramentas (leitura liberada; `capture_electron_scenario` só com
   aprovação) e timeout maior (≥ 180 s).
 
@@ -264,7 +264,7 @@ anterior estão marcadas com **(corrige)**.
   aging por decay e a consolidação por LLM. O binário oficial pode ser ligado
   como servidor MCP (`ai-memory mcp-bridge`), documentado em
   [`AI_MEMORY.md`](AI_MEMORY.md).
-- **Limitação registrada:** a busca do Forja é lexical (sem BM25/vetores) e não
+- **Limitação registrada:** a busca do Openclod é lexical (sem BM25/vetores) e não
   há captura automática de cada tool call nesta versão.
 
 ### G. Wispr Flow (`wispr-flow` / `WisprFlowInstaller.exe`)

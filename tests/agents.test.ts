@@ -96,7 +96,7 @@ describe('agent files: frontmatter', () => {
       color: 'blue',
       maxTurns: 12
     })
-    // "sonnet" is a Claude alias no Forja provider knows: the agent inherits instead.
+    // "sonnet" is a Claude alias no Openclod provider knows: the agent inherits instead.
     expect(def.model).toBeUndefined()
   })
 
@@ -137,7 +137,7 @@ describe('agent files: frontmatter', () => {
     expect(parse(agentFile('a', 'tools: Task(x)\ncanCall: [y]\n')).canCall).toEqual(['y'])
   })
 
-  it('reads Forja extras: mode, canCall, effort, hidden, provider/model', () => {
+  it('reads Openclod extras: mode, canCall, effort, hidden, provider/model', () => {
     const def = parse(agentFile('a', 'mode: plan\ncanCall: "*"\neffort: high\nhidden: true\nmodel: openai/gpt-4o\nmaxTurns: 5\n'))
     expect(def).toMatchObject({ mode: 'plan', canCall: '*', effort: 'high', hidden: true, model: 'openai/gpt-4o', maxTurns: 5 })
     expect(parse(agentFile('a', 'canCall: explorer, coder\n')).canCall).toEqual(['explorer', 'coder'])
@@ -234,7 +234,7 @@ describe('agent folders', () => {
     const on = loadAgents({ userDir, cwd, homeDir, importClaude: true })
     const byName = new Map(on.agents.map((a) => [a.name, a]))
     expect(byName.get('clash')).toMatchObject({ systemPrompt: 'PROJECT claude', source: 'project', imported: true })
-    // Forja's own files beat the imported ones at the same level; project beats user.
+    // Openclod's own files beat the imported ones at the same level; project beats user.
     expect(byName.get('native-clash')).toMatchObject({ systemPrompt: 'PROJECT forja' })
     expect(byName.get('native-clash')?.imported).toBeUndefined()
     expect(byName.get('home-agent')).toMatchObject({ systemPrompt: 'USER forja' })

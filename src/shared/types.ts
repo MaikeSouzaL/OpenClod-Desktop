@@ -220,6 +220,11 @@ export interface PolicyConfig {
   blockedCommands: string[]
   /** Filesystem roots the agent may write to. Reads are limited to these too. */
   allowedRoots: string[]
+  /**
+   * Personal-workstation mode: the agent may read/write any absolute path, not
+   * only the project roots. Dangerous commands and secret files still ask.
+   */
+  fullAccess?: boolean
   /** Allow network tools (fetch, browser, web search). */
   allowNetwork: boolean
   /** Allow computer-use tools to move the real mouse/keyboard. */
@@ -276,7 +281,7 @@ export interface HookHttp {
 export type HookDefinition = HookCommand | HookHttp
 
 export interface HookMatcher {
-  /** Regex over the tool name (Forja or Claude Code alias). Empty matches all. */
+  /** Regex over the tool name (Openclod or Claude Code alias). Empty matches all. */
   matcher?: string
   hooks: HookDefinition[]
 }
@@ -516,7 +521,7 @@ export interface AgentDefinition {
   source: AgentSource
   /** Absolute path of the markdown file that defined it (absent for built-ins). */
   file?: string
-  /** True when read from a Claude Code folder (`.claude/agents`); such files are never written by Forja. */
+  /** True when read from a Claude Code folder (`.claude/agents`); such files are never written by Openclod. */
   imported?: boolean
 }
 
@@ -549,6 +554,8 @@ export interface AppSettings {
   useAllModels?: boolean
   /** Last provider/model picked by the user; survives restarts. */
   lastModel?: { providerId: string; model: string }
+  /** The Claude Desktop/Code catalog (skills, agents, MCPs) was imported once. */
+  claudeCatalogImported?: boolean
   mcpServers: McpServerSettings[]
   /** User-level hooks (Claude Code format). */
   hooks?: HooksConfig
@@ -568,7 +575,7 @@ export interface AppSettings {
     mode?: 'toggle' | 'hold'
     /** Send the final text through the current model to fix punctuation/filler (costs tokens). */
     polish?: boolean
-    /** Where the final text goes when Forja is not focused. */
+    /** Where the final text goes when Openclod is not focused. */
     insert?: 'composer' | 'focused'
   }
   /** Settings schema version, used for one-time migrations. */
@@ -577,6 +584,12 @@ export interface AppSettings {
 
 export interface McpServerSettings {
   name: string
+  /** Transport. Missing means stdio, matching Claude Desktop's config. */
+  type?: 'stdio' | 'http' | 'sse'
+  /** Remote endpoint for http/sse transports. */
+  url?: string
+  /** Static headers for remote servers (Authorization, X-Api-Key, ...). */
+  headers?: Record<string, string>
   command: string
   args: string[]
   env?: Record<string, string>

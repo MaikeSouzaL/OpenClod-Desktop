@@ -5,6 +5,7 @@
 
 import type {
   AgentMode,
+  AgentsListing,
   AppSettings,
   CapabilityReport,
   FileChange,
@@ -162,6 +163,39 @@ export interface McpPresetEntry {
   unavailableReason?: string
 }
 
+/** Catalog card shown under Personalização → Conectores → Descobrir. */
+export interface McpCatalogInfo {
+  id: string
+  name: string
+  description: string
+  category: string
+  transport: 'stdio' | 'http' | 'sse'
+  needs: string[]
+  oauth: boolean
+  docs?: string
+  installed: boolean
+}
+
+/** One entry from the bundled Claude plugins marketplace snapshot. */
+export interface PluginCatalogEntry {
+  name: string
+  category: string | null
+  description: string
+  homepage: string | null
+}
+
+/** Result of importing the user's Claude Desktop/Code catalog. */
+export interface ClaudeImportInfo {
+  skills: number
+  agents: number
+  mcp: number
+  imported: number
+  mcpNames: string[]
+  plugins: number
+  sources: string[]
+  warnings: string[]
+}
+
 export type ScheduleSpec =
   | { kind: 'hourly'; minute: number }
   | { kind: 'daily'; time: string }
@@ -300,6 +334,11 @@ export const CH = {
   appDiscoverModels: 'app:discoverModels',
   appRememberModel: 'app:rememberModel',
   appMcpPresets: 'app:mcpPresets',
+  appMcpCatalog: 'app:mcpCatalog',
+  appMcpInstall: 'app:mcpInstall',
+  appImportClaude: 'app:importClaude',
+  appPluginCatalog: 'app:pluginCatalog',
+  appAgents: 'app:agents',
   appOpenSkills: 'app:openSkills',
 
   projectsList: 'projects:list',
@@ -384,7 +423,7 @@ export const CH = {
   event: 'forja:event'
 } as const
 
-export interface ForjaApi {
+export interface OpenclodApi {
   app: {
     capabilities(): Promise<IpcResult<CapabilityReport>>
     presets(): Promise<IpcResult<ProviderPresetInfo[]>>
@@ -401,6 +440,19 @@ export interface ForjaApi {
     /** Remembers the last picked provider/model for new sessions and restarts. */
     rememberModel(providerId: string, model: string): Promise<IpcResult<boolean>>
     mcpPresets(): Promise<IpcResult<McpPresetEntry[]>>
+    mcpCatalog(): Promise<IpcResult<McpCatalogInfo[]>>
+    /** Installs a catalog/registry MCP and hot-reloads the tools. */
+    installMcp(
+      id: string,
+      env?: Record<string, string>,
+      headers?: Record<string, string>
+    ): Promise<IpcResult<{ ok: boolean; name?: string; state?: string; tools?: string[]; missing?: string[]; needsOAuth?: boolean; error?: string }>>
+    /** Copies skills, agents and MCP servers from Claude Desktop/Code. */
+    importClaude(): Promise<IpcResult<ClaudeImportInfo>>
+    /** The 315-plugin marketplace snapshot bundled with the app. */
+    pluginCatalog(): Promise<IpcResult<PluginCatalogEntry[]>>
+    /** Built-in + imported agents available to a project. */
+    agents(cwd?: string): Promise<IpcResult<AgentsListing>>
     openSkillsFolder(): Promise<IpcResult<boolean>>
   }
   projects: {

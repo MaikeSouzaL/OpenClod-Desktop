@@ -1,0 +1,136 @@
+{
+  "_comentario": "Mapa de entregas por branch (scripts/entregas.py). Gere o rascunho com 'entregas.py hunks --repo nome=caminho --rascunho mapa.json', troque cada '?' pelo id do bloco dono do trecho (ou 'fora') e valide com 'entregas.py validar --mapa mapa.json'. Chaves que comecam com _ sao comentarios ou metadados. Caminhos relativos sao relativos a este arquivo.",
+  "versao": 1,
+  "titulo": "Entregas por branch - 2026-09-30",
+  "saida": "entregas",
+  "contexto": 3,
+  "ordem": ["01", "02", "03", "04", "05"],
+  "repos": {
+    "back": {
+      "_comentario": "Backend: sem typecheck configurado aqui (rode o build do backend a parte, ou configure dotnet build).",
+      "caminho": "../meu-app-api",
+      "base": "develop",
+      "remoto": "origin"
+    },
+    "front": {
+      "caminho": "../meu-app-web",
+      "base": "develop",
+      "remoto": "origin",
+      "incluir_novos": true,
+      "typecheck": {
+        "comando": "npx tsc --noEmit --incremental false -p .",
+        "contar": "error TS",
+        "links": ["node_modules"],
+        "arquivos": ["src", "tsconfig.json", "package.json", "next-env.d.ts"],
+        "timeout": 1800
+      }
+    }
+  },
+  "blocos": [
+    {
+      "id": "01",
+      "branch": "fix/esqueci-senha-feedback-real",
+      "titulo": "Esqueci minha senha: resposta real e senha preservada quando o e-mail falha",
+      "repos": ["back", "front"],
+      "deps": [],
+      "resumo": "A tela dizia sucesso em qualquer caso e o backend trocava a senha antes de enviar o e-mail.",
+      "itens": [
+        "1.1 Backend devolve 500 quando o envio falha e restaura a senha anterior",
+        "1.2 Tela mostra 'Enviando...', valida o e-mail sem requisicao e confirma na propria tela"
+      ],
+      "nao_validado": ["Restauracao da senha com o SMTP fora do ar (exige derrubar o SMTP do ambiente)"],
+      "commit": {
+        "back": "fix(auth): esqueci senha so troca a senha se o e-mail sair\n\n- ResetPasswordAsync devolve bool e restaura o hash anterior se o envio falhar\n- controller: e-mail inexistente 200, falha de envio 500\n",
+        "front": "fix(auth): esqueci senha com confirmacao real e envio travado\n\n- form com noValidate, e-mail invalido barrado sem requisicao\n- botao em 'Enviando...' durante o POST\n- confirmacao neutra na tela no lugar do toast incondicional\n"
+      }
+    },
+    {
+      "id": "02",
+      "branch": "fix/componentes-compartilhados-modal-toast",
+      "titulo": "Componentes compartilhados: modal, toast e datepicker",
+      "repos": ["front"],
+      "deps": [],
+      "resumo": "Props novas e opcionais nos componentes compartilhados. Sem a prop, nenhum uso existente muda.",
+      "itens": ["2.1 Modal ganha confirmVariant", "2.2 Datepicker respeita minDate no botao Hoje"],
+      "atencao": ["Mudanca em componente compartilhado: conferir um uso fora das telas do alvo"]
+    },
+    {
+      "id": "03",
+      "branch": "fix/oportunidade-correcoes-do-qa",
+      "titulo": "Oportunidade: correcoes do QA",
+      "repos": ["front"],
+      "deps": ["02"],
+      "resumo": "Usa a prop confirmVariant do bloco 02: subir depois dele.",
+      "itens": ["3.1 Confirmacao de perda em vermelho", "3.2 Salvar travado durante o POST"],
+      "fora_do_bloco": ["Criacao leva ~50 s no backend (notificacoes em serie): relato, nao corrigido aqui"]
+    },
+    {
+      "id": "04",
+      "branch": "fix/aditivo-rotulo-do-item",
+      "titulo": "Aditivo: duas linhas do mesmo produto apareciam iguais",
+      "repos": ["front"],
+      "deps": ["03"],
+      "empilhar": true,
+      "_comentario": "empilhar: os trechos encostam nos do bloco 03 no mesmo arquivo; a branch nasce da branch do 03.",
+      "itens": ["4.1 Rotulo com SKU, quantidade e inicio da vigencia"]
+    },
+    {
+      "id": "05",
+      "branch": "fix/solicitacoes-so-do-proprio-tenant",
+      "titulo": "Solicitacoes: cada tenant so ve as proprias",
+      "repos": ["back"],
+      "deps": [],
+      "segurar": {
+        "causa": "O filtro novo zera a lista da tela de aprovacao, que carrega em outro escopo sem o usuario da sessao.",
+        "saidas": [
+          "Filtrar pelo contexto de tenant propagado em vez do usuario da sessao",
+          "A tela de aprovacao chamar uma variante sem o filtro (ela ja e exclusiva do papel aprovador)"
+        ]
+      },
+      "itens": ["5.1 Vazamento entre tenants fechado no service"]
+    }
+  ],
+  "mapa": {
+    "back": {
+      "src/Controllers/AuthController.cs": "01",
+      "src/Services/UsuarioService.cs": "01",
+      "src/Services/SolicitacaoService.cs": "05",
+      "src/Services/Experimento.cs": "fora"
+    },
+    "front": {
+      "_comentario": "Exato vence padrao. Caminho existente com [id] e literal. Dentro do arquivo: indice, intervalo a-b e * para o resto.",
+      "src/app/(public)/esqueci-senha/page.tsx": "01",
+      "src/components/ui/*": "02",
+      "src/app/oportunidades/[id]/page.tsx": "03",
+      "src/app/contratos/[id]/aditivo-panels.tsx": {
+        "*": "04",
+        "0": "03",
+        "5-6": "03",
+        "_n": 9,
+        "_eol": "LF"
+      },
+      "src/i18n/pt-BR.ts": {
+        "0": "02",
+        "1-2": "01",
+        "3": "03",
+        "4": "04",
+        "5": "fora",
+        "_n": 6,
+        "_eol": "LF",
+        "_resumo": {
+          "0": "+ confirmVariant",
+          "1": "+ resetPassword.enviando",
+          "2": "+ resetPassword.confirmacao",
+          "3": "+ oportunidade.perderConfirmar",
+          "4": "+ aditivo.rotuloItem",
+          "5": "+ chave de outra sessao"
+        }
+      },
+      "src/i18n/types.ts": {
+        "*": "02",
+        "1": "01",
+        "2": "03"
+      }
+    }
+  }
+}

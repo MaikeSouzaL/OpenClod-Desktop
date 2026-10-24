@@ -1,11 +1,11 @@
-# Análise do estado atual do Forja — 2026-10-23
+# Análise do estado atual do Openclod — 2026-10-23
 
 > **Atualização (mesmo dia, tarde):** os defeitos de §5 e mais um encontrado
 > durante a correção (cofre de chaves) foram corrigidos e cobertos por testes.
 > Ver §12. O que segue em §1–§11 é o retrato **antes** das correções.
 
 Revisão da base criada na rodada anterior, feita com REA (análise do Claude
-Desktop e do próprio Forja), estudo do código-fonte dos 8 repositórios
+Desktop e do próprio Openclod), estudo do código-fonte dos 8 repositórios
 clonados em `repositorios/`, execução do build e dos testes, e capturas de tela
 do app rodando. Toda afirmação abaixo traz a evidência; o que não foi
 verificado está marcado como tal.
@@ -17,7 +17,7 @@ verificado está marcado como tal.
   navega (capturas em `evidence/forja-ui-2026-10-23/`).
 - **Nenhum teste de aceitação (A–J) foi executado com modelo real.** Não há
   credencial de provedor nesta máquina: nenhuma variável `*_API_KEY`, nenhum
-  segredo salvo no Forja, Ollama e LM Studio sem servidor ativo. O provedor
+  segredo salvo no Openclod, Ollama e LM Studio sem servidor ativo. O provedor
   padrão é o mock "Scripted". Isso é o principal bloqueio para validar o
   produto de ponta a ponta.
 - **Foram encontrados 10 defeitos concretos**, 4 deles no Computer Use, que na
@@ -25,9 +25,9 @@ verificado está marcado como tal.
   máquina (§5).
 - **A arquitetura difere da do Claude Desktop num ponto central:** lá, cada
   sessão Code é um **processo de harness separado** (`claude.exe` CLI) falando
-  stream-json com a UI; no Forja o harness roda **dentro do processo principal
+  stream-json com a UI; no Openclod o harness roda **dentro do processo principal
   do Electron** (§4).
-- **A superfície funcional é pequena perto do alvo:** o Forja expõe 38 métodos
+- **A superfície funcional é pequena perto do alvo:** o Openclod expõe 38 métodos
   IPC; o Claude Desktop expõe 1.400, sendo 352 só na interface `LocalSessions`
   da aba Code. Faltam terminal PTY, worktrees, Git/PR, hooks, plugins, rotinas,
   side chats, rewind, preview embutido e executores externos (§6, §8).
@@ -45,7 +45,7 @@ verificado está marcado como tal.
 | Grafo da aplicação | REA `analyze_javascript_application` em `out/` | 1 `BrowserWindow`, 1 preload, 1 API no `contextBridge` com 8 membros, 11 operações IPC (canais dinâmicos via constantes), 5 handlers no main, 1 validação de remetente |
 | Superfície IPC declarada | leitura de `src/shared/api.ts` | 38 canais `invoke` + 1 canal de eventos (`forja:event`) |
 | UI | Electron com `--remote-debugging-port` + Playwright | Início, Cowork, Code, sessão com painel lateral e Configurações renderizam; 0 erros de console |
-| Provedores disponíveis | variáveis de ambiente, `%APPDATA%\Forja\config`, portas 11434/1234 | nenhuma chave; `secrets.bin` ausente; Ollama e LM Studio sem servidor |
+| Provedores disponíveis | variáveis de ambiente, `%APPDATA%\Openclod\config`, portas 11434/1234 | nenhuma chave; `secrets.bin` ausente; Ollama e LM Studio sem servidor |
 | Computer Use | `open-computer-use call click` em processo novo | `isError: true`, "No app state is available… Run get_app_state" |
 | Geometria de tela | `SystemInformation.VirtualScreen` | 2 monitores, desktop virtual 3840×1082 |
 | Claude Desktop | REA MCP + `Get-CimInstance Win32_Process` | ver `CLAUDE_DESKTOP_OBSERVATIONS.md`, rodada 2 |
@@ -70,10 +70,10 @@ Código próprio: cerca de 18,5 mil linhas em `src/` (a maior parte em
 | UI | `src/renderer/src/components/*` | sidebar com Início/Cowork/Code, transcript, composer, painel da sessão (contexto, plano, arquivos, alterações, "terminal", "navegador"), aprovações, configurações |
 | Empacotamento | `electron-builder.yml` | NSIS x64 sem assinatura |
 
-## 4. Arquitetura: Forja × Claude Desktop
+## 4. Arquitetura: Openclod × Claude Desktop
 
 ```
-Claude Desktop (observado)                    Forja (hoje)
+Claude Desktop (observado)                    Openclod (hoje)
 ──────────────────────────                    ────────────
 Claude.exe (Electron)                         electron (main)
  ├─ UI: ion-dist (cliente web local)           ├─ UI: renderer React
@@ -93,7 +93,7 @@ Consequências de manter o harness no processo principal:
    reescrever o orquestrador.
 3. Sessões paralelas competem pelo mesmo event loop do main.
 
-Proposta (detalhe em §10, P2): definir um **protocolo de eventos do Forja**
+Proposta (detalhe em §10, P2): definir um **protocolo de eventos do Openclod**
 (compatível em espírito com o stream-json do Claude Agent SDK: mensagens de
 usuário/assistente, `tool_use`, `tool_result`, pedidos de permissão,
 `control_request`/`control_response`), rodar o `SessionRunner` atual como
@@ -116,7 +116,7 @@ nesta máquina.
 | 5 | `edit_file` corrompe texto com `$` | `tools/fs.ts:154` usa `before.replace(old, new)`; os padrões especiais de substituição (`$$`, `$&`, `$'` e cifrão seguido de crase) em `new_string` são interpretados | edições em shell, PHP, regex e templates saem erradas sem aviso | trocar por `split/join` ou função de substituição; teste com `$$` |
 | 6 | Memória do projeto nunca entra no prompt | `agent/runner.ts:213` passa `memory: []` | fatos gravados com `memory_write` só aparecem se o modelo chamar `memory_search` | carregar a memória do projeto no `buildSystem()` |
 | 7 | Permissões ignoram os argumentos | `security/permissions.ts:37` faz `void preview` | não há regra por padrão (ex.: permitir `npm test` mas perguntar `git push`), nem negação de arquivos sensíveis dentro do projeto (`.env`) | regras `ferramenta(padrão)` com allow/ask/deny e persistência por projeto |
-| 8 | Padrão de autonomia contrário ao pedido | `%APPDATA%\Forja\config\settings.json`: `mode: "ask"`, `allowComputerControl: false` | cada edição e comando pede aprovação, o oposto do "não interromper tarefas comuns" do prompt | oferecer modo autônomo (perguntar só em destrutivo/externo) como padrão de primeira execução, com confirmação explícita do usuário |
+| 8 | Padrão de autonomia contrário ao pedido | `%APPDATA%\Openclod\config\settings.json`: `mode: "ask"`, `allowComputerControl: false` | cada edição e comando pede aprovação, o oposto do "não interromper tarefas comuns" do prompt | oferecer modo autônomo (perguntar só em destrutivo/externo) como padrão de primeira execução, com confirmação explícita do usuário |
 | 9 | Parâmetros fixos quebram alguns modelos | `providers/openai.ts:128` envia `temperature` 0,2 sempre e usa sempre `max_tokens`; raciocínio não é guardado nem reenviado | modelos que rejeitam `temperature` ou exigem `max_completion_tokens`/reenvio de `reasoning_content` (Kimi, DeepSeek reasoner, série o da OpenAI) falham | tabela de compatibilidade por modelo (ver opencode `model-compatibility.ts`) |
 | 10 | Código morto e rótulos enganosos na UI | `components/RightPane.tsx` não é importado em lugar nenhum; a aba "Terminal" do painel é um log de atividade e "Navegador" mostra capturas | o usuário espera um terminal de verdade | remover `RightPane.tsx`; renomear para "Atividade" até existir PTY |
 
@@ -190,9 +190,9 @@ A–J.
 
 ## 8. Paridade com o Claude Desktop
 
-Mapeamento das interfaces observadas (rodada 2) para o Forja:
+Mapeamento das interfaces observadas (rodada 2) para o Openclod:
 
-| Área no Claude Desktop | Interface / evidência | Forja |
+| Área no Claude Desktop | Interface / evidência | Openclod |
 |---|---|---|
 | Ciclo de sessão, fila de mensagens, busca | `LocalSessions` (start, sendMessage, queue, search) | parcial: criar/enviar/abortar/arquivar; sem fila nem busca |
 | Modelo, effort, fast mode, modo de permissão | `setModel`, `setEffort`, `setFastMode`, `setPermissionMode` | parcial: modelo e modo; sem effort |
@@ -276,7 +276,7 @@ Mapeamento das interfaces observadas (rodada 2) para o Forja:
 1. **Qual provedor usar nos testes reais** (chave de nuvem ou subir LM
    Studio/Ollama local). Sem isso, A–J não podem ser executados.
 2. **Padrão de autonomia** na primeira execução (hoje é "perguntar").
-3. Se o Forja deve **rodar o Claude Code CLI** como executor (usa a assinatura
+3. Se o Openclod deve **rodar o Claude Code CLI** como executor (usa a assinatura
    do usuário) além do harness próprio.
 
 ## 12. Correções aplicadas (2026-10-23, tarde)
@@ -361,7 +361,7 @@ Verificação: `npx tsc` limpo nos dois projetos; `npx vitest run` →
 
 Detalhes técnicos que valem registro:
 
-- Sobre `temperature` na Anthropic: o Forja envia `anthropic-version:
+- Sobre `temperature` na Anthropic: o Openclod envia `anthropic-version:
   2023-06-01`; nessa versão o parâmetro ainda é aceito nos modelos antigos,
   mas é rejeitado no Opus 4.7+, Fable/Mythos, Sonnet 5.x e Haiku 5.x e sempre
   que há thinking. O provedor agora omite o parâmetro nesses casos. Migrar o

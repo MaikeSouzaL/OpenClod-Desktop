@@ -64,9 +64,10 @@ export const useSkillTool: ToolDef = {
         text: `skill "${args.name}" não encontrada. Disponíveis: ${available.join(', ') || '(nenhuma)'}`
       }
     }
+    const meta = ctx.services.skills.get(args.name)
     return {
       ok: true,
-      text: `<skill name="${args.name}">\n${content}\n</skill>`,
+      text: `<skill name="${args.name}" dir="${meta?.dir ?? ''}">\n${content}\n</skill>`,
       summary: `skill ${args.name} carregada`
     }
   }

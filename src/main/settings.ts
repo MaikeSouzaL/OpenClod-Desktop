@@ -18,6 +18,9 @@ const DEFAULT_POLICY: PolicyConfig = {
   mode: 'auto',
   blockedCommands: [],
   allowedRoots: [],
+  // The user asked the agent to work on the whole computer, not only inside
+  // the project folder. Dangerous commands and secret files still ask.
+  fullAccess: true,
   allowNetwork: true,
   allowComputerControl: false,
   shellTimeoutSec: 300,
@@ -75,6 +78,7 @@ export function defaultSettings(): AppSettings {
     telemetry: false,
     autoAgents: false,
     useAllModels: false,
+    claudeCatalogImported: false,
     mcpServers: [],
     hooks: {},
     importClaudeSettings: false,

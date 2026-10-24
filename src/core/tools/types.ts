@@ -75,6 +75,44 @@ export interface AgentCatalog {
   get(name: string): AgentDefinition | undefined
 }
 
+export interface McpSearchHit {
+  id: string
+  name: string
+  description: string
+  version?: string
+  transport: string
+  installed: boolean
+  needs: string[]
+  source: 'catalog' | 'registry'
+  docs?: string
+}
+
+export interface McpInstallResult {
+  ok: boolean
+  name?: string
+  state?: string
+  tools?: string[]
+  missing?: string[]
+  needsOAuth?: boolean
+  error?: string
+}
+
+/** Self-installation surface exposed to the agent (implemented by the app). */
+export interface McpToolService {
+  search(query: string, limit?: number): Promise<{ catalog: McpSearchHit[]; registry: McpSearchHit[]; installed: string[]; warning?: string }>
+  install(input: {
+    id: string
+    env?: Record<string, string>
+    headers?: Record<string, string>
+    name?: string
+    /** Custom server outside the catalog. */
+    url?: string
+    command?: string
+    args?: string[]
+  }): Promise<McpInstallResult>
+  list(): Array<{ name: string; state: string; transport: string; tools: string[]; error?: string }>
+}
+
 export interface ToolContext {
   sessionId: string
   cwd: string
@@ -96,6 +134,7 @@ export interface ToolContext {
     skills: SkillLibrary
     memory: MemoryStore
     projectMemory: ProjectMemory
+    mcp?: McpToolService
   }
   log(level: 'info' | 'warn' | 'error', message: string): void
 }

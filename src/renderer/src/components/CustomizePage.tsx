@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import type { AppSettings, CapabilityReport, HookEvent, McpServerSettings, SkillInfo } from '../../../shared/types'
-import type { McpPresetEntry } from '../../../shared/api'
+import type { AgentDefinition, AppSettings, CapabilityReport, HookEvent, McpServerSettings, SkillInfo } from '../../../shared/types'
+import type { McpCatalogInfo, McpPresetEntry, PluginCatalogEntry } from '../../../shared/api'
 import { Icon } from './Icons'
 import { errorMessage, unwrap } from '../lib/api'
 import type { SettingsTab } from './SettingsDialog'
 
-type CustomizeTab = 'skills' | 'connectors' | 'hooks'
+type CustomizeTab = 'skills' | 'connectors' | 'plugins' | 'agents' | 'hooks'
 
 const HOOK_LABELS: Partial<Record<HookEvent, string>> = {
   PreToolUse: 'Antes de cada ferramenta',
@@ -76,7 +76,11 @@ interface CustomizePageProps {
 
 export function CustomizePage({ settings, capabilities, onOpenSettings, onRestartMcp, onSaveMcpServers }: CustomizePageProps): ReactElement {
   const [presets, setPresets] = useState<McpPresetEntry[]>([])
+  const [catalog, setCatalog] = useState<McpCatalogInfo[]>([])
+  const [agents, setAgents] = useState<AgentDefinition[]>([])
+  const [plugins, setPlugins] = useState<PluginCatalogEntry[]>([])
   const [tab, setTab] = useState<CustomizeTab>('skills')
+  const [view, setView] = useState<'mine' | 'discover'>('mine')
   const [skills, setSkills] = useState<SkillInfo[]>([])
   const [query, setQuery] = useState('')
   const [source, setSource] = useState<'all' | 'usuario' | 'projeto'>('all')
@@ -100,6 +104,54 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
   useEffect(() => {
     void window.forja.app.mcpPresets().then((result) => result.ok && setPresets(result.value))
   }, [])
+
+  const loadCatalog = useCallback(async (): Promise<void> => {
+    const result = await window.forja.app.mcpCatalog()
+    if (result.ok) setCatalog(result.value)
+  }, [])
+
+  useEffect(() => {
+    void loadCatalog()
+  }, [loadCatalog])
+
+  useEffect(() => {
+    void window.forja.app.agents().then((result) => {
+      if (result.ok) setAgents(result.value.agents)
+    })
+    void window.forja.app.pluginCatalog().then((result) => {
+      if (result.ok) setPlugins(result.value)
+    })
+  }, [])
+
+  const installCatalog = async (entry: McpCatalogInfo): Promise<void> => {
+    if (entry.oauth) {
+      setError(`"${entry.name}" exige login OAuth, que ainda não é automatizado. Use um token em Configurações → MCP.`)
+      return
+    }
+    const env: Record<string, string> = {}
+    const headers: Record<string, string> = {}
+    for (const key of entry.needs) {
+      const value = window.prompt(`${entry.name}: informe ${key}`)
+      if (value === null) return
+      if (!value.trim()) {
+        setError(`${key} é obrigatório.`)
+        return
+      }
+      if (/authorization|token|key/i.test(key) && /^authorization$/i.test(key)) headers[key] = value.trim()
+      else env[key] = value.trim()
+    }
+    try {
+      const result = await unwrap(window.forja.app.installMcp(entry.id, env, headers))
+      if (!result.ok) {
+        setError(result.error ?? `faltam: ${(result.missing ?? []).join(', ')}`)
+        return
+      }
+      setNotice(`"${entry.name}" instalado${result.state === 'ready' ? ` · ${result.tools?.length ?? 0} ferramentas` : ' · conexão falhou, confira as credenciais'}.`)
+      await loadCatalog()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   const addPreset = async (preset: McpPresetEntry): Promise<void> => {
     if (!preset.server) return
@@ -128,17 +180,56 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
     <div className="page">
       <header className="page-head">
         <h1>Personalização</h1>
+        <div className="page-actions">
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={async () => {
+              try {
+                const result = await unwrap(window.forja.app.importClaude())
+                setNotice(
+                  `Claude importado: ${result.skills} skills, ${result.agents} agentes, ${result.imported} MCPs (${result.plugins} plugins no catálogo).`
+                )
+                await loadSkills()
+                await loadCatalog()
+                await onRestartMcp()
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="download" size={13} /> Importar do Claude
+          </button>
+        </div>
       </header>
-      <div className="page-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'skills'} className={tab === 'skills' ? 'active' : ''} onClick={() => setTab('skills')}>
-          <Icon name="sparkles" size={14} /> Skills
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'connectors'} className={tab === 'connectors' ? 'active' : ''} onClick={() => setTab('connectors')}>
-          <Icon name="plug" size={14} /> Conectores
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'hooks'} className={tab === 'hooks' ? 'active' : ''} onClick={() => setTab('hooks')}>
-          <Icon name="hammer" size={14} /> Hooks
-        </button>
+      <div className="customize-tabs-row">
+        <div className="page-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'skills'} className={tab === 'skills' ? 'active' : ''} onClick={() => setTab('skills')}>
+            <Icon name="sparkles" size={14} /> Skills
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'connectors'} className={tab === 'connectors' ? 'active' : ''} onClick={() => setTab('connectors')}>
+            <Icon name="plug" size={14} /> Conectores
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'plugins'} className={tab === 'plugins' ? 'active' : ''} onClick={() => setTab('plugins')}>
+            <Icon name="cpu" size={14} /> Plugins
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'agents'} className={tab === 'agents' ? 'active' : ''} onClick={() => setTab('agents')}>
+            <Icon name="users" size={14} /> Agentes
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'hooks'} className={tab === 'hooks' ? 'active' : ''} onClick={() => setTab('hooks')}>
+            <Icon name="hammer" size={14} /> Hooks
+          </button>
+        </div>
+        {tab !== 'hooks' ? (
+          <div className="view-switch" role="group" aria-label="Origem">
+            <button type="button" className={view === 'mine' ? 'active' : ''} onClick={() => setView('mine')}>
+              Meus
+            </button>
+            <button type="button" className={view === 'discover' ? 'active' : ''} onClick={() => setView('discover')}>
+              Descobrir
+            </button>
+          </div>
+        ) : null}
       </div>
       {error ? <div className="inline-error">{error}</div> : null}
       {notice ? <div className="panel-note">{notice}</div> : null}
@@ -201,6 +292,65 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
       ) : null}
 
       {tab === 'connectors' ? (
+        view === 'discover' ? (
+          <>
+            <p className="page-lead">
+              Conectores MCP prontos para instalar. O agente também pode instalá-los sozinho quando a tarefa pedir
+              (Jira, GitHub, banco, navegador, documentos). Os que exigem login OAuth aparecem marcados.
+            </p>
+            <div className="page-tools">
+              <div className="page-search">
+                <Icon name="search" size={14} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Procurar conectores (Jira, GitHub, banco...)"
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+            <div className="connector-grid">
+              {catalog
+                .filter((entry) => {
+                  const q = query.trim().toLowerCase()
+                  return !q || `${entry.id} ${entry.name} ${entry.description} ${entry.category}`.toLowerCase().includes(q)
+                })
+                .map((entry) => (
+                  <article key={entry.id} className="connector-card">
+                    <div className="connector-head">
+                      <span className="connector-icon">
+                        <Icon name={entry.category === 'atlassian' ? 'briefcase' : entry.category === 'database' ? 'archive' : entry.category === 'browser' ? 'globe' : 'plug'} size={18} />
+                      </span>
+                      <div>
+                        <strong>{entry.name}</strong>
+                        <span className="connector-meta">
+                          {entry.transport}
+                          {entry.oauth ? ' · OAuth' : ''}
+                          {entry.installed ? ' · instalado' : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <p>{entry.description}</p>
+                    <div className="connector-foot">
+                      <span className="connector-needs">
+                        {entry.needs.length ? `precisa: ${entry.needs.slice(0, 3).join(', ')}` : 'sem credenciais'}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={entry.installed}
+                        onClick={() => void installCatalog(entry)}
+                      >
+                        {entry.installed ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}
+                        {entry.installed ? 'Instalado' : 'Adicionar'}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+            </div>
+            {!catalog.length ? <p className="muted">Carregando catálogo…</p> : null}
+          </>
+        ) : (
         <>
           <p className="page-lead">
             Conectores são servidores MCP locais. Cada ferramenta que eles expõem passa pela mesma política de permissões das ferramentas nativas.
@@ -276,6 +426,166 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                 )}
               </div>
             ))}
+        </>
+        )
+      ) : null}
+
+      {tab === 'plugins' ? (
+        <>
+          <p className="page-lead">
+            Plugins empacotam skills, conectores e subagentes. O catálogo oficial da Anthropic tem 315 plugins; abaixo
+            estão os mais usados. Conectores com MCP podem ser instalados direto daqui.
+          </p>
+          <div className="plugin-hero">
+            <div>
+              <span className="plugin-overline">From Anthropic</span>
+              <strong>Data</strong>
+              <p>Consulte, analise e visualize dados: SQL, planilhas e painéis em um só lugar.</p>
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => {
+                  setTab('connectors')
+                  setView('discover')
+                  setQuery('postgres')
+                }}
+              >
+                Explorar conectores
+              </button>
+            </div>
+            <span className="plugin-hero-art">
+              <Icon name="gauge" size={54} />
+            </span>
+          </div>
+          <h2 className="section-title">Novos plugins</h2>
+          <div className="plugin-grid">
+            {[
+              { id: 'data', name: 'Data', text: 'SQL, planilhas e dashboards.', icon: 'gauge' as const },
+              { id: 'desktop-commander', name: 'Desktop Commander', text: 'Terminal e arquivos do computador.', icon: 'terminal' as const },
+              { id: 'design', name: 'Design', text: 'Crítica, design system e UX writing.', icon: 'sparkles' as const },
+              { id: 'github', name: 'GitHub', text: 'Issues, PRs e revisão de código.', icon: 'git' as const },
+              { id: 'atlassian', name: 'Atlassian MCP', text: 'Jira, Confluence e Bitbucket.', icon: 'briefcase' as const },
+              { id: 'playwright', name: 'Playwright', text: 'Navegador e testes end-to-end.', icon: 'globe' as const }
+            ].map((plugin) => {
+              const connector = catalog.find((entry) => entry.id === plugin.id)
+              return (
+                <article key={plugin.id} className="plugin-card">
+                  <span className="plugin-icon">
+                    <Icon name={plugin.icon} size={18} />
+                  </span>
+                  <div>
+                    <strong>{plugin.name}</strong>
+                    <p>{plugin.text}</p>
+                    <span className="muted">Anthropic Directory</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="plugin-add"
+                    title={connector ? 'Adicionar conector' : 'Disponível pelo catálogo do Claude Code'}
+                    onClick={() => {
+                      if (connector) {
+                        setTab('connectors')
+                        setView('discover')
+                        setQuery(plugin.name)
+                      } else {
+                        setNotice('Este plugin é de skills e ainda não é importado automaticamente. Use o catálogo de conectores para a parte MCP.')
+                      }
+                    }}
+                  >
+                    <Icon name="plus" size={14} />
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+          <h2 className="section-title">Categorias</h2>
+          <div className="category-grid">
+            {['Engenharia', 'Código', 'Arquivos e documentos', 'Design e mídia', 'Tickets e tarefas', 'Pipelines e jobs', 'APIs', 'Notas e memória', 'Documentos de referência'].map((category) => (
+              <button
+                key={category}
+                type="button"
+                className="category-card"
+                onClick={() => {
+                  setTab('connectors')
+                  setView('discover')
+                  setQuery(category.split(' ')[0])
+                }}
+              >
+                <Icon name="folder" size={14} /> {category}
+              </button>
+            ))}
+          </div>
+          <h2 className="section-title">Catálogo completo ({plugins.length || 315})</h2>
+          <div className="page-tools">
+            <div className="page-search">
+              <Icon name="search" size={14} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Procurar plugin oficial"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <div className="plugin-catalog">
+            {plugins
+              .filter((plugin) => {
+                const q = query.trim().toLowerCase()
+                return !q || `${plugin.name} ${plugin.description} ${plugin.category ?? ''}`.toLowerCase().includes(q)
+              })
+              .slice(0, 80)
+              .map((plugin) => (
+                <div key={plugin.name} className="plugin-catalog-row">
+                  <strong>{plugin.name}</strong>
+                  <span className="badge">{plugin.category ?? 'plugin'}</span>
+                  <p>{plugin.description}</p>
+                </div>
+              ))}
+          </div>
+          {!plugins.length ? <p className="muted">Catálogo ainda não carregado.</p> : null}
+        </>
+      ) : null}
+
+      {tab === 'agents' ? (
+        <>
+          <p className="page-lead">
+            Agentes especialistas disponíveis para o orquestrador. Os importados do Claude usam o melhor modelo liberado
+            no Openclod; os embutidos cobrem computador, web, mobile, QA, código e revisão.
+          </p>
+          <div className="page-tools">
+            <div className="page-search">
+              <Icon name="search" size={14} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Procurar agente"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <div className="card-grid">
+            {agents
+              .filter((agent) => {
+                const q = query.trim().toLowerCase()
+                return !q || `${agent.name} ${agent.description}`.toLowerCase().includes(q)
+              })
+              .map((agent) => (
+                <div key={agent.name} className="info-card">
+                  <div className="info-card-head">
+                    <Icon name="bot" size={14} />
+                    <strong>{agent.name}</strong>
+                    <span className="badge">{agent.mode ?? 'code'}</span>
+                  </div>
+                  <p>{agent.description}</p>
+                  <p className="muted">
+                    {agent.source === 'builtin' ? 'embutido' : 'usuário'}
+                    {agent.model ? ` · ${agent.model}` : ''}
+                    {agent.canCall ? ` · pode chamar ${agent.canCall === '*' ? 'qualquer agente' : agent.canCall.join(', ')}` : ''}
+                  </p>
+                </div>
+              ))}
+          </div>
+          {!agents.length ? <p className="muted">Nenhum agente carregado.</p> : null}
         </>
       ) : null}
 

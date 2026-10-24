@@ -84,7 +84,7 @@ The focused UI element is região.
 acessibilidade desligada/limitada até que um leitor de tela seja detectado.
 
 **Consequência de projeto:** um agente que dependa só de UI Automation falha em
-apps Electron como esse. O Forja implementa percepção híbrida (UIA → screenshot
+apps Electron como esse. O Openclod implementa percepção híbrida (UIA → screenshot
 + visão → coordenadas), exatamente como o briefing exige. Isso foi validado no
 próprio Claude Desktop: só a captura de tela permite "ver" a interface.
 
@@ -186,9 +186,9 @@ como bytes; nenhuma função foi descompilada ainda):
 - A única interface do instalador é a janela de progresso e as caixas de erro;
   ele não contém telas do app.
 
-Ideias aproveitáveis no empacotamento do Forja (fase 7): verificar assinatura
+Ideias aproveitáveis no empacotamento do Openclod (fase 7): verificar assinatura
 do que for baixado, fechar a instância em execução antes de atualizar,
-preservar `%APPDATA%\Forja` na desinstalação, detectar proxy com mensagem de
+preservar `%APPDATA%\Openclod` na desinstalação, detectar proxy com mensagem de
 remediação e abrir o app sem elevação depois de instalar.
 
 ### 2.2 Pacote instalado (MSIX 3.6556.1.0)
@@ -396,16 +396,16 @@ tamanho de cada superfície; não prova comportamento.
 | Computer use | 21 | Computer use approval |
 | Dispatch | 19 | Dispatch from anywhere |
 
-### 2.7 O que isso muda para o Forja
+### 2.7 O que isso muda para o Openclod
 
 1. A arquitetura de referência separa **UI + gerente de sessões** de um
    **harness por sessão em processo próprio**, falando um protocolo de eventos
-   (stream-json com mensagens de controle). O Forja roda o harness dentro do
+   (stream-json com mensagens de controle). O Openclod roda o harness dentro do
    processo principal; ver `GAP_ANALYSIS.md` §4.
 2. O protocolo stream-json do Claude Code é público (Claude Agent SDK). Um
-   adaptador "executor externo" deixaria o Forja rodar o Claude Code CLI (ou
+   adaptador "executor externo" deixaria o Openclod rodar o Claude Code CLI (ou
    Codex/OpenCode, como faz o cdesktop) além do harness próprio.
-3. As maiores superfícies que o Forja não tem: terminal PTY real, worktrees,
+3. As maiores superfícies que o Openclod não tem: terminal PTY real, worktrees,
    Git/PR, plugins/marketplace, rotinas, side chats, rewind, SSH/WSL, preview
    embutido, split view e hooks.
 4. O padrão de confiança de pasta (`checkTrust`/`saveTrust`) e de permissão por

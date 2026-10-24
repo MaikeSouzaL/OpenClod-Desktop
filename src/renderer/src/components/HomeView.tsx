@@ -1,7 +1,7 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
 import type { CapabilityReport, Project } from '../../../shared/types'
 import { Icon } from './Icons'
-import { ForjaMark } from './Chrome'
+import { OpenclodMark } from './Chrome'
 
 interface HomeViewProps {
   project: Project | null
@@ -31,17 +31,19 @@ export function HomeView({
   const [bannerOpen, setBannerOpen] = useState(true)
   const computer = capabilities?.computer.available === true
   const browser = capabilities?.browser.available === true
-  const heading = recentTitle?.trim() || project?.name || 'vamos forjar alguma coisa'
+  const hour = new Date().getHours()
+  const greeting =
+    hour < 5 ? 'coruja noturna' : hour < 12 ? 'bom dia' : hour < 18 ? 'boa tarde' : 'boa noite'
 
   return (
     <div className="home">
       <div className="home-center">
         <h1 className="home-greeting">
           <span className="home-star">
-            <ForjaMark size={34} />
+            <OpenclodMark size={34} />
           </span>
           <span>
-            De volta à ação, <em>{heading}</em>
+            Olá, <em>{greeting}</em>
           </span>
         </h1>
 
@@ -72,13 +74,12 @@ export function HomeView({
         <div className="home-composer">{composer}</div>
 
         <div className="home-hints">
-          <button type="button" className="home-hint" onClick={onAddProject}>
-            <Icon name="folderOpen" size={13} />
-            {project ? project.name : 'Abrir uma pasta de projeto'}
+          <button type="button" className="home-hint" onClick={onOpenSettings}>
+            <Icon name="settings" size={13} /> Provedores e permissões
           </button>
           <span className="home-dot">·</span>
           <button type="button" className="home-hint" onClick={onOpenSettings}>
-            <Icon name="settings" size={13} /> Provedores e permissões
+            <Icon name="archive" size={13} /> Memória do projeto
           </button>
         </div>
       </div>

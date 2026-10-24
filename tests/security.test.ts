@@ -255,3 +255,41 @@ describe('PolicyConfig helper sanity', () => {
     expect(a.blockedCommands).not.toBe(b.blockedCommands)
   })
 })
+
+describe('WorkspaceGuard full computer access', () => {
+  let base: string
+  let root: string
+  let outside: string
+
+  beforeEach(async () => {
+    base = await makeTempDir()
+    root = path.join(base, 'project')
+    outside = path.join(base, 'Desktop', 'afinitas')
+    await fs.promises.mkdir(root, { recursive: true })
+    await fs.promises.mkdir(outside, { recursive: true })
+    await fs.promises.writeFile(path.join(outside, 'nota.txt'), 'fora do projeto')
+  })
+
+  afterEach(async () => {
+    await removeTempDir(base)
+  })
+
+  it('accepts paths outside the project when the user enables full access', () => {
+    const guard = new WorkspaceGuard([root], true)
+    expect(guard.unrestricted).toBe(true)
+    expect(guard.resolve(outside).toLowerCase()).toBe(outside.toLowerCase())
+    expect(guard.resolve(path.join(outside, 'nota.txt')).toLowerCase()).toBe(path.join(outside, 'nota.txt').toLowerCase())
+    expect(guard.resolve('../Desktop/afinitas', root).toLowerCase()).toBe(outside.toLowerCase())
+  })
+
+  it('keeps the project confinement when full access is off', () => {
+    const guard = new WorkspaceGuard([root], false)
+    expect(guard.unrestricted).toBe(false)
+    expect(() => guard.resolve(outside)).toThrow(SecurityError)
+  })
+
+  it('still resolves relative paths against the session cwd in full access', () => {
+    const guard = new WorkspaceGuard([root], true)
+    expect(guard.resolve('src/app.ts', root).toLowerCase()).toBe(path.join(root, 'src', 'app.ts').toLowerCase())
+  })
+})

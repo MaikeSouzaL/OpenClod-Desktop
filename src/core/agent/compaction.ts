@@ -47,7 +47,7 @@ const PREVIOUS_SUMMARY_CHARS = 8000
 /**
  * Section names are stable English markers (the summary is read by a model,
  * not shown to the user); the content is requested in Portuguese. Template
- * shape inspired by opencode's compaction checkpoint, reworded for Forja.
+ * shape inspired by opencode's compaction checkpoint, reworded for Openclod.
  */
 export const SUMMARY_SECTIONS = [
   'Objective',

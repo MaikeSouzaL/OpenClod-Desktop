@@ -10,6 +10,7 @@ import type {
   HarnessEvent,
   ImagePart,
   Message,
+  McpServerSettings,
   Project,
   ProviderConfig,
   RunState,
@@ -48,11 +49,17 @@ import { WorkspaceGuard } from '../core/security/policy.js'
 import { mergeRules, ruleForApproval } from '../core/security/rules.js'
 import { HookRunner } from '../core/hooks/runner.js'
 import { ApprovalStore, loadProjectSettings, mergeHooks } from '../core/config/project.js'
-import { McpClient, mcpQualifiedName, type McpServerConfig } from '../core/mcp/client.js'
+import { McpClient, mcpQualifiedName, normalizeMcpServerSettings, type McpServerConfig } from '../core/mcp/client.js'
+import { buildCatalogServer, catalogEntry, searchMcpCatalog, MCP_CATALOG } from '../core/mcp/catalog.js'
+import { installFromRegistry, searchMcpRegistry } from '../core/mcp/registry.js'
+import type { McpToolService } from '../core/tools/types.js'
+import { mcpTools } from '../core/tools/mcp.js'
 import { describeToolchains, toolchains } from '../core/util/toolchains.js'
 import { ensureProjectInstructions } from '../core/agent/context.js'
+import { resourcePath } from '../core/util/resources.js'
 import { listMcpPresets, type McpPresetInfo } from '../core/mcp/presets.js'
 import { discoverForProvider, type DiscoveryResult } from '../core/providers/discovery.js'
+import { importClaudeCatalog, type ClaudeImportReport } from './claude-import.js'
 import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/external-agent.js'
 import { id } from '../core/util/ids.js'
 import type { AgentDefinition, AgentsListing, PolicyConfig, ReasoningEffort } from '../shared/types.js'
@@ -68,7 +75,7 @@ interface PendingApproval {
 export interface OrchestratorOptions {
   userData: string
   broadcast: (event: HarnessEvent) => void
-  /** Optional log sink (the main process writes to %APPDATA%\Forja\logs\main.log). */
+  /** Optional log sink (the main process writes to %APPDATA%\Openclod\logs\main.log). */
   log?: (message: string) => void
 }
 
@@ -145,6 +152,20 @@ export class Orchestrator {
     this.skills.addRoot(userSkills, 'usuario')
     await this.skills.reload()
 
+    // First start after the rename: bring the Claude Desktop/Code catalog in
+    // (skills, agents and MCP servers). The flag makes it a one-time import;
+    // the UI can run it again on demand.
+    if (!this.settings.get().claudeCatalogImported) {
+      try {
+        const imported = await this.importClaudeCatalog(false)
+        this.options.log?.(
+          `catálogo do Claude importado: ${imported.skills} skills, ${imported.agents} agentes, ${imported.imported} MCPs`
+        )
+      } catch (err) {
+        this.options.log?.(`importação do catálogo do Claude falhou: ${(err as Error).message}`)
+      }
+    }
+
     await this.startMcpServers()
     void toolchains() // warm the cache; the probes spawn processes
   }
@@ -152,14 +173,15 @@ export class Orchestrator {
   /* ------------------------------- registry ------------------------------ */
 
   private rebuildRegistry(): void {
-    this.baseRegistry = buildBaseRegistry()
+    const next = buildBaseRegistry()
     for (const tool of this.mcpTools) {
       // Names are capped at 60 chars, so two long tool names can collide; keep the first.
-      if (!this.baseRegistry.get(tool.name)) this.baseRegistry.register(tool)
+      if (!next.get(tool.name)) next.register(tool)
     }
-    // Existing runners hold stale references; dispose them so the next message
-    // rebuilds with the new toolset.
-    for (const sessionId of [...this.runners.keys()]) this.dropRunner(sessionId)
+    // Mutate the existing registry instead of replacing it: an active runner
+    // keeps its reference, so tools installed mid-turn become visible on the
+    // very next model iteration.
+    this.baseRegistry.replaceAll(next.list())
   }
 
   private async startMcpServers(): Promise<void> {
@@ -243,7 +265,10 @@ export class Orchestrator {
       new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', state.meta.projectId))
     this.projectMemories.set(state.meta.projectId, projectMemory)
 
-    const workspace = new WorkspaceGuard([state.meta.cwd, ...(settings.policy.allowedRoots ?? [])].filter(Boolean))
+    const workspace = new WorkspaceGuard(
+      [state.meta.cwd, ...(settings.policy.allowedRoots ?? [])].filter(Boolean),
+      settings.policy.fullAccess === true
+    )
     const project = this.store.listProjects().find((p) => p.id === state.meta.projectId)
     const branch = await gitBranch(state.meta.cwd)
     const { policy, hooks } = this.sessionConfig(state)
@@ -270,7 +295,8 @@ export class Orchestrator {
         computer: this.computer,
         skills: this.skills,
         memory,
-        projectMemory
+        projectMemory,
+        mcp: this.mcpToolService()
       },
       project: {
         name: project?.name ?? path.basename(state.meta.cwd),
@@ -284,6 +310,7 @@ export class Orchestrator {
       approve: (request) => this.approve(request),
       agents,
       autoAgents: Boolean(settings.autoAgents),
+      surface: state.meta.surface ?? 'code',
       createAgent: (input) => this.createAgentFromTool(input, agents, state.meta.cwd),
       runSubagent: (spec, caller) => spawnAgent(agentEnv, caller, spec),
       persist: (snapshot) => this.persist(sessionId, snapshot),
@@ -401,6 +428,51 @@ export class Orchestrator {
   }
 
   /** What the agent runtime needs from the app: providers, the tool registry, events and approvals. */
+  private bestProviderConfig(): ProviderConfig | undefined {
+    const settings = this.settings.get()
+    const resolver = this.settings.resolver()
+    const priority: Record<string, number> = {
+      anthropic: 0,
+      openai: 1,
+      deepseek: 2,
+      kimi: 3,
+      qwen: 4,
+      openrouter: 5,
+      ollama: 6,
+      lmstudio: 7
+    }
+    const providers = settings.providers
+      .filter((provider) => provider.kind !== 'mock' && hasCredentials(provider, resolver))
+      .sort((a, b) => (priority[a.id] ?? 20) - (priority[b.id] ?? 20))
+    const provider = providers[0]
+    if (!provider) return undefined
+    const models = (provider.models?.length ? provider.models : [provider.model]).filter(Boolean)
+    const preferred = settings.lastModel?.providerId === provider.id ? settings.lastModel.model : provider.model
+    const score = (model: string): number => {
+      const value = model.toLowerCase()
+      let total = 0
+      if (model === preferred) total += 200
+      if (value.includes('claude')) total += 60
+      if (/\bgpt-5|\bgpt-4|\bo3\b|\bo4\b/.test(value)) total += 55
+      if (value.includes('gemini')) total += 45
+      if (value.includes('deepseek')) total += 40
+      if (value.includes('qwen')) total += 35
+      if (value.includes('kimi')) total += 32
+      if (value.includes('gemma')) total += 28
+      if (value.includes('llama')) total += 22
+      if (/31b|32b|70b|72b|120b|235b|405b/.test(value)) total += 12
+      if (/4b|3b|1b|0\.5b|7b|8b/.test(value)) total -= 8
+      if (value.includes(':cloud')) total -= 30
+      if (value.includes(':free')) total -= 6
+      if (value.includes('coder')) total += 3
+      if (model === provider.model) total += 2
+      return total
+    }
+    const best = [...models].sort((a, b) => score(b) - score(a))[0] ?? provider.model
+    return { ...provider, model: best }
+  }
+
+  /** What the agent runtime needs from the app: providers, the tool registry, events and approvals. */
   private agentEnv(agents: AgentRegistry, extraContext: string): AgentRuntimeEnv {
     const resolver = this.settings.resolver()
     return {
@@ -414,6 +486,7 @@ export class Orchestrator {
         return createProvider(config, resolver)
       },
       findProvider: (providerId) => this.settings.providerConfig(providerId),
+      bestModel: () => this.bestProviderConfig(),
       emit: (event) => this.onEvent(event),
       approve: (request) => this.approve(request),
       toolOutputDir: this.toolOutputDir(),
@@ -585,7 +658,7 @@ export class Orchestrator {
     this.onEvent({ type: 'approval_request', sessionId: request.sessionId, request })
     void this.sessionHooks
       .get(request.sessionId)
-      ?.run('Notification', { message: `O Forja precisa de aprovação: ${request.title} — ${request.detail}`.slice(0, 500) })
+      ?.run('Notification', { message: `O Openclod precisa de aprovação: ${request.title} — ${request.detail}`.slice(0, 500) })
       .catch(() => undefined)
     return new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
@@ -692,13 +765,16 @@ export class Orchestrator {
     return {
       computer: this.computer.status(),
       browser: browserStatus,
-      mcp: [...this.mcpClients.entries()].map(([name, client]) => ({
-        name,
-        command: (settings.mcpServers ?? []).find((m) => m.name === name)?.command ?? '',
-        state: client.state,
-        tools: client.toolsList().map((t) => t.name),
-        error: client.lastError ?? undefined
-      })),
+      mcp: [...this.mcpClients.entries()].map(([name, client]) => {
+        const config = (settings.mcpServers ?? []).find((m) => m.name === name)
+        return {
+          name,
+          command: config?.url ? `${config.type ?? 'http'} ${config.url}` : (config?.command ?? ''),
+          state: client.state,
+          tools: client.toolsList().map((t) => t.name),
+          error: client.lastError ?? undefined
+        }
+      }),
       providers: settings.providers.map((provider) => ({
         id: provider.id,
         label: provider.label,
@@ -720,6 +796,171 @@ export class Orchestrator {
 
   mcpPresets(): McpPresetInfo[] {
     return listMcpPresets()
+  }
+
+  /** Full connector catalog for Personalização → Conectores → Descobrir. */
+  mcpCatalog(): import('../shared/api.js').McpCatalogInfo[] {
+    const installed = new Set((this.settings.get().mcpServers ?? []).map((server) => server.name))
+    return MCP_CATALOG.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      description: entry.description,
+      category: entry.category,
+      transport: entry.transport,
+      needs: [
+        ...(entry.env ?? []).filter((item) => item.required).map((item) => item.key),
+        ...(entry.headers ?? []).filter((item) => item.required).map((item) => item.key)
+      ],
+      oauth: Boolean(entry.oauth),
+      docs: entry.docs,
+      installed: installed.has(entry.id)
+    }))
+  }
+
+  /** Installs an MCP from the catalog/registry on behalf of the UI or the agent. */
+  async installMcp(input: { id: string; env?: Record<string, string>; headers?: Record<string, string>; name?: string }): ReturnType<McpToolService['install']> {
+    return this.mcpToolService().install(input)
+  }
+
+  /**
+   * Imports skills, agents and MCP servers from the user's Claude Desktop/Code
+   * installation. Existing Openclod entries win; nothing is deleted.
+   */
+  async importClaudeCatalog(restart = true): Promise<ClaudeImportReport & { imported: number }> {
+    const { report, servers } = importClaudeCatalog({ userData: this.options.userData })
+    const current = this.settings.get().mcpServers ?? []
+    const known = new Set(current.map((server) => server.name))
+    let added = 0
+    const merged = [...current]
+    for (const server of servers) {
+      if (known.has(server.name)) continue
+      known.add(server.name)
+      merged.push(server)
+      added++
+    }
+    await this.settings.update({ mcpServers: merged.slice(0, 40), claudeCatalogImported: true })
+    await this.skills.reload()
+    if (restart) await this.restartMcp()
+    return { ...report, imported: added }
+  }
+
+  /**
+   * Self-installation surface the agent uses when a task needs an integration
+   * that is not configured yet. It can search the curated catalog and the
+   * official MCP Registry, then save and hot-reload the server.
+   */
+  private mcpToolService(): McpToolService {
+    return {
+      search: async (query, limit = 8) => {
+        const installed = new Set((this.settings.get().mcpServers ?? []).map((server) => server.name))
+        const catalog = searchMcpCatalog(query, limit).map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          description: entry.description,
+          transport: entry.transport,
+          installed: installed.has(entry.id),
+          needs: [
+            ...(entry.env ?? []).filter((item) => item.required).map((item) => item.key),
+            ...(entry.headers ?? []).filter((item) => item.required).map((item) => item.key)
+          ],
+          source: 'catalog' as const,
+          docs: entry.docs
+        }))
+        let registry: Awaited<ReturnType<typeof searchMcpRegistry>> = []
+        let warning: string | undefined
+        try {
+          registry = await searchMcpRegistry(query, limit)
+        } catch (err) {
+          warning = `registro MCP indisponível: ${(err as Error).message}`
+        }
+        return {
+          catalog,
+          registry: registry
+            .filter((entry) => !catalog.some((hit) => hit.id === entry.id))
+            .map((entry) => ({
+              id: entry.id,
+              name: entry.name,
+              description: entry.description,
+              version: entry.version,
+              transport: entry.transport,
+              installed: [...installed].some((name) => entry.id.endsWith(`/${name}`)),
+              needs: entry.needs,
+              source: 'registry' as const,
+              docs: entry.docs
+            })),
+          installed: [...installed],
+          warning
+        }
+      },
+      install: async (input) => {
+        let server: McpServerSettings | null = null
+        let missing: string[] = []
+        let needsOAuth = false
+        let error: string | undefined
+
+        if (input.url || input.command) {
+          try {
+            server = normalizeMcpServerSettings({
+              name: input.name || (input.url ? 'remote-mcp' : 'custom-mcp'),
+              type: input.url ? 'http' : 'stdio',
+              url: input.url,
+              command: input.command ?? '',
+              args: input.args ?? [],
+              env: input.env,
+              headers: input.headers,
+              enabled: true
+            })
+          } catch (err) {
+            error = (err as Error).message
+          }
+        } else {
+          const entry = catalogEntry(input.id) ?? searchMcpCatalog(input.id, 1).find((item) => item.id === input.id)
+          if (entry) {
+            const built = buildCatalogServer(entry, { env: input.env, headers: input.headers, name: input.name })
+            server = built.server
+            missing = built.missing
+            needsOAuth = built.needsOAuth
+          } else {
+            try {
+              const built = await installFromRegistry(input.id, { env: input.env, headers: input.headers, name: input.name })
+              server = built.server
+              missing = built.missing
+              error = built.error
+            } catch (err) {
+              error = `não foi possível consultar o registro MCP: ${(err as Error).message}`
+            }
+          }
+        }
+
+        if (!server) return { ok: false, missing, needsOAuth, error: error ?? 'servidor não encontrado no catálogo nem no registro' }
+
+        const current = this.settings.get().mcpServers ?? []
+        const next = [...current.filter((item) => item.name !== server!.name), server].slice(-20)
+        await this.settings.update({ mcpServers: next })
+        await this.restartMcp()
+        const client = this.mcpClients.get(server.name)
+        return {
+          ok: true,
+          name: server.name,
+          state: client?.state ?? 'stopped',
+          tools: client?.toolsList().map((tool) => tool.name) ?? [],
+          error: client?.lastError ?? undefined
+        }
+      },
+      list: () => {
+        const configs = this.settings.get().mcpServers ?? []
+        return configs.map((config) => {
+          const client = this.mcpClients.get(config.name)
+          return {
+            name: config.name,
+            state: config.enabled ? (client?.state ?? 'stopped') : 'disabled',
+            transport: config.type ?? 'stdio',
+            tools: client?.toolsList().map((tool) => tool.name) ?? [],
+            error: client?.lastError ?? undefined
+          }
+        })
+      }
+    }
   }
 
   async testProvider(providerId: string): Promise<{ ok: boolean; detail: string }> {
@@ -913,6 +1154,7 @@ function buildBaseRegistry(): ToolRegistry {
     .register(...webTools)
     .register(...browserTools)
     .register(...computerTools)
+    .register(...mcpTools)
     .register(...planTools)
     .register(...projectMemoryTools)
     .register(...agentForgeTools)
@@ -1014,6 +1256,27 @@ description: Método para reproduzir, isolar e corrigir falhas sem chutar.
     if (!fs.existsSync(file)) {
       await fs.promises.mkdir(path.dirname(file), { recursive: true })
       await fs.promises.writeFile(file, content, 'utf8')
+    }
+  }
+
+  // Full skills shipped with the app (qa-total and future ones). Copy once;
+  // the user's edits in %APPDATA% are never overwritten.
+  const bundled = resourcePath('skills')
+  if (!bundled) return
+  let entries: fs.Dirent[] = []
+  try {
+    entries = await fs.promises.readdir(bundled, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const target = path.join(dir, entry.name)
+    if (fs.existsSync(path.join(target, 'SKILL.md'))) continue
+    try {
+      fs.cpSync(path.join(bundled, entry.name), target, { recursive: true, force: false, errorOnExist: false })
+    } catch {
+      /* a locked skill must not block startup */
     }
   }
 }

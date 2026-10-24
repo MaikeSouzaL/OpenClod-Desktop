@@ -209,7 +209,7 @@ async function runHttp(hook: HookHttp, url: URL, payload: string, signal?: Abort
     const headers = new Headers()
     for (const [name, value] of Object.entries(hook.headers ?? {})) headers.set(name, value)
     headers.set('content-type', 'application/json')
-    if (!headers.has('user-agent')) headers.set('user-agent', 'Forja-Hooks/1')
+    if (!headers.has('user-agent')) headers.set('user-agent', 'Openclod-Hooks/1')
     const response = await fetch(url, { method: 'POST', headers, body: payload, redirect: 'manual', signal: controller.signal })
     const stdout = await readCapped(response, MAX_OUTPUT)
     return { ...base, exitCode: response.ok ? 0 : response.status, stdout, http: { status: response.status } }

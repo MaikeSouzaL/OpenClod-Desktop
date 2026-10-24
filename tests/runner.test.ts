@@ -249,7 +249,7 @@ describe('MCP tools and effort reach the model', () => {
     }
     expect(await names('code')).toContain('mcp__srv__lookup')
     expect(await names('autonomous')).toContain('mcp__srv__lookup')
-    expect(await names('ask')).not.toContain('mcp__srv__lookup')
+    expect(await names('ask')).toContain('mcp__srv__lookup')
     expect(await names('review')).not.toContain('mcp__srv__lookup')
   })
 

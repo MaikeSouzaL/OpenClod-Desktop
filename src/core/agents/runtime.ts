@@ -47,6 +47,8 @@ export interface AgentRuntimeEnv {
   createProvider(config: ProviderConfig, info: ChildInfo): Provider
   /** Looks up a configured provider by id, for `model: "providerId/model"`. */
   findProvider(providerId: string): ProviderConfig | undefined
+  /** Best model/provider currently configured and unlocked, used by `model: "best"` agents. */
+  bestModel?: () => ProviderConfig | undefined
   /** Receives every event of the tree (subagent lifecycle, forwarded tool events, notices), already addressed to the root session. */
   emit(event: HarnessEvent): void
   /** Routes a child's approval request to the user. Its `sessionId` is the root session. */
@@ -302,7 +304,9 @@ export async function spawnAgent(
   const wanted = generic ? (spec.mode ?? def.mode ?? 'code') : (def.mode ?? 'code')
   const mode = modeAllowsWrite(wanted) && !modeAllowsWrite(caller.mode) ? caller.mode : wanted
 
-  const providerConfig = resolveAgentModel(def.model, caller.providerConfig, env.findProvider)
+  const providerConfig = def.model === 'best'
+    ? env.bestModel?.() ?? caller.providerConfig
+    : resolveAgentModel(def.model, caller.providerConfig, env.findProvider)
   const childId = id('sub')
   const parentChildId = caller.depth > 0 ? caller.sessionId : undefined
   const info: ChildInfo = { agent: def.name, label: spec.label, childId, depth, parentChildId }

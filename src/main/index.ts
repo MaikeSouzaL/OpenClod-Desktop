@@ -6,12 +6,13 @@ import { DictationController } from './dictation.js'
 import { SttService } from './stt.js'
 import { defaultSettings } from './settings.js'
 import { TerminalManager, availableShells } from './terminal.js'
+import { ComputerOverlay } from './computer-overlay.js'
 import { detectDevServers, startDevServer } from './preview.js'
 import { searchProjectFiles, writeProjectFile } from './project-files.js'
 import { backgroundProcessOutput, listBackgroundProcesses, stopBackgroundProcess } from '../core/tools/shell.js'
 import { gitFileDiff, gitStatus } from '../core/git/service.js'
 import { Scheduler, type ScheduledTask } from '../core/scheduler/scheduler.js'
-import { CH, type AppVersions, type CreateSessionInput, type ProviderPresetInfo, type SttStartOptions } from '../shared/api.js'
+import { CH, type AppVersions, type CreateSessionInput, type PluginCatalogEntry, type ProviderPresetInfo, type SttStartOptions } from '../shared/api.js'
 import {
   AGENT_MODES,
   REASONING_EFFORTS,
@@ -27,8 +28,31 @@ import { PROVIDER_PRESETS } from '../core/providers/presets.js'
 import { HOOK_EVENTS, normalizeHookDefinition } from '../core/hooks/runner.js'
 import { normalizeMcpServerSettings } from '../core/mcp/client.js'
 
-app.setName('Forja')
-app.setAppUserModelId('com.forja.desktop')
+app.setName('Openclod Desktop')
+app.setAppUserModelId('com.openclod.desktop')
+
+/**
+ * The app was previously branded Forja. Move the old profile (settings,
+ * encrypted keys, sessions, project memory) to the new folder once, so a
+ * rename never loses the user's work. A running old instance can lock the
+ * folder; in that case copy instead of rename and leave the old copy intact.
+ */
+function migrateLegacyProfile(): void {
+  try {
+    const appData = app.getPath('appData')
+    const legacy = path.join(appData, 'Forja')
+    const next = path.join(appData, 'Openclod Desktop')
+    if (fs.existsSync(next) || !fs.existsSync(legacy)) return
+    try {
+      fs.renameSync(legacy, next)
+    } catch {
+      fs.cpSync(legacy, next, { recursive: true })
+    }
+  } catch {
+    /* startup must continue even if the old profile cannot be moved */
+  }
+}
+migrateLegacyProfile()
 
 const isDev = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -42,12 +66,13 @@ const stt = new SttService({
   },
   log: (scope, message) => log(scope, message)
 })
+const computerOverlay = new ComputerOverlay()
 const dictation = new DictationController({
   getSettings: () => orchestrator?.settings.get() ?? defaultSettings(),
   sendToRenderer: (channel, payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
   },
-  isForjaFocused: () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+  isOpenclodFocused: () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
   polish: (text) => (orchestrator ? orchestrator.polishText(text) : Promise.resolve(text)),
   log: (scope, message) => log(scope, message)
 })
@@ -121,6 +146,24 @@ function toImages(value: unknown): ImagePart[] | undefined {
     }
     return { type: 'image', mediaType: image.mediaType, data: image.data, label: image.label?.slice(0, 80) }
   })
+}
+
+/** The bundled snapshot of Anthropic's official Claude plugins marketplace. */
+function pluginCatalog(): PluginCatalogEntry[] {
+  const candidates = [
+    path.join(process.resourcesPath ?? '', 'resources', 'catalog', 'claude-plugins-official.json'),
+    path.join(app.getAppPath(), 'resources', 'catalog', 'claude-plugins-official.json'),
+    path.join(process.cwd(), 'resources', 'catalog', 'claude-plugins-official.json')
+  ]
+  for (const file of candidates) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { plugins?: PluginCatalogEntry[] }
+      if (Array.isArray(parsed.plugins)) return parsed.plugins
+    } catch {
+      /* try the next location */
+    }
+  }
+  return []
 }
 
 /** Filesystem reads from the renderer are limited to registered roots. */
@@ -211,6 +254,7 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
         : [],
       allowNetwork: Boolean(policy.allowNetwork),
       allowComputerControl: Boolean(policy.allowComputerControl),
+      fullAccess: policy.fullAccess !== false,
       shellTimeoutSec: Math.max(5, Math.min(3600, Number(policy.shellTimeoutSec) || 300))
     }
     if (policy.rules && typeof policy.rules === 'object') {
@@ -321,6 +365,8 @@ function handle(channel: string, fn: Handler<unknown>): void {
 
 function broadcast(event: HarnessEvent): void {
   if (event.type === 'turn_end') scheduledTurns.get(event.sessionId)?.(event.stopReason)
+  // Orange desktop border + mascot while any agent is using Computer Use.
+  computerOverlay.handle(event)
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(CH.event, event)
   }
@@ -349,7 +395,7 @@ function createWindow(): void {
     show: false,
     frame: false,
     backgroundColor: '#0a0c0f',
-    title: 'Forja',
+    title: 'Openclod Desktop',
     ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -437,6 +483,7 @@ async function cleanup(): Promise<void> {
   terminals.killAll()
   stt.dispose()
   dictation.dispose()
+  computerOverlay.dispose()
   scheduler?.stop()
   if (keepAwakeId !== null && powerSaveBlocker.isStarted(keepAwakeId)) powerSaveBlocker.stop(keepAwakeId)
   try {
@@ -487,7 +534,7 @@ async function runScheduledTask(task: ScheduledTask): Promise<{ sessionId?: stri
     scheduledTurns.delete(meta.id)
   }
   if (Notification.isSupported()) {
-    new Notification({ title: 'Forja — tarefa agendada concluída', body: task.name, silent: true }).show()
+    new Notification({ title: 'Openclod Desktop - tarefa agendada concluída', body: task.name, silent: true }).show()
   }
   return { sessionId: meta.id }
 }
@@ -579,6 +626,13 @@ function registerIpc(): void {
     return true
   })
   handle(CH.appMcpPresets, async () => need().mcpPresets())
+  handle(CH.appMcpCatalog, async () => need().mcpCatalog())
+  handle(CH.appPluginCatalog, async () => pluginCatalog())
+  handle(CH.appAgents, async (cwd) => need().listAgents(cwd ? str(cwd, 'cwd', 1000) : undefined))
+  handle(CH.appImportClaude, async () => need().importClaudeCatalog())
+  handle(CH.appMcpInstall, async (id, env, headers) =>
+    need().installMcp({ id: str(id, 'id', 200), env: env as Record<string, string> | undefined, headers: headers as Record<string, string> | undefined })
+  )
   handle(CH.appCreateSkill, async (rawName, rawDescription, rawBody) => {
     const name = str(rawName, 'nome', 64).trim()
     if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(name)) throw new Error('nome da skill: use letras minúsculas, números e hífens (2 a 63 caracteres)')
@@ -633,9 +687,11 @@ function registerIpc(): void {
     return result.canceled || !result.filePaths.length ? null : result.filePaths[0]
   })
   handle(CH.projectsEnsureDefault, async () => {
-    const dir = path.join(app.getPath('userData'), 'workspace')
+    // The user's desktop is the neutral fallback for Chat/Cowork. Openclod never
+    // makes its own data folder the agent's working root.
+    const dir = app.getPath('desktop')
     fs.mkdirSync(dir, { recursive: true })
-    return need().addProject(dir, 'Forja Workspace')
+    return need().addProject(dir, 'Área de Trabalho')
   })
 
   handle(CH.sessionsList, async () => need().store.listSessions())
@@ -967,7 +1023,7 @@ if (!gotLock) {
     } catch (err) {
       log('init', err)
       dialog.showErrorBox(
-        'Forja — falha na inicialização',
+        'Openclod Desktop - falha na inicialização',
         `Não foi possível iniciar o harness.\n\n${(err as Error).message}\n\nLog: ${logFile()}`
       )
     }

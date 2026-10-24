@@ -1,9 +1,9 @@
 import type { DetailedHTMLProps, HTMLAttributes } from 'react'
-import type { ForjaApi } from '../../shared/api'
+import type { OpenclodApi } from '../../shared/api'
 
 declare global {
   interface Window {
-    forja: ForjaApi
+    forja: OpenclodApi
   }
 }
 

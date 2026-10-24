@@ -118,6 +118,8 @@ interface ComposerProps {
   onModelChange(providerId: string, model: string): void
   onEffortChange(effort: ReasoningEffort | null): void
   onPermissionChange(mode: PermissionMode): void
+  /** Home only: switch between plain Chat and Cowork without leaving Início. */
+  onSurfaceChange?(mode: 'chat' | 'cowork'): void
   onOpenSettings(): void
   onAddProject(): void
 }
@@ -155,7 +157,8 @@ export function Composer({
   onPermissionChange,
   effort,
   onOpenSettings,
-  onAddProject
+  onAddProject,
+  onSurfaceChange
 }: ComposerProps): ReactElement {
   const [text, setText] = useState('')
   const [images, setImages] = useState<ImagePart[]>([])
@@ -460,7 +463,7 @@ export function Composer({
       : variant === 'cowork'
         ? busy
           ? 'Digite para adicionar à fila…'
-          : 'Descreva a tarefa que o Forja deve executar'
+          : 'Descreva a tarefa que o Openclod deve executar'
         : busy
           ? 'Digite para adicionar à fila…'
           : 'Digite / para comandos'
@@ -606,6 +609,25 @@ export function Composer({
                 <Icon name="folder" size={13} />
                 <span>{workspaceName}</span>
               </span>
+            ) : null}
+
+            {onSurfaceChange && !session ? (
+              <div className="surface-switch" role="group" aria-label="Tipo de conversa">
+                <button
+                  type="button"
+                  className={variant === 'home' ? 'active' : ''}
+                  onClick={() => onSurfaceChange('chat')}
+                >
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  className={variant === 'cowork' ? 'active' : ''}
+                  onClick={() => onSurfaceChange('cowork')}
+                >
+                  Cowork
+                </button>
+              </div>
             ) : null}
           </div>
 

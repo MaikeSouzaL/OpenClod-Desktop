@@ -91,7 +91,7 @@ async function main() {
   }
   console.log('overlay page', Boolean(overlay), overlay ? overlay.url().slice(0, 60) : 'none')
   if (overlay) {
-    await overlay.waitForFunction(() => Boolean(window.forjaOverlay), { timeout: 5000 }).catch(() => undefined)
+    await overlay.waitForFunction(() => Boolean(window.openclodOverlay), { timeout: 5000 }).catch(() => undefined)
     console.log('overlay status', JSON.stringify(await overlay.evaluate(() => ({
       cls: document.body.className,
       status: document.getElementById('status')?.textContent,

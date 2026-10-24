@@ -7,7 +7,7 @@ export type PanelTab = 'context' | 'plan' | 'files' | 'changes' | 'terminal' | '
 /* Brand                                                               */
 /* ------------------------------------------------------------------ */
 
-export function ForjaMark({ size = 20, className = '' }: { size?: number; className?: string }): ReactElement {
+export function OpenclodMark({ size = 20, className = '' }: { size?: number; className?: string }): ReactElement {
   return (
     <svg
       width={size}
@@ -214,8 +214,8 @@ export function Titlebar({
       <div className="tb-main">
         {home ? (
           <span className="tb-brand">
-            <ForjaMark size={14} />
-            <span>Forja</span>
+            <OpenclodMark size={14} />
+            <span>Openclod Desktop</span>
           </span>
         ) : (
           <button

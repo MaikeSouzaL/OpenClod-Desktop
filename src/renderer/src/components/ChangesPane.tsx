@@ -247,7 +247,7 @@ export function ChangesPane({ root, changes, onReveal }: ChangesPaneProps): Reac
             <p>
               As alterações precisam de um repositório Git.
               <br />
-              Sem Git, o Forja ainda mostra aqui o que o agente alterar nesta sessão.
+              Sem Git, o Openclod ainda mostra aqui o que o agente alterar nesta sessão.
             </p>
           </div>
         )

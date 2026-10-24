@@ -120,7 +120,7 @@ function candidateDirs(env: NodeJS.ProcessEnv, home: string): string[] {
 
 /**
  * The launch command must be a real Node: inside Electron `process.execPath`
- * is the app binary, which would start a second Forja instead of the script.
+ * is the app binary, which would start a second Openclod instead of the script.
  */
 function findNode(env: NodeJS.ProcessEnv, hint?: string): string | null {
   if (hint && isFile(hint)) return hint
@@ -285,7 +285,7 @@ export function listMcpPresets(options: DetectReaOptions = {}): McpPresetInfo[] 
  * installed. Analysis tools are exposed as-is; the ones in REA_APPROVAL_TOOLS
  * always ask. The call timeout is 300 s, raised to REA_GHIDRA_STARTUP_TIMEOUT_MS
  * + 30 s when the install configures a longer Ghidra startup, so a first
- * `open_binary` cannot time out on Forja's side before Ghidra's.
+ * `open_binary` cannot time out on Openclod's side before Ghidra's.
  */
 export function reaMcpPreset(options: ReaPresetOptions = {}): McpServerSettings | null {
   const launch = options.launch === undefined ? detectRea() : options.launch

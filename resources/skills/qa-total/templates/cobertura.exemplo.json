@@ -1,0 +1,357 @@
+{
+  "rodada": {
+    "id": "2026-09-30-clientes-novo",
+    "alvo": "Tela Novo Cliente (/clientes/novo)",
+    "escopo": "tela /clientes/novo inteira (elementos, estados, papéis, APIs, regras, efeitos); fora: listagem /clientes (outra rodada)",
+    "ambiente": "local: front http://localhost:3000 → API https://localhost:5001/api/v1 → banco app_dev (servidor de teste)",
+    "inicio": "2026-09-30T14:02:00-03:00",
+    "fim": "",
+    "autorizacoes": [
+      "alterar código do front: sim (mensagem do usuário em 2026-09-30 14:03)",
+      "alterar código do back: não, só relatar",
+      "e-mail para caixas de teste usuario+qa@dominio: sim",
+      "escrita no banco: só via aplicação"
+    ],
+    "perfil": ".qa/PERFIL.md",
+    "tipo_projeto": "full-stack",
+    "tipos_projeto": ["full-stack"],
+    "modo": "completo",
+    "pedido": "testa a tela de novo cliente inteira, como um testador humano",
+    "estado": "em-andamento",
+    "observacao": "Exemplo didático de rodada em andamento: o gate ainda reprova de propósito (C-0010 pendente, evidências citadas que não existem em disco, itens elemento:/api: sem as cinco dimensões, seções do catálogo sem caso nem nao-aplicavel, mínimo por tipo de item e contagens incompletos, item estatico: ligado ao D-001, MAPA e notas de fase ainda não registrados, fim vazio). Todos os outros status aparecem com os campos que o gate exige. Todo título de caso começa pelo código do catálogo: é por ele que cobertura.py secoes conta a seção.",
+    "ambiente_confirmado": {
+      "por": "host da API lido na aba de rede depois de F5; sessão da máquina local vista no banco (sys.dm_exec_sessions, host_name)",
+      "em": "2026-09-30T14:05:00-03:00"
+    },
+    "papeis_usados": ["vendedor"],
+    "git": [
+      {
+        "repo": "front",
+        "branch": "develop",
+        "commit": "a1b2c3d",
+        "modificados_no_inicio": ["src/app/pedidos/page.tsx"],
+        "fim_de_linha": "LF"
+      }
+    ],
+    "baselines": [
+      {
+        "gate": "typecheck",
+        "comando": "npx tsc --noEmit",
+        "resultado": "308 erros",
+        "data": "2026-09-30",
+        "composicao": "inclui 9 erros de arquivos gerados em .next/types"
+      },
+      {
+        "gate": "lint",
+        "comando": "npm run lint",
+        "resultado": "não executável",
+        "data": "2026-09-30",
+        "composicao": "ESLint quebra antes de analisar (TypeError: Converting circular structure to JSON)"
+      }
+    ],
+    "criticas": [
+      { "passada": 1, "novos_itens": 2, "novos_casos": 5, "origem": "reconciliação swagger × rede: POST /cliente sem caso de papel e sem caso de IDOR" },
+      { "passada": 2, "novos_itens": 0, "novos_casos": 1, "origem": "pergunta: alguma ação sem os cinco resultados? (duplo clique em Salvar)" },
+      { "passada": 3, "novos_itens": 0, "novos_casos": 0, "origem": "checklist completo do crítico" },
+      { "passada": 4, "novos_itens": 0, "novos_casos": 0, "origem": "olhos frescos: segundo agente instruído a achar o que falta" }
+    ]
+  },
+  "itens": [
+    {
+      "id": "tela:/clientes/novo",
+      "tipo": "tela",
+      "titulo": "Tela Novo Cliente",
+      "pai": null,
+      "origem": "src/app/clientes/novo/page.tsx",
+      "descoberto_por": ["rota"],
+      "escopo": "dentro",
+      "notas": "acesso pelo botão Adicionar da listagem e por URL direta"
+    },
+    {
+      "id": "elemento:/clientes/novo#campo-cnpj",
+      "tipo": "elemento",
+      "titulo": "Campo CNPJ (obrigatório, com consulta à Receita no blur)",
+      "pai": "tela:/clientes/novo",
+      "origem": "src/app/clientes/novo/page.tsx:120 · data-testid=cliente-cnpj-input",
+      "descoberto_por": ["elemento-estatico", "elemento-runtime"],
+      "escopo": "dentro",
+      "notas": "máscara 00.000.000/0000-00; a consulta externa leva de 7 a 10 s"
+    },
+    {
+      "id": "elemento:/clientes/novo#botao-salvar",
+      "tipo": "elemento",
+      "titulo": "Botão Salvar do formulário",
+      "pai": "tela:/clientes/novo",
+      "origem": "src/app/clientes/novo/page.tsx:212 · data-testid=cliente-save-button",
+      "descoberto_por": ["elemento-estatico", "elemento-runtime"],
+      "escopo": "dentro",
+      "notas": "fica desabilitado durante o POST, com o rótulo 'Salvando…'"
+    },
+    {
+      "id": "api:POST /api/v1/cliente",
+      "tipo": "api",
+      "titulo": "Criação de cliente",
+      "pai": "elemento:/clientes/novo#botao-salvar",
+      "origem": "ClienteController.cs:58 · [Authorize] · chamado por services/cliente/index.ts:31",
+      "descoberto_por": ["api", "rede"],
+      "escopo": "dentro",
+      "notas": "resposta 201 com a entidade; 422 com errors[] por campo"
+    },
+    {
+      "id": "regra:cliente.cnpj-obrigatorio",
+      "tipo": "regra",
+      "titulo": "CNPJ é obrigatório quando o país é Brasil",
+      "pai": "elemento:/clientes/novo#campo-cnpj",
+      "origem": "front: src/app/clientes/novo/schema.ts:14 · back: ClienteValidator.cs:22",
+      "descoberto_por": ["regra"],
+      "escopo": "dentro",
+      "notas": "a regra existe nas duas camadas"
+    },
+    {
+      "id": "papel:somente-leitura",
+      "tipo": "papel",
+      "titulo": "Usuário com perfil somente leitura",
+      "pai": "tela:/clientes/novo",
+      "origem": "seeds/perfis.sql:40 · permissão CLIENTES_CREATE ausente",
+      "descoberto_por": ["papel", "critico"],
+      "escopo": "dentro",
+      "notas": "não deve ver Salvar; o POST direto deve ser barrado"
+    }
+  ],
+  "casos": [
+    {
+      "id": "C-0001",
+      "item_id": "tela:/clientes/novo",
+      "titulo": "[EL-EST-02] Tela carrega com todos os campos e combos preenchidos, sem zero falso",
+      "tecnica": "exploratorio",
+      "dimensao": "acerto",
+      "papel": "vendedor",
+      "passos": "abrir /clientes/novo pela listagem",
+      "resultado_esperado": "formulário completo, combos com opções, nenhum erro no console",
+      "oraculo": "código: src/app/clientes/novo/page.tsx (campos e combos do formulário)",
+      "resultado_obtido": "formulário completo em 1,8 s; 0 erros no console",
+      "status": "passou",
+      "evidencias": ["evidencias/01-tela-novo-cliente-carregada.png"],
+      "defeito_id": null,
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T14:10:00-03:00"
+    },
+    {
+      "id": "C-0002",
+      "item_id": "elemento:/clientes/novo#campo-cnpj",
+      "titulo": "[PF-CAD-01] CNPJ real e novo é aceito e os dados da Receita são preenchidos",
+      "tecnica": "particao",
+      "dimensao": "acerto",
+      "papel": "vendedor",
+      "passos": "digitar 00.000.000/0001-91 (Banco do Brasil, CNPJ público real; conferido no banco: não existia), sair do campo, Salvar",
+      "resultado_esperado": "razão social e endereço preenchidos; Salvar grava o cliente (201) e o banco tem 1 linha",
+      "oraculo": "regra do usuário no PERFIL (CNPJ sempre real) + código: services/receita.ts",
+      "resultado_obtido": "a Receita respondeu em 8,2 s; POST 201; 1 linha em clientes",
+      "status": "passou",
+      "evidencias": [
+        "evidencias/02-cnpj-valido-dados-da-receita.png",
+        "rede/02-post-cliente-201.json"
+      ],
+      "defeito_id": null,
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T14:16:00-03:00"
+    },
+    {
+      "id": "C-0003",
+      "item_id": "elemento:/clientes/novo#campo-cnpj",
+      "titulo": "[EL-MSK-02] CNPJ com dígito verificador inválido é barrado no front",
+      "tecnica": "particao",
+      "dimensao": "erro",
+      "papel": "vendedor",
+      "passos": "digitar 00.000.000/0001-00 (dígito verificador errado) e Salvar",
+      "resultado_esperado": "mensagem 'CNPJ inválido' sob o campo e zero requisições",
+      "oraculo": "o backend recusa DV inválido (ClienteValidator.cs:22); o front deveria barrar antes",
+      "resultado_obtido": "o front enviou o POST; a API devolveu 500 com a mensagem genérica do ORM; toast 'Erro inesperado'",
+      "status": "falhou",
+      "evidencias": [
+        "evidencias/03-cnpj-dv-invalido-ANTES-circulado.png",
+        "rede/03-post-cliente-500.json"
+      ],
+      "defeito_id": "D-001",
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T14:21:00-03:00"
+    },
+    {
+      "id": "C-0004",
+      "item_id": "elemento:/clientes/novo#campo-cnpj",
+      "titulo": "[EL-MSK-02] Reteste do D-001 na tela real, mais o outro uso do mesmo validador",
+      "tecnica": "regressao",
+      "dimensao": "erro",
+      "papel": "vendedor",
+      "passos": "digitar 00.000.000/0001-00 em /clientes/novo e em /parceiros/novo (mesmo validador) e Salvar",
+      "resultado_esperado": "'CNPJ inválido' sob o campo nas duas telas e zero requisições",
+      "oraculo": "correção do D-001 + comportamento atual de /parceiros/novo",
+      "resultado_obtido": "mensagem sob o campo nas duas telas; espião com 0 requisições",
+      "status": "passou",
+      "evidencias": [
+        "evidencias/04-cnpj-dv-invalido-CORRIGIDO-circulado.png",
+        "evidencias/05-parceiros-cnpj-invalido-RETESTE.png",
+        "rede/04-sem-requisicao.json"
+      ],
+      "defeito_id": "D-001",
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T15:02:00-03:00"
+    },
+    {
+      "id": "C-0005",
+      "item_id": "elemento:/clientes/novo#botao-salvar",
+      "titulo": "[DM-IDE-01] Duplo clique em Salvar não cria dois clientes",
+      "tecnica": "erro-adivinhado",
+      "dimensao": "risco",
+      "papel": "vendedor",
+      "passos": "dois cliques seguidos em Salvar com o formulário válido",
+      "resultado_esperado": "um POST, botão desabilitado com 'Salvando…', 1 linha no banco",
+      "oraculo": "expectativa razoável de usuário + código: botão com disabled={salvando}",
+      "resultado_obtido": "o espião mostrou 2 POST 201, mas o banco tem 1 linha e a ferramenta de rede do navegador mostra 1 POST",
+      "status": "retratado",
+      "evidencias": [
+        "rede/06-espiao-instalado-duas-vezes.json",
+        "evidencias/06-banco-um-cliente.png"
+      ],
+      "defeito_id": "D-002",
+      "justificativa": "Efeito da ferramenta: o espião de XHR foi instalado duas vezes na mesma página e contou cada requisição em dobro. Reproduzido por outro caminho (rede do navegador + banco): 1 POST, 1 cliente.",
+      "atualizado_em": "2026-09-30T14:30:00-03:00"
+    },
+    {
+      "id": "C-0006",
+      "item_id": "api:POST /api/v1/cliente",
+      "titulo": "[PJ-API-02] POST direto sem razão social é recusado com 422 e a mensagem do campo",
+      "tecnica": "api",
+      "dimensao": "erro",
+      "papel": "vendedor",
+      "passos": "POST /api/v1/cliente com o corpo do C-0002 sem o campo razaoSocial",
+      "resultado_esperado": "422 com errors[].campo = razaoSocial e nada gravado",
+      "oraculo": "código: ClienteValidator.cs:18",
+      "resultado_obtido": "422 'razaoSocial: campo obrigatório'; 0 linhas novas",
+      "status": "passou",
+      "evidencias": ["rede/07-post-sem-razao-social-422.json"],
+      "defeito_id": null,
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T14:40:00-03:00"
+    },
+    {
+      "id": "C-0007",
+      "item_id": "regra:cliente.cnpj-obrigatorio",
+      "titulo": "[EL-DEP-02] País diferente de Brasil dispensa o CNPJ",
+      "tecnica": "tabela-decisao",
+      "dimensao": "acerto",
+      "papel": "vendedor",
+      "passos": "país = Argentina, CNPJ vazio, Salvar",
+      "resultado_esperado": "salva sem CNPJ",
+      "oraculo": "código: schema.ts:14 (CNPJ obrigatório só quando país = BR)",
+      "resultado_obtido": "",
+      "status": "nao-aplicavel",
+      "evidencias": [],
+      "defeito_id": null,
+      "justificativa": "O combo País só oferece Brasil nesta versão (src/app/clientes/novo/page.tsx:88); a linha 'exterior' da tabela de decisão não é alcançável pela tela. Fica registrada para quando o combo ganhar outros países.",
+      "atualizado_em": "2026-09-30T14:45:00-03:00"
+    },
+    {
+      "id": "C-0008",
+      "item_id": "papel:somente-leitura",
+      "titulo": "[DM-AUT-04] Somente leitura não vê Salvar e o POST direto é barrado",
+      "tecnica": "rbac",
+      "dimensao": "bloqueio",
+      "papel": "somente-leitura",
+      "passos": "abrir /clientes/novo e chamar POST /api/v1/cliente com a sessão somente leitura",
+      "resultado_esperado": "Salvar ausente ou desabilitado com motivo; POST devolve 403",
+      "oraculo": "seeds/perfis.sql:40 (sem CLIENTES_CREATE) + [Authorize(Policy = ClientesCreate)]",
+      "resultado_obtido": "",
+      "status": "bloqueado",
+      "evidencias": [],
+      "defeito_id": null,
+      "justificativa": "Falta usuário com o papel somente-leitura logado. Pedido ao usuário às 14:20 para logar com ele; sem resposta até o fim da sessão.",
+      "atualizado_em": "2026-09-30T14:20:00-03:00"
+    },
+    {
+      "id": "C-0009",
+      "item_id": "tela:/clientes/novo",
+      "titulo": "[DM-RES-01] Em 390 px não há rolagem horizontal e o Salvar é alcançável",
+      "tecnica": "responsivo",
+      "dimensao": "risco",
+      "papel": "vendedor",
+      "passos": "viewport 390 × 844; conferir scrollWidth, campos e Salvar",
+      "resultado_esperado": "scrollWidth == clientWidth; nenhum campo cortado",
+      "oraculo": "breakpoints do tailwind.config (sm = 640) + regra do PERFIL: tela usada por parceiro no celular",
+      "resultado_obtido": "",
+      "status": "nao-validado",
+      "evidencias": [],
+      "defeito_id": null,
+      "justificativa": "A ferramenta de navegador desta sessão não fixa o viewport: depois do resize, innerWidth continuou 1440 e matchMedia('(min-width: 640px)') continuou true. Falta a ferramenta de viewport exato (destrava: Playwright com viewport fixo em 390 × 844).",
+      "atualizado_em": "2026-09-30T14:50:00-03:00"
+    },
+    {
+      "id": "C-0010",
+      "item_id": "api:POST /api/v1/cliente",
+      "titulo": "[DM-TEN-02] Cliente de outro tenant não é lido nem sobrescrito pelo id",
+      "tecnica": "seguranca",
+      "dimensao": "bloqueio",
+      "papel": "vendedor",
+      "passos": "GET e PUT /api/v1/cliente/{id de cliente de outro tenant}",
+      "resultado_esperado": "403 ou 404, sem nenhum dado do outro tenant no corpo",
+      "oraculo": "regra do usuário: o parceiro só vê os próprios dados",
+      "resultado_obtido": "",
+      "status": "pendente",
+      "evidencias": [],
+      "defeito_id": null,
+      "justificativa": "",
+      "atualizado_em": "2026-09-30T14:55:00-03:00"
+    }
+  ],
+  "defeitos": [
+    {
+      "id": "D-001",
+      "severidade": "medio",
+      "tipo": "defeito",
+      "titulo": "CNPJ com dígito verificador inválido vai para a API e volta erro 500 genérico",
+      "onde": "src/app/clientes/novo/schema.ts:14",
+      "causa": "O schema só exige 14 dígitos (regex) e não confere o dígito verificador. O backend lança exceção não tratada e devolve 500 com a mensagem do ORM, que a tela mostra como 'Erro inesperado'.",
+      "correcao": "O schema passou a usar validarCnpj() de src/shared/utils/cnpj.ts (o mesmo de /parceiros/novo) num .refine, com a mensagem i18n cliente.form.cnpjInvalido em todos os locales do projeto. O 500 da API continua para quem chama direto: relatado ao time, não corrigido (back fora da autorização desta rodada).",
+      "status": "retestado-ok",
+      "justificativa": "",
+      "evidencias": {
+        "antes": [
+          "evidencias/03-cnpj-dv-invalido-ANTES-circulado.png",
+          "rede/03-post-cliente-500.json"
+        ],
+        "depois": ["evidencias/04-cnpj-dv-invalido-CORRIGIDO-circulado.png"],
+        "reteste": ["evidencias/05-parceiros-cnpj-invalido-RETESTE.png"]
+      },
+      "atualizado_em": "2026-09-30T15:02:00-03:00"
+    },
+    {
+      "id": "D-002",
+      "severidade": "baixo",
+      "tipo": "retratado",
+      "titulo": "Duplo clique em Salvar parecia criar dois clientes",
+      "onde": "nenhum (efeito da ferramenta de teste)",
+      "causa": "O espião de XHR foi instalado duas vezes sem recarregar a página, e cada requisição apareceu duas vezes no log. O banco tem 1 cliente e a rede do navegador mostra 1 POST.",
+      "correcao": "Nenhuma: não era defeito.",
+      "status": "nao-corrigido",
+      "justificativa": "Retratado: o achado caiu ao ser reproduzido por outro caminho. Lição: confirmar duplicata no banco antes de chamar de bug, e reinstalar o espião só depois de navegar.",
+      "evidencias": {
+        "antes": ["rede/06-espiao-instalado-duas-vezes.json"],
+        "depois": ["evidencias/06-banco-um-cliente.png"],
+        "reteste": []
+      },
+      "atualizado_em": "2026-09-30T14:34:00-03:00"
+    }
+  ],
+  "sujeira": [
+    {
+      "id": "S-001",
+      "ambiente": "local (app_dev)",
+      "o_que": "cliente criado pelo C-0002",
+      "identificador": "CLI-TESTE-01 · Banco do Brasil · observação 'QA 2026-09-30'",
+      "estado_final": "ficou: permanece no banco, ativo",
+      "como_desfazer": "nada a fazer: dado de teste em ambiente local, marcado para achar depois; se pedirem, excluir pela tela de clientes",
+      "caso_id": "C-0002",
+      "atualizado_em": "2026-09-30T14:16:00-03:00"
+    }
+  ]
+}

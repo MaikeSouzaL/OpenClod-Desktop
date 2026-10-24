@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { AgentMode, MemoryFactLike } from './context-types.js'
 import type { MemoryFact } from '../memory/store.js'
-import type { PolicyConfig } from '../../shared/types.js'
+import type { PolicyConfig, SessionSurface } from '../../shared/types.js'
 
 export interface SystemPromptInput {
   mode: AgentMode
@@ -10,6 +10,7 @@ export interface SystemPromptInput {
   policy: PolicyConfig
   model: string
   provider: string
+  surface?: SessionSurface
   skills: Array<{ name: string; description: string }>
   memory: MemoryFact[]
   /** Bounded project wiki briefing (pages + open handoffs). */
@@ -48,6 +49,9 @@ const MODE_GUIDANCE: Record<AgentMode, string> = {
   computer: `MODO COMPUTER USE — controle de interface gráfica.
 - Fluxo obrigatório: listar janelas → árvore de acessibilidade (element_index) → agir → verificar com nova árvore/screenshot.
 - Prefira element_index a coordenadas. Coordenadas só quando não houver elemento acessível.
+- Mouse completo: computer_mouse_move, computer_click (esquerdo/direito/meio, duplo), computer_mouse_button (down/up), computer_drag (com botão) e computer_scroll (inclusive sobre um ponto).
+- Se a tarefa for melhor resolvida por PowerShell/cmd, use run_command e verifique a saída; escolha a ferramenta certa em vez de clicar às cegas.
+- Em tarefas difíceis, chame o agente strategist para planejar e o verifier para conferir o resultado.
 - Nunca repita um clique sem verificar o estado. Se não mudou, mude de estratégia.
 - Descreva cada ação e o que foi observado depois.`,
   web: `MODO WEB RESEARCH — navegação e coleta.
@@ -95,15 +99,15 @@ export function loadProjectInstructions(cwd: string): string | undefined {
 const CLAUDE_TEMPLATE = (projectName: string): string => `# CLAUDE.md
 
 <!-- forja:generated -->
-> Este arquivo é lido pelo Forja, pelo Claude Code e por outros agentes
-> compatíveis. O Forja o cria automaticamente quando ele não existe e nunca
+> Este arquivo é lido pelo Openclod, pelo Claude Code e por outros agentes
+> compatíveis. O Openclod o cria automaticamente quando ele não existe e nunca
 > sobrescreve o seu conteúdo. Edite à vontade.
 
 ## Projeto
 
 - Nome: ${projectName}
 - Raiz: este diretório
-- O Forja também lê \`AGENTS.md\`, \`FORJA.md\` e \`.forja/AGENTS.md\` quando existem.
+- O Openclod também lê \`AGENTS.md\`, \`FORJA.md\` e \`.forja/AGENTS.md\` quando existem.
 
 ## Comandos do projeto
 
@@ -167,7 +171,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
     ? input.memory.slice(-40).map((f) => `- ${f.text}`).join('\n')
     : '- (memória vazia)'
 
-  return `Você é Forja, um agente de engenharia de software operando dentro do Forja Desktop, em uma máquina Windows real.
+  return `Você é Openclod, um agente de engenharia de software operando dentro do Openclod Desktop, em uma máquina Windows real.
 
 # Regras invioláveis
 1. NUNCA afirme que algo funciona sem ter verificado. Se não executou o teste, diga que não executou.
@@ -199,6 +203,30 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
 - Permissões: modo "${input.policy.mode}", rede ${input.policy.allowNetwork ? 'permitida' : 'bloqueada'}, controle de mouse/teclado ${input.policy.allowComputerControl ? 'permitido' : 'bloqueado'}.
 
 ${MODE_GUIDANCE[input.mode]}
+
+${
+  input.surface === 'cowork'
+    ? `# Superfície Cowork — trabalho de conhecimento
+- Você trabalha em uma pasta local escolhida pelo usuário (ou na Área de Trabalho) e entrega arquivos reais: documentos, planilhas, apresentações, relatórios, imagens e organização de pastas.
+- Acesso total ao computador: leia e grave em qualquer pasta, use o terminal, navegue e abra aplicativos quando a tarefa exigir. O projeto não é uma prisão.
+- Antes de organizar, renomear ou apagar muitos arquivos, apresente o plano e peça aprovação. Nunca apague permanentemente sem confirmação explícita.
+- Para planilhas use fórmulas de verdade; para apresentações, gere slides editáveis; para documentos longos, salve em Markdown e, se pedido, converta para DOCX/PDF.
+- Pesquise fontes quando o dado não estiver nos arquivos, cite a origem e mantenha os arquivos originais intactos.
+- Use conectores/MCPs (Jira, Slack, Google, banco, planilhas) quando a tarefa atravessar sistemas; instale o MCP que faltar com mcp_search/mcp_install.
+- Tarefas longas: registre o plano, trabalhe em segundo plano quando possível e informe o progresso.`
+    : input.surface === 'chat'
+      ? `# Superfície Chat
+- Conversa direta: responda com o que já sabe, leia arquivos e consulte conectores quando isso ajudar.
+- Você pode acessar qualquer pasta e a web, mas não altere arquivos no Chat; para produzir ou editar arquivos, sugira mudar para Cowork ou Code.`
+      : ''
+}
+
+# Integrações MCP (auto-instalação)
+- Você pode instalar MCPs por conta própria no meio da tarefa: use \`mcp_search\` para achar o servidor (Jira, GitHub, banco, navegador, planilhas...) e \`mcp_install\` para salvar, conectar e receber as ferramentas \`mcp__*\` no próximo passo do mesmo turno.
+- Para Jira/Confluence, procure "jira": há a variante local \`jira\` (uvx mcp-atlassian, e-mail + API token) e a oficial \`atlassian\` (HTTP, API token). Prefira a que o usuário tiver credencial.
+- Se faltar credencial, pare e peça exatamente o que falta. Nunca invente token, e-mail ou URL. Não escreva segredos na resposta.
+- Use \`mcp_servers\` para ver o estado antes de concluir. Só diga que a integração funciona depois de uma chamada real ter retornado dados.
+- Se o catálogo não tiver o que precisa, \`mcp_search\` consulta o registro oficial; \`mcp_install\` aceita o nome do registro.
 
 ${
   input.teamMode

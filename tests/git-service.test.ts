@@ -38,7 +38,7 @@ async function tempDir(prefix = 'forja-git-ação-'): Promise<string> {
 async function initRepo(): Promise<string> {
   const dir = await tempDir()
   await git(dir, 'init', '-q', '-b', 'main')
-  await git(dir, 'config', 'user.name', 'Forja Test')
+  await git(dir, 'config', 'user.name', 'Openclod Test')
   await git(dir, 'config', 'user.email', 'forja@example.test')
   await git(dir, 'config', 'commit.gpgsign', 'false')
   await git(dir, 'config', 'core.autocrlf', 'false')
