@@ -1281,6 +1281,7 @@ export default function App(): ReactElement {
       onAddProject={() => void addProject()}
       onOpenSettings={() => setSettingsOpen(true)}
       onCapabilities={() => setSettingsOpen(true)}
+      onOpenMemory={() => setPage('memory')}
     />
   ) : cowork ? (
     <CoworkView

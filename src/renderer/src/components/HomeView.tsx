@@ -14,6 +14,7 @@ interface HomeViewProps {
   onAddProject(): void
   onOpenSettings(): void
   onCapabilities(): void
+  onOpenMemory?(): void
 }
 
 export function HomeView({
@@ -26,7 +27,8 @@ export function HomeView({
   composer,
   onAddProject,
   onOpenSettings,
-  onCapabilities
+  onCapabilities,
+  onOpenMemory
 }: HomeViewProps): ReactElement {
   const [bannerOpen, setBannerOpen] = useState(true)
   const computer = capabilities?.computer.available === true
@@ -78,7 +80,7 @@ export function HomeView({
             <Icon name="settings" size={13} /> Provedores e permissões
           </button>
           <span className="home-dot">·</span>
-          <button type="button" className="home-hint" onClick={onOpenSettings}>
+          <button type="button" className="home-hint" onClick={onOpenMemory}>
             <Icon name="archive" size={13} /> Memória do projeto
           </button>
         </div>

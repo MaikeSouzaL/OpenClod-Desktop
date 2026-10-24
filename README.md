@@ -1,6 +1,6 @@
-# Openclod
+# Openclod Desktop
 
-Openclod é um ambiente desktop para desenvolvimento assistido por modelos de linguagem,
+Openclod Desktop é um ambiente desktop para desenvolvimento assistido por modelos de linguagem,
 com **harness próprio**: loop de agente, ferramentas com classificação de risco,
 aprovação humana, Computer Use no Windows e navegação web via Playwright.
 
