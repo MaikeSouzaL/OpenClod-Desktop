@@ -50,6 +50,8 @@ export interface SubagentCaller {
   project: { name: string; branch?: string; isGitRepo: boolean }
   /** Owning project id, shared by every agent in the tree (AI-Memory scope). */
   projectId?: string
+  /** Execution environment profile shared by the whole agent tree. */
+  environment?: import('../../shared/types.js').EnvironmentProfile
   services: {
     browser: BrowserLayer
     computer: ComputerLayer

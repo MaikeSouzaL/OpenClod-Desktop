@@ -30,12 +30,16 @@ Uma página escrita no projeto A nunca é retornada para o projeto B.
 Ao fim de **cada turno**, o Openclod grava:
 
 1. Uma página na wiki nativa, com pedido, resultado, ferramentas e arquivos.
-2. Uma página no AI-Memory em `s/<hash-da-sessão>/<timestamp>.md`, com o
-   transcrito do turno, chamadas de ferramenta e saídas reais.
+2. Um bloco de turno na página da sessão no AI-Memory em
+   `s/<hash-da-sessão>.md`, com o transcrito, chamadas de ferramenta e saídas reais.
 
 Isso acontece mesmo que o modelo nunca chame `memory_page`. Páginas curadas
 criadas com `memory_page` são espelhadas em `pages/<slug>.md` para entrar no
 índice de entidades e links.
+
+Versões antigas gravavam um arquivo por turno em `s/<hash>/<turno>.md`; elas
+são consolidadas em uma página por sessão no início do app, para o grafo não
+ficar com um nó por turno.
 
 ## Recall antes de cada turno
 
@@ -65,6 +69,27 @@ projeto. A tela mostra:
 Transcritos de sessão ficam fora da grade para não afogar a lista; continuam
 pesquisáveis pelo agente e por **Buscar no índice**.
 
+## Grafo de memória (estilo Obsidian)
+
+Cada projeto tem a aba **Grafo** na tela Memória. O menu do projeto (botão de
+compartilhar na barra lateral, botão direito ou menu em Projetos) abre o grafo
+direto.
+
+- **Nós**: cada página/sessão/fato do projeto. O tamanho cresce com o grau.
+- **Arestas**:
+  - `link` — wikilink resolvido pelo índice do AI-Memory (`[[pages/foo.md]]`);
+  - `tag` — páginas que compartilham tags;
+  - `termo` — páginas que compartilham termos significativos.
+- Clique em um nó abre o conteúdo completo ao lado.
+- Arraste nós, use a roda para zoom e **Recentralizar** para reorganizar.
+- Ao final de cada turno, o Openclod procura páginas relacionadas e grava uma
+  seção `## Relacionados` com wikilinks. Isso alimenta o grafo e o
+  graph-neighbour RRF do próprio AI-Memory, melhorando o recall.
+
+A tela lê primeiro `/api/v1/.../graph` do AI-Memory (links explícitos) e
+complementa com as conexões semânticas. Se o sidecar estiver indisponível, cai
+para a wiki nativa.
+
 ## Exclusão
 
 - **Remover da lista**: o projeto sai da lista; sessões, wiki e índice ficam.
@@ -76,7 +101,7 @@ pesquisáveis pelo agente e por **Buscar no índice**.
 
 - Binário ausente: a wiki nativa continua funcionando.
 - Caminhos longos do Windows: páginas antigas em `sessions/...` são migradas
-  para `s/<hash>/...` no início, antes de qualquer purge.
+  para `s/<hash>.md` (uma por sessão) no início, antes de qualquer purge.
 - Servidor já em execução: o app reutiliza a porta/token salvos em
   `server.json` e roda a migração de caminhos.
 - Falha do sidecar nunca derruba um turno: a captura nativa é gravada antes.

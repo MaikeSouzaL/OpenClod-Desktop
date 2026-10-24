@@ -319,6 +319,31 @@ export interface MemoryPageContent {
   source: string
 }
 
+export interface MemoryGraphNodeInfo {
+  id: string
+  path: string
+  title: string
+  kind: 'session' | 'page' | 'fact'
+  tags: string[]
+  updated: string
+  degree: number
+  terms: string[]
+}
+
+export interface MemoryGraphEdgeInfo {
+  source: string
+  target: string
+  kind: 'link' | 'tag' | 'term'
+  weight: number
+}
+
+export interface MemoryGraphInfo {
+  nodes: MemoryGraphNodeInfo[]
+  edges: MemoryGraphEdgeInfo[]
+  truncated: boolean
+  source: 'ai-memory' | 'native'
+}
+
 export interface CreateTerminalInput {
   cwd: string
   cols: number
@@ -345,6 +370,8 @@ export const CH = {
   appMcpCatalog: 'app:mcpCatalog',
   appMcpInstall: 'app:mcpInstall',
   appImportClaude: 'app:importClaude',
+  appClaudeStatus: 'app:claudeStatus',
+  appClaudeLogin: 'app:claudeLogin',
   appPluginCatalog: 'app:pluginCatalog',
   appAgents: 'app:agents',
   appOpenSkills: 'app:openSkills',
@@ -366,6 +393,7 @@ export const CH = {
   sessionsSetMode: 'sessions:setMode',
   sessionsSetModel: 'sessions:setModel',
   sessionsSetEffort: 'sessions:setEffort',
+  sessionsSetEnvironment: 'sessions:setEnvironment',
   sessionsExport: 'sessions:export',
   sessionsImport: 'sessions:import',
   sessionsArchive: 'sessions:archive',
@@ -412,6 +440,7 @@ export const CH = {
   memoryImport: 'memory:import',
   memoryRecall: 'memory:recall',
   memoryAiStatus: 'memory:aiStatus',
+  memoryGraph: 'memory:graph',
   powerState: 'power:state',
 
   schedulesList: 'schedules:list',
@@ -466,6 +495,10 @@ export interface OpenclodApi {
     ): Promise<IpcResult<{ ok: boolean; name?: string; state?: string; tools?: string[]; missing?: string[]; needsOAuth?: boolean; error?: string }>>
     /** Copies skills, agents and MCP servers from Claude Desktop/Code. */
     importClaude(): Promise<IpcResult<ClaudeImportInfo>>
+    /** Authentication state of the local Claude Code CLI. */
+    claudeStatus(): Promise<IpcResult<{ loggedIn: boolean; method?: string; account?: string; raw?: string }>>
+    /** Opens a terminal running `claude auth login`; the user completes the browser step. */
+    claudeLogin(): Promise<IpcResult<boolean>>
     /** The 315-plugin marketplace snapshot bundled with the app. */
     pluginCatalog(): Promise<IpcResult<PluginCatalogEntry[]>>
     /** Built-in + imported agents available to a project. */
@@ -494,6 +527,7 @@ export interface OpenclodApi {
     setModel(sessionId: string, providerId: string, model: string): Promise<IpcResult<boolean>>
     /** null restores the model's own default depth. */
     setEffort(sessionId: string, effort: ReasoningEffort | null): Promise<IpcResult<boolean>>
+    setEnvironment(sessionId: string, environmentId: string): Promise<IpcResult<boolean>>
     export(sessionId: string): Promise<IpcResult<string>>
     import(json: string): Promise<IpcResult<SessionMeta>>
     archive(sessionId: string, archived: boolean): Promise<IpcResult<SessionMeta>>
@@ -552,6 +586,8 @@ export interface OpenclodApi {
     recall(projectId: string, query: string, limit?: number): Promise<IpcResult<{ text: string; hits: number }>>
     /** Sidecar status (binary, server, port, last error). */
     aiStatus(): Promise<IpcResult<{ available: boolean; running: boolean; root: string; port?: number; error?: string }>>
+    /** Obsidian-style graph: explicit + semantic connections for one project. */
+    graph(projectId: string): Promise<IpcResult<MemoryGraphInfo>>
     /** Saves every page as one Markdown bundle; returns the chosen path. */
     exportMarkdown(projectId: string): Promise<IpcResult<string | null>>
     /** Imports all .md files from a chosen folder as memory pages. */

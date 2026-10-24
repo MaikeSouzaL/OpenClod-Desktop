@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { z } from 'zod'
-import type { ToolResult } from '../../shared/types.js'
+import type { EnvironmentProfile, ToolResult } from '../../shared/types.js'
 import type { ToolDef } from './types.js'
 import { checkCommand, sanitizedEnv } from '../security/policy.js'
 import { truncateMiddle } from '../util/ids.js'
@@ -33,13 +33,46 @@ function track(sessionId: string, child: ChildProcess): void {
   child.on('exit', () => set.delete(child))
 }
 
-function startBackground(command: string, cwd: string, sessionId: string): BackgroundProcess {
-  const child = spawn(command, {
-    cwd,
-    shell: true,
-    windowsHide: true,
-    env: { ...sanitizedEnv(), FORCE_COLOR: '0', NO_COLOR: '1' }
-  })
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+export interface EnvironmentSpawn {
+  file: string
+  args: string[]
+  shell: boolean
+}
+
+/** Pure command-line construction, exported so routing can be tested without a host. */
+export function environmentSpawn(command: string, cwd: string, environment?: EnvironmentProfile): EnvironmentSpawn {
+  if (!environment || environment.kind === 'local') return { file: command, args: [], shell: true }
+  if (environment.kind === 'wsl') {
+    return {
+      file: 'wsl.exe',
+      args: [...(environment.distro ? ['-d', environment.distro] : []), '--cd', cwd, 'bash', '-lc', command],
+      shell: false
+    }
+  }
+  if (!environment.command) {
+    throw new Error(`ambiente ${environment.label}: configure o comando (ex.: ssh usuario@host)`)
+  }
+  const remote = `cd ${shellQuote(environment.remoteCwd || '.')} && ${command}`
+  return { file: `${environment.command} ${shellQuote(remote)}`, args: [], shell: true }
+}
+
+/**
+ * Routes one command to the session's execution environment. Local and WSL
+ * run on this machine; SSH/cloud use the profile's command prefix, so the
+ * operator can point it at a host, a jump box or a container.
+ */
+function spawnCommand(command: string, cwd: string, environment?: EnvironmentProfile): ChildProcess {
+  const env = { ...sanitizedEnv(), FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' }
+  const spec = environmentSpawn(command, cwd, environment)
+  return spawn(spec.file, spec.args, { cwd, shell: spec.shell, windowsHide: true, env })
+}
+
+function startBackground(command: string, cwd: string, sessionId: string, environment?: EnvironmentProfile): BackgroundProcess {
+  const child = spawnCommand(command, cwd, environment)
   track(sessionId, child)
   const record: BackgroundProcess = {
     pid: child.pid ?? -1,
@@ -171,15 +204,17 @@ function runShell(
   cwd: string,
   timeoutMs: number,
   sessionId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  environment?: EnvironmentProfile
 ): Promise<RunResult> {
   return new Promise((resolve) => {
-    const child = spawn(command, {
-      cwd,
-      shell: true,
-      windowsHide: true,
-      env: { ...sanitizedEnv(), FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' }
-    })
+    let child: ChildProcess
+    try {
+      child = spawnCommand(command, cwd, environment)
+    } catch (err) {
+      resolve({ code: -1, stdout: '', stderr: (err as Error).message, timedOut: false })
+      return
+    }
     track(sessionId, child)
     let stdout = ''
     let stderr = ''
@@ -251,7 +286,7 @@ export const runCommandTool: ToolDef = {
     }
     const cwd = args.cwd ? ctx.workspace.resolve(args.cwd, ctx.cwd) : ctx.cwd
     if (args.run_in_background) {
-      const record = startBackground(args.command, cwd, ctx.sessionId)
+      const record = startBackground(args.command, cwd, ctx.sessionId, ctx.environment)
       return {
         ok: record.pid > 0,
         text: `processo em segundo plano iniciado · pid=${record.pid}. Use read_process_output com este pid para ler a saída.`,
@@ -261,7 +296,7 @@ export const runCommandTool: ToolDef = {
     }
     const timeoutMs = args.timeout_ms ?? ctx.policy.shellTimeoutSec * 1000
     const started = Date.now()
-    const result = await runShell(args.command, cwd, timeoutMs, ctx.sessionId, ctx.signal)
+    const result = await runShell(args.command, cwd, timeoutMs, ctx.sessionId, ctx.signal, ctx.environment)
     const elapsed = ((Date.now() - started) / 1000).toFixed(1)
     const parts = [`$ ${args.command}`, `exit=${result.code ?? 'null'} · ${elapsed}s${result.timedOut ? ' · TIMEOUT' : ''}`]
     if (result.stdout.trim()) parts.push(`--- stdout ---\n${truncateMiddle(result.stdout.trim(), 28_000)}`)
@@ -300,7 +335,7 @@ export const startProcessTool: ToolDef = {
     if (guard.blocked) return { ok: false, text: `BLOQUEADO pela política: ${guard.reason}` }
     const cwd = args.cwd ? ctx.workspace.resolve(args.cwd, ctx.cwd) : ctx.cwd
 
-    const record = startBackground(args.command, cwd, ctx.sessionId)
+    const record = startBackground(args.command, cwd, ctx.sessionId, ctx.environment)
     await new Promise((r) => setTimeout(r, args.wait_ms ?? 1800))
     const { text } = takeNewOutput(record)
     const exited = record.exitCode !== null
@@ -407,7 +442,7 @@ export const listPortsTool: ToolDef = {
   },
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as { filter?: string }
-    const result = await runShell('netstat -ano -p tcp', ctx.cwd, 15_000, ctx.sessionId, ctx.signal)
+    const result = await runShell('netstat -ano -p tcp', ctx.cwd, 15_000, ctx.sessionId, ctx.signal, ctx.environment)
     const lines = result.stdout
       .split(/\r?\n/)
       .filter((l) => /LISTENING/i.test(l))

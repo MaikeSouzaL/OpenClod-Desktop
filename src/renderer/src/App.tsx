@@ -147,6 +147,7 @@ export default function App(): ReactElement {
   const defaultEffortRef = useRef(defaultEffort)
   defaultEffortRef.current = defaultEffort
   const [page, setPage] = useState<SidebarPage | null>(null)
+  const [memoryGraphRequest, setMemoryGraphRequest] = useState(0)
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined)
   const [keepAwake, setKeepAwake] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -605,8 +606,13 @@ export default function App(): ReactElement {
     [activeProjectId, clearSession]
   )
 
-  const deleteProject = useCallback(
-    async (project: Project): Promise<void> => {
+  const openMemoryGraph = useCallback((project: Project): void => {
+    setPage('memory')
+    setActiveProjectId(project.id)
+    setMemoryGraphRequest((value) => value + 1)
+  }, [])
+
+  const deleteProject = useCallback(    async (project: Project): Promise<void> => {
       try {
         await unwrap(window.forja.projects.delete(project.id))
         const [list, sessionList] = await Promise.all([
@@ -847,8 +853,21 @@ export default function App(): ReactElement {
       .catch(() => undefined)
   }, [activeSessionId])
 
-  const changeMode = useCallback(async (agentMode: AgentMode): Promise<void> => {
+  const changeEnvironment = useCallback(async (environmentId: string): Promise<void> => {
     const id = activeSessionRef.current
+    if (!id) return
+    try {
+      await unwrap(window.forja.sessions.setEnvironment(id, environmentId))
+      const patch = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, environment: environmentId })
+      setSession((current) => (current ? { ...current, meta: patch(current.meta) } : current))
+      setSessions((current) => current.map((item) => (item.meta.id === id ? { ...item, meta: patch(item.meta) } : item)))
+      setToast({ level: 'info', text: `Ambiente: ${environmentId}` })
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }, [])
+
+  const changeMode = useCallback(async (agentMode: AgentMode): Promise<void> => {    const id = activeSessionRef.current
     if (!id) return
     try {
       await unwrap(window.forja.sessions.setMode(id, agentMode))
@@ -1128,6 +1147,8 @@ export default function App(): ReactElement {
       skills={skills}
       contextPercent={contextPercent}
       effort={session ? (session.meta.effort ?? null) : defaultEffort}
+      environments={settings?.environments ?? []}
+      environmentId={session?.meta.environment ?? 'local'}
       workspaceName={activeProject?.name}
       seed={composerSeed}
       insert={dictationInsert}
@@ -1140,6 +1161,7 @@ export default function App(): ReactElement {
       onModelChange={(providerId, model) => void changeModel(providerId, model)}
       onEffortChange={(next) => void changeEffort(next)}
       onPermissionChange={(mode) => void changePermission(mode)}
+      onEnvironmentChange={(environmentId) => void changeEnvironment(environmentId)}
       onSurfaceChange={(next) => {
         setPage(null)
         setSurface(next)
@@ -1255,6 +1277,7 @@ export default function App(): ReactElement {
         onReveal={(path) => void revealPath(path)}
         onRemove={(project) => void removeProject(project)}
         onDelete={(project) => void deleteProject(project)}
+        onOpenGraph={openMemoryGraph}
       />
     ) : page === 'memory' ? (
       <MemoryPage
@@ -1263,9 +1286,12 @@ export default function App(): ReactElement {
         onSelectProject={(project) => void selectProject(project)}
         onAddProject={() => void addProject()}
         onOpenSettings={() => openSettingsAt('memory')}
+        graphRequest={memoryGraphRequest}
       />
     ) : page === 'artifacts' ? (
       <ArtifactsPage
+        projects={projects}
+        activeProjectId={activeProjectId}
         sessions={sessions}
         onCreate={(prompt) => {
           setPage(null)
@@ -1384,7 +1410,7 @@ export default function App(): ReactElement {
       <span className="we-mark">
         <OpenclodMark size={34} />
       </span>
-      <h1>Pronto para forjar</h1>
+      <h1>Pronto para começar</h1>
       <p className="we-tagline">Código, terminal, navegador e Computer Use no Windows real.</p>
       <p className="we-text">
         Abra uma pasta de projeto ou escolha uma sessão na barra lateral. Toda ação sensível passa por aprovação e
@@ -1491,6 +1517,7 @@ export default function App(): ReactElement {
             onAddProject={() => void addProject()}
             onRemoveProject={(project) => void removeProject(project)}
             onDeleteProject={(project) => void deleteProject(project)}
+            onOpenGraph={openMemoryGraph}
             onDeleteSession={(id) => void deleteSession(id)}
             onRenameSession={(id, title) => void renameSession(id, title)}
             onArchiveSession={(id, archived) => void archiveSession(id, archived)}

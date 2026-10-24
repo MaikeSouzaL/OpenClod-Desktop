@@ -133,8 +133,7 @@ export class Orchestrator {
    * `.forja/settings*.json` (+ `.claude/` when enabled) + "always allow"
    * choices saved for the project.
    */
-  private sessionConfig(state: SessionState): { policy: PolicyConfig; hooks: HookRunner } {
-    const settings = this.settings.get()
+  private sessionConfig(state: SessionState): { policy: PolicyConfig; hooks: HookRunner } {    const settings = this.settings.get()
     const project = loadProjectSettings(state.meta.cwd, { importClaude: settings.importClaudeSettings })
     const policy: PolicyConfig = {
       ...settings.policy,
@@ -329,6 +328,7 @@ export class Orchestrator {
       effort: state.meta.effort,
       registry: this.baseRegistry,
       policy,
+      environment: this.environmentFor(state),
       limits: settings.limits ?? DEFAULT_LIMITS,
       tracker,
       workspace,
@@ -681,35 +681,42 @@ export class Orchestrator {
       const turnId = lastUser?.id ?? `turn_${Date.now()}`
       const stamp = new Date().toISOString()
       const transcript = renderTurnTranscript(after)
-      const body = [
-        `# ${state.meta.title || 'Sessão'}`,
+      const body: string[] = [
+        `## Turno — ${new Date().toLocaleString('pt-BR')}`,
         '',
-        `- **Projeto:** ${state.meta.projectId}`,
-        `- **Sessão:** ${sessionId}`,
         `- **Turno:** ${turnId}`,
         `- **Data:** ${stamp}`,
         `- **Modelo:** ${state.meta.providerId}/${state.meta.model}`,
         '',
-        '## Pedido',
+        '### Pedido',
         '',
         userText.trim().slice(0, 12_000) || '(sem texto)',
         '',
-        '## Resposta',
+        '### Resposta',
         '',
         assistantText.trim().slice(0, 20_000) || '(sem resposta textual)',
         '',
-        '## Execução',
+        '### Execução',
         '',
         transcript || '(nenhuma ferramenta usada)',
         '',
-        '## Arquivos alterados',
+        '### Arquivos alterados',
         '',
         files.length ? files.map((file) => `- ${file}`).join('\n') : '(nenhum)'
-      ].join('\n')
+      ]
+      const pagePath = `s/${shortHash(sessionId)}.md`
+      const related = await this.aiMemory
+        .relatedMarkdown(state.meta.projectId, `${userText}\n${assistantText}`, pagePath, 4)
+        .catch(() => '')
+      if (related) body.push('', '### Relacionados', '', related)
+      const existing = await this.aiMemory.readPage(state.meta.projectId, pagePath).catch(() => null)
+      const fullBody = existing
+        ? `${existing.body.trim()}\n\n---\n\n${body.join('\n')}`
+        : [`# ${state.meta.title || 'Sessão'}`, '', body.join('\n')].join('\n')
       await this.aiMemory.writePage(state.meta.projectId, {
-        path: `s/${shortHash(sessionId)}/${Date.now().toString(36)}.md`,
-        title: `Sessão ${state.meta.title || sessionId} — ${new Date().toLocaleString('pt-BR')}`,
-        body,
+        path: pagePath,
+        title: `Sessão ${state.meta.title || sessionId}`,
+        body: fullBody,
         tags: ['sessao', 'automatico', 'turno'],
         tier: 'episodic'
       })
@@ -742,6 +749,24 @@ export class Orchestrator {
   async setEffort(sessionId: string, effort: ReasoningEffort | null): Promise<void> {
     this.dropRunner(sessionId)
     await this.store.patchMeta(sessionId, { effort: effort ?? undefined })
+  }
+
+  private environmentFor(state: SessionState): import('../shared/types.js').EnvironmentProfile | undefined {
+    const profiles = this.settings.get().environments ?? [
+      { id: 'local', label: 'Local', kind: 'local' as const },
+      { id: 'wsl', label: 'WSL', kind: 'wsl' as const }
+    ]
+    return profiles.find((profile) => profile.id === state.meta.environment) ?? profiles.find((profile) => profile.kind === 'local') ?? profiles[0]
+  }
+
+  async setEnvironment(sessionId: string, environmentId: string): Promise<void> {
+    const state = await this.store.loadSession(sessionId)
+    if (!state) throw new Error('sessão não encontrada')
+    const profiles = this.settings.get().environments ?? []
+    const profile = profiles.find((item) => item.id === environmentId)
+    if (!profile) throw new Error('ambiente não encontrado')
+    this.dropRunner(sessionId)
+    await this.store.patchMeta(sessionId, { environment: profile.id })
   }
 
   async setModel(sessionId: string, providerId: string, model: string): Promise<void> {
@@ -1324,14 +1349,24 @@ export class Orchestrator {
       const known = new Set(indexed.map((hit) => hit.path))
       for (const summary of native) {
         const path = `pages/${summary.slug}.md`
-        if (known.has(path)) continue
         const page = await this.memoryForProject(projectId).readPage(summary.slug)
         if (!page) continue
+        // Session pages already have a richer AI-Memory transcript at
+        // `s/<hash>.md`; mirroring the native summary would create a duplicate
+        // node for the same conversation in the graph.
+        if (summary.tags.includes('sessao') && summary.tags.includes('automatico')) {
+          await this.aiMemory.deletePage(projectId, path).catch(() => false)
+          continue
+        }
+        if (known.has(path)) continue
+        const related = await this.aiMemory
+          .relatedMarkdown(projectId, `${page.title}\n${page.body}`, path, 4)
+          .catch(() => '')
         await this.aiMemory
           .writePage(projectId, {
             path,
             title: page.title,
-            body: page.body,
+            body: related ? `${page.body}\n\n## Relacionados\n\n${related}` : page.body,
             tags: page.tags,
             pinned: page.pinned,
             tier: 'semantic'
@@ -1422,6 +1457,45 @@ export class Orchestrator {
     return this.aiMemory.recall(projectId, query, limit)
   }
 
+  /** Obsidian-style graph of the project's memory (explicit + semantic edges). */
+  async memoryGraph(projectId: string): Promise<import('./ai-memory.js').AiMemoryGraph> {
+    this.requireProject(projectId)
+    await this.syncNativeToAi(projectId)
+    const graph = await this.aiMemory.graph(projectId).catch(() => null)
+    if (graph?.nodes.length) return graph
+
+    // Fallback: native wiki only. Tags and keywords still give a usable graph.
+    const pages = await this.memoryForProject(projectId).listPages()
+    const nodes = pages.map((page) => ({
+      id: page.slug,
+      path: page.slug,
+      title: page.title,
+      kind: 'page' as const,
+      tags: page.tags,
+      updated: page.updated,
+      degree: 0,
+      terms: graphKeywords(`${page.title} ${page.summary}`)
+    }))
+    const edges: import('./ai-memory.js').AiMemoryGraphEdge[] = []
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const tags = nodes[i].tags.filter((tag) => nodes[j].tags.includes(tag)).length
+        const terms = nodes[i].terms.filter((term) => nodes[j].terms.includes(term)).length
+        if (tags || terms) {
+          edges.push({
+            source: nodes[i].id,
+            target: nodes[j].id,
+            kind: tags ? 'tag' : 'term',
+            weight: tags * 4 + terms * 2
+          })
+          nodes[i].degree++
+          nodes[j].degree++
+        }
+      }
+    }
+    return { nodes, edges, truncated: false, source: 'native' }
+  }
+
   /** Public status used by Configurações → Memória. */
   aiMemoryStatus(): import('./ai-memory.js').AiMemoryStatus {
     return { ...this.aiMemory.status(), root: this.aiMemory.root }
@@ -1503,6 +1577,15 @@ function aiPageId(pagePath: string): string {
 
 function shortHash(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex').slice(0, 10)
+}
+
+function graphKeywords(text: string): string[] {
+  const counts = new Map<string, number>()
+  for (const word of text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9_]+/)) {
+    if (word.length < 4 || /^\d+$/.test(word)) continue
+    counts.set(word, (counts.get(word) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([word]) => word)
 }
 
 /** Human-readable execution log of one turn, used in the AI-Memory page. */

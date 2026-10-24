@@ -48,6 +48,31 @@ export interface AiMemoryStatus {
   error?: string
 }
 
+export interface AiMemoryGraphNode {
+  id: string
+  path: string
+  title: string
+  kind: 'session' | 'page' | 'fact'
+  tags: string[]
+  updated: string
+  degree: number
+  terms: string[]
+}
+
+export interface AiMemoryGraphEdge {
+  source: string
+  target: string
+  kind: 'link' | 'tag' | 'term'
+  weight: number
+}
+
+export interface AiMemoryGraph {
+  nodes: AiMemoryGraphNode[]
+  edges: AiMemoryGraphEdge[]
+  truncated: boolean
+  source: 'ai-memory' | 'native'
+}
+
 interface ServerState {
   port: number
   token: string
@@ -108,6 +133,9 @@ export class AiMemoryService {
       await this.compactLongPaths().catch((err) => {
         this.lastError = `migração de caminhos: ${(err as Error).message}`
       })
+      await this.mergeSessionTurns().catch((err) => {
+        this.lastError = `consolidação de sessões: ${(err as Error).message}`
+      })
       return
     }
 
@@ -128,6 +156,7 @@ export class AiMemoryService {
         `127.0.0.1:${port}`,
         '--workspace',
         AI_MEMORY_WORKSPACE,
+        '--enable-api',
         '--no-watcher'
       ],
       {
@@ -158,6 +187,9 @@ export class AiMemoryService {
         this.lastError = ''
         await this.compactLongPaths().catch((err) => {
           this.lastError = `migração de caminhos: ${(err as Error).message}`
+        })
+        await this.mergeSessionTurns().catch((err) => {
+          this.lastError = `consolidação de sessões: ${(err as Error).message}`
         })
         return
       }
@@ -273,6 +305,135 @@ export class AiMemoryService {
       })
     })
     return { path: result.path, pageId: result.page_id }
+  }
+
+  /**
+   * Markdown block linking a page to its closest neighbours. The engine's
+   * graph, entity index and graph-neighbour RRF all consume these wikilinks,
+   * so the Obsidian-style graph is not just decoration: it improves recall.
+   */
+  async relatedMarkdown(projectId: string, query: string, excludePath = '', limit = 4): Promise<string> {
+    try {
+      const hits = (await this.search(projectId, query, limit + 2)).filter((hit) => hit.path !== excludePath).slice(0, limit)
+      if (!hits.length) return ''
+      return hits.map((hit) => `- [[${hit.path}]] — ${hit.title}`).join('\n')
+    } catch {
+      return ''
+    }
+  }
+
+  /**
+   * Obsidian-style memory graph for one project. The engine supplies resolved
+   * wikilinks; this method adds semantic edges from shared tags and significant
+   * terms so pages that talk about the same subject are visibly connected even
+   * before the agent writes an explicit link.
+   */
+  async graph(projectId: string): Promise<AiMemoryGraph> {
+    const recent = await this.recent(projectId, 100).catch(() => [])
+    if (!recent.length) return { nodes: [], edges: [], truncated: false, source: 'ai-memory' }
+    const pages = (await mapLimit(recent, 6, (hit) => this.readPage(projectId, hit.path))).filter(
+      (page): page is AiMemoryPage => Boolean(page)
+    )
+    if (!pages.length) return { nodes: [], edges: [], truncated: false, source: 'ai-memory' }
+
+    const nodes: AiMemoryGraphNode[] = pages.map((page) => ({
+      id: page.path,
+      path: page.path,
+      title: page.path.startsWith('s/')
+        ? page.title.replace(/ — \d{2}\/\d{2}\/\d{4}.*$/, '')
+        : page.title,
+      kind: page.path.startsWith('s/') || page.path.startsWith('sessions/')
+        ? 'session'
+        : page.path.startsWith('pages/')
+          ? 'page'
+          : 'fact',
+      tags: page.tags,
+      updated: page.updated,
+      degree: 0,
+      terms: keywords(`${page.title}\n${page.body}`)
+    }))
+
+    const edgeMap = new Map<string, AiMemoryGraphEdge>()
+    const addEdge = (source: string, target: string, kind: AiMemoryGraphEdge['kind'], weight: number): void => {
+      if (source === target) return
+      const [a, b] = source < target ? [source, target] : [target, source]
+      const key = `${a}|${b}`
+      const current = edgeMap.get(key)
+      if (!current || current.weight < weight) edgeMap.set(key, { source: a, target: b, kind, weight })
+    }
+
+    // 1. Explicit resolved wikilinks from the AI-Memory index.
+    const explicit = await this.explicitEdges(projectId)
+    for (const edge of explicit) addEdge(edge.from, edge.to, 'link', 6)
+
+    // 2. Semantic links: shared tags first, then significant terms.
+    const byTag = new Map<string, string[]>()
+    const byTerm = new Map<string, string[]>()
+    for (const node of nodes) {
+      for (const tag of new Set(node.tags.map((tag) => tag.toLowerCase().trim()).filter(Boolean))) {
+        byTag.set(tag, [...(byTag.get(tag) ?? []), node.path])
+      }
+      for (const term of node.terms.slice(0, 8)) {
+        byTerm.set(term, [...(byTerm.get(term) ?? []), node.path])
+      }
+    }
+    for (const paths of byTag.values()) {
+      for (let i = 0; i < paths.length; i++) {
+        for (let j = i + 1; j < paths.length; j++) addEdge(paths[i], paths[j], 'tag', 4)
+      }
+    }
+    for (const paths of byTerm.values()) {
+      if (paths.length > 8) continue
+      for (let i = 0; i < paths.length; i++) {
+        for (let j = i + 1; j < paths.length; j++) addEdge(paths[i], paths[j], 'term', 2)
+      }
+    }
+
+    // Keep the graph readable: each page gets its strongest semantic edges,
+    // while every explicit link is always kept.
+    const explicitKeys = new Set(explicit.map((edge) => [edge.from, edge.to].sort().join('|')))
+    const ranked = [...edgeMap.values()].sort((a, b) => b.weight - a.weight)
+    const perNode = new Map<string, number>()
+    const edges: AiMemoryGraphEdge[] = []
+    for (const edge of ranked) {
+      const key = `${edge.source}|${edge.target}`
+      if (!explicitKeys.has(key)) {
+        const count = Math.max(perNode.get(edge.source) ?? 0, perNode.get(edge.target) ?? 0)
+        if (count >= 5) continue
+      }
+      edges.push(edge)
+      perNode.set(edge.source, (perNode.get(edge.source) ?? 0) + 1)
+      perNode.set(edge.target, (perNode.get(edge.target) ?? 0) + 1)
+    }
+    for (const edge of edges) {
+      const source = nodes.find((node) => node.id === edge.source)
+      const target = nodes.find((node) => node.id === edge.target)
+      if (source) source.degree++
+      if (target) target.degree++
+    }
+    return { nodes, edges, truncated: recent.length >= 100, source: 'ai-memory' }
+  }
+
+  private async explicitEdges(projectId: string): Promise<Array<{ from: string; to: string }>> {
+    const scope = `workspace=${encodeURIComponent(AI_MEMORY_WORKSPACE)}&project=${encodeURIComponent(projectId)}`
+    const urls = [
+      `/api/v1/workspaces/${encodeURIComponent(AI_MEMORY_WORKSPACE)}/projects/${encodeURIComponent(projectId)}/graph`,
+      `/api/v1/graph?${scope}`
+    ]
+    for (const url of urls) {
+      try {
+        const body = await this.request<{
+          edges?: Array<{ from_path?: string; to_path?: string; from_project?: string; to_project?: string }>
+        }>(url)
+        const edges = (body.edges ?? [])
+          .filter((edge) => edge.from_path && edge.to_path && (!edge.from_project || edge.from_project === projectId))
+          .map((edge) => ({ from: edge.from_path!, to: edge.to_path! }))
+        if (edges.length) return edges
+      } catch {
+        /* API may be disabled on an older config; semantic edges still work */
+      }
+    }
+    return []
   }
 
   async recent(projectId: string, limit = 40): Promise<AiMemoryHit[]> {    const hits = await this.request<Array<{ path: string; title: string; snippet: string; updated_at?: string }>>(
@@ -444,9 +605,55 @@ export class AiMemoryService {
     if (migrated) this.lastError = ''
   }
 
+  /**
+   * Older versions wrote one page per turn (`s/<hash>/<turn>.md`). One node
+   * per turn makes the graph unreadable; merge them into `s/<hash>.md`.
+   */
+  private async mergeSessionTurns(): Promise<void> {
+    const hits = await this.request<Array<{ path: string; title: string; workspace?: string; project?: string }>>(
+      '/admin/recent?limit=100'
+    ).catch(() => [])
+    const groups = new Map<string, Array<{ path: string; project: string }>>()
+    for (const hit of hits) {
+      const match = /^s\/([a-f0-9]{6,})\/[^/]+\.md$/.exec(hit.path)
+      if (!match || !hit.project) continue
+      const list = groups.get(match[1]) ?? []
+      list.push({ path: hit.path, project: hit.project })
+      groups.set(match[1], list)
+    }
+    for (const [hash, list] of groups) {
+      if (!list.length) continue
+      const project = list[0].project
+      const pages = (
+        await mapLimit(list, 6, async (item) => ({
+          item,
+          page: await this.readPage(project, item.path).catch(() => null)
+        }))
+      )
+        .filter((entry): entry is { item: { path: string; project: string }; page: AiMemoryPage } => Boolean(entry.page))
+        .sort((a, b) => a.page.updated.localeCompare(b.page.updated))
+      if (!pages.length) continue
+      const target = `s/${hash}.md`
+      const existing = await this.readPage(project, target).catch(() => null)
+      const chunks = pages.map((entry) => entry.page.body.replace(/^#\s+.+\n+/, '').trim()).filter(Boolean)
+      const body = [existing?.body.trim(), ...chunks].filter(Boolean).join('\n\n---\n\n')
+      const title = (existing?.title || pages[0].page.title).replace(/ — \d{2}\/\d{2}\/\d{4}.*$/, '')
+      await this.writePage(project, {
+        path: target,
+        title,
+        body,
+        tags: ['sessao', 'automatico', 'turno'],
+        tier: 'episodic'
+      })
+      for (const entry of pages) {
+        if (entry.item.path === target) continue
+        await this.deletePage(project, entry.item.path)
+      }
+    }
+  }
+
   /** Recursively removes a wiki file by relative path, bypassing MAX_PATH. */
-  private removeLongFile(relative: string): void {
-    const root = path.join(this.dataDir, 'wiki')
+  private removeLongFile(relative: string): void {    const root = path.join(this.dataDir, 'wiki')
     const wanted = relative.replace(/\\/g, '/')
     const walk = (dir: string): boolean => {
       let entries: fs.Dirent[]
@@ -517,6 +724,40 @@ function stripHtml(value: string): string {
 
 function hash(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex').slice(0, 12)
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++
+      out[index] = await fn(items[index])
+    }
+  })
+  await Promise.all(workers)
+  return out
+}
+
+const STOPWORDS = new Set([
+  'para', 'pelo', 'pela', 'pelos', 'pelas', 'como', 'mais', 'menos', 'isso', 'este', 'esta', 'esse', 'essa',
+  'aquele', 'aquela', 'with', 'from', 'this', 'that', 'the', 'and', 'for', 'not', 'are', 'was', 'were',
+  'tem', 'ter', 'foi', 'ser', 'sao', 'são', 'uma', 'uns', 'umas', 'dos', 'das', 'por', 'que', 'com', 'sem',
+  'projeto', 'sessao', 'sessão', 'arquivo', 'arquivos', 'codigo', 'código', 'resposta', 'pedido', 'resultado',
+  'execucao', 'execução', 'ferramenta', 'ferramentas', 'usuario', 'usuário', 'openclod', 'uracan', 'decisao',
+  'decisão', 'theme', 'tema', 'white', 'label', 'cores', 'cor', 'azul'
+])
+
+function keywords(text: string): string[] {
+  const counts = new Map<string, number>()
+  for (const raw of text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9_]+/)) {
+    if (raw.length < 4 || raw.length > 40 || /^\d+$/.test(raw) || STOPWORDS.has(raw)) continue
+    counts.set(raw, (counts.get(raw) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 12)
+    .map(([term]) => term)
 }
 
 function sleep(ms: number): Promise<void> {

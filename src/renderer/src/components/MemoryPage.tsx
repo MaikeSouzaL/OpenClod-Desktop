@@ -4,6 +4,7 @@ import type { MemoryPageContent, MemoryPageInfo, MemoryStatsInfo } from '../../.
 import { errorMessage, unwrap } from '../lib/api'
 import { Icon } from './Icons'
 import { Markdown } from './Markdown'
+import { MemoryGraph } from './MemoryGraph'
 
 interface MemoryPageProps {
   projects: Project[]
@@ -11,6 +12,8 @@ interface MemoryPageProps {
   onSelectProject(project: Project): void
   onAddProject(): void
   onOpenSettings(): void
+  /** Incremented by the project menu when the user asks for the graph. */
+  graphRequest?: number
 }
 
 /** Per-project long-term memory: the markdown wiki every model and agent shares. */
@@ -19,7 +22,8 @@ export function MemoryPage({
   activeProjectId,
   onSelectProject,
   onAddProject,
-  onOpenSettings
+  onOpenSettings,
+  graphRequest = 0
 }: MemoryPageProps): ReactElement {
   const initial = projects.find((project) => project.id === activeProjectId) ?? projects[0] ?? null
   const [projectId, setProjectId] = useState<string | null>(initial?.id ?? null)
@@ -33,6 +37,7 @@ export function MemoryPage({
   const [aiStatus, setAiStatus] = useState<{ available: boolean; running: boolean; port?: number; error?: string } | null>(null)
   const [recallText, setRecallText] = useState('')
   const [recalling, setRecalling] = useState(false)
+  const [view, setView] = useState<'pages' | 'graph'>('pages')
 
   const project = useMemo(
     () => projects.find((item) => item.id === projectId) ?? null,
@@ -74,6 +79,11 @@ export function MemoryPage({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!graphRequest) return
+    setView('graph')
+  }, [graphRequest])
 
   const openPage = async (slug: string): Promise<void> => {
     if (!projectId) return
@@ -224,6 +234,31 @@ export function MemoryPage({
 
       {project ? (
         <>
+          <div className="memory-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'pages'}
+              className={view === 'pages' ? 'active' : ''}
+              onClick={() => setView('pages')}
+            >
+              <Icon name="file" size={13} /> Páginas
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'graph'}
+              className={view === 'graph' ? 'active' : ''}
+              onClick={() => setView('graph')}
+            >
+              <Icon name="share" size={13} /> Grafo
+            </button>
+          </div>
+
+          {view === 'graph' ? (
+            <MemoryGraph project={project} />
+          ) : (
+            <>
           <div className="memory-stats">
             <div className="memory-stat">
               <span className="memory-stat-value">{pages.length}</span>
@@ -344,6 +379,8 @@ export function MemoryPage({
                   ))}
                 </div>
               )}
+            </>
+          )}
             </>
           )}
         </>

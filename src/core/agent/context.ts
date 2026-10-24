@@ -23,6 +23,8 @@ export interface SystemPromptInput {
   isGitRepo: boolean
   /** Max effort or the user's "separate into agents" toggle. */
   teamMode?: boolean
+  /** Selected execution environment, e.g. "WSL (wsl)". */
+  environment?: string
   extra?: string
 }
 
@@ -203,6 +205,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
 - Data: ${now}
 - Modelo: ${input.provider}/${input.model}
 - Permissões: modo "${input.policy.mode}", rede ${input.policy.allowNetwork ? 'permitida' : 'bloqueada'}, controle de mouse/teclado ${input.policy.allowComputerControl ? 'permitido' : 'bloqueado'}.
+${input.environment ? `- Ambiente de execução: ${input.environment}. Comandos e processos usam esse destino.` : ''}
 
 ${MODE_GUIDANCE[input.mode]}
 

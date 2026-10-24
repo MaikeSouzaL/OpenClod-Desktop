@@ -92,6 +92,7 @@ export function SettingsDialog({
   const [rootsText, setRootsText] = useState('')
   const [mcpText, setMcpText] = useState('[]')
   const [rulesText, setRulesText] = useState({ allow: '', ask: '', deny: '' })
+  const [environmentsText, setEnvironmentsText] = useState('[]')
   const [hooksText, setHooksText] = useState('{}')
   const [importClaude, setImportClaude] = useState(false)
   const [voice, setVoice] = useState<NonNullable<AppSettings['voice']>>({
@@ -140,6 +141,7 @@ export function SettingsDialog({
       ask: (settings.policy.rules?.ask ?? []).join('\n'),
       deny: (settings.policy.rules?.deny ?? []).join('\n')
     })
+    setEnvironmentsText(JSON.stringify(settings.environments ?? [], null, 2))
     setHooksText(JSON.stringify(settings.hooks ?? {}, null, 2))
     setImportClaude(Boolean(settings.importClaudeSettings))
     setVoice({
@@ -332,6 +334,17 @@ export function SettingsDialog({
       rules: { allow: lines(rulesText.allow), ask: lines(rulesText.ask), deny: lines(rulesText.deny) }
     }
 
+    let environments: AppSettings['environments'] = []
+    try {
+      const parsed = JSON.parse(environmentsText) as unknown
+      if (!Array.isArray(parsed)) throw new Error('use uma lista JSON')
+      environments = parsed as AppSettings['environments']
+    } catch (err) {
+      setError(`Ambientes inválidos: ${errorMessage(err)}`)
+      setTab('policy')
+      return
+    }
+
     setSaving(true)
     try {
       await onSave({
@@ -342,6 +355,7 @@ export function SettingsDialog({
         policy: nextPolicy,
         autoAgents,
         useAllModels,
+        environments,
         limits,
         mcpServers,
         hooks,
@@ -926,6 +940,23 @@ export function SettingsDialog({
                   </label>
                 ))}
               </div>
+
+              <h3>Ambientes de execução</h3>
+              <p className="field-help">
+                Lista JSON usada pelo seletor do composer. <code>local</code> roda nesta máquina; <code>wsl</code> usa
+                o WSL (opcionalmente com <code>distro</code>); <code>ssh</code> e <code>cloud</code> usam um prefixo de
+                comando, por exemplo <code>{'{"id":"prod","label":"Produção","kind":"ssh","command":"ssh deploy@host","remoteCwd":"/srv/app"}'}</code>.
+                O comando real escolhido na sessão é envolvido por esse prefixo.
+              </p>
+              <label className="field">
+                <span>Perfis (JSON)</span>
+                <textarea
+                  rows={9}
+                  value={environmentsText}
+                  onChange={(event) => setEnvironmentsText(event.target.value)}
+                  spellCheck={false}
+                />
+              </label>
 
               <h3>Hooks</h3>
               <p className="field-help">

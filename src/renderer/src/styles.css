@@ -8083,3 +8083,430 @@ button.env-row:hover {
   color: var(--text-2, #b7b4ab);
   flex: 0 0 auto;
 }
+
+/* ------------------------------------------------------------------ */
+/* Memory graph                                                       */
+/* ------------------------------------------------------------------ */
+
+.memory-tabs {
+  display: flex;
+  gap: 3px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.memory-tabs button {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 13px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.memory-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.memory-graph-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 620px;
+}
+
+.memory-graph-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.memory-graph-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.035), transparent 55%),
+    var(--elevated);
+  overflow: hidden;
+  min-height: 560px;
+}
+
+.memory-graph {
+  display: block;
+  width: 100%;
+  height: 620px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.memory-graph:active {
+  cursor: grabbing;
+}
+
+.memory-edge {
+  stroke: rgba(220, 218, 210, 0.26);
+}
+
+.memory-edge.link {
+  stroke: rgba(240, 179, 90, 0.75);
+}
+
+.memory-edge.tag {
+  stroke-dasharray: 5 4;
+}
+
+.memory-edge.term {
+  stroke-dasharray: 2 5;
+}
+
+.memory-edge.dim {
+  opacity: 0.12;
+}
+
+.memory-node {
+  cursor: pointer;
+}
+
+.memory-node-halo {
+  fill: transparent;
+}
+
+.memory-node:hover .memory-node-halo,
+.memory-node.selected .memory-node-halo {
+  fill: rgba(255, 255, 255, 0.07);
+}
+
+.memory-node-dot {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 1;
+}
+
+.memory-node-label {
+  fill: var(--text-2);
+  font-size: 12px;
+  font-family: var(--sans);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.memory-node.dim {
+  opacity: 0.16;
+}
+
+.memory-node.selected .memory-node-label {
+  fill: var(--text);
+  font-weight: 600;
+}
+
+.memory-graph-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  display: flex;
+  gap: 13px;
+  flex-wrap: wrap;
+  background: rgba(20, 20, 19, 0.82);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.memory-graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-graph-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.memory-graph-legend i.line {
+  width: 18px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px solid rgba(220, 218, 210, 0.6);
+}
+
+.memory-graph-legend i.line.dashed {
+  border-top-style: dashed;
+}
+
+.memory-graph-legend i.line.dotted {
+  border-top-style: dotted;
+}
+
+.memory-graph-detail {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(390px, 45%);
+  background: rgba(24, 24, 23, 0.97);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  padding: 15px 17px;
+  overflow: auto;
+}
+
+.memory-graph-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-graph-detail-head .icon-btn {
+  margin-left: auto;
+}
+
+.memory-graph-detail h3 {
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.2;
+  margin: 12px 0 9px;
+}
+
+.memory-graph-detail-body {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.memory-graph-terms {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 8px 0 0;
+}
+
+@media (max-width: 900px) {
+  .memory-graph-detail {
+    width: 70%;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Artifact studio                                                    */
+/* ------------------------------------------------------------------ */
+
+.artifact-file-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.artifact-file-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.artifact-file-card:hover {
+  border-color: var(--border-strong, var(--accent));
+  background: var(--hover, var(--elevated));
+}
+
+.artifact-file-ext {
+  flex: 0 0 44px;
+  height: 28px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: rgba(240, 179, 90, 0.14);
+  color: #f0b35a;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.artifact-file-ext.md,
+.artifact-file-ext.mdx {
+  background: rgba(110, 168, 254, 0.14);
+  color: #6ea8fe;
+}
+
+.artifact-file-ext.html,
+.artifact-file-ext.svg {
+  background: rgba(255, 120, 120, 0.14);
+  color: #ff8a8a;
+}
+
+.artifact-file-ext.json,
+.artifact-file-ext.csv {
+  background: rgba(143, 227, 136, 0.14);
+  color: #8fe388;
+}
+
+.artifact-file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.artifact-file-info strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.artifact-file-info small {
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-file-size {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.artifact-studio {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--elevated);
+  overflow: hidden;
+}
+
+.artifact-studio-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.artifact-studio-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.artifact-studio-title strong {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-studio-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.artifact-studio-actions .is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.artifact-studio-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 560px;
+}
+
+.artifact-studio-body.editor {
+  grid-template-columns: 1fr;
+}
+
+.artifact-studio-body.preview {
+  grid-template-columns: 1fr;
+}
+
+.artifact-editor {
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.artifact-studio-body.editor .artifact-editor {
+  border-right: 0;
+}
+
+.artifact-editor .cm-editor {
+  height: 100%;
+  min-height: 560px;
+  font-size: 12.5px;
+}
+
+.artifact-preview {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 20px;
+  background: var(--bg);
+}
+
+.artifact-preview-frame {
+  width: 100%;
+  min-height: 540px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.artifact-code {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.artifact-table-wrap {
+  overflow: auto;
+}
+
+.artifact-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.artifact-table td {
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  white-space: pre-wrap;
+}
+
+.artifact-table tr:first-child td {
+  font-weight: 700;
+  background: var(--elevated);
+}

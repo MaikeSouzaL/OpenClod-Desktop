@@ -79,6 +79,10 @@ export function defaultSettings(): AppSettings {
     telemetry: false,
     autoAgents: false,
     useAllModels: false,
+    environments: [
+      { id: 'local', label: 'Local', kind: 'local' },
+      { id: 'wsl', label: 'WSL', kind: 'wsl' }
+    ],
     claudeCatalogImported: false,
     mcpServers: [],
     hooks: {},

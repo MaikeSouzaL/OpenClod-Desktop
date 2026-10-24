@@ -11,6 +11,7 @@ import {
 } from 'react'
 import type {
   AgentMode,
+  EnvironmentProfile,
   ImagePart,
   PermissionMode,
   ProviderConfig,
@@ -105,6 +106,9 @@ interface ComposerProps {
   contextPercent: number
   /** null = the model's own default depth. */
   effort: ReasoningEffort | null
+  /** Execution environments available for this session. */
+  environments?: EnvironmentProfile[]
+  environmentId?: string
   workspaceName?: string
   seed?: { id: string; text: string }
   /** Text dictated by the global shortcut; inserted at the caret. */
@@ -118,6 +122,7 @@ interface ComposerProps {
   onModelChange(providerId: string, model: string): void
   onEffortChange(effort: ReasoningEffort | null): void
   onPermissionChange(mode: PermissionMode): void
+  onEnvironmentChange?(environmentId: string): void
   /** Home only: switch between plain Chat and Cowork without leaving Início. */
   onSurfaceChange?(mode: 'chat' | 'cowork'): void
   onOpenSettings(): void
@@ -156,6 +161,9 @@ export function Composer({
   onEffortChange,
   onPermissionChange,
   effort,
+  environments = [],
+  environmentId,
+  onEnvironmentChange,
   onOpenSettings,
   onAddProject,
   onSurfaceChange
@@ -168,6 +176,7 @@ export function Composer({
   const [modelQuery, setModelQuery] = useState('')
   const [effortOpen, setEffortOpen] = useState(false)
   const [permissionOpen, setPermissionOpen] = useState(false)
+  const [environmentOpen, setEnvironmentOpen] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [slashIndex, setSlashIndex] = useState(0)
@@ -422,6 +431,8 @@ export function Composer({
       ]
     : [{ id: 'effort-none', label: 'Este modelo não expõe esforço de raciocínio', heading: 'Esforço de raciocínio', icon: 'gauge', disabled: true }]
 
+  const activeEnvironment = environments.find((environment) => environment.id === (environmentId ?? 'local'))
+
   const permissionItems: MenuItem[] = (['readonly', 'ask', 'accept-edits', 'auto'] as PermissionMode[]).map((candidate, index) => ({
     id: `perm-${candidate}`,
     label: `${PERMISSION_LABELS[candidate]} · ${PERMISSION_HINTS[candidate]}`,
@@ -429,6 +440,15 @@ export function Composer({
     icon: candidate === 'auto' ? 'alert' : 'shield',
     checked: permissionMode === candidate,
     onSelect: () => onPermissionChange(candidate)
+  }))
+
+  const environmentItems: MenuItem[] = environments.map((environment, index) => ({
+    id: `env-${environment.id}`,
+    label: `${environment.label} · ${environment.kind === 'local' ? 'nesta máquina' : environment.kind === 'wsl' ? 'WSL' : environment.kind === 'ssh' ? `SSH${environment.command ? ` (${environment.command})` : ''}` : 'nuvem'}`,
+    heading: index === 0 ? 'Ambiente de execução' : undefined,
+    icon: environment.kind === 'local' ? 'terminal' : 'globe',
+    checked: (environmentId ?? 'local') === environment.id,
+    onSelect: () => onEnvironmentChange?.(environment.id)
   }))
 
   const modeItems: MenuItem[] = [
@@ -748,6 +768,15 @@ export function Composer({
           </button>
           {permissionOpen ? <MenuPopover items={permissionItems} onClose={() => setPermissionOpen(false)} className="permission-menu" /> : null}
         </span>
+        {environments.length ? (
+          <span className="composer-permission-wrap">
+            <button type="button" className="composer-permission" title="Ambiente de execução" onClick={() => setEnvironmentOpen((value) => !value)}>
+              <Icon name="globe" size={11} />
+              {activeEnvironment?.label ?? 'Local'}
+            </button>
+            {environmentOpen ? <MenuPopover items={environmentItems} onClose={() => setEnvironmentOpen(false)} className="permission-menu" /> : null}
+          </span>
+        ) : null}
         <span className="composer-hint">
           {dictation.phase === 'listening' ? (
             <em className="listening-note">

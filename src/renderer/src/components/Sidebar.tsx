@@ -40,6 +40,7 @@ interface SidebarProps {
   onAddProject(): void
   onRemoveProject(project: Project): void
   onDeleteProject(project: Project): void
+  onOpenGraph(project: Project): void
   onDeleteSession(sessionId: string): void
   onRenameSession(sessionId: string, title: string): void
   onArchiveSession(sessionId: string, archived: boolean): void
@@ -71,6 +72,7 @@ export function Sidebar({
   onAddProject,
   onRemoveProject,
   onDeleteProject,
+  onOpenGraph,
   onDeleteSession,
   onRenameSession,
   onArchiveSession,
@@ -186,6 +188,12 @@ export function Sidebar({
           label: 'Nova sessão',
           icon: 'plus',
           onSelect: () => onNewSession(projectSession)
+        },
+        {
+          id: 'graph',
+          label: 'Ver grafo da memória',
+          icon: 'share',
+          onSelect: () => onOpenGraph(projectSession)
         },
         { id: 'sep', separator: true },
         {
@@ -303,6 +311,17 @@ export function Sidebar({
             {list.length ? <span className="side-count">{list.length}</span> : null}
           </button>
           {isOpen ? <Icon name="chevronDown" size={11} className="side-project-caret" /> : null}
+          <button
+            type="button"
+            className="side-mini side-project-graph hover-only"
+            title="Ver grafo da memória"
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpenGraph(project)
+            }}
+          >
+            <Icon name="share" size={13} />
+          </button>
           <button
             type="button"
             className="side-mini side-project-add"

@@ -186,6 +186,8 @@ export interface RunnerDeps {
   mode: AgentMode
   provider: Provider
   providerConfig: ProviderConfig
+  /** Execution environment selected for this session. Missing means local. */
+  environment?: import('../../shared/types.js').EnvironmentProfile
   registry: ToolRegistry
   policy: PolicyConfig
   limits: HarnessLimits
@@ -558,6 +560,7 @@ export class SessionRunner {
       tracker: deps.tracker,
       project: { ...deps.project, name: deps.project.name },
       projectId: deps.projectId,
+      environment: deps.environment,
       services: deps.services,
       autoAgents: deps.autoAgents,
       createAgent: deps.createAgent
@@ -582,6 +585,7 @@ export class SessionRunner {
       gitBranch: this.deps.project.branch,
       isGitRepo: this.deps.project.isGitRepo,
       teamMode: this.deps.effort === 'max' || Boolean(this.deps.autoAgents),
+      environment: this.deps.environment ? `${this.deps.environment.label} (${this.deps.environment.kind})` : undefined,
       extra: extra || undefined
     })
   }
@@ -709,6 +713,7 @@ export class SessionRunner {
       workspace: this.toolWorkspace(),
       signal,
       tracker: deps.tracker,
+      environment: deps.environment,
       services: deps.services,
       projectId: deps.projectId,
       emit: (event) => this.emit(event),

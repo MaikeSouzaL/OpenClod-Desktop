@@ -68,11 +68,14 @@ export const memoryPageTool: ToolDef = {
       // Mirror curated pages into AI-Memory so their entities, links and
       // full-text index are available to every model and every project scope.
       if (ctx.projectId && ctx.services.aiMemory) {
+        const related = await ctx.services.aiMemory
+          .relatedMarkdown(ctx.projectId, `${page.title}\n${args.body}`, `pages/${page.slug}.md`, 4)
+          .catch(() => '')
         await ctx.services.aiMemory
           .writePage(ctx.projectId, {
             path: `pages/${page.slug}.md`,
             title: page.title,
-            body: args.body,
+            body: related ? `${args.body}\n\n## Relacionados\n\n${related}` : args.body,
             tags: page.tags,
             pinned: page.pinned,
             tier: 'semantic'

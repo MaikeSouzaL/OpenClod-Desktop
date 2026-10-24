@@ -3,6 +3,7 @@ import type {
   AgentDefinition,
   AgentMode,
   ApprovalRequest,
+  EnvironmentProfile,
   FileChange,
   HarnessEvent,
   PlanItem,
@@ -120,6 +121,7 @@ export interface McpToolService {
  */
 export interface AiMemoryToolService {
   recall(projectId: string, query: string, limit?: number): Promise<{ text: string; hits: number }>
+  relatedMarkdown(projectId: string, query: string, excludePath?: string, limit?: number): Promise<string>
   writePage(
     projectId: string,
     input: { path: string; title: string; body: string; tags?: string[]; pinned?: boolean; tier?: string }
@@ -134,6 +136,8 @@ export interface ToolContext {
   workspace: WorkspaceGuard
   signal: AbortSignal
   tracker: Tracker
+  /** Execution environment selected for this session. Missing means local. */
+  environment?: EnvironmentProfile
   emit(event: HarnessEvent): void
   approve(request: Omit<ApprovalRequest, 'id' | 'sessionId'>): Promise<boolean>
   setPlan(items: PlanItem[]): void

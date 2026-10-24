@@ -358,6 +358,7 @@ export async function spawnAgent(
     services,
     project: { ...caller.project, name: `${caller.project.name} / ${spec.label}`.slice(0, 120) },
     projectId: caller.projectId,
+    environment: caller.environment,
     hooks: caller.hooks,
     emit: (event) => {
       switch (event.type) {

@@ -17,9 +17,10 @@ interface ProjectsPageProps {
   onReveal(path: string): void
   onRemove(project: Project): void
   onDelete(project: Project): void
+  onOpenGraph(project: Project): void
 }
 
-export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove, onDelete }: ProjectsPageProps): ReactElement {
+export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove, onDelete, onOpenGraph }: ProjectsPageProps): ReactElement {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'recent' | 'name'>('recent')
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -49,6 +50,7 @@ export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, 
     ? [
         { id: 'new', label: 'Nova sessão', icon: 'plus', onSelect: () => onNewSession(menuProject) },
         { id: 'reveal', label: 'Abrir no Explorer', icon: 'external', onSelect: () => onReveal(menuProject.path) },
+        { id: 'graph', label: 'Ver grafo da memória', icon: 'share', onSelect: () => onOpenGraph(menuProject) },
         { id: 'sep', separator: true },
         {
           id: 'remove',

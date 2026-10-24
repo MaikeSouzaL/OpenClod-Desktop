@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFile, spawn } from 'node:child_process'
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, Notification, powerSaveBlocker, session as electronSession, shell, type IpcMainInvokeEvent } from 'electron'
 import { Orchestrator } from './orchestrator.js'
 import { DictationController } from './dictation.js'
@@ -287,6 +288,21 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   if (typeof input.profileName === 'string') patch.profileName = input.profileName.trim().slice(0, 80)
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
   if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
+
+  if (Array.isArray(input.environments)) {
+    patch.environments = input.environments.slice(0, 12).map((raw, index) => {
+      const entry = (raw ?? {}) as unknown as Record<string, unknown>
+      const kind = ['local', 'wsl', 'ssh', 'cloud'].includes(String(entry.kind)) ? (entry.kind as 'local' | 'wsl' | 'ssh' | 'cloud') : 'local'
+      return {
+        id: String(entry.id || `env-${index}`).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40),
+        label: String(entry.label || entry.id || `Ambiente ${index + 1}`).slice(0, 60),
+        kind,
+        command: typeof entry.command === 'string' ? entry.command.trim().slice(0, 500) : undefined,
+        remoteCwd: typeof entry.remoteCwd === 'string' ? entry.remoteCwd.trim().slice(0, 500) : undefined,
+        distro: typeof entry.distro === 'string' ? entry.distro.trim().slice(0, 80) : undefined
+      }
+    })
+  }
 
   if (input.voice && typeof input.voice === 'object') {
     const model = String(input.voice.model ?? 'base')
@@ -631,6 +647,28 @@ function registerIpc(): void {
   handle(CH.appPluginCatalog, async () => pluginCatalog())
   handle(CH.appAgents, async (cwd) => need().listAgents(cwd ? str(cwd, 'cwd', 1000) : undefined))
   handle(CH.appImportClaude, async () => need().importClaudeCatalog())
+  handle(CH.appClaudeStatus, async () => {
+    const raw = await new Promise<string>((resolve) => {
+      execFile('cmd.exe', ['/d', '/s', '/c', 'claude auth status --json'], { timeout: 20_000, windowsHide: true }, (_error, stdout) =>
+        resolve(String(stdout ?? ''))
+      )
+    })
+    const text = raw.replace(/\u0000/g, '').trim()
+    try {
+      const parsed = JSON.parse(text) as { loggedIn?: boolean; authMethod?: string; account?: string }
+      return { loggedIn: Boolean(parsed.loggedIn), method: parsed.authMethod, account: parsed.account, raw: text.slice(0, 800) }
+    } catch {
+      return { loggedIn: false, raw: text.slice(0, 800) }
+    }
+  })
+  handle(CH.appClaudeLogin, async () => {
+    spawn('cmd.exe', ['/d', '/s', '/c', 'start', '', 'cmd.exe', '/k', 'claude auth login'], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false
+    }).unref()
+    return true
+  })
   handle(CH.appMcpInstall, async (id, env, headers) =>
     need().installMcp({ id: str(id, 'id', 200), env: env as Record<string, string> | undefined, headers: headers as Record<string, string> | undefined })
   )
@@ -762,6 +800,10 @@ function registerIpc(): void {
     await need().setEffort(str(sessionId, 'sessionId', 80), (effort as ReasoningEffort | null) ?? null)
     return true
   })
+  handle(CH.sessionsSetEnvironment, async (sessionId, environmentId) => {
+    await need().setEnvironment(str(sessionId, 'sessionId', 80), str(environmentId, 'environmentId', 60))
+    return true
+  })
   handle(CH.sessionsSetModel, async (sessionId, providerId, model) => {
     await need().setModel(
       str(sessionId, 'sessionId', 80),
@@ -887,6 +929,7 @@ function registerIpc(): void {
     )
   )
   handle(CH.memoryAiStatus, async () => need().aiMemoryStatus())
+  handle(CH.memoryGraph, async (projectId) => need().memoryGraph(str(projectId, 'projectId', 80)))
   handle(CH.memoryExport, async (projectId) => {
     const id = str(projectId, 'projectId', 80)
     const bundle = await need().memoryExportMarkdown(id)

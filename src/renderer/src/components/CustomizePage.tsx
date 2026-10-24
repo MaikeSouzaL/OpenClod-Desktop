@@ -186,6 +186,38 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             className="btn ghost small"
             onClick={async () => {
               try {
+                const status = await unwrap(window.forja.app.claudeStatus())
+                setNotice(
+                  status.loggedIn
+                    ? `Claude Code conectado${status.method ? ` (${status.method})` : ''}.`
+                    : 'Claude Code não está autenticado. Clique em Reconectar Claude Code.'
+                )
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="shield" size={13} /> Status do Claude Code
+          </button>
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={async () => {
+              try {
+                await unwrap(window.forja.app.claudeLogin())
+                setNotice('Terminal aberto: conclua o login do Claude Code no navegador e volte ao Openclod.')
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="key" size={13} /> Reconectar Claude Code
+          </button>
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={async () => {
+              try {
                 const result = await unwrap(window.forja.app.importClaude())
                 setNotice(
                   `Claude importado: ${result.skills} skills, ${result.agents} agentes, ${result.imported} MCPs (${result.plugins} plugins no catálogo).`

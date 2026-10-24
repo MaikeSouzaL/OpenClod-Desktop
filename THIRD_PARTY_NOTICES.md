@@ -1,10 +1,10 @@
 # Avisos de terceiros (Third-Party Notices)
 
-Este documento lista os componentes de terceiros distribuídos com o **Forja**
+Este documento lista os componentes de terceiros distribuídos com o **Openclod Desktop**
 (versão 0.1.0) ou usados para construí-lo. Ele deve acompanhar o instalador e o
 código-fonte.
 
-- O código do Forja é licenciado sob MIT.
+- O código do Openclod Desktop é licenciado sob MIT.
 - As licenças abaixo são as declaradas nos pacotes instalados em `node_modules`
   (campo `license` do `package.json` e arquivo `LICENSE` de cada pacote).
 - Nenhum texto de licença foi removido ou alterado.
@@ -13,7 +13,7 @@ código-fonte.
 
 Estas bibliotecas fazem parte do aplicativo distribuído.
 
-| Pacote | Versão instalada | Licença | Uso no Forja |
+| Pacote | Versão instalada | Licença | Uso no Openclod Desktop |
 |---|---|---|---|
 | [`diff`](https://github.com/kpdecker/jsdiff) | 5.2.2 | **BSD-3-Clause** | Geração de diffs de arquivos para a UI e para o rastreador de mudanças. |
 | [`dompurify`](https://github.com/cure53/DOMPurify) | 3.4.17 | **MPL-2.0 OR Apache-2.0** (esta distribuição usa Apache-2.0) | Sanitização do HTML produzido a partir de markdown antes de renderizar. |
@@ -38,8 +38,8 @@ Estas bibliotecas fazem parte do aplicativo distribuído.
 
 | Componente | Licença | Observação |
 |---|---|---|
-| [`@opensymph/open-computer-use`](https://www.npmjs.com/package/@opensymph/open-computer-use) | MIT | Backend opcional de Computer Use. **Não é empacotado** no instalador; é instalado globalmente pelo usuário (`npm i -g @opensymph/open-computer-use`) e detectado em tempo de execução. Seus avisos de licença são responsabilidade da instalação global do usuário. |
-| Navegadores baixados por `npx playwright install` | Licenças do projeto Chromium | Não são distribuídos pelo instalador do Forja; o usuário os baixa separadamente. |
+| [`open-computer-use`](https://github.com/opensymph/open-computer-use) | MIT | Backend de Computer Use (Go), **empacotado** em `resources/bin/open-computer-use.exe`. |
+| Navegadores baixados por `npx playwright install` | Licenças do projeto Chromium | Não são distribuídos pelo instalador do Openclod Desktop; o usuário os baixa separadamente. |
 
 ## 2. Runtime desktop
 
@@ -76,7 +76,7 @@ artefato final (exceto o resultado do build):
 A SIL OFL 1.1 exige que o aviso de copyright e o texto da licença acompanhem a
 redistribuição das fontes. O texto integral está em
 <https://openfontlicense.org/open-font-license-official-text/>. As fontes são
-usadas apenas na interface do Forja e não foram modificadas.
+usadas apenas na interface do Openclod Desktop e não foram modificadas.
 
 ## 4.1 Runtime de voz embarcado (`resources/`)
 
@@ -98,8 +98,8 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
 
 | Projeto | Licença | Como foi usado |
 |---|---|---|
-| [ai-memory](https://github.com/akitaonrails/ai-memory) | **MIT** | Estudo do modelo (wiki markdown por projeto, índice derivado, briefing, handoffs claim-once). A implementação do Forja é independente, em TypeScript; nenhum código Rust foi copiado. O binário oficial pode ser ligado como MCP. |
-| [Wispr Flow](https://wisprflow.ai) | **Proprietário** | Análise de comportamento com REA (instalador, `app.asar`, helper .NET). Nenhum código, ícone, fonte, prompt ou artefato foi copiado; o ditado do Forja é uma implementação independente. |
+| [ai-memory](https://github.com/akitaonrails/ai-memory) | **MIT** | Motor de memória de longo prazo executado como sidecar (`resources/bin/ai-memory.exe`, licença em `resources/licenses/ai-memory/MIT.txt`). O grafo consome a API oficial `/api/v1/graph` e complementa com conexões semânticas próprias. O layout circular inicial em `src/renderer/src/lib/graph-layout.ts` é uma adaptação do `circular_layout` de `crates/ai-memory-web/src/routes/graph.rs`. |
+| [Wispr Flow](https://wisprflow.ai) | **Proprietário** | Análise de comportamento com REA (instalador, `app.asar`, helper .NET). Nenhum código, ícone, fonte, prompt ou artefato foi copiado; o ditado do Openclod Desktop é uma implementação independente. |
 | [opencode](https://github.com/anomalyco/opencode) | MIT | Referência de padrões; trechos adaptados estão identificados no código. |
 | [openharness](https://github.com/pokkai/openharness) | MIT | Referência de hooks, permissões e compactação; sem código copiado. |
 | [cdesktop](https://github.com/cdesktop-ai/cdesktop) | Apache-2.0 | Referência de UX e executores; sem código copiado. |
@@ -114,7 +114,7 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
   Anthropic/Claude é usado, copiado ou redistribuído neste projeto.**
 - "Claude" e "Anthropic" são marcas registradas de Anthropic PBC. Os nomes
   aparecem apenas para identificar interoperabilidade de API (provedor compatível).
-- O Forja é um projeto independente, **sem afiliação, patrocínio ou endosso** da
+- O Openclod Desktop é um projeto independente, **sem afiliação, patrocínio ou endosso** da
   Anthropic ou de qualquer outro fornecedor de modelos.
 - A interface usa identidade visual própria (tipografia Inter + Source Serif 4,
   ambas OFL). Nenhum recurso visual proprietário do Claude Desktop é reproduzido.
@@ -246,5 +246,5 @@ As fontes não foram modificadas nem vendidas separadamente.
 
 ---
 
-Dúvidas sobre licenciamento devem ser resolvidas antes de redistribuir o Forja.
+Dúvidas sobre licenciamento devem ser resolvidas antes de redistribuir o Openclod Desktop.
 Este documento não é aconselhamento jurídico.

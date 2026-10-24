@@ -440,6 +440,20 @@ export interface SkillInfo {
   source: 'usuario' | 'projeto'
 }
 
+export type EnvironmentKind = 'local' | 'wsl' | 'ssh' | 'cloud'
+
+export interface EnvironmentProfile {
+  id: string
+  label: string
+  kind: EnvironmentKind
+  /** For ssh/cloud: command prefix, e.g. `ssh user@host` or `docker exec -i box`. */
+  command?: string
+  /** Remote working directory for ssh/cloud. */
+  remoteCwd?: string
+  /** WSL distribution name; empty uses the default distro. */
+  distro?: string
+}
+
 export interface SessionMeta {
   id: string
   title: string
@@ -448,6 +462,8 @@ export interface SessionMeta {
   mode: AgentMode
   /** Which desktop tab created the session: chat, cowork or code. */
   surface?: SessionSurface
+  /** Execution environment profile id; missing means local. */
+  environment?: string
   providerId: string
   model: string
   /** Reasoning depth; unset means the model's own default. */
@@ -566,6 +582,8 @@ export interface AppSettings {
   telemetry: false
   /** Team mode: split work across specialist agents (also on at max effort). */
   autoAgents?: boolean
+  /** Execution environments shown in the composer. */
+  environments?: EnvironmentProfile[]
   /** Try the next model/provider when one runs out of quota or is unavailable. */
   useAllModels?: boolean
   /** Last provider/model picked by the user; survives restarts. */
