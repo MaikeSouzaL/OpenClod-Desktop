@@ -101,6 +101,10 @@ export class Orchestrator {
   private browsers = new Map<string, BrowserLayer>()
   private memories = new Map<string, MemoryStore>()
   private projectMemories = new Map<string, ProjectMemory>()
+  /** Projects whose native wiki was already mirrored into AI-Memory this run. */
+  private syncedMemories = new Set<string>()
+  /** In-flight mirror, shared by concurrent list/status/runner calls. */
+  private memorySyncs = new Map<string, Promise<void>>()
   private persistTimers = new Map<string, NodeJS.Timeout>()
   private pending = new Map<string, PendingApproval>()
   private sessionAllow = new Map<string, Set<string>>()
@@ -301,6 +305,7 @@ export class Orchestrator {
       this.projectMemories.get(state.meta.projectId) ??
       new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', state.meta.projectId))
     this.projectMemories.set(state.meta.projectId, projectMemory)
+    await this.syncNativeToAi(state.meta.projectId)
 
     const workspace = new WorkspaceGuard(
       [state.meta.cwd, ...(settings.policy.allowedRoots ?? [])].filter(Boolean),
@@ -1294,10 +1299,55 @@ export class Orchestrator {
     return project
   }
 
+  /**
+   * Mirrors native wiki pages that predate the AI-Memory integration (or were
+   * imported outside it) into the project's index. Runs once per project per
+   * app run; new pages are mirrored at write time.
+   */
+  private async syncNativeToAi(projectId: string): Promise<void> {
+    if (this.syncedMemories.has(projectId) || !this.aiMemory.available) return
+    const running = this.memorySyncs.get(projectId)
+    if (running) return running
+    const task = this.doSyncNativeToAi(projectId).finally(() => {
+      this.memorySyncs.delete(projectId)
+      this.syncedMemories.add(projectId)
+    })
+    this.memorySyncs.set(projectId, task)
+    return task
+  }
+
+  private async doSyncNativeToAi(projectId: string): Promise<void> {
+    try {
+      const native = await this.memoryForProject(projectId).listPages()
+      if (!native.length) return
+      const indexed = await this.aiMemory.recent(projectId, 100)
+      const known = new Set(indexed.map((hit) => hit.path))
+      for (const summary of native) {
+        const path = `pages/${summary.slug}.md`
+        if (known.has(path)) continue
+        const page = await this.memoryForProject(projectId).readPage(summary.slug)
+        if (!page) continue
+        await this.aiMemory
+          .writePage(projectId, {
+            path,
+            title: page.title,
+            body: page.body,
+            tags: page.tags,
+            pinned: page.pinned,
+            tier: 'semantic'
+          })
+          .catch(() => undefined)
+      }
+    } catch (err) {
+      this.options.log?.(`sincronização da memória nativa com AI-Memory falhou: ${(err as Error).message}`)
+    }
+  }
+
   async memoryStats(
     projectId: string
   ): Promise<Awaited<ReturnType<ProjectMemory['stats']>> & { indexed?: number; aiRunning?: boolean }> {
     this.requireProject(projectId)
+    await this.syncNativeToAi(projectId)
     const stats = await this.memoryForProject(projectId).stats()
     const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
     return { ...stats, indexed: indexed.length, aiRunning: this.aiMemory.status().running }
@@ -1311,6 +1361,7 @@ export class Orchestrator {
    */
   async memoryList(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['listPages']>>> {
     this.requireProject(projectId)
+    await this.syncNativeToAi(projectId)
     const native = await this.memoryForProject(projectId).listPages()
     const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
     const known = new Set(native.map((page) => page.title.trim().toLowerCase()))
@@ -1383,6 +1434,8 @@ export class Orchestrator {
     for (const session of sessions) await this.deleteSession(session.meta.id)
     await this.store.removeProject(projectId)
     this.projectMemories.delete(projectId)
+    this.syncedMemories.delete(projectId)
+    this.memorySyncs.delete(projectId)
     this.approvals.clear(projectId)
     await fs.promises
       .rm(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', projectId), {
