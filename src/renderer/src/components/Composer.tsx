@@ -162,6 +162,7 @@ export function Composer({
   const [documents, setDocuments] = useState<TextAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [modelQuery, setModelQuery] = useState('')
   const [effortOpen, setEffortOpen] = useState(false)
   const [permissionOpen, setPermissionOpen] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
@@ -378,9 +379,13 @@ export function Composer({
   }
 
   const modelItems: MenuItem[] = []
+  const query = modelQuery.trim().toLowerCase()
   for (const item of providers) {
     const list = item.models?.length ? item.models : [item.model]
-    list.forEach((candidate, index) => {
+    const matched = query
+      ? list.filter((candidate) => candidate.toLowerCase().includes(query) || item.label.toLowerCase().includes(query))
+      : list
+    matched.forEach((candidate, index) => {
       modelItems.push({
         id: `${item.id}::${candidate}`,
         label: candidate,
@@ -619,17 +624,62 @@ export function Composer({
               {effortOpen ? <MenuPopover items={effortItems} onClose={() => setEffortOpen(false)} align="right" className="model-menu" /> : null}
             </div>
             <div className="composer-model">
-              <button type="button" className="model-btn" onClick={() => setModelOpen((value) => !value)} title="Escolher modelo">
+              <button
+                type="button"
+                className="model-btn"
+                onClick={() => {
+                  setModelOpen((value) => !value)
+                  setModelQuery('')
+                }}
+                title="Escolher modelo"
+              >
                 <span className="model-short">{modelLabel}</span>
                 <Icon name="chevronDown" size={11} />
               </button>
               {modelOpen ? (
-                <MenuPopover items={modelItems} onClose={() => setModelOpen(false)} align="right" className="model-menu" />
+                <MenuPopover
+                  items={modelItems}
+                  onClose={() => {
+                    setModelOpen(false)
+                    setModelQuery('')
+                  }}
+                  align="right"
+                  className="model-menu"
+                  header={
+                    <div className="menu-search-wrap">
+                      <input
+                        className="menu-search"
+                        value={modelQuery}
+                        onChange={(event) => setModelQuery(event.target.value)}
+                        placeholder="Buscar modelo (ex.: free, kimi, qwen)…"
+                        spellCheck={false}
+                        autoFocus
+                      />
+                    </div>
+                  }
+                />
               ) : null}
             </div>
-            <button type="button" className="round-btn context-btn" title={`${contextPercent}% da janela de contexto em uso`}>
-              <span className="context-ring" style={{ ['--pct' as string]: `${Math.max(2, Math.min(100, contextPercent))}%` }} />
-            </button>
+            <div className="context-wrap">
+              <button type="button" className="round-btn context-btn" title={`${contextPercent}% da janela de contexto em uso`}>
+                <span className="context-ring" style={{ ['--pct' as string]: `${Math.max(2, Math.min(100, contextPercent))}%` }} />
+              </button>
+              <div className="context-popover" role="tooltip">
+                <div className="context-popover-head">
+                  <span>Contexto</span>
+                  <strong>{contextPercent}% usado</strong>
+                </div>
+                <div className="context-bar">
+                  <span style={{ width: `${Math.max(1, Math.min(100, contextPercent))}%` }} />
+                </div>
+                <div className="context-popover-foot">
+                  <span>{Math.round((session?.usage.input ?? 0) / 1000)}k usados</span>
+                  <span>
+                    {Math.max(0, Math.round(((provider?.contextWindow ?? 0) - (session?.usage.input ?? 0)) / 1000))}k livres
+                  </span>
+                </div>
+              </div>
+            </div>
             <button
               type="button"
               className={`round-btn mic-btn state-${dictation.phase}`}

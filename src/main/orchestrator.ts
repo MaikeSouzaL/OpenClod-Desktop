@@ -11,6 +11,7 @@ import type {
   ImagePart,
   Message,
   Project,
+  ProviderConfig,
   RunState,
   SessionMeta,
   SessionState,
@@ -220,7 +221,9 @@ export class Orchestrator {
       )
     }
 
-    const provider = createProvider({ ...providerConfig, model: state.meta.model || providerConfig.model }, this.settings.resolver())
+    const activeConfig = { ...providerConfig, model: state.meta.model || providerConfig.model }
+    const provider = createProvider(activeConfig, this.settings.resolver())
+    const fallback = settings.useAllModels ? this.buildFallback(settings, activeConfig) : undefined
     const tracker = this.trackers.get(sessionId) ?? new FileTracker(state.meta.cwd)
     if (state.changes?.length) tracker.restore(state.changes)
     this.trackers.set(sessionId, tracker)
@@ -254,7 +257,8 @@ export class Orchestrator {
       cwd: state.meta.cwd,
       mode: state.meta.mode,
       provider,
-      providerConfig: { ...providerConfig, model: state.meta.model || providerConfig.model },
+      providerConfig: activeConfig,
+      fallback,
       effort: state.meta.effort,
       registry: this.baseRegistry,
       policy,
@@ -361,6 +365,39 @@ export class Orchestrator {
     const saved: AgentDefinition = { ...def, file }
     registry.register(saved)
     return { path: file, agent: saved }
+  }
+
+  /**
+   * When `useAllModels` is on, every configured provider/model with credentials
+   * becomes a fallback, in order. The active model is excluded; the runner
+   * switches only after a quota/rate-limit/auth/transport failure and keeps the
+   * same conversation + project memory.
+   */
+  private buildFallback(
+    settings: AppSettings,
+    current: ProviderConfig
+  ): Array<{ provider: ReturnType<typeof createProvider>; config: ProviderConfig }> {
+    const out: Array<{ provider: ReturnType<typeof createProvider>; config: ProviderConfig }> = []
+    const seen = new Set<string>([`${current.id}::${current.model}`])
+    const resolver = this.settings.resolver()
+    for (const provider of settings.providers) {
+      if (provider.kind === 'mock') continue
+      if (!hasCredentials(provider, resolver)) continue
+      const models = provider.models?.length ? provider.models : [provider.model]
+      for (const model of models) {
+        const key = `${provider.id}::${model}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        const config = { ...provider, model }
+        try {
+          out.push({ provider: createProvider(config, resolver), config })
+        } catch {
+          /* one invalid provider must not stop the fallback chain */
+        }
+        if (out.length >= 100) return out
+      }
+    }
+    return out
   }
 
   /** What the agent runtime needs from the app: providers, the tool registry, events and approvals. */

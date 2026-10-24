@@ -18,16 +18,17 @@ export const browserOpenTool: ToolDef = {
   requires: 'network',
   schema: z.object({
     url: z.string().url(),
-    headed: z.boolean().optional().describe('Mostrar a janela do navegador')
+    headed: z.boolean().optional().describe('Mostrar a janela do navegador'),
+    new_tab: z.boolean().optional().describe('Abrir em uma nova aba em vez de reutilizar a atual')
   }),
   describe(a) {
     const args = a as { url: string }
     return { title: 'Abrir navegador', detail: args.url, preview: args.url }
   },
   async execute(raw, ctx): Promise<ToolResult> {
-    const args = this.schema.parse(raw) as { url: string; headed?: boolean }
+    const args = this.schema.parse(raw) as { url: string; headed?: boolean; new_tab?: boolean }
     const browser = ctx.services.browser
-    await browser.open(args.url, args.headed ?? false)
+    await browser.open(args.url, args.headed ?? false, args.new_tab ?? false)
     const snap = await browser.snapshot()
     return {
       ok: true,
@@ -239,6 +240,102 @@ export const browserWaitTool: ToolDef = {
   }
 }
 
+export const browserTabsTool: ToolDef = {
+  name: 'browser_tabs',
+  description: 'Lista as abas abertas do navegador (id, título, URL e qual está ativa). Use antes de alternar ou fechar uma aba.',
+  risk: 'read',
+  parallelSafe: true,
+  requires: 'network',
+  schema: z.object({}),
+  describe() {
+    return { title: 'Listar abas', detail: 'abas abertas' }
+  },
+  async execute(_raw, ctx) {
+    const tabs = await ctx.services.browser.tabsList()
+    if (!tabs.length) return { ok: true, text: 'nenhuma aba aberta; use browser_new_tab ou browser_open', summary: '0 abas' }
+    return {
+      ok: true,
+      text: tabs
+        .map((tab) => `${tab.active ? '*' : ' '} ${tab.id} · ${tab.title || '(sem título)'} · ${tab.url}`)
+        .join('\n'),
+      summary: `${tabs.length} abas`
+    }
+  }
+}
+
+export const browserNewTabTool: ToolDef = {
+  name: 'browser_new_tab',
+  description: 'Abre uma nova aba (opcionalmente em uma URL) e a torna ativa. Use para trabalhar em paralelo sem perder a aba atual.',
+  risk: 'network',
+  parallelSafe: false,
+  requires: 'network',
+  schema: z.object({
+    url: z.string().url().optional().describe('URL inicial; omita para uma aba em branco')
+  }),
+  describe(a) {
+    const args = a as { url?: string }
+    return { title: 'Nova aba', detail: args.url ?? 'about:blank', preview: args.url }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { url?: string }
+    const id = await ctx.services.browser.newTab(args.url)
+    const snap = await ctx.services.browser.snapshot()
+    return {
+      ok: true,
+      text: `aba ${id} aberta e ativa\n<page url="${snap.url}" title="${snap.title}">\n${snap.tree}\n</page>`,
+      summary: `aba ${id}`,
+      data: { tab: id, url: snap.url, title: snap.title }
+    }
+  }
+}
+
+export const browserSwitchTabTool: ToolDef = {
+  name: 'browser_switch_tab',
+  description: 'Ativa uma aba existente pelo id retornado por browser_tabs/browser_new_tab e devolve seu snapshot.',
+  risk: 'read',
+  parallelSafe: false,
+  requires: 'network',
+  schema: z.object({ tab: z.string().min(1).describe('Id da aba, ex.: tab_2') }),
+  describe(a) {
+    const args = a as { tab?: string }
+    return { title: 'Trocar de aba', detail: args.tab ?? '', preview: args.tab }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { tab: string }
+    await ctx.services.browser.switchTab(args.tab)
+    const snap = await ctx.services.browser.snapshot()
+    return {
+      ok: true,
+      text: `aba ${args.tab} ativa\n<page url="${snap.url}" title="${snap.title}">\n${snap.tree}\n</page>`,
+      summary: `aba ${args.tab}`,
+      data: { tab: args.tab, url: snap.url, title: snap.title }
+    }
+  }
+}
+
+export const browserCloseTabTool: ToolDef = {
+  name: 'browser_close_tab',
+  description: 'Fecha uma aba (a ativa quando tab é omitido) e lista as restantes.',
+  risk: 'network',
+  parallelSafe: false,
+  requires: 'network',
+  schema: z.object({ tab: z.string().min(1).optional().describe('Id da aba; omita para fechar a ativa') }),
+  describe(a) {
+    const args = a as { tab?: string }
+    return { title: 'Fechar aba', detail: args.tab ?? 'aba ativa', preview: args.tab }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { tab?: string }
+    await ctx.services.browser.closeTab(args.tab)
+    const tabs = await ctx.services.browser.tabsList()
+    return {
+      ok: true,
+      text: `aba fechada. Restantes: ${tabs.length}\n${tabs.map((tab) => `${tab.active ? '*' : ' '} ${tab.id} · ${tab.url}`).join('\n')}`,
+      summary: `${tabs.length} abas restantes`
+    }
+  }
+}
+
 export const browserTools: ToolDef[] = [
   browserOpenTool,
   browserNavigateTool,
@@ -249,5 +346,9 @@ export const browserTools: ToolDef[] = [
   browserReadTool,
   browserScreenshotTool,
   browserConsoleTool,
-  browserWaitTool
+  browserWaitTool,
+  browserTabsTool,
+  browserNewTabTool,
+  browserSwitchTabTool,
+  browserCloseTabTool
 ]

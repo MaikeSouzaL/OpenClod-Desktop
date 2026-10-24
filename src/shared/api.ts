@@ -298,6 +298,7 @@ export const CH = {
   appNotify: 'app:notify',
   appCreateSkill: 'app:createSkill',
   appDiscoverModels: 'app:discoverModels',
+  appRememberModel: 'app:rememberModel',
   appMcpPresets: 'app:mcpPresets',
   appOpenSkills: 'app:openSkills',
 
@@ -305,6 +306,7 @@ export const CH = {
   projectsAdd: 'projects:add',
   projectsRemove: 'projects:remove',
   projectsPick: 'projects:pick',
+  projectsEnsureDefault: 'projects:ensureDefault',
 
   sessionsList: 'sessions:list',
   sessionsCreate: 'sessions:create',
@@ -396,6 +398,8 @@ export interface ForjaApi {
     notify(title: string, body: string): Promise<IpcResult<boolean>>
     createSkill(name: string, description: string, body: string): Promise<IpcResult<SkillInfo>>
     discoverModels(providerId: string): Promise<IpcResult<ModelDiscovery>>
+    /** Remembers the last picked provider/model for new sessions and restarts. */
+    rememberModel(providerId: string, model: string): Promise<IpcResult<boolean>>
     mcpPresets(): Promise<IpcResult<McpPresetEntry[]>>
     openSkillsFolder(): Promise<IpcResult<boolean>>
   }
@@ -404,6 +408,8 @@ export interface ForjaApi {
     add(folder: string, name?: string): Promise<IpcResult<Project>>
     remove(projectId: string): Promise<IpcResult<boolean>>
     pick(): Promise<IpcResult<string | null>>
+    /** Returns the default workspace project used by Home when no project is open. */
+    ensureDefault(): Promise<IpcResult<Project>>
   }
   sessions: {
     list(): Promise<IpcResult<SessionSummary[]>>

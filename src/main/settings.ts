@@ -74,6 +74,7 @@ export function defaultSettings(): AppSettings {
     theme: 'dark',
     telemetry: false,
     autoAgents: false,
+    useAllModels: false,
     mcpServers: [],
     hooks: {},
     importClaudeSettings: false,

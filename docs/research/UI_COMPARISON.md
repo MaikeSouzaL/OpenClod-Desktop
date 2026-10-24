@@ -94,3 +94,41 @@ maiúscula no meio da frase do resumo.
 Ainda não verificado nesta etapa: agentes aparecendo no painel com modelo e
 "N tarefas" (depende dos eventos do sistema de agentes — ver abaixo), e o
 ponto "trabalhando" para sessões que não estão na tela.
+
+## Captura ao vivo do Claude Desktop (rodada 2026-10-23, fim da noite)
+
+Referência: janela principal real, 1440 × 900, aberta pelo pacote MSIX
+(`shell:AppsFolder\Claude_pzs8sxrjxfjjc!Claude`; o `.exe` direto é negado pelo
+Windows). A árvore de acessibilidade expõe apenas os três botões da barra de
+título — o conteúdo é renderizado sem UIA —, então a comparação é visual e não
+por automação de elementos. A captura fica fora do repositório, em
+`%TEMP%\opencode\claude-main.png`, para não versionar conversas privadas.
+
+O que a tela mostra, e o estado do Forja depois desta rodada:
+
+| Elemento do Claude Desktop | Observação na captura | Forja agora |
+|---|---|---|
+| Barra lateral estreita com "Novo chat" no topo | ícone quadrado, rótulo curto, lista de conversas abaixo | mesma estrutura; "Novo chat" e busca de sessões |
+| Abas no topo (`Chat`, `Cowork`, `Code`) | três abas, a ativa com sublinhado; `Code` abre o ambiente de projeto | `Home` (chat sem projeto), `Cowork` e `Code`; `Home` não exige pasta |
+| Compositor central com modelo e esforço no rodapé | linha discreta, seletor de modelo à direita | seletor de modelo com busca, esforço por modelo, microfone e anel de contexto |
+| Anel/medidor de contexto | sem número visível | anel clicável; no hover mostra `% usado`, tokens usados e livres |
+| Aviso de limite de uso | faixa fina acima do compositor quando a cota aperta | troca automática de modelo (fallback) com aviso na conversa, preservando contexto e memória |
+| Grade de provedores nas configurações | não é a mesma tela; o Claude usa só a conta Anthropic | grade de ícones com 9 provedores; clique abre credenciais e detalhes com botão voltar |
+| Tema claro/escuro e tipografia | fundo quente, serifada nos títulos, sans no corpo | mesma direção: fundo quente, `Source Serif` nos títulos, `Inter` no corpo |
+
+Decisões que vieram da comparação:
+
+1. **Home sem projeto**: o aviso "Abra uma pasta de projeto" ficou restrito ao
+   `Code`. No `Home`, o Forja cria `%APPDATA%\Forja\workspace` na primeira
+   mensagem e responde normalmente.
+2. **Contexto visível sem poluir**: o número só aparece no hover; em repouso
+   fica o anel, como no Claude.
+3. **Fallback explícito**: quando o modelo escolhido esgota cota ou fica
+   indisponível, o Forja avisa qual modelo assumiu em vez de mostrar uma faixa
+   de limite sem saída.
+4. **Modelo lembrado**: a escolha sobrevive ao reinício (`lastModel` em
+   `settings.json`), algo que a captura não permite verificar no Claude.
+
+Cobertura desta rodada: `tests/browser-tabs.test.ts` (6 testes de abas) e
+`tests/runner.test.ts` (4 testes de fallback: cota, `bad_request`, resposta
+parcial e cadeia esgotada). Total: **675 testes**, `typecheck` limpo.

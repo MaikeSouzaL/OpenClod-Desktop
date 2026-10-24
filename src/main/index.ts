@@ -183,8 +183,10 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
         contextWindow: Math.max(1000, Math.min(4_000_000, Number(provider.contextWindow) || 32_000)),
         supportsVision: Boolean(provider.supportsVision),
         supportsTools: provider.supportsTools !== false,
+        // OpenRouter exposes ~300 models; keep the whole catalog so the
+        // searchable model menu can show every option.
         models: Array.isArray(provider.models)
-          ? provider.models.slice(0, 60).map((model) => String(model).slice(0, 200)).filter(Boolean)
+          ? provider.models.slice(0, 1000).map((model) => String(model).slice(0, 200)).filter(Boolean)
           : [],
         inputCostPerMTok: Number(provider.inputCostPerMTok) || undefined,
         outputCostPerMTok: Number(provider.outputCostPerMTok) || undefined,
@@ -239,6 +241,7 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
 
   if (input.theme === 'light' || input.theme === 'dark') patch.theme = input.theme
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
+  if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
 
   if (input.voice && typeof input.voice === 'object') {
     const model = String(input.voice.model ?? 'base')
@@ -569,6 +572,12 @@ function registerIpc(): void {
     }))
   )
   handle(CH.appDiscoverModels, async (providerId) => need().discoverModels(str(providerId, 'providerId', 60)))
+  handle(CH.appRememberModel, async (providerId, model) => {
+    const id = str(providerId, 'providerId', 60)
+    const value = str(model, 'model', 200)
+    await need().settings.update({ lastModel: { providerId: id, model: value } })
+    return true
+  })
   handle(CH.appMcpPresets, async () => need().mcpPresets())
   handle(CH.appCreateSkill, async (rawName, rawDescription, rawBody) => {
     const name = str(rawName, 'nome', 64).trim()
@@ -622,6 +631,11 @@ function registerIpc(): void {
       ? await dialog.showOpenDialog(mainWindow, options)
       : await dialog.showOpenDialog(options)
     return result.canceled || !result.filePaths.length ? null : result.filePaths[0]
+  })
+  handle(CH.projectsEnsureDefault, async () => {
+    const dir = path.join(app.getPath('userData'), 'workspace')
+    fs.mkdirSync(dir, { recursive: true })
+    return need().addProject(dir, 'Forja Workspace')
   })
 
   handle(CH.sessionsList, async () => need().store.listSessions())

@@ -17,9 +17,25 @@ import type {
   ProviderPresetInfo,
   SttStatusInfo
 } from '../../../shared/api'
-import { Icon } from './Icons'
+import { Icon, type IconName } from './Icons'
 import { MODE_LABELS } from '../lib/format'
 import { errorMessage, unwrap } from '../lib/api'
+
+const PROVIDER_VISUALS: Record<string, { icon: IconName; color: string }> = {
+  anthropic: { icon: 'spark', color: '#d97757' },
+  openai: { icon: 'cpu', color: '#10a37f' },
+  deepseek: { icon: 'code', color: '#4d6bfe' },
+  kimi: { icon: 'link', color: '#8b5cf6' },
+  qwen: { icon: 'globe', color: '#a855f7' },
+  openrouter: { icon: 'globe', color: '#6366f1' },
+  ollama: { icon: 'terminal', color: '#e5e7eb' },
+  lmstudio: { icon: 'monitor', color: '#22c55e' },
+  mock: { icon: 'terminal', color: '#f59e0b' }
+}
+
+function providerVisual(id: string): { icon: IconName; color: string } {
+  return PROVIDER_VISUALS[id] ?? { icon: 'bot', color: '#94a3b8' }
+}
 
 export type SettingsTab = 'providers' | 'appearance' | 'voice' | 'policy' | 'memory' | 'mcp' | 'about'
 type Tab = SettingsTab
@@ -69,6 +85,7 @@ export function SettingsDialog({
   const [theme, setTheme] = useState<'dark' | 'light'>(settings.theme)
   const [policy, setPolicy] = useState<PolicyConfig>(settings.policy)
   const [autoAgents, setAutoAgents] = useState(Boolean(settings.autoAgents))
+  const [useAllModels, setUseAllModels] = useState(Boolean(settings.useAllModels))
   const [limits, setLimits] = useState(settings.limits)
   const [blockedText, setBlockedText] = useState('')
   const [rootsText, setRootsText] = useState('')
@@ -89,6 +106,7 @@ export function SettingsDialog({
   const [memoryPages, setMemoryPages] = useState<MemoryPageInfo[]>([])
   const [memoryPage, setMemoryPage] = useState<MemoryPageContent | null>(null)
   const [memoryNotice, setMemoryNotice] = useState('')
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
   const [keyStatus, setKeyStatus] = useState<Record<string, string>>({})
   const [testStatus, setTestStatus] = useState<Record<string, { state: string; detail: string }>>({})
@@ -110,6 +128,7 @@ export function SettingsDialog({
     setTheme(settings.theme)
     setPolicy(structuredClone(settings.policy))
     setAutoAgents(Boolean(settings.autoAgents))
+    setUseAllModels(Boolean(settings.useAllModels))
     setLimits(structuredClone(settings.limits))
     setBlockedText(settings.policy.blockedCommands.join('\n'))
     setRootsText(settings.policy.allowedRoots.join('\n'))
@@ -319,6 +338,7 @@ export function SettingsDialog({
         theme,
         policy: nextPolicy,
         autoAgents,
+        useAllModels,
         limits,
         mcpServers,
         hooks,
@@ -396,12 +416,58 @@ export function SettingsDialog({
 
           {tab === 'providers' ? (
             <div className="providers">
+              <div className="providers-toolbar">
+                <p className="field-help">
+                  A chave é cifrada com o DPAPI do Windows e nunca volta para a interface. Provedores locais
+                  (Ollama/LM Studio) não precisam de chave.
+                </p>
+                <label className="check-line providers-fallback" title="Se um modelo esgotar cota/limite ou ficar indisponível, tenta o próximo mantendo a conversa e a memória do projeto.">
+                  <input
+                    type="checkbox"
+                    checked={useAllModels}
+                    onChange={(event) => setUseAllModels(event.target.checked)}
+                  />
+                  Usar todos os modelos (fallback)
+                </label>
+              </div>
               <p className="field-help">
-                A chave é cifrada com o DPAPI do Windows e nunca volta para a interface. Provedores locais
-                (Ollama/LM Studio) não precisam de chave.
+                Com o fallback ligado, uma falha de cota/limite/autenticação troca para o próximo modelo
+                configurado sem reiniciar a tarefa; o histórico e a wiki do projeto continuam os mesmos.
               </p>
 
-              {providers.map((provider) => (
+              {selectedProvider ? (
+                <button type="button" className="btn ghost small provider-back" onClick={() => setSelectedProvider(null)}>
+                  <Icon name="arrowLeft" size={14} /> Voltar para provedores
+                </button>
+              ) : (
+                <div className="provider-grid">
+                  {providers.map((provider) => {
+                    const visual = providerVisual(provider.id)
+                    const local = provider.id === 'ollama' || provider.id === 'lmstudio' || /127\.0\.0\.1|localhost/.test(provider.baseUrl)
+                    const status = provider.kind === 'mock' ? 'autoteste' : local ? 'local' : configured(provider.id) ? 'pronto' : 'sem chave'
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        className={`provider-tile ${defaultId === provider.id ? 'is-default' : ''}`}
+                        onClick={() => setSelectedProvider(provider.id)}
+                      >
+                        <span className="provider-icon" style={{ ['--brand' as string]: visual.color }}>
+                          <Icon name={visual.icon} size={20} />
+                        </span>
+                        <span className="provider-tile-name">{provider.label}</span>
+                        <span className="provider-tile-model">{provider.model}</span>
+                        <span className={`provider-tile-status ${status === 'pronto' || status === 'local' ? 'ok' : status === 'sem chave' ? 'warn' : ''}`}>
+                          {status}
+                          {provider.models?.length ? ` · ${provider.models.length} modelos` : ''}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {providers.map((provider) => selectedProvider === provider.id ? (
                 <div key={provider.id} className={`provider-card ${defaultId === provider.id ? 'is-default' : ''}`}>
                   <div className="provider-head">
                     <label className="radio-line" title="Usar como provedor padrão">
@@ -552,9 +618,9 @@ export function SettingsDialog({
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ) : null)}
 
-              <div className="add-provider">
+              {!selectedProvider ? <div className="add-provider">
                 <select value={presetKey} onChange={(event) => setPresetKey(event.target.value)}>
                   <option value="">Adicionar preset…</option>
                   {availablePresets.map((preset) => (
@@ -569,7 +635,7 @@ export function SettingsDialog({
                 <button type="button" className="btn small ghost" onClick={addCustom}>
                   <Icon name="plus" size={12} /> OpenAI-compatível
                 </button>
-              </div>
+              </div> : null}
             </div>
           ) : null}
 

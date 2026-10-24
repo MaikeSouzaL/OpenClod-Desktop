@@ -26,23 +26,34 @@ export class BrowserLayer {
   private pw: PlaywrightModule | null = null
   private browser: Browser | null = null
   private context: BrowserContext | null = null
-  private page: Page | null = null
+  /** Every open tab, keyed by a stable id (`tab_1`, `tab_2`, ...). */
+  private tabs = new Map<string, Page>()
+  private activeTab = ''
+  private tabSeq = 0
   private consoleLog: ConsoleEntry[] = []
   private networkErrors: string[] = []
   private headed = false
   lastError: string | null = null
 
+  private activePage(): Page | null {
+    const page = this.tabs.get(this.activeTab)
+    return page && !page.isClosed() ? page : null
+  }
+
   get isOpen(): boolean {
-    return Boolean(this.page && !this.page.isClosed())
+    return Boolean(this.activePage())
   }
 
   async status(): Promise<BrowserStatus> {
     try {
       // Resolving the module is enough to know the dependency is installed.
       await this.load()
+      const page = this.activePage()
       return {
         available: true,
-        detail: this.isOpen ? `navegador aberto: ${this.page?.url() ?? ''}` : 'Playwright disponível',
+        detail: page
+          ? `navegador aberto: ${page.url()} (${this.tabs.size} aba${this.tabs.size === 1 ? '' : 's'})`
+          : 'Playwright disponível',
         engine: this.browser ? 'chromium' : undefined
       }
     } catch (err) {
@@ -55,7 +66,8 @@ export class BrowserLayer {
     return this.pw
   }
 
-  async open(url: string, headed = false): Promise<void> {
+  /** Ensures the browser and a page exist; `newTab` forces a fresh tab. */
+  async open(url: string, headed = false, newTab = false): Promise<void> {
     const pw = await this.load()
     if (this.browser && this.headed !== headed) await this.close()
     if (!this.browser) {
@@ -99,16 +111,74 @@ export class BrowserLayer {
       })
     }
     if (!this.context) throw new Error('contexto do navegador indisponível')
-    if (!this.page || this.page.isClosed()) {
-      this.page = await this.context.newPage()
-      this.page.setDefaultTimeout(15_000)
+    const current = this.activePage()
+    if (!newTab && current) {
+      await current.goto(url, { waitUntil: 'domcontentloaded' })
+      return
     }
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' })
+    const page = await this.createPage()
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+  }
+
+  private async createPage(): Promise<Page> {
+    if (!this.context) throw new Error('contexto do navegador indisponível')
+    const page = await this.context.newPage()
+    const id = `tab_${++this.tabSeq}`
+    this.tabs.set(id, page)
+    this.activeTab = id
+    page.setDefaultTimeout(15_000)
+    page.on('close', () => {
+      this.tabs.delete(id)
+      if (this.activeTab === id) this.activeTab = [...this.tabs.keys()][0] ?? ''
+    })
+    return page
+  }
+
+  /** Opens a new tab (empty when url is omitted) and makes it active. */
+  async newTab(url?: string): Promise<string> {
+    await this.load()
+    if (!this.context) {
+      // Reuse open() to perform the full browser bootstrap, then add a tab.
+      await this.open(url ?? 'about:blank')
+      return this.activeTab
+    }
+    const page = await this.createPage()
+    if (url) await page.goto(url, { waitUntil: 'domcontentloaded' })
+    return this.activeTab
+  }
+
+  async tabsList(): Promise<Array<{ id: string; title: string; url: string; active: boolean }>> {
+    const entries = [...this.tabs.entries()]
+    return Promise.all(
+      entries.map(async ([id, page]) => ({
+        id,
+        title: page.isClosed() ? '(fechada)' : await page.title().catch(() => ''),
+        url: page.isClosed() ? '' : page.url(),
+        active: id === this.activeTab
+      }))
+    )
+  }
+
+  async switchTab(id: string): Promise<void> {
+    const page = this.tabs.get(id)
+    if (!page || page.isClosed()) throw new Error(`aba não encontrada: ${id}`)
+    this.activeTab = id
+    await page.bringToFront().catch(() => undefined)
+  }
+
+  async closeTab(id?: string): Promise<void> {
+    const target = id ?? this.activeTab
+    const page = this.tabs.get(target)
+    if (!page) throw new Error(`aba não encontrada: ${target}`)
+    await page.close().catch(() => undefined)
+    this.tabs.delete(target)
+    if (this.activeTab === target) this.activeTab = [...this.tabs.keys()][0] ?? ''
   }
 
   private requirePage(): Page {
-    if (!this.page || this.page.isClosed()) throw new Error('nenhuma página aberta; use browser_open primeiro')
-    return this.page
+    const page = this.activePage()
+    if (!page) throw new Error('nenhuma página aberta; use browser_open primeiro')
+    return page
   }
 
   async navigate(url: string): Promise<void> {
@@ -205,7 +275,8 @@ export class BrowserLayer {
     } catch {
       /* ignore */
     }
-    this.page = null
+    this.tabs.clear()
+    this.activeTab = ''
     this.context = null
     this.browser = null
     this.consoleLog = []

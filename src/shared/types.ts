@@ -545,6 +545,10 @@ export interface AppSettings {
   telemetry: false
   /** Team mode: split work across specialist agents (also on at max effort). */
   autoAgents?: boolean
+  /** Try the next model/provider when one runs out of quota or is unavailable. */
+  useAllModels?: boolean
+  /** Last provider/model picked by the user; survives restarts. */
+  lastModel?: { providerId: string; model: string }
   mcpServers: McpServerSettings[]
   /** User-level hooks (Claude Code format). */
   hooks?: HooksConfig

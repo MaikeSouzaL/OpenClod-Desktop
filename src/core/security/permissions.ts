@@ -167,6 +167,9 @@ for (const tools of Object.values(MODE_TOOLS)) {
     if (!tools.includes(name)) tools.push(name)
   }
   if (!tools.includes('web_research')) tools.push('web_research')
+  for (const name of ['browser_tabs', 'browser_new_tab', 'browser_switch_tab', 'browser_close_tab']) {
+    if (!tools.includes(name)) tools.push(name)
+  }
 }
 
 // Surgical edits are available wherever files can be written.

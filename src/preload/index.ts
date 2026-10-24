@@ -20,6 +20,7 @@ const api: ForjaApi = {
     notify: (title, body) => call(CH.appNotify, title, body),
     createSkill: (name, description, body) => call(CH.appCreateSkill, name, description, body),
     discoverModels: (providerId) => call(CH.appDiscoverModels, providerId),
+    rememberModel: (providerId, model) => call(CH.appRememberModel, providerId, model),
     mcpPresets: () => call(CH.appMcpPresets),
     openSkillsFolder: () => call(CH.appOpenSkills)
   },
@@ -27,7 +28,8 @@ const api: ForjaApi = {
     list: () => call(CH.projectsList),
     add: (folder, name) => call(CH.projectsAdd, folder, name),
     remove: (projectId) => call(CH.projectsRemove, projectId),
-    pick: () => call(CH.projectsPick)
+    pick: () => call(CH.projectsPick),
+    ensureDefault: () => call(CH.projectsEnsureDefault)
   },
   sessions: {
     list: () => call(CH.sessionsList),

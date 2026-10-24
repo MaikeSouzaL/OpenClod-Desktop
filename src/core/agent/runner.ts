@@ -60,6 +60,21 @@ const MAX_LENGTH_CONTINUATIONS = 2
 const MAX_STREAM_RETRIES = 2
 /** Times a Stop hook may send the agent back to work in one turn. */
 const MAX_STOP_HOOK_LOOPS = 3
+/** How many models one turn may switch to before giving up. */
+const MAX_MODEL_FALLBACKS = 8
+
+function isFallbackKind(kind: ProviderErrorKind | undefined): boolean {
+  return (
+    kind === 'quota' ||
+    kind === 'rate_limit' ||
+    kind === 'overloaded' ||
+    kind === 'auth' ||
+    kind === 'bad_request' ||
+    kind === 'server' ||
+    kind === 'network' ||
+    kind === 'timeout'
+  )
+}
 
 const CONTINUE_PROMPT =
   'Sua resposta anterior foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir o que já escreveu.'
@@ -107,6 +122,8 @@ export interface RunnerDeps {
   createAgent?: (input: CreateAgentInput) => Promise<{ path: string; agent: import('../../shared/types.js').AgentDefinition }>
   /** Team mode: the system prompt tells the model to split work across agents (also on at max effort). */
   autoAgents?: boolean
+  /** Ordered alternatives to switch to when the active model is exhausted or unavailable. */
+  fallback?: Array<{ provider: Provider; config: ProviderConfig }>
   persist?: (state: RunnerSnapshot) => void
   systemExtra?: string
   initial?: { messages?: Message[]; plan?: PlanItem[]; usage?: Usage }
@@ -233,6 +250,10 @@ export class SessionRunner {
   busy = false
   private controller: AbortController | null = null
   private readonly deps: RunnerDeps
+  /** Active provider/config; a fallback may replace them between iterations. */
+  private provider: Provider
+  private providerConfig: ProviderConfig
+  private fallback: Array<{ provider: Provider; config: ProviderConfig }>
   private lastToolSignature = ''
   private repeatedCalls = 0
   private toolCallCount = 0
@@ -246,6 +267,9 @@ export class SessionRunner {
 
   constructor(deps: RunnerDeps) {
     this.deps = deps
+    this.provider = deps.provider
+    this.providerConfig = deps.providerConfig
+    this.fallback = [...(deps.fallback ?? [])]
     this.messages = deps.initial?.messages ? [...deps.initial.messages] : []
     this.plan = deps.initial?.plan ? [...deps.initial.plan] : []
     this.usage = deps.initial?.usage ?? { input: 0, output: 0 }
@@ -288,8 +312,8 @@ export class SessionRunner {
     const result = await compactIfNeeded({
       system: this.buildSystem(),
       messages: this.messages,
-      provider: this.deps.provider,
-      contextWindow: this.deps.providerConfig.contextWindow,
+      provider: this.provider,
+      contextWindow: this.providerConfig.contextWindow,
       keepRecent: 4,
       force: true,
       onNote: (note) =>
@@ -400,7 +424,7 @@ export class SessionRunner {
       cwd: deps.cwd,
       mode: deps.mode,
       policy: deps.policy,
-      providerConfig: deps.providerConfig,
+      providerConfig: this.providerConfig,
       effort: deps.effort,
       limits: deps.limits,
       availableTools: this.availableTools(),
@@ -421,8 +445,8 @@ export class SessionRunner {
       mode: this.deps.mode,
       cwd: this.deps.cwd,
       policy: this.deps.policy,
-      model: this.deps.providerConfig.model,
-      provider: this.deps.providerConfig.label,
+      model: this.providerConfig.model,
+      provider: this.providerConfig.label,
       skills: this.deps.services.skills.list().map((s) => ({ name: s.name, description: s.description })),
       memory: this.memoryFacts,
       projectMemory: this.projectMemoryBrief,
@@ -604,6 +628,7 @@ export class SessionRunner {
     let streamRetries = 0
     let stopHookLoops = 0
     let overflowCompactions = 0
+    let fallbacksUsed = 0
 
     try {
       await this.refreshMemory()
@@ -673,7 +698,7 @@ export class SessionRunner {
         let iterationStop: StopReason = 'stop'
 
         try {
-          for await (const event of this.deps.provider.stream(request)) {
+          for await (const event of this.provider.stream(request)) {
             switch (event.type) {
               case 'text_delta':
                 textBuffer += event.text
@@ -729,7 +754,7 @@ export class SessionRunner {
         }
 
         if (usageDelta) {
-          this.usage = addUsage(this.usage, usageDelta, this.deps.providerConfig)
+          this.usage = addUsage(this.usage, usageDelta, this.providerConfig)
           this.emit({ type: 'usage', sessionId: this.deps.sessionId, usage: usageDelta, total: this.usage })
         }
 
@@ -758,6 +783,23 @@ export class SessionRunner {
               text: `Falha transitória do provedor (${errorKind}); nova tentativa em ${delay / 1000}s.`
             })
             await sleep(delay, signal).catch(() => undefined)
+            iteration--
+            continue
+          }
+          // Quota/rate limit/auth: switch to the next model and keep the same
+          // conversation and project memory, instead of aborting the task.
+          if (nothingEmitted && errorKind && isFallbackKind(errorKind) && this.fallback.length && fallbacksUsed < MAX_MODEL_FALLBACKS) {
+            const next = this.fallback.shift() as { provider: Provider; config: ProviderConfig }
+            const previous = `${this.providerConfig.label}/${this.providerConfig.model}`
+            this.provider = next.provider
+            this.providerConfig = next.config
+            fallbacksUsed++
+            this.emit({
+              type: 'notice',
+              sessionId: this.deps.sessionId,
+              level: 'warn',
+              text: `${previous} falhou (${errorKind}); continuando com ${next.config.label}/${next.config.model}. O contexto e a memória do projeto foram preservados.`
+            })
             iteration--
             continue
           }
@@ -793,7 +835,7 @@ export class SessionRunner {
           ts: Date.now(),
           parts: assistantParts,
           providerBlocks,
-          model: this.deps.providerConfig.model,
+          model: this.providerConfig.model,
           usage: usageDelta ?? undefined
         })
 
@@ -838,7 +880,7 @@ export class SessionRunner {
 
           // Vision-less models still receive a textual description.
           if (part.type === 'tool_result' && part.images?.length) {
-            if (!this.deps.provider.supportsVision) {
+            if (!this.provider.supportsVision) {
               part.text += `\n[${part.images.length} imagem(ns) capturada(s) — o modelo atual não suporta visão]`
               part.images = undefined
             }
@@ -894,14 +936,14 @@ export class SessionRunner {
       compactIfNeeded({
         system,
         messages: this.messages,
-        provider: this.deps.provider,
-        contextWindow: this.deps.providerConfig.contextWindow,
+        provider: this.provider,
+        contextWindow: this.providerConfig.contextWindow,
         keepRecent: force ? 4 : undefined,
         force,
         signal,
         onNote: (note) => this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'info', text: note })
       })
-    if (!force && estimateContextTokens(system, this.messages) < this.deps.providerConfig.contextWindow * 0.75) return false
+    if (!force && estimateContextTokens(system, this.messages) < this.providerConfig.contextWindow * 0.75) return false
     const trigger = force ? 'overflow' : 'auto'
     await this.runHook('PreCompact', { trigger }, undefined, signal)
     const result = await run()

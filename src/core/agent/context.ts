@@ -53,6 +53,7 @@ const MODE_GUIDANCE: Record<AgentMode, string> = {
   web: `MODO WEB RESEARCH — navegação e coleta.
 - Use web_search para descobrir fontes e fetch_url/browser para ler.
 - Prefira documentação oficial. Registre URL e trecho que sustenta cada conclusão.
+- Você pode manter várias abas: browser_new_tab, browser_tabs, browser_switch_tab e browser_close_tab. Use abas separadas para fontes diferentes e diga qual aba está ativa.
 - Não contorne CAPTCHA, login ou MFA. Não envie dados para terceiros sem aprovação.`,
   autonomous: `MODO AUTONOMOUS — tarefa longa de ponta a ponta.
 - Planeje, execute, verifique e itere até concluir ou atingir um bloqueio real.

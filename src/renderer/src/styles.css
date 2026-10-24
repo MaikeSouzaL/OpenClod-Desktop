@@ -483,13 +483,40 @@ a {
 
 .menu-popover {
   min-width: 250px;
-  max-width: 340px;
+  max-width: 360px;
+  /* A provider may expose hundreds of models (OpenRouter, Ollama cloud). */
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
   background: var(--elevated);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 5px;
   box-shadow: var(--shadow);
   animation: pop-in 0.12s ease;
+}
+
+.menu-search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 3px 3px 6px;
+  background: var(--elevated);
+}
+
+.menu-search {
+  width: 100%;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--composer);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.menu-search:focus {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
 .menu-popover.align-right {
@@ -2997,6 +3024,101 @@ a {
   padding: 1px 4px;
   border-radius: 4px;
   background: var(--elevated);
+}
+
+.providers-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.providers-toolbar .field-help {
+  margin: 0;
+}
+
+.providers-fallback {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.provider-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--elevated) 55%, transparent);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+
+.provider-tile:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--elevated);
+  transform: translateY(-1px);
+}
+
+.provider-tile.is-default {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.provider-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 5px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--brand, var(--text-3)) 16%, transparent);
+  color: var(--brand, var(--text-2));
+}
+
+.provider-tile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.provider-tile-model {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.provider-tile-status {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.provider-tile-status.ok {
+  color: var(--green);
+}
+
+.provider-tile-status.warn {
+  color: var(--amber);
+}
+
+.provider-back {
+  margin-bottom: 10px;
 }
 
 .provider-card {
@@ -7074,6 +7196,66 @@ button.env-row:hover {
   white-space: nowrap;
 }
 
+/* Context ring + hover meter */
+.context-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.context-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 232px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 120;
+}
+
+.context-wrap:hover .context-popover,
+.context-wrap:focus-within .context-popover {
+  opacity: 1;
+  transform: none;
+}
+
+.context-popover-head,
+.context-popover-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.context-popover-head strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.context-bar {
+  height: 7px;
+  margin: 8px 0 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-3) 18%, transparent);
+  overflow: hidden;
+}
+
+.context-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--amber));
+  transition: width 0.2s ease;
+}
+
 /* Dictation */
 .mic-btn {
   position: relative;
@@ -7107,7 +7289,7 @@ button.env-row:hover {
   animation: forja-pulse 1s ease-in-out infinite;
 }
 
-/* Project memory (Settings > Memória) */
+/* Project memory (Settings > Memï¿½ria) */
 .memory-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
 .memory-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--elevated); }
 .memory-title { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

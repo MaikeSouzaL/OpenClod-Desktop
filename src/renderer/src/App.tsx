@@ -274,13 +274,17 @@ export default function App(): ReactElement {
   const createSession = useCallback(
     async (project: Project, targetSurface: SessionSurface = surface): Promise<SessionState | null> => {
       if (!settings) return null
+      const preferred = settings.lastModel
       const provider =
-        settings.providers.find((item) => item.id === settings.defaultProviderId) ?? settings.providers[0]
+        settings.providers.find((item) => item.id === preferred?.providerId) ??
+        settings.providers.find((item) => item.id === settings.defaultProviderId) ??
+        settings.providers[0]
       if (!provider) {
         setError('Nenhum provedor configurado. Abra as configurações.')
         setSettingsOpen(true)
         return null
       }
+      const model = preferred?.providerId === provider.id && preferred.model ? preferred.model : provider.model
       try {
         const meta = await unwrap(
           window.forja.sessions.create({
@@ -289,7 +293,7 @@ export default function App(): ReactElement {
             mode: targetSurface === 'chat' ? 'ask' : 'code',
             surface: targetSurface,
             providerId: provider.id,
-            model: provider.model
+            model
           })
         )
         if (defaultEffortRef.current) {
@@ -715,11 +719,21 @@ export default function App(): ReactElement {
     async (text: string, images: ImagePart[], options?: { fresh?: boolean }): Promise<boolean> => {
       let target = activeSessionRef.current
       if (!target || options?.fresh) {
-        const project =
-          projectsRef.current.find((item) => item.id === activeProjectId) ?? projectsRef.current[0]
+        let project =
+          projectsRef.current.find((item) => item.id === activeProjectId) ?? projectsRef.current[0] ?? null
         if (!project) {
-          setError('Abra uma pasta de projeto para começar. O agente precisa de uma raiz de trabalho.')
-          return false
+          // Home/Cowork work without a chosen project; Code still needs one.
+          if (surface === 'code') {
+            setError('Abra uma pasta de projeto para começar no modo Code. O Home funciona sem projeto.')
+            return false
+          }
+          try {
+            project = await unwrap(window.forja.projects.ensureDefault())
+            setProjects((current) => (current.some((item) => item.id === project.id) ? current : [project, ...current]))
+          } catch (err) {
+            setError(errorMessage(err))
+            return false
+          }
         }
         const created = await createSession(project)
         if (!created) return false
@@ -739,7 +753,7 @@ export default function App(): ReactElement {
         return false
       }
     },
-    [activeProjectId, createSession]
+    [activeProjectId, createSession, surface]
   )
 
   const stop = useCallback(async (): Promise<void> => {
@@ -794,8 +808,11 @@ export default function App(): ReactElement {
 
   const changeModel = useCallback(async (providerId: string, model: string): Promise<void> => {
     const id = activeSessionRef.current
-    if (!id) return
     try {
+      // Remember the choice for new sessions and for the next app start.
+      await unwrap(window.forja.app.rememberModel(providerId, model))
+      setSettings((current) => (current ? { ...current, lastModel: { providerId, model } } : current))
+      if (!id) return
       await unwrap(window.forja.sessions.setModel(id, providerId, model))
       const patch = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, providerId, model })
       setSession((current) => (current ? { ...current, meta: patch(current.meta) } : current))
@@ -999,8 +1016,10 @@ export default function App(): ReactElement {
   /* ------------------------------- view ------------------------------- */
 
   const activeProject = projects.find((item) => item.id === activeProjectId) ?? null
+  const selectedProviderId =
+    session?.meta.providerId ?? settings?.lastModel?.providerId ?? settings?.defaultProviderId
   const provider =
-    settings?.providers.find((item) => item.id === session?.meta.providerId) ??
+    settings?.providers.find((item) => item.id === selectedProviderId) ??
     settings?.providers.find((item) => item.id === settings?.defaultProviderId) ??
     settings?.providers[0] ??
     null
@@ -1039,8 +1058,8 @@ export default function App(): ReactElement {
     <Composer
       session={session}
       providers={settings?.providers ?? []}
-      providerId={session?.meta.providerId ?? provider?.id ?? ''}
-      model={session?.meta.model ?? provider?.model ?? ''}
+      providerId={session?.meta.providerId ?? settings?.lastModel?.providerId ?? provider?.id ?? ''}
+      model={session?.meta.model ?? settings?.lastModel?.model ?? provider?.model ?? ''}
       mode={session?.meta.mode ?? 'ask'}
       permissionMode={settings?.policy.mode ?? 'ask'}
       runState={runState}

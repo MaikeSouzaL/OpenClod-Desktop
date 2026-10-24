@@ -275,3 +275,88 @@ describe('MCP tools and effort reach the model', () => {
     expect(assistant?.providerBlocks).toEqual({ kind: 'anthropic', model: 'm', blocks: [{ type: 'thinking', thinking: 't', signature: 's' }] })
   })
 })
+
+describe('model fallback', () => {
+  const backupConfig = {
+    id: 'mock-backup',
+    kind: 'mock' as const,
+    label: 'Backup',
+    baseUrl: '',
+    model: 'backup-model',
+    contextWindow: 32_000,
+    supportsVision: false,
+    supportsTools: true
+  }
+
+  function withFallback(
+    primary: ScriptedProvider,
+    backup: ScriptedProvider,
+    overrides: Partial<RunnerDeps> = {}
+  ): { runner: SessionRunner; events: HarnessEvent[] } {
+    return makeRunner(primary, {
+      fallback: [{ provider: backup, config: backupConfig }],
+      ...overrides
+    })
+  }
+
+  it('switches to the next model after quota exhaustion and keeps the conversation', async () => {
+    const primary = new ScriptedProvider([{ error: '402 payment required', errorKind: 'quota' }])
+    const backup = new ScriptedProvider([{ text: 'fallback ok' }])
+    const { runner, events } = withFallback(primary, backup)
+
+    await runner.send('continue o trabalho')
+
+    expect(runner.state).toBe('done')
+    // Same user message, then the backup model's answer: nothing was lost.
+    expect(runner.messages[0]).toMatchObject({ role: 'user' })
+    expect(runner.messages.at(-1)?.parts[0]).toMatchObject({ type: 'text', text: 'fallback ok' })
+    expect(backup.requests).toHaveLength(1)
+    expect(backup.requests[0].messages.some((m) => m.role === 'user')).toBe(true)
+
+    const notice = events.find(
+      (e): e is Extract<HarnessEvent, { type: 'notice' }> =>
+        e.type === 'notice' && e.text.includes('continuando com')
+    )
+    expect(notice?.text).toContain('quota')
+    expect(notice?.text).toContain('Backup/backup-model')
+    expect(events.at(-1)).toMatchObject({ type: 'turn_end', stopReason: 'stop' })
+  })
+
+  it('also falls back on a bad_request (model unavailable on the provider)', async () => {
+    const primary = new ScriptedProvider([{ error: '400 model not found', errorKind: 'bad_request' }])
+    const backup = new ScriptedProvider([{ text: 'modelo alternativo respondeu' }])
+    const { runner } = withFallback(primary, backup)
+
+    await runner.send('oi')
+
+    expect(runner.state).toBe('done')
+    expect(backup.requests).toHaveLength(1)
+  })
+
+  it('does not hide a partial answer by switching models mid-stream', async () => {
+    const primary = new ScriptedProvider([
+      { text: 'resposta parcial', error: '402 payment required', errorKind: 'quota' }
+    ])
+    const backup = new ScriptedProvider([{ text: 'não deveria ser chamado' }])
+    const { runner, events } = withFallback(primary, backup)
+
+    await runner.send('oi')
+
+    expect(runner.state).toBe('error')
+    expect(backup.requests).toHaveLength(0)
+    const failed = runner.messages.find((m) => m.role === 'assistant' && m.error)
+    expect(failed?.parts[0]).toMatchObject({ type: 'text', text: 'resposta parcial' })
+    expect(events.some((e) => e.type === 'notice' && e.level === 'error')).toBe(true)
+  })
+
+  it('reports a real error when every model in the fallback chain fails', async () => {
+    const primary = new ScriptedProvider([{ error: '402 payment required', errorKind: 'quota' }])
+    const backup = new ScriptedProvider([{ error: '401 invalid api key', errorKind: 'auth' }])
+    const { runner } = withFallback(primary, backup, { retryBaseMs: 0 })
+
+    await runner.send('oi')
+
+    expect(runner.state).toBe('error')
+    expect(runner.messages.at(-1)?.error).toContain('401')
+  })
+})
