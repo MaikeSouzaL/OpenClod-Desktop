@@ -519,6 +519,7 @@ export class Orchestrator {
       await this.store.patchMeta(sessionId, { title })
     }
     await runner.send(text, { images })
+    await this.captureTurnMemory(sessionId, runner, text)
   }
 
   /**
@@ -533,14 +534,49 @@ export class Orchestrator {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
       await this.store.patchMeta(sessionId, { title })
     }
-    void runner.send(text, { images }).catch((err) => {
-      this.onEvent({
-        type: 'notice',
-        sessionId,
-        level: 'error',
-        text: `falha ao iniciar turno: ${(err as Error).message}`
+    void runner
+      .send(text, { images })
+      .then(() => this.captureTurnMemory(sessionId, runner, text))
+      .catch((err) => {
+        this.onEvent({
+          type: 'notice',
+          sessionId,
+          level: 'error',
+          text: `falha ao iniciar turno: ${(err as Error).message}`
+        })
       })
-    })
+  }
+
+  /**
+   * Deterministic memory capture after every turn. The agent can still write
+   * curated pages/handoffs, but a model that never calls memory_page still
+   * leaves a durable session record in the project wiki.
+   */
+  private async captureTurnMemory(sessionId: string, runner: SessionRunner, userText: string): Promise<void> {
+    try {
+      const state = await this.store.loadSession(sessionId)
+      if (!state) return
+      const messages = runner.messages
+      const lastUser = [...messages].reverse().find((message) => message.role === 'user' && !message.hidden)
+      const after = lastUser ? messages.slice(messages.indexOf(lastUser) + 1) : messages
+      const assistantText = after
+        .filter((message) => message.role === 'assistant')
+        .map((message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text).join(' ').trim())
+        .filter(Boolean)
+        .pop() ?? ''
+      const tools = [...new Set(after.flatMap((message) => message.parts).filter((part) => part.type === 'tool_call').map((part) => part.name))]
+      const files = (this.trackers.get(sessionId)?.changes() ?? []).map((change) => change.path).slice(-12)
+      await this.memoryForProject(state.meta.projectId).rememberTurn({
+        sessionTitle: state.meta.title,
+        sessionId,
+        userText,
+        assistantText,
+        tools,
+        files
+      })
+    } catch (err) {
+      this.options.log?.(`memória automática da sessão ${sessionId} falhou: ${(err as Error).message}`)
+    }
   }
 
   async abort(sessionId: string): Promise<void> {

@@ -120,6 +120,34 @@ describe('project memory: handoffs', () => {
   })
 })
 
+describe('project memory: automatic turn capture', () => {
+  it('appends every finished turn to the same session page', async () => {
+    await memory.rememberTurn({
+      sessionTitle: 'Corrigir login',
+      sessionId: 'ses_1',
+      userText: 'Corrija o login',
+      assistantText: 'Login corrigido.',
+      tools: ['read_file', 'edit_file'],
+      files: ['src/login.ts']
+    })
+    await memory.rememberTurn({
+      sessionTitle: 'Corrigir login',
+      sessionId: 'ses_1',
+      userText: 'Rode os testes',
+      assistantText: '3 testes passaram.',
+      tools: ['run_command']
+    })
+    const pages = await memory.listPages()
+    const page = pages.find((item) => item.slug === 'sessao-corrigir-login')
+    expect(page).toBeTruthy()
+    const full = await memory.readPage('sessao-corrigir-login')
+    expect(full?.body).toContain('Corrija o login')
+    expect(full?.body).toContain('Rode os testes')
+    expect(full?.body).toContain('src/login.ts')
+    expect(full?.source).toBe('auto')
+  })
+})
+
 describe('slugify', () => {
   it('removes accents and punctuation', () => {
     expect(slugify('Decisões de Arquitetura!')).toBe('decisoes-de-arquitetura')

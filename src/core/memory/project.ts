@@ -255,6 +255,44 @@ export class ProjectMemory {
     return [...(await this.index()).pages]
   }
 
+  /**
+   * Appends a deterministic turn summary to the session's memory page. This is
+   * the safety net for models that never call `memory_page`: every finished
+   * turn leaves a durable record of the request, the outcome and the files.
+   */
+  async rememberTurn(input: {
+    sessionTitle: string
+    sessionId: string
+    userText: string
+    assistantText: string
+    tools?: string[]
+    files?: string[]
+  }): Promise<MemoryPageSummary | null> {
+    const request = input.userText.replace(/\s+/g, ' ').trim().slice(0, 2_000)
+    if (!request) return null
+    const title = `Sessão: ${clean(input.sessionTitle, 80) || input.sessionId}`
+    const slug = pageSlug(title)
+    const existing = await this.readPage(slug)
+    const stamp = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    const lines = [
+      `### ${stamp}`,
+      '',
+      `**Pedido:** ${request}`,
+      '',
+      `**Resultado:** ${input.assistantText.replace(/\s+/g, ' ').trim().slice(0, 4_000) || '(sem resposta textual)'}`
+    ]
+    if (input.tools?.length) lines.push('', `**Ferramentas:** ${input.tools.slice(0, 20).join(', ')}`)
+    if (input.files?.length) lines.push('', `**Arquivos:** ${input.files.slice(0, 20).join(', ')}`)
+    const body = existing ? `${existing.body.trim()}\n\n${lines.join('\n')}` : lines.join('\n')
+    return this.writePage({
+      title,
+      body,
+      tags: ['sessao', 'automatico'],
+      pinned: false,
+      source: 'auto'
+    })
+  }
+
   async deletePage(slug: string): Promise<boolean> {
     if (!/^[a-z0-9][a-z0-9-]{0,80}$/.test(slug)) return false
     try {
