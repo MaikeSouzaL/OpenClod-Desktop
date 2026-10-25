@@ -24,7 +24,7 @@ export const AGENT_MODES: AgentMode[] = [
   'autonomous'
 ]
 
-export type PermissionMode = 'readonly' | 'ask' | 'accept-edits' | 'auto'
+export type PermissionMode = 'readonly' | 'ask' | 'accept-edits' | 'auto' | 'unrestricted'
 
 export interface TextPart {
   type: 'text'
@@ -369,6 +369,7 @@ export type HarnessEvent =
     }
   | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: StopReason; error?: string }
   | { type: 'notice'; sessionId: string; level: 'info' | 'warn' | 'error'; text: string }
+  | { type: 'settings_changed'; sessionId: string; scope: 'mcp' | 'browser' | 'general' }
 
 export type RunState =
   | 'idle'
@@ -593,6 +594,12 @@ export interface AppSettings {
   mcpServers: McpServerSettings[]
   /** User-level hooks (Claude Code format). */
   hooks?: HooksConfig
+  /** Browser automation target. Auto uses an attached Chrome extension when available. */
+  browser?: {
+    mode: 'auto' | 'chrome-existing' | 'playwright'
+    /** Give each Openclod session its own named Chrome tab group. */
+    groupBySession?: boolean
+  }
   /**
    * Also read `.claude/settings.json` / `.claude/settings.local.json` of the
    * project (permissions + hooks), like Claude Code does. Off by default
@@ -657,6 +664,10 @@ export interface BrowserStatus {
   available: boolean
   detail: string
   engine?: string
+  mode?: 'auto' | 'chrome-existing' | 'playwright'
+  /** True when the companion Chrome extension is attached to the native host. */
+  attached?: boolean
+  browser?: string
 }
 
 export interface MCPStatus {

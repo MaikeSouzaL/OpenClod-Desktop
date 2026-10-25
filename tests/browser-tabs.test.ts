@@ -190,4 +190,63 @@ describe('BrowserLayer tabs', () => {
     expect(status.detail).toContain('2 abas')
     expect(status.engine).toBe('chromium')
   })
+
+  it('delegates to an attached Chrome backend without launching another browser', async () => {
+    const chrome = {
+      mode: 'chrome-existing' as const,
+      isAttached: () => true,
+      status: async () => ({ available: true, attached: true, engine: 'Chrome (extensão)', detail: 'conectado' }),
+      isOpen: async () => false,
+      open: vi.fn(async () => undefined),
+      navigate: vi.fn(async () => undefined),
+      snapshot: vi.fn(async () => ({ url: 'https://jira.test/browse/CNC-1', title: 'Jira', tree: 'Backlog' })),
+      click: vi.fn(async () => 'https://jira.test/browse/CNC-1'),
+      type: vi.fn(async () => undefined),
+      press: vi.fn(async () => undefined),
+      readText: vi.fn(async () => 'Backlog'),
+      screenshot: vi.fn(async () => ({ base64: '', width: 1280, height: 720 })),
+      waitFor: vi.fn(async () => undefined),
+      tabsList: vi.fn(async () => [{ id: 'chrome_1', title: 'Jira', url: 'https://jira.test', active: true }]),
+      newTab: vi.fn(async () => 'chrome_2'),
+      claimTab: vi.fn(async () => 'chrome_3'),
+      switchTab: vi.fn(async () => undefined),
+      closeTab: vi.fn(async () => undefined),
+      consoleEntries: () => [],
+      errors: () => []
+    }
+    const layer = new BrowserLayer({ sessionId: 'ses_existing_chrome', chrome, mode: 'chrome-existing' })
+
+    await layer.open('https://jira.test', false, true)
+    expect(await layer.snapshot()).toMatchObject({ title: 'Jira', tree: 'Backlog' })
+    expect(chrome.open).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'ses_existing_chrome', groupName: expect.stringContaining('ses_exis') }))
+    expect(fake.state.launches).toHaveLength(0)
+  })
+
+  it('claims and groups an already-open Chrome tab without creating another tab', async () => {
+    const chrome = {
+      mode: 'chrome-existing' as const,
+      isAttached: () => true,
+      status: async () => ({ available: true, attached: true, engine: 'Chrome (extensão)' }),
+      open: vi.fn(async () => undefined),
+      tabsList: vi.fn(async () => []),
+      claimTab: vi.fn(async () => 'chrome_77')
+    }
+    const layer = new BrowserLayer({ sessionId: 'ses_existing_chrome', chrome: chrome as never, mode: 'chrome-existing' })
+    await expect(layer.claimTab({ url: 'https://jira.test/browse/CNC-1' })).resolves.toBe('chrome_77')
+    expect(chrome.claimTab).toHaveBeenCalledWith({
+      url: 'https://jira.test/browse/CNC-1',
+      sessionId: 'ses_existing_chrome',
+      groupName: expect.stringContaining('ses_exis')
+    })
+    expect(chrome.open).not.toHaveBeenCalled()
+  })
+
+  it('fails clearly when Chrome-existing is forced but the extension is disconnected', async () => {
+    const chrome = {
+      mode: 'chrome-existing' as const,
+      isAttached: () => false
+    }
+    const layer = new BrowserLayer({ chrome: chrome as never, mode: 'chrome-existing' })
+    await expect(layer.open('https://jira.test')).rejects.toThrow(/extensão do Openclod/i)
+  })
 })

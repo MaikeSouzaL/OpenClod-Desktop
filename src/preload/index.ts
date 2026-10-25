@@ -24,12 +24,18 @@ const api: OpenclodApi = {
     mcpPresets: () => call(CH.appMcpPresets),
     mcpCatalog: () => call(CH.appMcpCatalog),
     installMcp: (id, env, headers) => call(CH.appMcpInstall, id, env, headers),
+    mcpOAuthStatus: (serverName) => call(CH.appMcpOAuthStatus, serverName),
+    authorizeMcp: (serverName) => call(CH.appMcpOAuthAuthorize, serverName),
     importClaude: () => call(CH.appImportClaude),
   claudeStatus: () => call(CH.appClaudeStatus),
   claudeLogin: () => call(CH.appClaudeLogin),
     pluginCatalog: () => call(CH.appPluginCatalog),
     agents: (cwd) => call(CH.appAgents, cwd),
-    openSkillsFolder: () => call(CH.appOpenSkills)
+    openSkillsFolder: () => call(CH.appOpenSkills),
+    chromeCompanion: () => call(CH.appChromeCompanion),
+    installChromeCompanion: () => call(CH.appChromeInstall),
+    openChromeExtensions: () => call(CH.appChromeExtensions),
+    environmentCheck: (environmentId) => call(CH.appEnvironmentCheck, environmentId)
   },
   projects: {
     list: () => call(CH.projectsList),
@@ -115,7 +121,8 @@ const api: OpenclodApi = {
     aiStatus: () => call(CH.memoryAiStatus),
     graph: (projectId) => call(CH.memoryGraph, projectId),
     exportMarkdown: (projectId) => call(CH.memoryExport, projectId),
-    importMarkdown: (projectId) => call(CH.memoryImport, projectId)
+    importMarkdown: (projectId) => call(CH.memoryImport, projectId),
+    importZip: (projectId) => call(CH.memoryImportZip, projectId)
   },
   power: {
     keepAwake: (enabled) => call(CH.powerKeepAwake, enabled),

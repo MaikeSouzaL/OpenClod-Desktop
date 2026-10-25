@@ -16,14 +16,14 @@ import { killTree } from './shell.js'
  * Safety rules:
  * - The tool asks for approval like run_command (risk `exec`).
  * - The child's own permission mode follows Openclod's, and never goes beyond
- *   "accept edits": no bypassPermissions, no --dangerously-*, no full-access sandbox.
+ *   unrestricted is an explicit opt-in; other modes retain their own caps.
  * - The prompt travels over stdin, never argv: argv would be re-parsed by
  *   cmd.exe for the npm `.cmd` shims on Windows.
  * - The child gets the sanitized environment (no API keys/tokens from Openclod)
  *   and its whole process tree is killed on abort or timeout.
  */
 
-export type ExternalAgentName = 'claude' | 'codex'
+export type ExternalAgentName = 'claude' | 'codex' | 'opencode'
 
 const DEFAULT_TIMEOUT_MS = 600_000
 const MAX_TIMEOUT_MS = 3_600_000
@@ -49,8 +49,9 @@ export interface ExternalAgentOptions {
 /* Permission mapping                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Openclod permission mode → `claude --permission-mode`. Never bypassPermissions. */
-export function claudePermissionMode(mode: PermissionMode): 'plan' | 'default' | 'acceptEdits' {
+/** Openclod permission mode → `claude --permission-mode`. */
+export function claudePermissionMode(mode: PermissionMode): 'plan' | 'default' | 'acceptEdits' | 'bypassPermissions' {
+  if (mode === 'unrestricted') return 'bypassPermissions'
   switch (mode) {
     case 'ask':
       return 'default'
@@ -62,14 +63,16 @@ export function claudePermissionMode(mode: PermissionMode): 'plan' | 'default' |
   }
 }
 
-/** Openclod permission mode → `codex exec -s`. Never danger-full-access. */
-export function codexSandbox(mode: PermissionMode): 'read-only' | 'workspace-write' {
+/** Openclod permission mode → `codex exec -s`. */
+export function codexSandbox(mode: PermissionMode): 'read-only' | 'workspace-write' | 'danger-full-access' {
+  if (mode === 'unrestricted') return 'danger-full-access'
   return mode === 'accept-edits' || mode === 'auto' ? 'workspace-write' : 'read-only'
 }
 
-const FORBIDDEN_ARGS = /bypassPermissions|dangerously|danger-full-access|skip-permissions/i
+const FORBIDDEN_ARGS = /bypassPermissions|dangerously|skip-permissions/i
 
-function guardArgs(args: string[]): string[] {
+function guardArgs(args: string[], mode: PermissionMode): string[] {
+  if (mode === 'unrestricted') return args
   const bad = args.find((arg) => FORBIDDEN_ARGS.test(arg))
   if (bad) throw new Error(`argumento proibido para agente externo: ${bad}`)
   return args
@@ -287,6 +290,108 @@ function codexParser(): StreamParser {
   }
 }
 
+/**
+ * `opencode run --format json`: one JSON object per line. Text can arrive in
+ * several `part.text` events, so the final answer keeps them in arrival order.
+ * Tool failures stay visible in progress while the process-level result still
+ * decides whether the delegated task succeeded.
+ */
+function opencodeParser(): StreamParser {
+  let sessionId: string | undefined
+  let answer = ''
+  let failure: string | undefined
+  let completed = false
+  let usage: Usage | undefined
+  const toolFailure: string[] = []
+  return {
+    get done() {
+      return completed || failure !== undefined
+    },
+    push(event, progress) {
+      const sid = str(event.sessionID)
+      if (sid) sessionId = sid
+      switch (event.type) {
+        case 'step_start': {
+          const part = asRecord(event.part)
+          const step = asRecord(event.data)
+          const agent = str(step?.agent) ?? str(part?.agent)
+          const model = str(step?.model) ?? str(part?.model)
+          progress(agent || model ? `passo ${agent ?? ''}${model ? ` · ${model}` : ''}` : 'passo iniciado')
+          break
+        }
+        case 'text': {
+          const text = str(asRecord(event.part)?.text)
+          if (text) answer += text
+          break
+        }
+        case 'tool_use': {
+          const part = asRecord(event.part)
+          const name = str(part?.tool) ?? str(part?.name)
+          if (name) progress(name)
+          break
+        }
+        case 'step_finish': {
+          const part = asRecord(event.part)
+          const raw = asRecord(part?.tokens)
+          const cache = asRecord(raw?.cache)
+          if (raw) {
+            usage = {
+              input: num(raw.input) ?? 0,
+              output: num(raw.output) ?? 0,
+              cachedInput: num(cache?.read) || undefined,
+              costUsd: num(part?.cost)
+            }
+          }
+          break
+        }
+        case 'tool_result': {
+          const part = asRecord(event.part)
+          if (part?.isError === true) {
+            const text = str(part.text)
+            if (text) toolFailure.push(oneLine(text, 300))
+          }
+          break
+        }
+        case 'result': {
+          completed = true
+          const result = str(event.result) ?? str(event.output)
+          if (result) answer = result
+          break
+        }
+        case 'error':
+        case 'session.error':
+        case 'run.error':
+          failure = str(asRecord(event.error)?.message) ?? str(event.message) ?? 'o OpenCode reportou um erro'
+          break
+        case 'session.execution.failed':
+        case 'execution.failed':
+          failure =
+            str(asRecord(event.data)?.error) ??
+            str(asRecord(asRecord(event.data)?.error)?.message) ??
+            'a execução do OpenCode falhou'
+          break
+        case 'session.execution.succeeded':
+        case 'execution.succeeded':
+          completed = true
+          break
+      }
+    },
+    finish() {
+      const text = answer.trim()
+      const ok = failure === undefined && text.length > 0
+      return {
+        answer: text,
+        ok,
+        error: ok ? undefined : (failure ?? 'o OpenCode encerrou sem resposta final'),
+        sessionId,
+        usage,
+        denials: [...new Set(toolFailure)],
+        incomplete: !ok && failure === undefined
+      }
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Binary lookup and process launch                                     */
 /* ------------------------------------------------------------------ */
@@ -297,6 +402,7 @@ interface AgentSpec {
   binNames: string[]
   installHint: string
   args(mode: PermissionMode): string[]
+  envFor?(mode: PermissionMode): Record<string, string>
   parser(): StreamParser
 }
 
@@ -316,7 +422,7 @@ const SPECS: Record<ExternalAgentName, AgentSpec> = {
         claudePermissionMode(mode),
         // Nobody can answer questions in print mode.
         '--disallowedTools=AskUserQuestion'
-      ]),
+      ], mode),
     parser: claudeParser
   },
   codex: {
@@ -334,9 +440,23 @@ const SPECS: Record<ExternalAgentName, AgentSpec> = {
         '-s',
         codexSandbox(mode),
         // "-" makes codex read the prompt from stdin.
+        ...(mode === 'unrestricted' ? ['--dangerously-bypass-approvals-and-sandbox'] : []),
         '-'
-      ]),
+      ], mode),
     parser: codexParser
+  },
+  opencode: {
+    label: 'OpenCode',
+    binEnv: 'FORJA_OPENCODE_BIN',
+    binNames: ['opencode'],
+    installHint: 'Instale com "npm i -g opencode-ai@1.2.10" e reabra o Openclod, ou aponte FORJA_OPENCODE_BIN para o executável.',
+    args: () => ['run', '--format', 'json', '--'],
+    envFor: (mode) => {
+      const env: Record<string, string> = {}
+      if (mode === 'unrestricted') env.OPENCODE_PERMISSION = '"allow"'
+      return env
+    },
+    parser: opencodeParser
   }
 }
 
@@ -576,7 +696,7 @@ function runAgent(params: {
 /* ------------------------------------------------------------------ */
 
 const schema = z.object({
-  agent: z.enum(['claude', 'codex']).describe('Qual CLI usar: "claude" (Claude Code) ou "codex" (OpenAI Codex)'),
+  agent: z.enum(['claude', 'codex', 'opencode']).describe('Qual CLI usar: "claude" (Claude Code), "codex" (OpenAI Codex) ou "opencode" (OpenCode)'),
   prompt: z.string().min(1).max(100_000).describe('Tarefa completa e autocontida para o agente externo'),
   cwd: z.string().optional().describe('Diretório de trabalho (dentro do projeto); padrão: o da sessão'),
   timeout_ms: z.number().int().min(1000).max(MAX_TIMEOUT_MS).optional().describe('Tempo máximo em ms (padrão 600000)')
@@ -608,7 +728,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
   return {
     name: 'external_agent',
     description:
-      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code ou Codex CLI). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Openclod: em "perguntar" ele só lê; editar exige "aceitar edições" ou "automático"; nunca roda sem proteções. Escreva o prompt completo, pois ele não vê esta conversa.',
+      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code, Codex CLI ou OpenCode). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Openclod; no modo ultrarrestrito recebe o modo sem confirmações do respectivo CLI. Escreva o prompt completo, pois ele não vê esta conversa.',
     risk: 'exec',
     parallelSafe: false,
     requires: 'network',
@@ -655,7 +775,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
         mode,
         prompt: args.prompt,
         cwd,
-        env: { ...sanitizedEnv(), ...options.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+        env: { ...sanitizedEnv(), ...options.env, ...spec.envFor?.(mode), NO_COLOR: '1', FORCE_COLOR: '0' },
         timeoutMs,
         doneGraceMs: options.doneGraceMs ?? DEFAULT_DONE_GRACE_MS,
         sessionId: ctx.sessionId,

@@ -1,0 +1,239 @@
+# MÓDULO 12 — PROVEDORES DE IA, ROTEAMENTO INTELIGENTE DE MODELOS E FALLBACK
+
+## 1. OBJETIVO
+
+Implemente no harness uma camada unificada para conectar, configurar e utilizar diferentes modelos de inteligência artificial, tanto por APIs remotas quanto por servidores locais.
+
+O sistema deverá permitir que o usuário escolha modelos manualmente ou deixe o harness selecionar automaticamente o modelo mais adequado para cada tarefa.
+
+Deve suportar, conforme a compatibilidade real das APIs e dos adaptadores implementados:
+
+- Modelos de diferentes fornecedores.
+- APIs compatíveis com formatos comuns de chat e ferramentas.
+- Servidores locais de inferência.
+- Streaming de respostas.
+- Chamadas de ferramentas.
+- Respostas estruturadas.
+- Visão e entrada multimodal quando suportadas.
+- Seleção de modelos por agente, tarefa ou projeto.
+- Fallback para outro modelo quando houver falha.
+- Registro de consumo e latência.
+- Configuração de limites de custo.
+- Catálogo atualizável de modelos.
+
+Não presuma que todos os modelos oferecem as mesmas capacidades. Cada provedor deve declarar e validar o que realmente suporta.
+
+## 2. INSPEÇÃO E REPOSITÓRIOS
+
+Inspecione a arquitetura existente e os adaptadores de modelos já implementados antes de alterar o código.
+
+Clone e analise os seguintes projetos:
+
+- LiteLLM: https://github.com/BerriAI/litellm
+- Vercel AI SDK: https://github.com/vercel/ai
+- OpenRouter SDK: https://github.com/OpenRouterTeam/openrouter-sdk
+- OpenAI Node SDK: https://github.com/openai/openai-node
+- OpenAI Python SDK: https://github.com/openai/openai-python
+- Anthropic SDK para TypeScript: https://github.com/anthropics/anthropic-sdk-typescript
+- Anthropic SDK para Python: https://github.com/anthropics/anthropic-sdk-python
+- Ollama: https://github.com/ollama/ollama
+- llama.cpp: https://github.com/ggml-org/llama.cpp
+- vLLM: https://github.com/vllm-project/vllm
+- SGLang: https://github.com/sgl-project/sglang
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenAI Codex: https://github.com/openai/codex
+
+Verifique a disponibilidade, a manutenção, as licenças e a compatibilidade de cada projeto. Não instale todos automaticamente.
+
+Examine implementações reais de adaptadores, streaming, tratamento de erros, ferramentas, seleção de modelos e configuração. Reaproveite componentes compatíveis sem duplicar funcionalidades já existentes.
+
+## 3. ARQUITETURA
+
+Implemente os componentes equivalentes a seguir, adaptando-os à stack real do harness.
+
+### 3.1. Provider Registry
+
+Gerencie provedores com:
+
+- Identificador.
+- Nome.
+- Tipo de integração.
+- Endpoint.
+- Método de autenticação.
+- Estado da conexão.
+- Capacidades suportadas.
+- Modelos disponíveis.
+- Configuração e limites.
+- Diagnósticos e erros recentes.
+
+Permita adicionar provedores remotos e locais sem modificar o núcleo do agente.
+
+### 3.2. Model Registry
+
+Cada modelo deve possuir metadados como:
+
+- Identificador do provedor.
+- Nome e versão, quando conhecidos.
+- Janela de contexto.
+- Limite de saída.
+- Suporte a streaming.
+- Suporte a ferramentas.
+- Suporte a imagens ou outras modalidades.
+- Suporte a saídas estruturadas.
+- Dados de preço, quando fornecidos por uma fonte confiável.
+- Limitações conhecidas.
+- Estado de disponibilidade e última verificação.
+
+Não invente preços, capacidades ou limites. Quando desconhecidos, marque-os como não verificados.
+
+### 3.3. Provider Adapter
+
+Crie um contrato interno padronizado para:
+
+- Enviar mensagens.
+- Transmitir respostas em streaming.
+- Receber chamadas de ferramentas.
+- Cancelar solicitações quando suportado.
+- Reportar uso de tokens.
+- Traduzir erros.
+- Consultar capacidades.
+- Normalizar respostas.
+
+Mantenha os detalhes específicos de cada API dentro do respectivo adaptador.
+
+### 3.4. Model Router
+
+Implemente seleção de modelos por regras configuráveis.
+
+O roteador deve considerar:
+
+- Tipo de tarefa.
+- Complexidade estimada.
+- Necessidade de ferramentas.
+- Necessidade de visão.
+- Tamanho do contexto.
+- Latência.
+- Disponibilidade.
+- Custo estimado.
+- Preferências do usuário.
+- Modelo configurado para o agente.
+- Limites de consumo.
+
+Permita regras como:
+
+- Modelo rápido para tarefas simples.
+- Modelo de maior capacidade para arquitetura e depuração complexa.
+- Modelo com visão para análise de imagens.
+- Modelo local para tarefas que possam ser executadas localmente.
+- Modelo compatível com ferramentas para tarefas que exigem chamadas de ferramentas.
+
+A seleção automática deve ser explicável e permitir substituição manual.
+
+### 3.5. Fallback Manager
+
+Implemente uma cadeia de alternativas para falhas recuperáveis.
+
+Diferencie:
+
+- Timeout.
+- Falha de rede.
+- Limite de requisições.
+- Limite de consumo.
+- Erro de autenticação.
+- Modelo indisponível.
+- Resposta inválida.
+- Contexto excedido.
+- Falha durante streaming.
+
+Configure tentativas e fallback conforme o tipo de erro. Não repita indefinidamente requisições que falham por credenciais inválidas ou configurações incompatíveis.
+
+Não troque silenciosamente para um modelo com capacidades insuficientes. Antes do fallback, valide se ele consegue realizar a tarefa. Se não conseguir, explique o problema e solicite intervenção quando necessário.
+
+### 3.6. Usage and Cost Tracker
+
+Registre, quando disponíveis:
+
+- Tokens de entrada.
+- Tokens de saída.
+- Tokens em cache.
+- Tempo até o primeiro token.
+- Duração total.
+- Provedor e modelo utilizados.
+- Erros e tentativas.
+- Custo calculado a partir de preços confiáveis.
+
+Diferencie consumo informado pelo provedor de estimativas locais.
+
+Não apresente custos estimados como cobranças reais.
+
+## 4. CONFIGURAÇÃO
+
+Implemente uma interface para:
+
+- Adicionar e editar provedores.
+- Configurar credenciais.
+- Testar conexões.
+- Consultar modelos disponíveis.
+- Selecionar o modelo padrão.
+- Definir modelos por tarefa e agente.
+- Configurar fallback.
+- Definir limites de consumo.
+- Visualizar estatísticas.
+
+Utilize o sistema de configuração existente. Não armazene segredos em texto nos logs.
+
+## 5. INTEGRAÇÃO COM OS MÓDULOS ANTERIORES
+
+Integre o roteador ao Agent Core, aos subagentes, ao sistema de contexto, às ferramentas MCP e ao sistema de plugins.
+
+O Agent Core deve utilizar um contrato comum de modelos, sem precisar conhecer os detalhes de cada fornecedor.
+
+Os subagentes podem utilizar modelos diferentes, desde que o roteador respeite as capacidades e as configurações de cada tarefa.
+
+O gerenciamento de contexto deve consultar a janela do modelo efetivamente selecionado.
+
+A telemetria deve registrar qual modelo executou cada tarefa e quais alternativas foram utilizadas.
+
+## 6. TESTES
+
+Implemente testes para:
+
+- Conectar e desconectar provedores.
+- Normalizar respostas de diferentes APIs.
+- Streaming.
+- Chamadas de ferramentas.
+- Seleção automática de modelos.
+- Preferência manual.
+- Fallback por timeout.
+- Fallback por indisponibilidade.
+- Erros de autenticação sem repetição infinita.
+- Incompatibilidade de capacidades.
+- Controle de contexto.
+- Estimativa e registro de consumo.
+- Limites de uso.
+- Retomada após falhas.
+
+Utilize servidores simulados para testes unitários e servidores locais reais quando apropriado. Não dependa de APIs pagas nos testes automatizados.
+
+## 7. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo deverá:
+
+- Suportar múltiplos provedores através de adaptadores.
+- Permitir configurar modelos locais e remotos.
+- Selecionar modelos por tarefa.
+- Executar fallback controlado.
+- Preservar o suporte a ferramentas.
+- Integrar-se ao Agent Core.
+- Exibir dados de consumo com origem identificada.
+- Permitir configuração e diagnóstico.
+- Funcionar mesmo que apenas um provedor esteja configurado.
+- Passar nos testes de integração e regressão.
+
+## 8. EXECUÇÃO E RELATÓRIO
+
+Inspecione, implemente, teste e documente. Não pare em uma proposta de arquitetura.
+
+Ao finalizar, apresente os arquivos alterados, adaptadores implementados, provedores testados, estratégias de roteamento, resultados dos testes, limitações e instruções de configuração.
+
+Não declare uma API funcional sem uma integração real ou um teste que demonstre seu comportamento.

@@ -183,7 +183,14 @@ export function resolveChildTools(input: ToolsetInput): { tools: string[]; ignor
 
 /** A child is never more permissive than its caller: `auto` and `readonly` carry over, everything else asks. */
 export function childPolicy(parent: PolicyConfig): PolicyConfig {
-  const mode = parent.mode === 'auto' ? 'auto' : parent.mode === 'readonly' ? 'readonly' : 'ask'
+  const mode =
+    parent.mode === 'unrestricted'
+      ? 'unrestricted'
+      : parent.mode === 'auto'
+        ? 'auto'
+        : parent.mode === 'readonly'
+          ? 'readonly'
+          : 'ask'
   return { ...parent, mode }
 }
 
@@ -333,7 +340,10 @@ export async function spawnAgent(
   env.emit({ type: 'subagent', sessionId: root, childId, label: spec.label, state: 'thinking', ...identity, startedAt, prompt: spec.prompt.slice(0, PROMPT_EVENT_CHARS) })
   env.onChildStart?.(root, childId)
 
-  const services = { ...caller.services, browser: (env.createBrowser ?? (() => new BrowserLayer()))() }
+  const services = {
+    ...caller.services,
+    browser: (env.createBrowser ?? (() => new BrowserLayer({ sessionId: childId })))()
+  }
   let lastError: string | undefined
 
   const deps: RunnerDeps = {

@@ -1,0 +1,288 @@
+# MÓDULO 14 — TESTES AUTOMATIZADOS, QUALIDADE DE CÓDIGO E AUTORREPARAÇÃO
+
+## 1. OBJETIVO
+
+Implemente um sistema integrado de qualidade de software que permita ao harness descobrir como validar um projeto, executar testes, interpretar falhas, localizar causas prováveis, aplicar correções e verificar se o problema foi resolvido.
+
+O sistema deverá trabalhar com diferentes linguagens e frameworks, respeitando as ferramentas já instaladas em cada workspace.
+
+Não crie um mecanismo que apenas leia mensagens de erro e peça ao modelo para tentar novamente. Desenvolva um fluxo verificável de diagnóstico, correção e validação.
+
+## 2. REPOSITÓRIOS OPEN SOURCE
+
+Clone e analise:
+
+- Vitest: https://github.com/vitest-dev/vitest
+- Jest: https://github.com/jestjs/jest
+- Playwright: https://github.com/microsoft/playwright
+- pytest: https://github.com/pytest-dev/pytest
+- Ruff: https://github.com/astral-sh/ruff
+- ESLint: https://github.com/eslint/eslint
+- Biome: https://github.com/biomejs/biome
+- Semgrep: https://github.com/semgrep/semgrep
+- SonarQube Community Build: https://github.com/SonarSource/sonarqube
+- Tree-sitter: https://github.com/tree-sitter/tree-sitter
+- ast-grep: https://github.com/ast-grep/ast-grep
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- SWE-agent: https://github.com/SWE-agent/SWE-agent
+- Aider: https://github.com/Aider-AI/aider
+
+Verifique a compatibilidade, as licenças e os requisitos de cada ferramenta. Não instale todos os projetos indiscriminadamente.
+
+Reaproveite mecanismos úteis de execução de testes, interpretação de resultados, análise estática e correção de código.
+
+## 3. TEST DISCOVERY ENGINE
+
+Implemente descoberta automática de ferramentas de validação.
+
+O sistema deverá identificar, quando possível:
+
+- Linguagem e framework.
+- Gerenciador de pacotes.
+- Arquivos de configuração.
+- Scripts de teste.
+- Testes unitários.
+- Testes de integração.
+- Testes de interface.
+- Linters.
+- Formatadores.
+- Analisadores estáticos.
+- Comandos de build.
+- Verificações de tipos.
+- Testes já utilizados pelo projeto.
+
+Use arquivos existentes como package.json, pyproject.toml, arquivos de solução .NET, configurações de build e outros formatos pertinentes à stack detectada.
+
+Não presuma que um comando existe apenas porque o projeto utiliza determinada linguagem.
+
+Se a ferramenta necessária não estiver instalada, informe isso claramente. Não instale dependências pesadas ou modifique o ambiente sem considerar a configuração existente.
+
+## 4. TEST EXECUTION ENGINE
+
+Implemente execução padronizada de verificações por meio do módulo de terminal existente.
+
+Cada execução deverá registrar:
+
+- Identificador.
+- Workspace.
+- Comando.
+- Diretório de trabalho.
+- Horário de início e fim.
+- Código de saída.
+- Saída padrão.
+- Saída de erro.
+- Duração.
+- Arquivos de relatório gerados.
+- Estado final.
+- Relação com a tarefa que originou o teste.
+
+Permita executar:
+
+- Uma verificação específica.
+- Uma seleção de testes.
+- O conjunto de testes relevante para um arquivo.
+- Todos os testes configurados.
+- Build.
+- Lint.
+- Verificação de tipos.
+- Análise estática.
+
+Implemente timeouts, cancelamento, captura de saídas extensas e acesso ao resultado original.
+
+Não declare sucesso quando o processo falhar, expirar ou não puder ser executado.
+
+## 5. FAILURE ANALYZER
+
+Implemente um analisador que converta saídas de testes em diagnósticos estruturados.
+
+O diagnóstico deve conter, quando disponível:
+
+- Tipo de falha.
+- Mensagem original.
+- Arquivo e linha.
+- Teste afetado.
+- Stack trace.
+- Categoria provável.
+- Relação com alterações recentes.
+- Hipóteses de causa.
+- Evidências.
+- Sugestões de investigação.
+
+Diferencie fatos encontrados na saída dos testes de hipóteses geradas pelo modelo.
+
+Agrupe falhas repetidas e identifique problemas que provavelmente possuem a mesma causa.
+
+Não descarte a saída original: preserve-a para investigação posterior.
+
+## 6. CODE REPAIR ENGINE
+
+Integre o analisador ao mecanismo de edição de código já existente.
+
+O fluxo deve ser:
+
+1. Executar uma validação.
+2. Capturar a falha.
+3. Recuperar o contexto relevante.
+4. Identificar arquivos e símbolos envolvidos.
+5. Examinar alterações recentes.
+6. Formular uma hipótese.
+7. Planejar a correção.
+8. Aplicar a alteração.
+9. Examinar o diff.
+10. Executar novamente a validação.
+11. Comparar os resultados.
+12. Confirmar a correção ou reverter a tentativa quando apropriado.
+
+Utilize os módulos de Git, worktrees e controle de alterações para preservar a possibilidade de revisão e recuperação.
+
+Evite modificar arquivos não relacionados ao problema.
+
+Não reverta alterações preexistentes do usuário para tentar fazer os testes passarem.
+
+Não considere a correção concluída quando apenas uma mensagem de erro tiver desaparecido. Execute os testes pertinentes e verifique se novas falhas foram introduzidas.
+
+## 7. SELEÇÃO INTELIGENTE DE TESTES
+
+Aproveite o módulo de inteligência de código para selecionar testes relevantes.
+
+Considere:
+
+- Arquivos modificados.
+- Dependências.
+- Símbolos alterados.
+- Testes que cobrem os módulos envolvidos.
+- Histórico recente de falhas.
+- Alterações em configurações.
+- Mudanças em APIs e contratos.
+
+Execute primeiro os testes mais relevantes quando isso economizar tempo, mas permita uma execução completa antes de considerar uma entrega validada quando necessário.
+
+Se não houver informação suficiente para estabelecer a relação entre código e testes, execute uma seleção mais ampla ou informe a limitação.
+
+## 8. QUALIDADE E REGRESSÃO
+
+Implemente uma estratégia configurável para:
+
+- Lint.
+- Formatação.
+- Tipagem.
+- Testes unitários.
+- Testes de integração.
+- Build.
+- Testes de interface.
+- Análise estática.
+- Comparação de resultados antes e depois de uma alteração.
+
+Respeite as ferramentas e os padrões existentes do projeto.
+
+Não reformate indiscriminadamente arquivos inteiros se isso produzir diffs enormes e sem relação com a tarefa.
+
+Diferencie falhas preexistentes de falhas introduzidas pela alteração sempre que houver uma referência de comparação confiável.
+
+## 9. EXECUÇÃO REPETIDA E PREVENÇÃO DE CICLOS
+
+Implemente limites configuráveis de tentativas, tempo e consumo de modelos.
+
+Antes de tentar novamente, verifique se:
+
+- A alteração anterior modificou o problema.
+- A mesma hipótese já falhou.
+- O erro mudou.
+- Há novas evidências.
+- Uma estratégia diferente é justificável.
+
+Evite ciclos infinitos de correção e teste.
+
+Se não houver progresso, interrompa a autorreparação, preserve o estado e produza um relatório claro com os bloqueios restantes.
+
+## 10. INTEGRAÇÃO COM OS MÓDULOS EXISTENTES
+
+Integre o sistema com:
+
+- Agent Core.
+- Planejamento e execução de tarefas.
+- Subagentes de teste e revisão.
+- Memória e recuperação de contexto.
+- Terminal e processos.
+- Inteligência de código.
+- Git e worktrees.
+- Provedores de IA.
+- Plugins e ferramentas MCP.
+- Interface de progresso.
+
+Use os contratos já existentes. Não crie um segundo executor de terminal ou um sistema concorrente de edição de código.
+
+## 11. INTERFACE DE QUALIDADE
+
+Se houver interface gráfica, disponibilize:
+
+- Lista de verificações disponíveis.
+- Estado das execuções.
+- Saída de testes.
+- Falhas agrupadas.
+- Arquivos e linhas envolvidos.
+- Histórico de tentativas de correção.
+- Diff das alterações.
+- Resultados antes e depois.
+- Testes pendentes.
+- Estado geral da validação.
+
+Permita executar novamente uma verificação e inspecionar o resultado original.
+
+A interface deve distinguir entre “passou”, “falhou”, “não executado” e “resultado inconclusivo”.
+
+## 12. TESTES DO PRÓPRIO MÓDULO
+
+Crie testes para:
+
+- Descoberta de comandos.
+- Execução bem-sucedida.
+- Falha de teste.
+- Timeout.
+- Cancelamento.
+- Captura de saída extensa.
+- Interpretação de erros.
+- Seleção de testes relevantes.
+- Correção de um problema reproduzível.
+- Detecção de regressões.
+- Limite de tentativas.
+- Interrupção por ausência de progresso.
+- Preservação de alterações preexistentes.
+- Integração com Git.
+- Retomada de uma execução interrompida.
+
+Utilize um projeto de teste pequeno e controlado para demonstrar o ciclo completo de diagnóstico, correção e validação.
+
+## 13. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo deve:
+
+- Detectar os mecanismos de teste disponíveis no workspace.
+- Executar verificações reais.
+- Preservar resultados e códigos de saída.
+- Transformar falhas em diagnósticos estruturados.
+- Selecionar testes relevantes quando houver informação suficiente.
+- Aplicar correções por meio dos mecanismos de edição existentes.
+- Verificar correções com novas execuções.
+- Evitar ciclos infinitos.
+- Preservar alterações preexistentes.
+- Registrar evidências de sucesso ou falha.
+- Integrar-se ao planejador e ao Agent Core.
+- Passar nos testes de integração e regressão.
+
+## 14. ENTREGA FINAL
+
+Implemente o módulo, execute os testes e apresente:
+
+1. Ferramentas detectadas e integradas.
+2. Arquivos criados e modificados.
+3. Fluxo de diagnóstico e correção.
+4. Um exemplo real de falha reproduzida e analisada.
+5. Resultado da tentativa de correção.
+6. Testes executados antes e depois.
+7. Limitações e dependências.
+8. Instruções de uso.
+
+Não afirme que uma correção foi validada sem apresentar o resultado da verificação correspondente.
+
+**RESULTADO ESPERADO:** um sistema de qualidade de software que permita ao harness executar testes, investigar falhas, propor e aplicar correções e verificar resultados com evidências, mantendo o controle das alterações e evitando ciclos improdutivos.

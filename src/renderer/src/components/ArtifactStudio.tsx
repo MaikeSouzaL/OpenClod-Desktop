@@ -12,6 +12,7 @@ import { python } from '@codemirror/lang-python'
 import { errorMessage, unwrap } from '../lib/api'
 import { Icon } from './Icons'
 import { Markdown } from './Markdown'
+import { SlideStudio } from './SlideStudio'
 
 export interface ArtifactFile {
   path: string
@@ -139,6 +140,9 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
   }
 
   const preview = useMemo(() => {
+    if (file.path.toLowerCase().endsWith('.openclod-slides.json')) {
+      return <SlideStudio source={draft} onChange={setDraft} />
+    }
     if (kind === 'markdown') return <Markdown text={draft} />
     if (kind === 'html' || kind === 'svg') {
       const src = kind === 'svg' ? `<html><body style="margin:0;background:#fff">${draft}</body></html>` : draft

@@ -12,6 +12,38 @@ export interface SnapshotResult {
   tree: string
 }
 
+/** Implemented by the Chrome native-messaging bridge in the main process. */
+export interface ChromeBrowserBackend {
+  readonly mode: 'auto' | 'chrome-existing' | 'playwright'
+  isAttached(): boolean
+  status(): Promise<BrowserStatus>
+  isOpen(sessionId: string): Promise<boolean>
+  open(input: { url: string; sessionId: string; groupName: string; newTab: boolean }): Promise<void>
+  navigate(input: { url: string; sessionId: string; groupName: string }): Promise<void>
+  snapshot(input: { sessionId: string; groupName: string; maxChars: number }): Promise<SnapshotResult>
+  click(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string } }): Promise<string>
+  type(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string }; value: string; submit: boolean }): Promise<void>
+  press(input: { sessionId: string; groupName: string; key: string }): Promise<void>
+  readText(input: { sessionId: string; groupName: string; selector?: string }): Promise<string>
+  screenshot(input: { sessionId: string; groupName: string }): Promise<{ base64: string; width: number; height: number }>
+  waitFor(input: { sessionId: string; groupName: string; selector: string; timeoutMs: number }): Promise<void>
+  tabsList(input: { sessionId: string; groupName: string }): Promise<Array<{ id: string; title: string; url: string; active: boolean }>>
+  newTab(input: { url?: string; sessionId: string; groupName: string }): Promise<string>
+  /** Adds a user-opened tab to this session's group without creating one. */
+  claimTab?(input: { tabId?: string; url?: string; sessionId: string; groupName: string }): Promise<string>
+  switchTab(input: { id: string; sessionId: string; groupName: string }): Promise<void>
+  closeTab(input: { id?: string; sessionId: string; groupName: string }): Promise<void>
+  consoleEntries(sessionId: string): ConsoleEntry[]
+  errors(sessionId: string): string[]
+}
+
+export interface BrowserLayerOptions {
+  sessionId?: string
+  chrome?: ChromeBrowserBackend
+  mode?: 'auto' | 'chrome-existing' | 'playwright'
+  groupBySession?: boolean
+}
+
 type PlaywrightModule = typeof import('playwright')
 type Browser = import('playwright').Browser
 type BrowserContext = import('playwright').BrowserContext
@@ -33,7 +65,36 @@ export class BrowserLayer {
   private consoleLog: ConsoleEntry[] = []
   private networkErrors: string[] = []
   private headed = false
+  private chromeHasTabs = false
+  private readonly sessionId: string
+  private readonly chrome?: ChromeBrowserBackend
+  private readonly mode: 'auto' | 'chrome-existing' | 'playwright'
+  private readonly groupBySession: boolean
   lastError: string | null = null
+
+  constructor(options: BrowserLayerOptions = {}) {
+    this.sessionId = options.sessionId ?? 'session'
+    this.chrome = options.chrome
+    this.mode = options.mode ?? 'playwright'
+    this.groupBySession = options.groupBySession !== false
+  }
+
+  private get groupName(): string {
+    return this.groupBySession ? `Openclod · ${this.sessionId.slice(0, 8)}` : 'Openclod'
+  }
+
+  private chromeBackend(): ChromeBrowserBackend | null {
+    if (this.mode === 'playwright' || !this.chrome?.isAttached()) return null
+    return this.chrome
+  }
+
+  private requireChromeIfRequested(): ChromeBrowserBackend | null {
+    const chrome = this.chromeBackend()
+    if (!chrome && this.mode === 'chrome-existing') {
+      throw new Error('Chrome existente não conectado. Instale a extensão do Openclod e abra a ponte em Configurações → Navegador.')
+    }
+    return chrome
+  }
 
   private activePage(): Page | null {
     const page = this.tabs.get(this.activeTab)
@@ -41,11 +102,23 @@ export class BrowserLayer {
   }
 
   get isOpen(): boolean {
-    return Boolean(this.activePage())
+    return this.chromeHasTabs || Boolean(this.activePage())
   }
 
   async status(): Promise<BrowserStatus> {
     try {
+      if (this.chrome?.isAttached()) {
+        this.chromeHasTabs = await this.chrome.isOpen(this.sessionId)
+        return await this.chrome.status()
+      }
+      if (this.mode === 'chrome-existing') {
+        return {
+          available: false,
+          mode: this.mode,
+          attached: false,
+          detail: 'Chrome existente não conectado. Instale a extensão do Openclod.'
+        }
+      }
       // Resolving the module is enough to know the dependency is installed.
       await this.load()
       const page = this.activePage()
@@ -54,7 +127,9 @@ export class BrowserLayer {
         detail: page
           ? `navegador aberto: ${page.url()} (${this.tabs.size} aba${this.tabs.size === 1 ? '' : 's'})`
           : 'Playwright disponível',
-        engine: this.browser ? 'chromium' : undefined
+        engine: this.browser ? 'chromium' : undefined,
+        mode: this.mode,
+        attached: false
       }
     } catch (err) {
       return { available: false, detail: (err as Error).message }
@@ -68,6 +143,12 @@ export class BrowserLayer {
 
   /** Ensures the browser and a page exist; `newTab` forces a fresh tab. */
   async open(url: string, headed = false, newTab = false): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      await chrome.open({ url, sessionId: this.sessionId, groupName: this.groupName, newTab })
+      this.chromeHasTabs = true
+      return
+    }
     const pw = await this.load()
     if (this.browser && this.headed !== headed) await this.close()
     if (!this.browser) {
@@ -136,6 +217,12 @@ export class BrowserLayer {
 
   /** Opens a new tab (empty when url is omitted) and makes it active. */
   async newTab(url?: string): Promise<string> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      const id = await chrome.newTab({ url, sessionId: this.sessionId, groupName: this.groupName })
+      this.chromeHasTabs = true
+      return id
+    }
     await this.load()
     if (!this.context) {
       // Reuse open() to perform the full browser bootstrap, then add a tab.
@@ -147,7 +234,28 @@ export class BrowserLayer {
     return this.activeTab
   }
 
+  /** Uses an existing Chrome tab for this session and groups it, without a second browser. */
+  async claimTab(input: { tabId?: string; url?: string } = {}): Promise<string> {
+    const chrome = this.requireChromeIfRequested()
+    if (!chrome?.claimTab) throw new Error('vincular aba existente exige o Chrome conectado')
+    if (!input.tabId?.trim() && !input.url?.trim()) throw new Error('informe tab_id ou url da aba existente')
+    const id = await chrome.claimTab({
+      ...(input.tabId?.trim() ? { tabId: input.tabId.trim() } : {}),
+      ...(input.url?.trim() ? { url: input.url.trim() } : {}),
+      sessionId: this.sessionId,
+      groupName: this.groupName
+    })
+    this.chromeHasTabs = true
+    return id
+  }
+
   async tabsList(): Promise<Array<{ id: string; title: string; url: string; active: boolean }>> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      const tabs = await chrome.tabsList({ sessionId: this.sessionId, groupName: this.groupName })
+      this.chromeHasTabs = tabs.length > 0
+      return tabs
+    }
     const entries = [...this.tabs.entries()]
     return Promise.all(
       entries.map(async ([id, page]) => ({
@@ -160,6 +268,12 @@ export class BrowserLayer {
   }
 
   async switchTab(id: string): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      await chrome.switchTab({ id, sessionId: this.sessionId, groupName: this.groupName })
+      this.chromeHasTabs = true
+      return
+    }
     const page = this.tabs.get(id)
     if (!page || page.isClosed()) throw new Error(`aba não encontrada: ${id}`)
     this.activeTab = id
@@ -167,6 +281,12 @@ export class BrowserLayer {
   }
 
   async closeTab(id?: string): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      await chrome.closeTab({ id, sessionId: this.sessionId, groupName: this.groupName })
+      this.chromeHasTabs = (await chrome.tabsList({ sessionId: this.sessionId, groupName: this.groupName })).length > 0
+      return
+    }
     const target = id ?? this.activeTab
     const page = this.tabs.get(target)
     if (!page) throw new Error(`aba não encontrada: ${target}`)
@@ -182,10 +302,21 @@ export class BrowserLayer {
   }
 
   async navigate(url: string): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      await chrome.navigate({ url, sessionId: this.sessionId, groupName: this.groupName })
+      this.chromeHasTabs = true
+      return
+    }
     await this.requirePage().goto(url, { waitUntil: 'domcontentloaded' })
   }
 
   async snapshot(maxChars = 18_000): Promise<SnapshotResult> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      return chrome.snapshot({ sessionId: this.sessionId, groupName: this.groupName, maxChars })
+    }
     const page = this.requirePage()
     let tree = ''
     try {
@@ -198,6 +329,11 @@ export class BrowserLayer {
   }
 
   async click(target: { selector?: string; role?: string; name?: string; text?: string }): Promise<string> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      return chrome.click({ sessionId: this.sessionId, groupName: this.groupName, target })
+    }
     const page = this.requirePage()
     const locator = this.locate(target)
     await locator.first().click({ timeout: 15_000 })
@@ -210,6 +346,12 @@ export class BrowserLayer {
     value: string,
     submit = false
   ): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      await chrome.type({ sessionId: this.sessionId, groupName: this.groupName, target, value, submit })
+      return
+    }
     const page = this.requirePage()
     const locator = this.locate(target)
     await locator.first().click({ timeout: 15_000 })
@@ -221,10 +363,21 @@ export class BrowserLayer {
   }
 
   async press(key: string): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      await chrome.press({ sessionId: this.sessionId, groupName: this.groupName, key })
+      return
+    }
     await this.requirePage().keyboard.press(key)
   }
 
   async readText(selector?: string): Promise<string> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      return chrome.readText({ sessionId: this.sessionId, groupName: this.groupName, selector })
+    }
     const page = this.requirePage()
     const text = selector
       ? await page.locator(selector).first().innerText()
@@ -233,6 +386,11 @@ export class BrowserLayer {
   }
 
   async screenshot(): Promise<{ base64: string; width: number; height: number }> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      return chrome.screenshot({ sessionId: this.sessionId, groupName: this.groupName })
+    }
     const page = this.requirePage()
     const buffer = await page.screenshot({ type: 'png', fullPage: false })
     const size = page.viewportSize() ?? { width: 1440, height: 900 }
@@ -240,15 +398,21 @@ export class BrowserLayer {
   }
 
   async waitFor(selector: string, timeoutMs = 15_000): Promise<void> {
+    const chrome = this.requireChromeIfRequested()
+    if (chrome) {
+      this.chromeHasTabs = true
+      await chrome.waitFor({ sessionId: this.sessionId, groupName: this.groupName, selector, timeoutMs })
+      return
+    }
     await this.requirePage().locator(selector).first().waitFor({ state: 'visible', timeout: timeoutMs })
   }
 
   consoleEntries(): ConsoleEntry[] {
-    return [...this.consoleLog]
+    return this.chromeBackend()?.consoleEntries(this.sessionId) ?? [...this.consoleLog]
   }
 
   errors(): string[] {
-    return [...this.networkErrors]
+    return this.chromeBackend()?.errors(this.sessionId) ?? [...this.networkErrors]
   }
 
   /** Elements are located semantically first, falling back to CSS/text. */
@@ -265,6 +429,9 @@ export class BrowserLayer {
   }
 
   async close(): Promise<void> {
+    // The native bridge controls tabs in the user's own Chrome. Closing an
+    // Openclod session leaves those tabs visible for review.
+    this.chromeHasTabs = false
     try {
       await this.context?.close()
     } catch {

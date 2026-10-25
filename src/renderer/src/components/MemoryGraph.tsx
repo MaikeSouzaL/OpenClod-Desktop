@@ -169,7 +169,12 @@ export function MemoryGraph({ project }: MemoryGraphProps): ReactElement {
     setReading(true)
     setContent(null)
     try {
-      const slug = graph?.source === 'native' ? node.path : `ai:${node.path}`
+      // Native nodes are identified by their wiki slug; only extra sidecar
+      // nodes use the `ai:` prefix. Do not infer this from the graph's global
+      // source, because a merged graph contains both kinds at once.
+      const slug = node.path === node.id ? node.path : /^pages\/.+\.md$/i.test(node.path)
+        ? `ai:${node.path}`
+        : `ai:${node.path}`
       const page = await unwrap(window.forja.memory.read(project.id, slug))
       setContent(page)
     } catch (err) {
@@ -239,7 +244,8 @@ export function MemoryGraph({ project }: MemoryGraphProps): ReactElement {
           (node) =>
             node.title.toLowerCase().includes(filtered) ||
             node.tags.some((tag) => tag.toLowerCase().includes(filtered)) ||
-            node.terms.some((term) => term.includes(filtered))
+            node.terms.some((term) => term.includes(filtered)) ||
+            Boolean(node.summary?.toLowerCase().includes(filtered))
         )
         .map((node) => node.id)
     )
@@ -255,6 +261,13 @@ export function MemoryGraph({ project }: MemoryGraphProps): ReactElement {
 
   return (
     <div className="memory-graph-wrap">
+      <div className="memory-graph-summary">
+        <Icon name="share" size={14} />
+        <span>
+          Wiki markdown + índice AI-Memory. Links explícitos vêm de <code>[[wikilinks]]</code>; tags e termos
+          conectam páginas sem link escrito. Clique em qualquer nó para abrir a memória completa.
+        </span>
+      </div>
       <div className="memory-graph-tools">
         <div className="page-search">
           <Icon name="search" size={14} />

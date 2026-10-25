@@ -194,6 +194,23 @@ export function MemoryPage({
           >
             <Icon name="archive" size={13} /> Importar
           </button>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={!projectId}
+            onClick={async () => {
+              if (!projectId) return
+              try {
+                const count = await unwrap(window.forja.memory.importZip(projectId))
+                setNotice(count ? `${count} página(s) importada(s) do ZIP.` : 'Nenhum arquivo .md encontrado no ZIP.')
+                await load()
+              } catch (err) {
+                setError(errorMessage(err))
+              }
+            }}
+          >
+            <Icon name="archive" size={13} /> Importar ZIP
+          </button>
           <button type="button" className="btn small" onClick={onOpenSettings}>
             <Icon name="settings" size={13} /> Configurar
           </button>

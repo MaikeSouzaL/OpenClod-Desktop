@@ -1,0 +1,962 @@
+# MÓDULO 04 — COMPUTER USE, VISÃO COMPUTACIONAL E AUTOMAÇÃO DESKTOP PARA WINDOWS
+
+## 1. MISSÃO
+
+Implemente no nosso AI Development Harness um sistema completo de Computer Use que permita ao agente de inteligência artificial interagir com o computador Windows como um operador digital.
+
+O sistema deve permitir que o agente:
+
+- Observe a tela do computador.
+- Capture screenshots e analise o conteúdo visual.
+- Identifique janelas, controles, botões, campos de texto, menus e diálogos.
+- Utilize informações de acessibilidade do Windows quando disponíveis.
+- Mova o cursor do mouse.
+- Clique, clique duas vezes, pressione e solte botões.
+- Digite textos e utilize atalhos de teclado.
+- Role páginas e listas.
+- Alterne entre janelas e aplicativos.
+- Abra e manipule programas.
+- Interaja com navegadores, editores de código, exploradores de arquivos e outros aplicativos compatíveis.
+- Execute tarefas compostas por várias ações.
+- Observe o resultado de cada ação.
+- Detecte falhas e tente estratégias alternativas.
+- Interrompa uma tarefa quando necessário.
+- Retome tarefas quando o estado puder ser recuperado.
+- Integre a automação ao Agent Core e aos subagents já existentes.
+
+**Não construa apenas um programa de controle de mouse.** Construa uma camada de Computer Use que possa ser utilizada pelo agente central e por outros módulos do harness.
+
+O objetivo é permitir tarefas reais, como:
+
+1. Abrir o Visual Studio Code.
+2. Abrir um projeto.
+3. Navegar entre arquivos.
+4. Editar código usando os mecanismos apropriados.
+5. Executar comandos no terminal integrado.
+6. Observar os resultados.
+7. Corrigir erros.
+8. Executar testes.
+9. Confirmar visualmente ou por dados estruturados que a tarefa foi concluída.
+
+A mesma arquitetura deve permitir outros fluxos de trabalho, como utilizar aplicativos desktop, navegar em sites e preencher interfaces gráficas.
+
+## 2. REGRA DE IMPLEMENTAÇÃO
+
+Antes de alterar o projeto:
+
+1. Inspecione o harness existente.
+2. Identifique a linguagem, o framework, a arquitetura de execução e os sistemas de ferramentas.
+3. Verifique se já existem recursos de screenshots, mouse, teclado, navegador, terminal, automação ou visão computacional.
+4. Execute os testes existentes e registre os resultados.
+5. Identifique o sistema operacional e as dependências realmente disponíveis.
+6. Preserve o código funcional e as alterações locais do usuário.
+
+Em seguida, clone e examine os repositórios deste documento.
+
+Não quero apenas pesquisa ou recomendações. Quero que você utilize os códigos-fonte como referência para implementar as capacidades no harness.
+
+Para cada projeto externo:
+
+- Clone o repositório.
+- Examine a implementação, não apenas o README.
+- Identifique as bibliotecas, APIs, abstrações e algoritmos relevantes.
+- Compare-os com os componentes existentes.
+- Reaproveite ou adapte implementações que tragam benefícios concretos.
+- Implemente funcionalidades ausentes.
+- Preserve componentes próprios que já funcionam bem.
+- Evite duplicar sistemas equivalentes.
+- Respeite as licenças e as obrigações de atribuição.
+- Registre os componentes efetivamente aproveitados.
+
+Não substitua a arquitetura existente por um projeto externo completo sem demonstrar que isso é necessário.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E EXAMINAR
+
+### 3.1. Win Computer Use
+
+https://github.com/CarlosShao/win-computer-use
+
+Investigue sua abordagem de interação com o ambiente Windows, identificando:
+
+- Captura e interpretação da tela.
+- Operações de mouse e teclado.
+- Abstrações de ações.
+- Integração com agentes.
+- Execução de sequências de ações.
+- Tratamento de falhas.
+
+Adapte as partes compatíveis com o nosso ambiente.
+
+### 3.2. Desktop Use
+
+https://github.com/dutuanan96/desktop-use
+
+Examine a implementação da automação de desktop e identifique componentes reutilizáveis para:
+
+- Representação de ações.
+- Controle de interfaces.
+- Captura de estado.
+- Execução de ações em sequência.
+- Integração com agentes de IA.
+
+Verifique a compatibilidade e as dependências reais antes de incorporar qualquer componente.
+
+### 3.3. PyAutoGUI
+
+https://github.com/asweigart/pyautogui
+
+Analise a implementação de:
+
+- Mouse.
+- Teclado.
+- Captura de tela.
+- Cliques e movimentos.
+- Teclas especiais.
+- Rolagem.
+- Localização visual de elementos.
+- Tratamento de erros.
+
+Se o harness utilizar Python, avalie a integração direta. Se utilizar outra linguagem, determine se vale a pena criar um serviço auxiliar ou se existe uma alternativa nativa mais adequada.
+
+Não introduza um processo Python separado sem necessidade técnica.
+
+### 3.4. pywinauto
+
+https://github.com/pywinauto/pywinauto
+
+Utilize como referência para automação de interfaces nativas do Windows.
+
+Investigue:
+
+- Automação Win32.
+- Automação baseada em UI Automation.
+- Descoberta de janelas.
+- Identificação de controles.
+- Seleção de elementos por propriedades.
+- Interação com botões, menus e caixas de diálogo.
+- Espera por estados específicos.
+- Verificação de resultados.
+
+Priorize a identificação semântica dos controles quando ela estiver disponível, em vez de depender exclusivamente de coordenadas de tela.
+
+### 3.5. FlaUI
+
+https://github.com/FlaUI/FlaUI
+
+Analise essa implementação .NET de automação de interfaces Windows.
+
+Avalie:
+
+- Microsoft UI Automation.
+- Árvores de acessibilidade.
+- Descoberta de elementos.
+- Seletores.
+- Padrões de controle.
+- Interação com elementos.
+- Eventos e espera por mudanças de estado.
+
+Se o harness for desenvolvido em C# ou .NET, considere especialmente a possibilidade de aproveitar diretamente os componentes compatíveis.
+
+Se o harness utilizar outra tecnologia, compare o custo de integração de um serviço auxiliar com alternativas nativas.
+
+### 3.6. OpenCV
+
+https://github.com/opencv/opencv
+
+Examine os recursos relevantes de visão computacional:
+
+- Comparação de imagens.
+- Correspondência de templates.
+- Detecção de regiões.
+- Recorte de imagens.
+- Comparação de estados antes e depois.
+- Processamento para melhorar a legibilidade.
+- Detecção de mudanças visuais.
+
+Não implemente um sistema complexo de visão computacional quando a acessibilidade do Windows fornecer o mesmo resultado de maneira mais confiável.
+
+### 3.7. Tesseract OCR
+
+https://github.com/tesseract-ocr/tesseract
+
+Avalie o reconhecimento de texto em screenshots.
+
+Investigue:
+
+- Extração de texto.
+- Coordenadas de regiões reconhecidas.
+- Idiomas disponíveis.
+- Processamento de imagens antes do OCR.
+- Desempenho.
+- Integração com o pipeline de visão.
+
+Use OCR como uma fonte complementar de informação, não como substituto universal da árvore de acessibilidade ou de modelos multimodais.
+
+### 3.8. Python MSS
+
+https://github.com/BoboTiG/python-mss
+
+Avalie a captura rápida de tela e a captura de regiões específicas.
+
+Verifique:
+
+- Captura do monitor inteiro.
+- Captura de regiões.
+- Compatibilidade com Windows.
+- Desempenho.
+- Uso de memória.
+- Integração com os formatos de imagem utilizados pelo harness.
+
+### 3.9. Browser Use
+
+https://github.com/browser-use/browser-use
+
+Analise a automação de navegadores orientada a agentes.
+
+Investigue:
+
+- Descoberta de elementos.
+- Planejamento de ações no navegador.
+- Navegação por páginas.
+- Preenchimento de formulários.
+- Observação de resultados.
+- Tratamento de carregamentos.
+- Gerenciamento de abas.
+- Integração com modelos de linguagem.
+
+Aproveite as abordagens úteis, mas mantenha uma distinção arquitetural entre automação web e automação de aplicativos desktop.
+
+### 3.10. Playwright
+
+https://github.com/microsoft/playwright
+
+Examine:
+
+- Seletores semânticos.
+- Localizadores.
+- Esperas automáticas.
+- Captura de screenshots.
+- Interação com campos e botões.
+- Controle de páginas e abas.
+- Tratamento de erros.
+- Testes de interfaces.
+
+Quando o alvo for uma página web, prefira os mecanismos estruturados do Playwright a cliques cegos em coordenadas, sempre que a integração for possível.
+
+### 3.11. Stagehand
+
+https://github.com/browserbase/stagehand
+
+https://github.com/browserbase/stagehand/tree/main
+
+Analise as abordagens de automação web orientada por linguagem natural, extração de informações e interação com elementos de páginas.
+
+Verifique a estrutura atual do repositório e reutilize somente os componentes compatíveis com a arquitetura e as dependências do harness.
+
+### 3.12. AutoHotkey
+
+https://github.com/AutoHotkey/AutoHotkey
+
+Avalie se scripts de automação específicos podem complementar o sistema para:
+
+- Atalhos globais.
+- Interação com janelas.
+- Operações repetitivas.
+- Controle de teclado.
+- Automação de aplicações que não exponham APIs mais adequadas.
+
+Não torne AutoHotkey uma dependência obrigatória se o sistema puder operar melhor com recursos nativos ou bibliotecas já instaladas.
+
+### 3.13. MCP TypeScript SDK
+
+https://github.com/modelcontextprotocol/typescript-sdk
+
+### 3.14. MCP Python SDK
+
+https://github.com/modelcontextprotocol/python-sdk
+
+Utilize essas implementações como referência para expor capacidades de Computer Use por meio de ferramentas estruturadas, caso o harness já utilize MCP ou se essa integração for compatível com sua arquitetura.
+
+Não introduza MCP apenas para executar chamadas internas que poderiam utilizar os contratos existentes.
+
+### Regra sobre os repositórios
+
+Verifique a disponibilidade e a licença de cada projeto. Se um endereço não existir, estiver indisponível ou não contiver o código esperado, registre o fato e continue com as demais referências.
+
+Os projetos citados são fontes de implementação, não exigências para incorporar todas as dependências.
+
+---
+
+## 4. ARQUITETURA DO COMPUTER USE
+
+Implemente os componentes abaixo ou aprimore os equivalentes já existentes.
+
+### 4.1. Computer Use Controller
+
+Controlador central da automação.
+
+Responsabilidades:
+
+- Receber solicitações de ação.
+- Validar os parâmetros.
+- Selecionar o mecanismo de execução.
+- Executar a ação.
+- Registrar o resultado.
+- Solicitar uma nova observação quando necessário.
+- Informar falhas ao Agent Core.
+- Suportar cancelamento.
+- Coordenar ações sequenciais.
+- Impedir que dois agentes controlem o mesmo desktop de forma conflitante.
+
+O controlador não deve depender diretamente de um modelo específico.
+
+### 4.2. Screen Capture Service
+
+Responsável por capturar a tela e fornecer informações visuais ao agente.
+
+Deve oferecer:
+
+- Captura de todos os monitores.
+- Captura de um monitor específico.
+- Captura de uma região.
+- Identificação da resolução.
+- Informações sobre escala e densidade de pixels quando disponíveis.
+- Registro temporal da captura.
+- Conversão para formatos aceitos pelo modelo.
+- Redimensionamento controlado.
+- Compressão quando necessária.
+- Cache limitado de capturas.
+- Liberação de memória.
+- Tratamento de erros.
+
+Evite capturar a tela continuamente sem necessidade. Prefira capturas acionadas por eventos ou pela necessidade de observar o resultado de uma ação.
+
+### 4.3. Window Manager
+
+Responsável por descobrir e gerenciar janelas.
+
+Deve permitir:
+
+- Listar janelas disponíveis.
+- Obter títulos.
+- Identificar processos associados quando permitido.
+- Localizar uma janela por critérios estruturados.
+- Consultar a janela ativa.
+- Ativar uma janela.
+- Verificar se uma janela está visível.
+- Detectar diálogos.
+- Esperar que uma janela apareça.
+- Identificar mudanças de foco.
+- Distinguir a janela principal de janelas auxiliares.
+
+Evite encerrar processos ou fechar aplicativos como consequência automática de uma falha de identificação.
+
+### 4.4. UI Automation Service
+
+Camada para consultar a árvore de acessibilidade e os controles do Windows.
+
+Quando suportado, permita:
+
+- Listar elementos.
+- Consultar nomes e tipos.
+- Obter identificadores acessíveis.
+- Ler propriedades disponíveis.
+- Consultar retângulos delimitadores.
+- Descobrir relações entre elementos.
+- Consultar estados habilitado/desabilitado.
+- Identificar elementos focáveis.
+- Consultar padrões de controle.
+- Executar ações suportadas pelos próprios controles.
+
+A estrutura de dados retornada deve ser normalizada para que o agente não dependa de uma biblioteca específica.
+
+Quando o elemento não puder ser encontrado pela automação de interface, o sistema deve poder recorrer a estratégias visuais.
+
+### 4.5. Input Controller
+
+Responsável por mouse e teclado.
+
+Deve disponibilizar operações estruturadas para:
+
+- Mover o mouse.
+- Clicar.
+- Clicar duas vezes.
+- Pressionar e soltar botões.
+- Manter um botão pressionado durante uma operação controlada.
+- Digitar texto.
+- Pressionar teclas.
+- Executar combinações de teclas.
+- Rolar.
+- Alterar o foco quando possível.
+- Consultar o estado disponível do dispositivo.
+
+Defina uma representação normalizada de teclas e botões.
+
+Trate corretamente teclas especiais, caracteres Unicode, layouts de teclado e diferenças entre mecanismos de automação.
+
+Não presuma que digitar texto e simular uma sequência de teclas produzem o mesmo resultado em todos os aplicativos.
+
+### 4.6. Visual Target Resolver
+
+Componente responsável por identificar o alvo de uma ação.
+
+Deve poder utilizar, em ordem apropriada:
+
+1. Referência semântica a um elemento de acessibilidade.
+2. Seletor estruturado de um aplicativo ou navegador.
+3. Identificador de janela e controle.
+4. Reconhecimento de texto por OCR.
+5. Correspondência visual de imagens.
+6. Coordenadas calculadas a partir de uma observação recente.
+
+A ordem deve poder variar conforme o tipo de aplicação.
+
+Quando um alvo tiver sido identificado por coordenadas, registre a captura de origem, a resolução e a região que justificaram a escolha.
+
+Não reutilize cegamente coordenadas antigas depois de mudanças significativas na janela, na resolução ou no layout.
+
+### 4.7. Action Verifier
+
+Componente responsável por confirmar se uma ação produziu o resultado esperado.
+
+Exemplos:
+
+- Depois de abrir um aplicativo, verificar se a janela apareceu.
+- Depois de clicar em um botão, verificar a mudança de estado.
+- Depois de digitar texto, verificar se o campo contém o conteúdo esperado quando isso puder ser consultado.
+- Depois de salvar um arquivo, verificar o resultado por um mecanismo confiável.
+- Depois de navegar em uma página, verificar se a navegação foi concluída.
+
+A verificação deve utilizar a fonte de evidência mais adequada, como estado da interface, árvore de acessibilidade, resultado de uma ferramenta ou screenshot.
+
+Não declare uma ação bem-sucedida apenas porque o clique foi enviado.
+
+### 4.8. Action Planner
+
+Responsável por transformar uma tarefa em ações observáveis.
+
+Exemplo de tarefa:
+
+“Abra o aplicativo, encontre as configurações e altere a opção solicitada.”
+
+Plano interno possível:
+
+1. Identificar o aplicativo.
+2. Verificar se está aberto.
+3. Ativá-lo.
+4. Observar o estado atual.
+5. Localizar as configurações.
+6. Executar uma ação.
+7. Observar novamente.
+8. Confirmar o resultado.
+9. Prosseguir ou corrigir o plano.
+
+O planejamento deve considerar as capacidades reais das ferramentas disponíveis e não inventar controles que não foram observados.
+
+### 4.9. Action History e Recovery
+
+Registre um histórico estruturado das ações.
+
+Cada registro deve incluir, quando aplicável:
+
+- Identificador da tarefa.
+- Identificador da ação.
+- Tipo de ação.
+- Alvo.
+- Parâmetros não sensíveis.
+- Momento de execução.
+- Resultado.
+- Evidências de verificação.
+- Erros.
+- Tentativas de recuperação.
+- Estado final.
+
+Não registre senhas, tokens, dados privados de formulários ou outros conteúdos sensíveis sem necessidade.
+
+---
+
+## 5. CONTRATO UNIFICADO DE FERRAMENTAS
+
+Crie ferramentas com nomes e parâmetros consistentes, adaptando os exemplos ao registro de ferramentas existente.
+
+### Ferramentas de observação
+
+- `computer.get_screen_info`
+- `computer.capture_screen`
+- `computer.capture_region`
+- `computer.get_active_window`
+- `computer.list_windows`
+- `computer.get_window_info`
+- `computer.inspect_accessibility_tree`
+- `computer.find_ui_element`
+- `computer.get_cursor_position`
+
+### Ferramentas de interação
+
+- `computer.activate_window`
+- `computer.click`
+- `computer.double_click`
+- `computer.move_mouse`
+- `computer.drag`
+- `computer.scroll`
+- `computer.type_text`
+- `computer.press_key`
+- `computer.hotkey`
+- `computer.select_ui_element`
+- `computer.invoke_ui_control`
+
+### Ferramentas de verificação
+
+- `computer.wait_for_window`
+- `computer.wait_for_element`
+- `computer.verify_action`
+- `computer.compare_screen_state`
+
+### Ferramentas de coordenação
+
+- `computer.get_task_status`
+- `computer.cancel_action`
+- `computer.get_action_history`
+
+Esses nomes são propostas de contrato, não uma exigência para duplicar ferramentas já existentes.
+
+Cada ferramenta deve possuir:
+
+- Nome.
+- Descrição.
+- Esquema de entrada.
+- Validação de parâmetros.
+- Resultado estruturado.
+- Erros tipados.
+- Limites de execução.
+- Suporte a cancelamento quando aplicável.
+- Regras de autorização.
+- Metadados de observabilidade.
+
+As ferramentas de interação devem retornar resultados claros, como ação aceita, ação concluída, falha, timeout ou resultado não verificado.
+
+---
+
+## 6. OBSERVAÇÃO VISUAL E RACIOCÍNIO DO AGENTE
+
+Integre a observação da tela com o modelo utilizado pelo Agent Core.
+
+### 6.1. Modelos multimodais
+
+Se o provedor selecionado aceitar imagens, disponibilize screenshots através do contrato existente de mensagens multimodais.
+
+Não crie uma integração exclusiva com um único provedor.
+
+Se o modelo não aceitar imagens, utilize estratégias alternativas compatíveis, como:
+
+- Árvore de acessibilidade.
+- OCR.
+- Metadados de janelas.
+- Estrutura do DOM em navegadores.
+- Informações estruturadas de aplicativos.
+
+Quando nenhuma estratégia conseguir identificar o alvo com confiabilidade suficiente, o agente deve reconhecer a limitação.
+
+### 6.2. Coordenadas
+
+Defina um sistema de coordenadas documentado.
+
+Considere:
+
+- Resolução do monitor.
+- Múltiplos monitores.
+- Coordenadas relativas e absolutas.
+- Escala de exibição do Windows.
+- Janelas redimensionadas.
+- Barras de título e regiões não cliente.
+- Mudanças de resolução.
+- Diferenças entre a resolução original e a imagem enviada ao modelo.
+
+Se uma screenshot for redimensionada para o modelo, implemente uma transformação correta entre as coordenadas da imagem e as coordenadas reais do desktop.
+
+### 6.3. Confiança
+
+Quando a identificação de um alvo for incerta, registre a origem da evidência e a confiança estimada, se o mecanismo realmente produzir essa informação.
+
+Não invente uma pontuação de confiança baseada apenas em uma suposição do modelo.
+
+Para ações que dependam de identificação visual ambígua, prefira obter uma nova observação antes de agir.
+
+### 6.4. Ciclo de observação e ação
+
+Implemente o seguinte ciclo integrado:
+
+1. Receber a tarefa.
+2. Observar o estado atual.
+3. Identificar o próximo objetivo.
+4. Resolver o alvo.
+5. Validar os parâmetros.
+6. Executar a ação.
+7. Observar o resultado.
+8. Verificar se o objetivo foi atingido.
+9. Atualizar o plano.
+10. Repetir ou concluir.
+
+O ciclo deve utilizar o Agent Core, suas ferramentas, seus estados, seus limites e seu mecanismo de cancelamento.
+
+Não crie um segundo agente autônomo independente para executar esse ciclo.
+
+---
+
+## 7. ESTRATÉGIAS DIFERENTES PARA WEB E DESKTOP
+
+Não utilize a mesma estratégia para todos os ambientes.
+
+### 7.1. Navegadores
+
+Quando for possível controlar o navegador por Playwright ou por uma integração equivalente:
+
+- Utilize seletores.
+- Identifique elementos pelo papel e pelo nome.
+- Aguarde estados de carregamento.
+- Consulte a estrutura da página.
+- Valide o resultado da navegação.
+- Utilize screenshots quando necessário.
+
+Se o navegador não estiver acessível por uma API de automação, permita o uso da interface gráfica como alternativa.
+
+### 7.2. Aplicativos Windows
+
+Para aplicações nativas:
+
+- Priorize UI Automation.
+- Utilize seletores semânticos quando disponíveis.
+- Use mouse e teclado como alternativa.
+- Recorra a OCR e visão computacional quando necessário.
+- Verifique mudanças de estado.
+- Considere aplicativos com interfaces personalizadas.
+
+### 7.3. Editores de código e terminais
+
+Quando o objetivo for editar código, inspecione as capacidades existentes do harness.
+
+Prefira ferramentas estruturadas de leitura e edição de arquivos quando forem mais confiáveis. Use a interface gráfica para tarefas que dependam efetivamente dela.
+
+Não force a utilização do mouse para uma operação que já possa ser realizada com segurança por uma ferramenta especializada.
+
+O Computer Use deve complementar as capacidades do harness, não substituí-las indiscriminadamente.
+
+---
+
+## 8. AUTOMAÇÃO DE TAREFAS COMPOSTAS
+
+Permita que o agente execute tarefas com múltiplas etapas mantendo o estado e o histórico.
+
+Implemente:
+
+- Identificação do objetivo.
+- Plano de ações.
+- Estado atual da tarefa.
+- Dependências entre ações.
+- Resultado esperado.
+- Verificação após ações relevantes.
+- Recuperação de falhas.
+- Limites de tentativas.
+- Cancelamento.
+- Relatório final.
+
+Uma tarefa deve ser interrompida ou replanejada quando:
+
+- O alvo não puder ser localizado.
+- A interface mudar de maneira inesperada.
+- Uma janela necessária estiver indisponível.
+- A ação falhar.
+- O resultado não puder ser confirmado.
+- Um diálogo exigir uma decisão que não foi autorizada.
+- O usuário cancelar a execução.
+
+Evite repetir indefinidamente uma ação que está falhando.
+
+---
+
+## 9. INTEGRAÇÃO COM O AGENT CORE E OS SUBAGENTS
+
+### 9.1. Agent Core
+
+O Agent Core deve conseguir:
+
+- Descobrir ferramentas de Computer Use.
+- Consultar seus esquemas.
+- Selecionar ferramentas adequadas.
+- Executar ações.
+- Receber resultados estruturados.
+- Observar erros.
+- Replanejar tarefas.
+- Cancelar execuções.
+- Registrar o histórico.
+- Utilizar a verificação de resultados.
+
+A autorização deve ser aplicada pelo executor real das ferramentas, e não depender exclusivamente de instruções enviadas ao modelo.
+
+### 9.2. Subagents
+
+Os subagents podem solicitar operações de Computer Use por meio do orquestrador, mas não devem controlar simultaneamente o mesmo desktop sem coordenação.
+
+Implemente um mecanismo de exclusão mútua ou de agendamento para as ações que compartilham o mesmo ambiente gráfico.
+
+Quando houver suporte a múltiplos desktops ou sessões isoladas, modele cada ambiente separadamente.
+
+### 9.3. Eventos
+
+Integre o módulo aos eventos existentes, adicionando os necessários, por exemplo:
+
+- `computer.observation_started`
+- `computer.observation_completed`
+- `computer.action_started`
+- `computer.action_completed`
+- `computer.action_failed`
+- `computer.verification_completed`
+- `computer.recovery_started`
+- `computer.task_completed`
+- `computer.task_cancelled`
+
+Não crie um sistema de eventos paralelo se o harness já tiver um dispatcher central.
+
+---
+
+## 10. INTEGRAÇÃO COM A INTERFACE DO HARNESS
+
+Integre o Computer Use à interface existente.
+
+Quando tecnicamente possível, disponibilize:
+
+- Estado da sessão de automação.
+- Aplicativo ou janela atualmente controlada.
+- Screenshot recente.
+- Ação atual.
+- Histórico de ações.
+- Resultado das verificações.
+- Erros e tentativas de recuperação.
+- Botão de cancelamento.
+- Estado de execução.
+- Ferramentas disponíveis.
+- Indicação de quando o agente está aguardando uma observação.
+
+Se o aplicativo já possuir uma área de execução de tarefas, incorpore essas informações nela.
+
+Não construa uma segunda aplicação desktop independente apenas para demonstrar o módulo.
+
+Não exponha screenshots ou histórico de uma sessão a outro workspace sem autorização.
+
+---
+
+## 11. DESEMPENHO E CONFIABILIDADE
+
+Implemente mecanismos proporcionais às necessidades do projeto:
+
+- Captura sob demanda.
+- Captura de regiões quando suficiente.
+- Limites de tamanho de screenshots.
+- Cache limitado.
+- Liberação de recursos.
+- Timeout por ação.
+- Esperas baseadas em condições.
+- Cancelamento.
+- Limites de tentativas.
+- Detecção de mudanças relevantes.
+- Reutilização de conexões quando suportada.
+- Logs estruturados.
+- Diagnóstico de incompatibilidades.
+- Monitoramento de dependências indisponíveis.
+
+Evite loops que capturem screenshots e chamem o modelo continuamente sem uma condição de parada.
+
+Quando uma ação não produzir mudança observável, o agente deve avaliar se precisa esperar, atualizar a observação, utilizar outro mecanismo ou encerrar a tentativa.
+
+---
+
+## 12. CONFIGURAÇÃO E COMPATIBILIDADE COM WINDOWS
+
+Inspecione o ambiente real antes de escolher dependências.
+
+O projeto deve funcionar no Windows 10 ou em versões posteriores compatíveis com as bibliotecas escolhidas, conforme os requisitos efetivos de cada dependência.
+
+Considere:
+
+- Permissões do usuário.
+- Arquitetura do processo.
+- Dependências nativas.
+- Instalação de runtimes.
+- Diferenças entre processos elevados e não elevados.
+- Múltiplos monitores.
+- Escala de exibição.
+- Aplicativos em primeiro plano.
+- Bloqueios de sessão.
+- UAC e diálogos do sistema.
+- Restrições de acesso a determinadas janelas.
+
+Não solicite privilégios administrativos automaticamente. Se uma operação exigir privilégios que o processo não possui, informe a limitação e utilize uma alternativa compatível quando possível.
+
+Documente as dependências necessárias e forneça instruções reproduzíveis de instalação.
+
+---
+
+## 13. TESTES AUTOMATIZADOS
+
+Utilize o framework de testes existente.
+
+### 13.1. Testes unitários
+
+Teste:
+
+- Validação de parâmetros.
+- Normalização de coordenadas.
+- Transformação entre resoluções.
+- Parsing de teclas.
+- Contratos de ações.
+- Registro de ferramentas.
+- Estados de execução.
+- Classificação de erros.
+- Cancelamento.
+- Histórico de ações.
+
+### 13.2. Testes de integração
+
+Verifique:
+
+- Captura de tela.
+- Descoberta de janelas.
+- Consulta de acessibilidade.
+- Clique em controles de teste.
+- Digitação em campos de teste.
+- Espera por mudanças de estado.
+- Verificação de resultados.
+- Integração com o Agent Core.
+- Integração com eventos.
+- Tratamento de falhas de dependências.
+
+### 13.3. Aplicativo de teste
+
+Crie ou utilize uma pequena aplicação de teste com:
+
+- Botões identificáveis.
+- Campos de texto.
+- Checkboxes.
+- Menus.
+- Diálogos.
+- Estados visuais diferentes.
+- Mensagens de confirmação.
+
+Utilize essa aplicação para validar o fluxo real de observação, ação e verificação sem depender de aplicativos de produção.
+
+### 13.4. Testes ponta a ponta
+
+Implemente cenários como:
+
+**Cenário A — Abrir e identificar uma janela**
+
+1. Localizar uma janela de teste.
+2. Ativá-la.
+3. Capturar o estado.
+4. Verificar a janela ativa.
+
+**Cenário B — Preencher um formulário**
+
+1. Identificar os campos.
+2. Preencher os valores de teste.
+3. Acionar o botão de envio.
+4. Verificar a mensagem de confirmação.
+
+**Cenário C — Recuperar uma falha**
+
+1. Solicitar uma ação sobre um elemento inexistente.
+2. Detectar a falha.
+3. Atualizar a observação.
+4. Tentar uma estratégia alternativa.
+5. Encerrar corretamente se não for possível concluir.
+
+**Cenário D — Integração com o agente**
+
+1. Enviar uma tarefa em linguagem natural.
+2. Permitir que o Agent Core selecione as ferramentas.
+3. Executar ações.
+4. Verificar os resultados.
+5. Retornar um resumo fiel da execução.
+
+Execute os testes e registre os resultados reais. Não declare testes aprovados sem executá-los.
+
+---
+
+## 14. CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] O harness consegue capturar a tela.
+- [ ] O sistema identifica informações sobre janelas.
+- [ ] A árvore de acessibilidade pode ser consultada quando disponível.
+- [ ] O sistema pode interagir com mouse e teclado.
+- [ ] O sistema possui ferramentas estruturadas de Computer Use.
+- [ ] Os alvos podem ser identificados por estratégias diferentes.
+- [ ] As coordenadas são convertidas corretamente entre resoluções.
+- [ ] As ações importantes possuem verificação de resultado.
+- [ ] Falhas podem provocar atualização da observação e replanejamento.
+- [ ] O usuário pode cancelar uma tarefa.
+- [ ] As ações são registradas.
+- [ ] O Agent Core consegue utilizar as ferramentas.
+- [ ] Os subagents não provocam conflitos no desktop compartilhado.
+- [ ] A interface existente exibe o estado de execução.
+- [ ] As dependências são documentadas.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam funcionando.
+- [ ] O módulo não depende exclusivamente de coordenadas fixas.
+- [ ] O sistema consegue distinguir uma ação executada de uma ação efetivamente verificada.
+
+---
+
+## 15. ORDEM DE IMPLEMENTAÇÃO
+
+Execute as etapas nesta sequência:
+
+1. Inspecionar o harness e executar os testes iniciais.
+2. Clonar e analisar os repositórios indicados.
+3. Escolher as bibliotecas compatíveis com a tecnologia existente.
+4. Definir os contratos de ferramentas e os tipos de resultado.
+5. Implementar captura de tela e gerenciamento de janelas.
+6. Implementar mouse, teclado e ações estruturadas.
+7. Implementar consulta à acessibilidade do Windows.
+8. Implementar resolução de alvos visuais.
+9. Implementar verificação e recuperação.
+10. Integrar com o Agent Core.
+11. Integrar com os subagents e eventos.
+12. Integrar à interface existente.
+13. Criar testes automatizados e de ponta a ponta.
+14. Corrigir regressões.
+15. Documentar a instalação e a utilização.
+
+Adapte a ordem se houver dependências técnicas, mas não deixe de executar e validar cada parte.
+
+---
+
+## 16. RELATÓRIO FINAL
+
+Ao terminar, informe:
+
+1. Arquitetura inicial encontrada.
+2. Repositórios efetivamente clonados.
+3. Componentes externos aproveitados.
+4. Bibliotecas adicionadas.
+5. Componentes criados ou aprimorados.
+6. Arquivos modificados.
+7. Integração com os Módulos 01, 02 e 03.
+8. Comandos de instalação e inicialização.
+9. Testes executados e resultados.
+10. Limitações conhecidas.
+11. Exemplos de tarefas que foram testadas com sucesso.
+12. Próximos passos para o módulo seguinte.
+
+Diferencie claramente funcionalidades implementadas, funcionalidades testadas e funcionalidades que ainda precisam ser desenvolvidas.
+
+## 17. DIRETRIZ FINAL
+
+Implemente o Computer Use dentro do nosso harness existente.
+
+Não entregue somente uma arquitetura teórica ou uma demonstração independente.
+
+Clone os projetos, examine seus códigos-fonte e aproveite as melhores implementações compatíveis. Preserve o que já funciona e não crie componentes duplicados sem necessidade.
+
+O resultado deve permitir que o Agent Core controle aplicativos Windows por ferramentas estruturadas, observe o resultado das ações, se recupere de falhas e conclua tarefas de várias etapas.
+
+Ao terminar, deixe o módulo funcional, testado e documentado, preparado para receber os próximos módulos do nosso AI Development Harness.

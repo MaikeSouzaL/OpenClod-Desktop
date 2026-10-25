@@ -1,0 +1,619 @@
+# MÓDULO 09 — CONTEXT ENGINEERING, MEMÓRIA PERSISTENTE E RECUPERAÇÃO DE CONHECIMENTO
+
+## 1. OBJETIVO PRINCIPAL
+
+Implemente no harness atual um sistema completo de engenharia de contexto, memória persistente, indexação de conhecimento e recuperação inteligente de informações.
+
+O sistema deve permitir que o agente:
+
+- Entenda o projeto atual sem precisar reler todos os arquivos a cada solicitação.
+- Recupere decisões, instruções, arquitetura e descobertas de tarefas anteriores.
+- Lembre o que já foi implementado, quais problemas foram encontrados e quais soluções funcionaram.
+- Identifique automaticamente quais arquivos, símbolos, funções, classes e documentos são relevantes para cada tarefa.
+- Controle a quantidade de tokens enviada a cada modelo.
+- Preserve informações importantes durante conversas longas e compactação de contexto.
+- Continue tarefas interrompidas sem perder o progresso.
+- Atualize o conhecimento quando o código mudar.
+- Trabalhe com vários projetos sem misturar suas memórias.
+- Utilize mecanismos de busca locais mesmo quando não houver um serviço de embeddings ou banco vetorial disponível.
+
+**Não entregue apenas uma pesquisa, um documento de arquitetura ou um protótipo isolado. Implemente o módulo funcionalmente no harness existente.**
+
+O projeto já possui módulos destinados ao núcleo do agente, subagentes, skills, automação do computador, navegador, terminal, inteligência de código e Git. Este módulo deve se integrar a essas capacidades, sem recriá-las desnecessariamente.
+
+## 2. PRIMEIRA ETAPA — INSPECIONAR O PROJETO EXISTENTE
+
+Antes de modificar qualquer arquivo:
+
+1. Identifique a linguagem de programação, os frameworks, a arquitetura e a estrutura real do harness.
+2. Examine os módulos já implementados, principalmente o Agent Core, a execução de ferramentas, as sessões, os subagentes, as skills, o terminal, a inteligência de código e o gerenciamento Git.
+3. Localize os pontos em que o contexto é montado, as mensagens são enviadas ao modelo, as respostas são processadas e as sessões são persistidas.
+4. Identifique os mecanismos de armazenamento, configuração, logs, eventos e testes já existentes.
+5. Verifique se já existem recursos de busca de arquivos, indexação, embeddings, gerenciamento de tokens, memória ou compactação de conversas.
+6. Aproveite os recursos existentes sempre que forem adequados. Amplie-os em vez de criar implementações duplicadas.
+7. Determine quais componentes podem ser integrados diretamente e quais precisam de adaptadores.
+
+Não presuma que o projeto utiliza Node.js, Python, TypeScript, React, SQLite, PostgreSQL ou qualquer tecnologia específica. Descubra a stack real e adapte a implementação a ela.
+
+Antes de iniciar a implementação, produza uma lista objetiva dos componentes que serão reaproveitados, ampliados, criados ou substituídos. Em seguida, continue o trabalho sem aguardar uma nova autorização para cada etapa.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA ANÁLISE E REUTILIZAÇÃO
+
+Clone os repositórios relevantes em um diretório temporário de pesquisa fora do núcleo funcional do harness. Inspecione o código-fonte real, os pontos de entrada, as interfaces, os algoritmos, os testes e as dependências.
+
+Não copie projetos inteiros cegamente. Identifique implementações maduras que resolvam problemas específicos e reutilize os componentes compatíveis, respeitando as licenças aplicáveis.
+
+### 3.1. Memória e persistência de agentes
+
+- Memória para agentes: https://github.com/mem0ai/mem0
+- Persistência e checkpoint de fluxos de agentes: https://github.com/langchain-ai/langgraph
+- Framework de agentes com memória: https://github.com/agno-agi/agno
+- Framework de agentes para TypeScript: https://github.com/mastra-ai/mastra
+- Base de código de agentes com gerenciamento de sessões: https://github.com/anomalyco/opencode
+- Agentes de programação e gestão de contexto: https://github.com/Aider-AI/aider
+
+Investigue como os projetos tratam memória persistente, estado de sessão, recuperação de informações, resumos, continuidade de tarefas e separação entre memória temporária e duradoura.
+
+### 3.2. Indexação, RAG e recuperação de conhecimento
+
+- Framework de indexação e recuperação: https://github.com/run-llama/llama_index
+- Framework de recuperação e composição de contexto: https://github.com/langchain-ai/langchain
+- Banco vetorial: https://github.com/qdrant/qdrant
+- Banco vetorial integrado: https://github.com/chroma-core/chroma
+- Extensão vetorial para PostgreSQL: https://github.com/pgvector/pgvector
+- Sistema de recuperação com grafo de conhecimento: https://github.com/getzep/graphiti
+- Pesquisa e recuperação de contexto em repositórios: https://github.com/continuedev/continue
+- Engenharia de contexto para assistentes de programação: https://github.com/sourcegraph/cody
+
+Não é necessário instalar todos esses sistemas. Escolha as técnicas e os componentes que ofereçam melhor compatibilidade com o harness, considerando desempenho, complexidade operacional e possibilidade de execução local.
+
+### 3.3. Mapeamento e contexto de repositórios de código
+
+- Aider: https://github.com/Aider-AI/aider
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- OpenAI Codex: https://github.com/openai/codex
+- Continue: https://github.com/continuedev/continue
+- ast-grep: https://github.com/ast-grep/ast-grep
+- Tree-sitter: https://github.com/tree-sitter/tree-sitter
+
+Investigue especialmente estratégias de mapas de repositório, seleção de arquivos, referências entre símbolos, busca de trechos relevantes, compactação e montagem de contexto para agentes de programação.
+
+**Regras para a pesquisa técnica:**
+
+- Não afirme que uma biblioteca possui determinado recurso sem verificar sua implementação.
+- Não limite a análise ao README.
+- Examine o código-fonte e os testes dos componentes selecionados.
+- Registre quais implementações ou algoritmos foram efetivamente aproveitados.
+- Não copie código sem verificar sua licença e compatibilidade.
+- Se um repositório estiver indisponível, documente isso e prossiga com alternativas reais.
+- Não deixe a entrega dependente de um serviço pago, de uma API proprietária ou de um banco vetorial remoto.
+
+## 4. ARQUITETURA DO MÓDULO
+
+Implemente os componentes equivalentes abaixo, adaptando nomes e estrutura à arquitetura existente.
+
+### 4.1. Context Assembly Engine
+
+Responsável por montar o contexto final de cada solicitação.
+
+Deve reunir, conforme a necessidade:
+
+- Instruções globais do harness.
+- Instruções do workspace e do projeto.
+- Arquivos de instruções reconhecidos pelo harness, como AGENTS.md, quando aplicável.
+- Mensagens recentes da conversa.
+- Resumo persistente da sessão.
+- Memórias relevantes do projeto.
+- Arquitetura conhecida e decisões técnicas.
+- Mapa do repositório.
+- Arquivos, símbolos e trechos relevantes.
+- Estado da tarefa e subtarefas pendentes.
+- Resultados importantes de ferramentas.
+- Alterações recentes e diffs relevantes.
+- Erros anteriores e soluções já tentadas.
+- Restrições específicas da solicitação atual.
+
+O mecanismo não deve simplesmente anexar tudo ao prompt.
+
+Deve selecionar, ordenar e limitar o conteúdo conforme a tarefa atual, a janela de contexto do modelo e as prioridades definidas pelo harness.
+
+### 4.2. Project Memory Manager
+
+Implemente um gerenciador de memória persistente com categorias distintas:
+
+**Memória global do harness**
+- Preferências gerais de funcionamento.
+- Configurações de agentes e fluxos de trabalho.
+- Informações reutilizáveis entre projetos, quando apropriado.
+
+**Memória do projeto**
+- Objetivos e funcionalidades.
+- Arquitetura e tecnologias detectadas.
+- Convenções de código.
+- Decisões técnicas e justificativas.
+- Estrutura de módulos.
+- Integrações e dependências.
+- Problemas conhecidos.
+- Requisitos e restrições.
+- Testes relevantes e comandos de execução.
+
+**Memória da sessão**
+- Objetivo atual.
+- Arquivos examinados.
+- Alterações realizadas.
+- Resultados das ferramentas.
+- Hipóteses verificadas.
+- Problemas ainda abertos.
+- Próximos passos.
+
+**Memória da tarefa**
+- Plano de execução.
+- Subtarefas concluídas.
+- Subtarefas pendentes.
+- Dependências entre subtarefas.
+- Tentativas anteriores.
+- Resultados da validação.
+- Estado necessário para retomada.
+
+Cada memória deve possuir, quando aplicável:
+
+- Identificador.
+- Tipo e escopo.
+- Projeto ou sessão de origem.
+- Conteúdo.
+- Data de criação e atualização.
+- Proveniência.
+- Nível de confiança.
+- Referências aos arquivos e símbolos envolvidos.
+- Estado de validade.
+- Relação com outras memórias.
+- Indicação de conteúdo temporário ou persistente.
+
+Não armazene indiscriminadamente todas as mensagens como memória permanente. Extraia informações úteis, deduplique fatos repetidos e mantenha a origem verificável.
+
+### 4.3. Context Retrieval Engine
+
+Crie um mecanismo de recuperação híbrida que possa combinar:
+
+1. Busca textual por palavras e frases.
+2. Busca semântica, quando houver embeddings disponíveis.
+3. Busca por arquivos, símbolos, classes, funções e módulos.
+4. Busca por referências e dependências.
+5. Recuperação de decisões técnicas relacionadas.
+6. Recuperação de erros e soluções anteriores.
+7. Recuperação por recência e relevância para a tarefa.
+
+Cada resultado deverá possuir uma pontuação calculada a partir de critérios configuráveis, como:
+
+- Correspondência com a solicitação.
+- Relevância semântica.
+- Correspondência de símbolos e caminhos.
+- Importância do conteúdo.
+- Recência.
+- Confiança.
+- Relação com arquivos alterados.
+- Validade da informação.
+
+Não use a recência como único critério. Uma decisão arquitetural antiga, mas ainda válida, pode ser mais importante do que uma mensagem recente sem relação com a tarefa.
+
+Sempre que possível, apresente os resultados com referências à origem, como caminho do arquivo, linhas, símbolo, identificador da memória ou sessão.
+
+### 4.4. Token Budget Manager
+
+Implemente um gerenciador de orçamento de contexto.
+
+Ele deverá:
+
+- Identificar a janela de contexto declarada pelo provedor ou modelo.
+- Respeitar limites específicos do modelo e da API.
+- Reservar espaço para a resposta, ferramentas e mensagens de controle.
+- Estimar tokens antes do envio.
+- Contabilizar tokens reais quando o provedor disponibilizar esses dados.
+- Evitar depender de um único tokenizador para todos os modelos.
+- Distribuir o orçamento entre instruções, conversa, memórias, código e resultados de ferramentas.
+- Reduzir ou substituir conteúdos de menor prioridade quando o limite for excedido.
+- Preservar informações críticas e requisitos explícitos.
+- Registrar a composição do contexto para diagnóstico.
+
+Quando não houver tokenizador compatível, utilize uma estimativa configurável e identifique-a como estimativa. Não apresente estimativas como contagens exatas.
+
+O sistema deve ser compatível com diferentes provedores e modelos, sem pressupor que todos utilizam a mesma janela de contexto.
+
+### 4.5. Context Compaction Engine
+
+Implemente compactação para conversas e tarefas longas.
+
+A compactação deverá preservar:
+
+- Objetivo original.
+- Instruções e restrições importantes.
+- Decisões confirmadas e suas justificativas.
+- Estado atual da implementação.
+- Arquivos relevantes.
+- Resultados importantes de testes.
+- Erros encontrados e tentativas já realizadas.
+- Pendências e próximos passos.
+- Identificadores e resultados necessários para retomar tarefas.
+- Referências às fontes originais.
+
+Não resuma tudo em um único texto genérico que elimine detalhes técnicos.
+
+Prefira resumos estruturados, com separação entre fatos confirmados, hipóteses, decisões, pendências e resultados de ferramentas.
+
+Quando possível, mantenha um histórico recuperável das mensagens originais, dos resumos e das compactações. A compactação não deve apagar informações necessárias para auditoria ou retomada.
+
+Se o modelo falhar durante a compactação, preserve o contexto original e utilize uma estratégia alternativa.
+
+### 4.6. Repository Knowledge Index
+
+Integre o módulo de contexto à inteligência de código existente.
+
+O índice deverá reconhecer, conforme as linguagens e ferramentas disponíveis:
+
+- Arquivos e diretórios.
+- Linguagens e frameworks.
+- Classes, funções, métodos e interfaces.
+- Imports e exports.
+- Dependências e referências.
+- Testes relacionados.
+- Documentação.
+- Configurações relevantes.
+- Histórico de alterações disponível no Git.
+
+A indexação deve ser incremental.
+
+Quando um arquivo mudar, atualize apenas os registros afetados sempre que possível, em vez de reconstruir todo o índice.
+
+Aproveite o módulo de inteligência de código para Tree-sitter, LSP, busca textual, símbolos e dependências, quando essas capacidades já estiverem disponíveis.
+
+Implemente mecanismos de exclusão e filtragem para não indexar indiscriminadamente:
+
+- Diretórios de dependências.
+- Artefatos de compilação.
+- Arquivos gerados.
+- Cache.
+- Binários.
+- Arquivos temporários.
+- Diretórios explicitamente ignorados pelo projeto.
+- Conteúdo sensível que não deva ser indexado.
+
+Respeite as regras de exclusão já existentes, como .gitignore, e permita configuração adicional.
+
+### 4.7. Embeddings e armazenamento vetorial opcional
+
+Implemente uma abstração para embeddings e busca vetorial.
+
+O módulo deverá oferecer:
+
+- Interface independente do provedor de embeddings.
+- Suporte a embeddings locais ou remotos quando configurados.
+- Persistência dos vetores e dos metadados.
+- Atualização incremental.
+- Identificação da versão do modelo de embeddings.
+- Reconstrução do índice quando a configuração mudar.
+- Recuperação híbrida com busca textual.
+- Alternativa funcional sem embeddings.
+
+Não torne Qdrant, Chroma ou pgvector obrigatórios se o harness puder funcionar adequadamente com armazenamento local e busca textual.
+
+Escolha a implementação padrão de acordo com a stack atual. Para um harness local, priorize uma solução simples, persistente, leve e de fácil manutenção.
+
+Não baixe automaticamente modelos de IA muito grandes. A instalação e configuração de modelos locais devem ser explícitas e documentadas.
+
+### 4.8. Memory Lifecycle Manager
+
+Implemente o ciclo de vida completo das memórias:
+
+1. Capturar.
+2. Classificar.
+3. Validar.
+4. Deduplicar.
+5. Persistir.
+6. Recuperar.
+7. Atualizar.
+8. Invalidar quando estiver desatualizada.
+9. Arquivar quando necessário.
+10. Excluir quando solicitado.
+
+Diferencie fatos confirmados de hipóteses geradas pelo agente.
+
+Se o agente registrar que determinada função existe em um arquivo, mas o arquivo for removido ou alterado, a memória correspondente deve ser revalidada antes de ser utilizada como fato atual.
+
+Permita consultar, pesquisar, editar e excluir memórias por projeto, sessão e categoria.
+
+Se o usuário solicitar que uma informação não seja mais utilizada, o sistema deve respeitar essa solicitação no escopo aplicável e disponibilizar um mecanismo real para localizar e excluir os registros persistidos correspondentes.
+
+Não mantenha cópias ocultas de memórias excluídas em caches ativos ou índices recuperáveis.
+
+### 4.9. Proveniência e confiabilidade
+
+Todo conhecimento recuperado deve manter sua origem sempre que possível.
+
+Distinga claramente:
+
+- Informação lida diretamente de um arquivo.
+- Informação extraída de uma mensagem do usuário.
+- Resultado retornado por uma ferramenta.
+- Resumo produzido por um modelo.
+- Hipótese ainda não confirmada.
+- Informação antiga que precisa ser validada.
+
+Quando houver contradições, priorize fontes atuais e verificáveis, sem apagar silenciosamente o histórico das decisões.
+
+Uma memória não deve ser tratada como verdadeira apenas porque foi registrada anteriormente.
+
+### 4.10. Isolamento entre projetos
+
+Implemente separação clara entre:
+
+- Memória global.
+- Memória de cada workspace.
+- Memória de cada projeto.
+- Memória de cada sessão.
+- Memória de cada tarefa.
+
+Uma tarefa executada em um projeto não deve recuperar automaticamente código, credenciais, caminhos internos ou informações específicas de outro projeto.
+
+A memória global só deve conter informações que façam sentido nesse escopo.
+
+O mecanismo de isolamento deve existir na camada de armazenamento e recuperação, e não depender exclusivamente de instruções enviadas ao modelo.
+
+## 5. FERRAMENTAS QUE O AGENTE DEVE PODER UTILIZAR
+
+Integre ferramentas equivalentes às seguintes ao registro central de ferramentas do Agent Core.
+
+Adapte os nomes à convenção já utilizada pelo harness.
+
+### Contexto
+- context.build
+- context.inspect
+- context.estimate_tokens
+- context.get_budget
+- context.get_sources
+
+### Memória
+- memory.search
+- memory.get
+- memory.create
+- memory.update
+- memory.delete
+- memory.list
+- memory.validate
+- memory.get_project_summary
+
+### Recuperação
+- retrieval.search
+- retrieval.search_files
+- retrieval.search_symbols
+- retrieval.search_decisions
+- retrieval.search_solutions
+
+### Indexação
+- index.get_status
+- index.index_project
+- index.update_changed_files
+- index.search
+- index.rebuild
+- index.invalidate
+
+### Compactação
+- context.compact
+- context.get_compaction_history
+- context.restore_checkpoint
+
+### Diagnóstico
+- context.get_statistics
+- context.get_retrieval_trace
+- context.get_token_usage
+- context.validate_memory_isolation
+
+Essas ferramentas devem executar operações reais. Não crie funções que retornem respostas simuladas ou dados estáticos apenas para satisfazer os testes.
+
+As ferramentas que modificam ou excluem memórias devem validar os parâmetros recebidos, registrar o resultado e operar no escopo correto.
+
+## 6. INTEGRAÇÃO COM OS MÓDULOS ANTERIORES
+
+### Agent Core
+Antes de chamar o modelo, solicitar a montagem do contexto. Depois da resposta, atualizar o estado da tarefa e registrar resultados úteis.
+
+### Subagentes e orquestração
+Cada subagente deve receber apenas o contexto pertinente à sua tarefa, além das instruções e restrições necessárias. Resultados importantes devem poder ser compartilhados com o orquestrador sem compartilhar indiscriminadamente todo o histórico.
+
+### Skills, comandos e hooks
+Permitir que skills e comandos declarem informações contextuais necessárias. Utilize os hooks existentes para atualizar memórias após eventos relevantes, como conclusão de tarefas, alterações arquiteturais ou execução de testes.
+
+Não grave uma memória a cada evento sem avaliar se ela tem utilidade futura.
+
+### Terminal e processos
+Armazene referências a comandos executados e seus resultados relevantes, incluindo código de saída e informações necessárias para diagnóstico. Evite copiar grandes saídas de terminal integralmente para o contexto quando um resumo com acesso ao resultado original for suficiente.
+
+### Inteligência de código
+Reaproveite o índice, o sistema de símbolos, a busca textual, o LSP e a análise de dependências existentes.
+
+### Git e worktrees
+Utilize mudanças de arquivos e commits como sinais de invalidação do índice. Não considere automaticamente uma memória antiga válida após mudanças incompatíveis no código.
+
+### Sessões e retomada
+Ao reabrir uma sessão ou retomar uma tarefa, recupere o último estado consistente, reconstrua o contexto necessário e verifique se os arquivos e resultados relevantes continuam válidos.
+
+## 7. CONFIGURAÇÃO E INTERFACE
+
+Integre o módulo à interface e ao sistema de configuração existentes, respeitando o design atual.
+
+Se houver uma interface gráfica, disponibilize uma seção de contexto e memória com:
+
+- Estado da indexação.
+- Projeto indexado.
+- Última atualização do índice.
+- Quantidade de arquivos e registros indexados.
+- Estado do mecanismo vetorial, se habilitado.
+- Consumo estimado e real de tokens, quando disponível.
+- Memórias recuperadas para a tarefa atual.
+- Fontes utilizadas na montagem do contexto.
+- Histórico de compactações.
+- Erros de indexação e recuperação.
+- Opções para reconstruir o índice.
+- Opções para pesquisar, editar e excluir memórias.
+
+Se a interface atual não possuir uma área adequada, crie uma integração consistente com os padrões já utilizados. Não reconstrua a interface inteira para implementar este módulo.
+
+As configurações devem permitir ajustar:
+
+- Limite de contexto.
+- Reserva de tokens para resposta.
+- Tamanho dos resumos.
+- Limites de resultados de recuperação.
+- Estratégia de ranking.
+- Persistência e localização do armazenamento.
+- Provedor de embeddings.
+- Indexação automática.
+- Diretórios ignorados.
+- Política de retenção.
+- Ativação ou desativação da memória semântica.
+
+As configurações devem possuir valores padrão funcionais.
+
+## 8. DESEMPENHO E EFICIÊNCIA
+
+O sistema deve ser desenvolvido para funcionar em um computador pessoal, sem exigir infraestrutura de servidor para as funções essenciais.
+
+Implemente:
+
+- Cache de resultados quando fizer sentido.
+- Indexação incremental.
+- Processamento assíncrono quando compatível com a arquitetura.
+- Limites de memória e tamanho de resultados.
+- Paginação de resultados extensos.
+- Cancelamento de indexações demoradas.
+- Persistência confiável.
+- Tratamento de arquivos removidos ou renomeados.
+- Recuperação após interrupções.
+- Métricas de tempo de recuperação e montagem de contexto.
+
+Evite executar repetidamente a mesma busca ou recalcular índices completos quando os dados não tiverem mudado.
+
+Não envie o repositório inteiro ao modelo como estratégia padrão.
+
+## 9. TESTES OBRIGATÓRIOS
+
+Crie testes automatizados compatíveis com a infraestrutura de testes existente.
+
+### Testes de memória
+- Criar, recuperar, atualizar e excluir memórias.
+- Deduplificar registros equivalentes.
+- Preservar a origem e a categoria.
+- Invalidar memórias desatualizadas.
+- Separar memória global, de projeto, sessão e tarefa.
+
+### Testes de recuperação
+- Encontrar arquivos relevantes para uma tarefa.
+- Recuperar uma decisão arquitetural anterior.
+- Localizar uma solução anterior para um erro.
+- Combinar busca textual e semântica quando disponível.
+- Continuar funcionando sem embeddings.
+- Respeitar filtros e exclusões.
+
+### Testes de orçamento
+- Montar um contexto abaixo do limite.
+- Reduzir conteúdos de menor prioridade quando o limite for excedido.
+- Preservar instruções essenciais.
+- Reservar espaço para a resposta.
+- Diferenciar estimativas de contagens reais.
+
+### Testes de compactação
+- Compactar uma conversa longa.
+- Preservar decisões e restrições.
+- Preservar arquivos e resultados relevantes.
+- Retomar uma tarefa após compactação.
+- Recuperar o histórico original quando necessário.
+- Preservar os dados quando o modelo falhar durante a compactação.
+
+### Testes de indexação
+- Indexar um projeto de teste.
+- Atualizar apenas os arquivos modificados.
+- Remover referências a arquivos excluídos.
+- Ignorar diretórios configurados.
+- Recuperar símbolos e trechos relevantes.
+- Reindexar corretamente quando a versão dos embeddings mudar.
+
+### Testes de isolamento
+- Criar dois projetos com informações distintas.
+- Garantir que a recuperação de um projeto não exponha as memórias exclusivas do outro.
+- Verificar isolamento entre sessões.
+- Confirmar que exclusões sejam respeitadas pelos mecanismos de busca e caches.
+
+### Testes de integração
+- Enviar uma tarefa ao Agent Core e verificar a montagem do contexto.
+- Confirmar que os subagentes recebem apenas o contexto pertinente.
+- Modificar um arquivo e verificar a atualização do índice.
+- Interromper e retomar uma tarefa.
+- Confirmar que o contexto recuperado contenha referências verificáveis.
+- Executar o conjunto de testes existente para detectar regressões.
+
+Não utilize somente mocks para declarar o módulo funcional. Mocks podem ser usados nos testes unitários, mas os principais fluxos também devem ser verificados com armazenamento real temporário e um projeto de teste real.
+
+## 10. ORDEM DE IMPLEMENTAÇÃO
+
+Execute o trabalho nesta ordem:
+
+1. Inspecionar o harness e identificar os pontos reais de integração.
+2. Clonar e analisar os repositórios open source selecionados.
+3. Documentar brevemente quais técnicas serão reaproveitadas e por quê.
+4. Definir os contratos de dados e interfaces do módulo.
+5. Implementar armazenamento persistente e isolamento por escopo.
+6. Implementar gerenciamento do ciclo de vida das memórias.
+7. Implementar indexação e recuperação textual.
+8. Integrar a recuperação semântica como capacidade opcional.
+9. Implementar montagem de contexto e orçamento de tokens.
+10. Implementar compactação e checkpoints de contexto.
+11. Integrar o módulo ao Agent Core e aos demais componentes existentes.
+12. Integrar configurações e interface, se aplicável.
+13. Executar os testes unitários, de integração e de regressão.
+14. Corrigir os problemas encontrados.
+15. Documentar a utilização, configuração e limitações reais.
+
+Não pare após produzir o plano. Prossiga com a implementação até concluir o máximo possível do escopo e execute as validações.
+
+## 11. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo só deve ser considerado concluído quando:
+
+- O harness monta contexto dinamicamente a partir da tarefa atual.
+- O sistema persiste e recupera memórias após reinicialização.
+- As memórias possuem escopos distintos e verificáveis.
+- A recuperação encontra arquivos e conhecimentos pertinentes.
+- A busca textual funciona sem serviços externos.
+- O uso de embeddings é opcional.
+- O orçamento de contexto é aplicado antes do envio ao modelo.
+- Conversas longas podem ser compactadas sem perder o estado essencial.
+- Tarefas interrompidas podem ser retomadas com informações relevantes.
+- Alterações de arquivos atualizam ou invalidam os registros afetados.
+- O sistema preserva a proveniência do conhecimento recuperado.
+- Os subagentes recebem contexto relevante para suas tarefas.
+- A interface e as configurações existentes continuam funcionando.
+- Os testes comprovam os principais fluxos com dados reais de teste.
+- Nenhuma funcionalidade preexistente é removida sem justificativa técnica.
+- Não existem integrações simuladas apresentadas como implementações reais.
+
+## 12. RELATÓRIO FINAL
+
+Ao terminar, apresente um relatório objetivo contendo:
+
+1. Componentes existentes que foram reaproveitados.
+2. Repositórios analisados e implementações efetivamente aproveitadas.
+3. Arquivos criados e modificados.
+4. Arquitetura final e fluxo de montagem do contexto.
+5. Estratégia de armazenamento e recuperação.
+6. Funcionamento da indexação incremental.
+7. Estratégia de gerenciamento de tokens e compactação.
+8. Integrações realizadas com o Agent Core e os subagentes.
+9. Testes executados e resultados reais.
+10. Comandos necessários para executar e validar o módulo.
+11. Dependências novas e justificativa de cada uma.
+12. Funcionalidades concluídas, parciais ou pendentes, com motivos concretos.
+13. Limitações identificadas e próximos passos recomendados.
+
+Se alguma funcionalidade não puder ser concluída, não a declare pronta. Explique o impedimento e deixe a implementação preparada para continuidade quando isso for tecnicamente possível.
+
+**Resultado esperado:** um sistema de contexto e memória integrado ao harness, capaz de recuperar conhecimento relevante, manter a continuidade das tarefas e utilizar a janela de contexto dos modelos com eficiência, sem depender da releitura constante de todo o projeto.

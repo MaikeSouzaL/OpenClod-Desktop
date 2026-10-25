@@ -1,0 +1,739 @@
+# PROMPT ULTRADETALHADO 01 — CONSTRUIR E APRIMORAR O NÚCLEO INTELIGENTE DO NOSSO AI DEVELOPMENT HARNESS
+
+## 1. MISSÃO PRINCIPAL
+
+Você é o engenheiro responsável pelo núcleo de execução inteligente do nosso AI Development Harness, uma aplicação desktop de desenvolvimento assistido por inteligência artificial.
+
+Sua missão é analisar o código existente e construir, completar ou aprimorar o **Agent Core**, o mecanismo central responsável por transformar uma solicitação do usuário em uma tarefa planejada, executada por meio de ferramentas, observada, validada e concluída.
+
+O objetivo é desenvolver um núcleo com capacidades comparáveis, em sua arquitetura e experiência de uso, às encontradas em agentes modernos de programação, como Claude Code, OpenAI Codex e OpenCode.
+
+Não estamos construindo apenas um chatbot que responde perguntas. Estamos construindo um sistema capaz de compreender um projeto, planejar modificações, operar ferramentas, executar código, interpretar resultados, corrigir erros e continuar trabalhando até alcançar o objetivo ou identificar um impedimento real.
+
+**Não implemente apenas uma demonstração. Construa uma implementação funcional, integrada ao harness e verificável por testes.**
+
+Não presuma que o projeto está vazio. Primeiro examine o que já existe, preserve o que funciona e aproveite as melhores implementações disponíveis.
+
+---
+
+## 2. OBJETIVO DO AGENT CORE
+
+O núcleo deverá receber uma solicitação do usuário e coordenar o processo necessário para atendê-la.
+
+Exemplos de tarefas que deverá conseguir conduzir:
+
+- Criar uma aplicação a partir de uma descrição.
+- Compreender um repositório existente.
+- Investigar um erro.
+- Localizar arquivos relevantes.
+- Modificar código.
+- Executar comandos no terminal.
+- Instalar dependências quando apropriado.
+- Executar testes.
+- Interpretar mensagens de erro.
+- Corrigir problemas encontrados.
+- Verificar se as correções funcionaram.
+- Explicar as alterações realizadas.
+- Retomar uma tarefa interrompida.
+- Coordenar posteriormente subagentes especializados.
+- Utilizar ferramentas disponíveis sem depender de uma implementação específica de modelo.
+
+O Agent Core não precisa executar diretamente todas essas operações. Ele deve coordenar ferramentas e módulos especializados por meio de contratos internos bem definidos.
+
+---
+
+## 3. PRIMEIRA ETAPA: ANALISAR O PROJETO EXISTENTE
+
+Antes de modificar arquivos, realize uma inspeção técnica do harness.
+
+Identifique:
+
+1. A linguagem principal.
+2. O framework da interface.
+3. A tecnologia do backend.
+4. O ponto de entrada da aplicação.
+5. A implementação atual de chat.
+6. A integração com os provedores de modelos.
+7. A forma como mensagens são enviadas e recebidas.
+8. A existência de chamadas de ferramentas.
+9. O gerenciamento de sessões.
+10. O armazenamento do histórico.
+11. O sistema atual de contexto.
+12. A execução de tarefas assíncronas.
+13. O tratamento de erros.
+14. O sistema de logs.
+15. Os testes existentes.
+16. As interfaces utilizadas pelos demais módulos.
+
+Examine os arquivos de configuração, as dependências, os testes e os componentes realmente utilizados.
+
+Não conclua que uma funcionalidade existe apenas porque há um arquivo com nome sugestivo. Verifique se ela está conectada ao fluxo real da aplicação.
+
+Crie uma matriz interna com estas categorias:
+
+- Implementado e funcional.
+- Implementado parcialmente.
+- Implementado, mas com limitações importantes.
+- Ausente.
+- Presente, mas duplicado.
+- Presente, mas incompatível com a arquitetura atual.
+
+Registre também as dependências entre os componentes.
+
+### Regra de preservação
+
+Não reescreva todo o projeto para introduzir uma arquitetura idealizada.
+
+Aproveite o código existente sempre que for adequado. Modifique somente o necessário para tornar o núcleo mais robusto, modular e funcional.
+
+Não sobrescreva alterações locais do usuário, arquivos de configuração importantes ou dados existentes.
+
+---
+
+## 4. ARQUITETURA DO CICLO DE EXECUÇÃO DO AGENTE
+
+Implemente ou aprimore o ciclo principal de execução.
+
+O fluxo lógico deverá seguir estas etapas:
+
+1. Receber a solicitação do usuário.
+2. Identificar a sessão e o contexto relevante.
+3. Construir a entrada para o modelo.
+4. Enviar a solicitação ao provedor de LLM selecionado.
+5. Interpretar a resposta do modelo.
+6. Detectar se a resposta contém uma resposta final, uma chamada de ferramenta ou outra ação suportada.
+7. Validar a chamada de ferramenta.
+8. Solicitar autorização quando exigido pela política de execução.
+9. Executar a ferramenta pelo mecanismo apropriado.
+10. Capturar o resultado.
+11. Registrar a execução.
+12. Adicionar o resultado ao contexto da tarefa.
+13. Consultar novamente o modelo quando necessário.
+14. Avaliar se a tarefa foi concluída.
+15. Continuar, corrigir, interromper ou solicitar esclarecimentos conforme o estado da execução.
+16. Apresentar o resultado ao usuário.
+
+Esse ciclo deverá ser controlado por código explícito, com estados observáveis e condições de encerramento.
+
+Não dependa de um loop infinito nem presuma que o modelo sempre produzirá respostas corretas.
+
+### Estados mínimos da execução
+
+Implemente estados equivalentes a:
+
+- `idle`
+- `planning`
+- `running`
+- `waiting_for_model`
+- `waiting_for_tool`
+- `waiting_for_approval`
+- `recovering`
+- `completed`
+- `failed`
+- `cancelled`
+- `interrupted`
+
+Adapte os nomes à linguagem e às convenções do projeto, se necessário.
+
+Cada transição deve ser válida, rastreável e testável.
+
+Por exemplo, uma tarefa concluída não deve voltar automaticamente ao estado de execução. Uma tarefa cancelada não deve continuar executando ferramentas em segundo plano.
+
+---
+
+## 5. CONTRATOS DE COMUNICAÇÃO COM MODELOS
+
+O núcleo não deve depender exclusivamente de um único provedor de inteligência artificial.
+
+Analise a abstração de modelos já existente e crie ou aprimore uma interface comum para os provedores.
+
+Essa interface deverá representar, conforme os recursos suportados pelo provedor:
+
+- Envio de mensagens.
+- Mensagens de sistema, usuário e assistente.
+- Streaming de respostas.
+- Chamadas de ferramentas.
+- Respostas de ferramentas.
+- Metadados de uso.
+- Encerramento de uma rodada.
+- Erros de autenticação.
+- Limites de requisições.
+- Limites de contexto.
+- Cancelamento de chamadas.
+- Identificadores de requisição.
+- Informações de latência e consumo.
+
+Não obrigue todos os provedores a oferecer recursos que não suportam.
+
+Defina capacidades declaradas por provedor, permitindo ao núcleo escolher estratégias compatíveis.
+
+Exemplos de capacidades:
+
+- `streaming`
+- `tool_calling`
+- `structured_output`
+- `vision`
+- `reasoning_controls`
+- `context_window_metadata`
+- `request_cancellation`
+
+Os nomes são ilustrativos. Utilize o formato mais apropriado para a arquitetura existente.
+
+### Comportamento esperado
+
+Se um modelo não suportar chamadas nativas de ferramentas, o sistema deverá identificar essa limitação e utilizar uma estratégia alternativa somente se ela já estiver implementada e for confiável.
+
+Não interprete texto arbitrário como uma chamada executável sem validação.
+
+O núcleo deverá distinguir claramente:
+
+- Texto destinado ao usuário.
+- Chamadas estruturadas de ferramentas.
+- Resultados de ferramentas.
+- Metadados do provedor.
+- Erros de comunicação.
+- Respostas finais.
+
+---
+
+## 6. PLANEJAMENTO E DECOMPOSIÇÃO DE TAREFAS
+
+Implemente um mecanismo para que tarefas complexas possam ser divididas em etapas menores.
+
+O planejamento deve considerar:
+
+- O objetivo final.
+- O contexto já conhecido.
+- As informações ainda necessárias.
+- As ferramentas disponíveis.
+- As dependências entre etapas.
+- Os resultados que precisam ser verificados.
+- Os possíveis pontos de falha.
+- Os critérios de conclusão.
+
+Uma tarefa complexa poderá ser representada como uma lista de etapas ou um grafo de dependências.
+
+Cada etapa deverá ter, conforme necessário:
+
+- Identificador.
+- Descrição.
+- Estado.
+- Pré-requisitos.
+- Entradas.
+- Resultados esperados.
+- Ferramentas utilizadas.
+- Tentativas realizadas.
+- Erros encontrados.
+- Critérios de conclusão.
+
+Não obrigue tarefas simples a passar por um planejamento longo.
+
+Para uma solicitação direta, como explicar uma função, o núcleo deverá responder de maneira eficiente.
+
+Para tarefas que envolvam múltiplos arquivos, dependências, testes ou operações sequenciais, deverá ser capaz de planejar e acompanhar o trabalho.
+
+### Replanejamento
+
+Se uma etapa falhar, o núcleo deverá avaliar se pode:
+
+- Repetir a operação de maneira segura.
+- Corrigir os parâmetros.
+- Utilizar outra ferramenta.
+- Reexaminar o projeto.
+- Revisar o plano.
+- Solicitar informações ao usuário.
+- Encerrar com uma explicação fundamentada.
+
+Não repita cegamente a mesma operação que já falhou várias vezes.
+
+---
+
+## 7. EXECUÇÃO DE FERRAMENTAS
+
+O Agent Core deverá utilizar um registro central de ferramentas.
+
+Ele não deverá conter implementações específicas de terminal, navegador, Git ou Computer Use diretamente misturadas ao loop principal.
+
+Cada ferramenta deverá possuir um contrato claro, com informações como:
+
+- Identificador.
+- Nome.
+- Descrição.
+- Esquema de entrada.
+- Validação dos parâmetros.
+- Método de execução.
+- Formato do resultado.
+- Tipo de erro.
+- Requisitos de autorização.
+- Tempo limite.
+- Suporte a cancelamento.
+- Metadados de execução.
+
+O contrato deverá ser compatível com a tecnologia utilizada pelo projeto e poderá ser adaptado para ferramentas MCP.
+
+### Registro de ferramentas
+
+O núcleo deverá consultar as ferramentas efetivamente disponíveis.
+
+Se uma ferramenta não estiver instalada, conectada ou habilitada, não deverá fingir que pode executá-la.
+
+Quando necessário, deverá explicar que a capacidade está indisponível.
+
+### Chamadas de ferramentas
+
+Cada chamada deverá ter um identificador rastreável.
+
+O núcleo deverá relacionar a chamada ao agente, à sessão e à tarefa correspondentes.
+
+O resultado de uma ferramenta deverá ser devolvido ao modelo no formato esperado pelo provedor.
+
+Erros de execução devem ser representados de forma estruturada, permitindo ao agente decidir o próximo passo.
+
+### Ferramentas paralelas
+
+Permita paralelismo quando as ferramentas forem independentes.
+
+Não execute simultaneamente operações conflitantes sobre o mesmo arquivo, diretório ou recurso compartilhado sem uma estratégia explícita de coordenação.
+
+Operações dependentes deverão respeitar a ordem correta.
+
+---
+
+## 8. CONTROLE DE CONTEXTO
+
+O Agent Core deverá gerenciar o contexto enviado ao modelo.
+
+Não envie indiscriminadamente todo o histórico e todos os arquivos em cada chamada.
+
+Implemente ou aprimore estratégias para:
+
+- Recuperar mensagens relevantes.
+- Preservar as instruções essenciais.
+- Manter o contexto da tarefa atual.
+- Incorporar resultados de ferramentas.
+- Evitar duplicações desnecessárias.
+- Detectar aproximação dos limites de contexto.
+- Compactar históricos longos.
+- Preservar decisões importantes.
+- Recuperar informações de execuções anteriores.
+- Distinguir contexto temporário de memória persistente.
+
+### Hierarquia de contexto
+
+Avalie uma organização que contemple:
+
+1. Instruções fundamentais do sistema.
+2. Instruções globais da aplicação.
+3. Instruções do projeto.
+4. Solicitação atual do usuário.
+5. Plano e estado da tarefa.
+6. Resultados relevantes de ferramentas.
+7. Histórico recente.
+8. Memórias e documentos recuperados.
+
+A hierarquia deve respeitar a arquitetura real e as regras de precedência do produto.
+
+Não permita que o conteúdo de um arquivo, de uma página web ou de um resultado externo seja tratado automaticamente como uma instrução privilegiada para o núcleo.
+
+### Compactação de contexto
+
+Quando o contexto se aproximar do limite disponível:
+
+- Preserve o objetivo original.
+- Preserve as decisões importantes.
+- Preserve os arquivos envolvidos.
+- Preserve as alterações já realizadas.
+- Preserve os testes executados.
+- Preserve os erros encontrados.
+- Preserve o estado atual das etapas.
+- Preserve os próximos passos.
+
+A compactação não deve ser considerada perfeita. Registre o que foi compactado e permita recuperar o histórico persistido quando necessário.
+
+---
+
+## 9. GERENCIAMENTO DE SESSÕES E EXECUÇÕES
+
+Implemente ou aprimore o gerenciamento de sessões.
+
+Uma sessão deverá manter, conforme necessário:
+
+- Identificador.
+- Histórico de mensagens.
+- Estado da execução.
+- Tarefas em andamento.
+- Ferramentas utilizadas.
+- Referências a resultados.
+- Identificadores de requisições.
+- Metadados do provedor.
+- Datas de criação e atualização.
+- Estado de cancelamento.
+- Resumo contextual.
+- Referências a checkpoints.
+
+Separe os conceitos de conversa, tarefa e chamada de ferramenta.
+
+Uma conversa pode conter várias tarefas. Uma tarefa pode realizar diversas chamadas de modelo e ferramentas.
+
+Não confunda o encerramento de uma chamada de LLM com a conclusão de toda a tarefa.
+
+### Persistência
+
+Utilize o mecanismo de armazenamento existente sempre que for adequado.
+
+Se não houver persistência suficiente, implemente uma solução compatível com o projeto.
+
+A aplicação deverá conseguir recuperar sessões após reinicializações, quando os dados necessários tiverem sido persistidos.
+
+Não persista segredos ou credenciais diretamente no histórico.
+
+---
+
+## 10. STREAMING E ATUALIZAÇÕES EM TEMPO REAL
+
+Quando o provedor suportar streaming, o núcleo deverá disponibilizar os eventos progressivamente à interface.
+
+Considere eventos como:
+
+- Início da execução.
+- Atualização do plano.
+- Início de chamada de modelo.
+- Fragmento de texto.
+- Chamada de ferramenta detectada.
+- Ferramenta iniciada.
+- Ferramenta concluída.
+- Ferramenta com erro.
+- Solicitação de autorização.
+- Atualização de estado.
+- Recuperação após erro.
+- Conclusão.
+- Cancelamento.
+
+Defina um contrato de eventos consistente entre backend e frontend.
+
+Não obrigue a interface a interpretar diretamente os formatos específicos de cada provedor.
+
+O frontend deverá receber eventos normalizados, sem perder metadados importantes para depuração.
+
+Se o streaming for interrompido, o núcleo deverá identificar a interrupção e aplicar a estratégia de recuperação apropriada.
+
+---
+
+## 11. TRATAMENTO DE ERROS E RECUPERAÇÃO
+
+O núcleo deverá diferenciar tipos de falha, incluindo:
+
+- Erro de rede.
+- Falha de autenticação.
+- Limite de requisições.
+- Limite de contexto.
+- Timeout.
+- Falha de ferramenta.
+- Resultado inválido.
+- Resposta incompleta.
+- Provedor indisponível.
+- Cancelamento.
+- Falha de persistência.
+- Estado inconsistente da tarefa.
+
+Implemente políticas de recuperação por categoria.
+
+### Tentativas automáticas
+
+Quando uma operação for segura para repetir, permita tentativas com limites configuráveis e atrasos progressivos.
+
+Respeite informações de espera fornecidas pelo provedor quando disponíveis.
+
+Não repita automaticamente operações que possam produzir efeitos duplicados, como criar recursos, enviar mensagens, realizar compras ou executar outras ações com consequências externas.
+
+Quando o resultado de uma operação for incerto, verifique o estado antes de tentar novamente.
+
+### Falha definitiva
+
+Quando a recuperação não for possível:
+
+- Marque a tarefa com o estado correto.
+- Registre o erro.
+- Preserve os resultados já obtidos.
+- Informe ao usuário o que aconteceu.
+- Identifique o que ainda não foi concluído.
+- Permita retomar ou reiniciar quando tecnicamente possível.
+
+Não declare sucesso quando uma etapa essencial falhar.
+
+---
+
+## 12. CANCELAMENTO, INTERRUPÇÃO E RETOMADA
+
+Implemente mecanismos reais de cancelamento.
+
+Quando o usuário cancelar uma tarefa:
+
+1. Registre a solicitação de cancelamento.
+2. Interrompa chamadas de modelo quando suportado.
+3. Interrompa ferramentas que aceitem cancelamento.
+4. Finalize processos associados conforme as interfaces existentes.
+5. Evite iniciar novas etapas.
+6. Persista o estado final.
+7. Notifique a interface.
+
+O cancelamento não pode depender exclusivamente de uma variável visual no frontend.
+
+Se uma ferramenta externa não puder ser interrompida imediatamente, registre essa limitação e impeça que a execução seja considerada normalmente concluída.
+
+### Retomada
+
+Permita retomar uma tarefa quando existirem dados suficientes para recuperar seu estado.
+
+Antes de continuar, verifique se os arquivos, processos, ferramentas e dependências ainda estão em condições compatíveis com o estado salvo.
+
+Não execute novamente etapas irreversíveis apenas porque a aplicação foi reiniciada.
+
+---
+
+## 13. CRITÉRIOS DE CONCLUSÃO
+
+O núcleo deverá distinguir entre:
+
+- Resposta final produzida pelo modelo.
+- Tarefa operacional concluída.
+- Tarefa parcialmente concluída.
+- Tarefa bloqueada.
+- Tarefa cancelada.
+- Tarefa com falha.
+
+Para tarefas de programação, a conclusão deverá considerar as verificações relevantes disponíveis, como:
+
+- Arquivos alterados.
+- Comandos executados.
+- Testes realizados.
+- Resultados de compilação.
+- Diagnósticos encontrados.
+- Pendências conhecidas.
+
+Não exija que todas as tarefas executem testes de código. Uma pergunta conceitual não precisa compilar um projeto.
+
+O conjunto de verificações deverá ser proporcional ao tipo de tarefa.
+
+O agente poderá concluir uma tarefa sem eliminar todos os avisos possíveis, desde que informe com precisão as verificações realizadas e as limitações restantes.
+
+---
+
+## 14. OBSERVABILIDADE E RASTREAMENTO
+
+Toda execução deverá ser rastreável.
+
+Registre eventos estruturados com informações como:
+
+- Identificador da sessão.
+- Identificador da tarefa.
+- Identificador da chamada.
+- Provedor utilizado.
+- Modelo selecionado.
+- Ferramenta executada.
+- Horário.
+- Duração.
+- Estado.
+- Tipo de erro.
+- Tentativa.
+- Metadados de uso disponíveis.
+
+Não registre chaves de API, tokens de autenticação ou dados sensíveis desnecessariamente.
+
+Permita investigar uma execução e compreender a sequência de eventos sem precisar reproduzir o problema às cegas.
+
+Se já existir um sistema de logs ou observabilidade, integre-se a ele em vez de criar um sistema concorrente.
+
+---
+
+## 15. REFERÊNCIAS DE CÓDIGO PARA ESTUDO E APROVEITAMENTO
+
+Examine os repositórios abaixo como referências para componentes do núcleo.
+
+### Agentes de programação
+
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenAI Codex: https://github.com/openai/codex
+- Aider: https://github.com/Aider-AI/aider
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- Cline: https://github.com/cline/cline
+- Goose: https://github.com/block/goose
+- Qwen Code: https://github.com/QwenLM/qwen-code
+
+### Orquestração e workflows
+
+- LangGraph: https://github.com/langchain-ai/langgraph
+- CrewAI: https://github.com/crewAIInc/crewAI
+- Pydantic AI: https://github.com/pydantic/pydantic-ai
+- Agno: https://github.com/agno-agi/agno
+
+### Abstração de modelos
+
+- LiteLLM: https://github.com/BerriAI/litellm
+- Vercel AI SDK: https://github.com/vercel/ai
+- Ollama: https://github.com/ollama/ollama
+
+Não incorpore todos esses projetos como dependências obrigatórias.
+
+Inspecione as implementações relevantes, identifique os padrões úteis e determine quais componentes realmente melhoram nosso núcleo.
+
+Antes de integrar qualquer código, verifique sua licença, compatibilidade, dependências, estado de manutenção e adequação à arquitetura existente.
+
+---
+
+## 16. CONTRATOS INTERNOS DO AGENT CORE
+
+Defina contratos claros entre o núcleo e os demais módulos.
+
+O Agent Core deverá depender de interfaces estáveis, não de detalhes específicos da interface gráfica.
+
+Considere contratos para:
+
+- Provedores de modelos.
+- Registro de ferramentas.
+- Executor de ferramentas.
+- Gerenciador de contexto.
+- Persistência.
+- Sessões.
+- Planejamento.
+- Eventos.
+- Cancelamento.
+- Observabilidade.
+- Políticas de execução.
+
+Os nomes, arquivos e interfaces devem seguir as convenções da base de código existente.
+
+Não crie camadas abstratas sem necessidade. Cada interface deve ter uma responsabilidade concreta e facilitar a evolução independente dos módulos.
+
+---
+
+## 17. TESTES OBRIGATÓRIOS
+
+Implemente testes unitários, testes de integração e testes de fluxo conforme a arquitetura permitir.
+
+### Testes do ciclo do agente
+
+- Uma pergunta simples produz uma resposta final.
+- Uma tarefa com chamada de ferramenta executa a ferramenta correta.
+- O resultado da ferramenta retorna ao modelo.
+- O modelo pode utilizar mais de uma ferramenta na mesma tarefa.
+- A tarefa termina corretamente quando não há novas ações.
+- Uma chamada inválida é rejeitada.
+- Uma ferramenta indisponível gera um erro compreensível.
+
+### Testes de contexto
+
+- O histórico é preservado.
+- A compactação mantém as informações essenciais.
+- O contexto não ultrapassa silenciosamente os limites configurados.
+- Resultados de ferramentas são associados à tarefa correta.
+- Sessões diferentes não misturam seus dados.
+
+### Testes de recuperação
+
+- Erros temporários seguem a política de tentativas.
+- Operações não repetíveis não são executadas novamente cegamente.
+- O cancelamento impede novas etapas.
+- A retomada recupera o estado persistido.
+- Uma falha de ferramenta não é apresentada como sucesso.
+
+### Testes de integração
+
+- O frontend recebe eventos normalizados.
+- O backend mantém o estado correto.
+- A persistência funciona.
+- O provedor selecionado é utilizado.
+- O sistema continua funcionando com uma ferramenta simulada.
+- O núcleo consegue operar sem depender de serviços externos durante testes unitários.
+
+Use mocks ou provedores simulados para tornar os testes determinísticos e evitar custos desnecessários com APIs reais.
+
+---
+
+## 18. CRITÉRIOS DE ACEITAÇÃO
+
+Considere o módulo concluído somente quando:
+
+1. O ciclo do agente estiver implementado e testado.
+2. As chamadas de ferramentas estiverem integradas.
+3. Os estados da execução forem consistentes.
+4. O contexto for gerenciado de maneira explícita.
+5. O histórico e o estado das tarefas forem preservados conforme a estratégia de persistência.
+6. O streaming funcionar quando suportado.
+7. O cancelamento tiver comportamento real.
+8. Os erros forem classificados e tratados.
+9. A retomada funcionar nos casos suportados.
+10. A conclusão das tarefas for distinguida da conclusão de uma simples resposta.
+11. Os eventos forem rastreáveis.
+12. As interfaces com os outros módulos estiverem documentadas.
+13. Os testes relevantes forem executados.
+14. As funcionalidades preexistentes continuarem funcionando.
+
+Se algum critério não puder ser concluído, informe a limitação e o motivo. Não declare o módulo concluído artificialmente.
+
+---
+
+## 19. ORDEM DE IMPLEMENTAÇÃO
+
+Execute o trabalho nesta sequência:
+
+**Etapa A — Diagnóstico**
+
+Compreender o harness, mapear as implementações existentes e executar os testes iniciais.
+
+**Etapa B — Contratos**
+
+Definir ou aprimorar as interfaces entre o núcleo, os provedores, as ferramentas, o contexto e a persistência.
+
+**Etapa C — Ciclo do agente**
+
+Implementar ou corrigir o loop principal de execução.
+
+**Etapa D — Estado e sessões**
+
+Integrar o ciclo ao gerenciamento de tarefas, histórico e persistência.
+
+**Etapa E — Ferramentas e contexto**
+
+Aprimorar a execução de ferramentas, o gerenciamento de contexto e o streaming.
+
+**Etapa F — Recuperação**
+
+Implementar cancelamento, tratamento de erros, tentativas seguras e retomada.
+
+**Etapa G — Verificação**
+
+Executar testes, corrigir regressões e documentar o resultado.
+
+Conclua cada etapa de forma incremental. Não faça uma reescrita integral de uma só vez.
+
+---
+
+## 20. RELATÓRIO FINAL
+
+Ao terminar, apresente:
+
+- Diagnóstico inicial.
+- Arquitetura encontrada.
+- Componentes reutilizados.
+- Arquivos criados ou modificados.
+- Funcionalidades adicionadas.
+- Funcionalidades aprimoradas.
+- Decisões técnicas relevantes.
+- Dependências adicionadas.
+- Repositórios consultados e código efetivamente aproveitado.
+- Testes executados e resultados.
+- Limitações restantes.
+- Próximas etapas recomendadas.
+
+Separe claramente o que foi implementado, o que foi testado e o que permanece pendente.
+
+## INSTRUÇÃO FINAL
+
+Construa um Agent Core real, modular, resiliente e extensível, integrado ao nosso harness existente.
+
+Não se limite a escrever documentação ou sugerir arquitetura. Examine o código, implemente as melhorias viáveis, valide o comportamento e preserve o que já funciona.
+
+O resultado deverá servir de base para os próximos módulos: subagentes, skills, hooks, ferramentas, MCP, memória, execução de código, navegador e Computer Use.
+
+**O Agent Core deve coordenar essas capacidades por meio de interfaces estáveis, sem precisar conhecer internamente a implementação de cada uma delas.**

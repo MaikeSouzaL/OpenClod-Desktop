@@ -28,6 +28,8 @@ import {
 import { PROVIDER_PRESETS } from '../core/providers/presets.js'
 import { HOOK_EVENTS, normalizeHookDefinition } from '../core/hooks/runner.js'
 import { normalizeMcpServerSettings } from '../core/mcp/client.js'
+import { chromeCompanionStatus, installChromeCompanion, openChromeExtensions } from './chrome/install.js'
+import { environmentSpawn } from '../core/tools/shell.js'
 
 app.setName('Openclod Desktop')
 app.setAppUserModelId('com.openclod.desktop')
@@ -197,7 +199,7 @@ function insideKnownRoot(target: string): string {
 }
 
 function isPermissionMode(value: unknown): value is PermissionMode {
-  return value === 'readonly' || value === 'ask' || value === 'accept-edits' || value === 'auto'
+  return value === 'readonly' || value === 'ask' || value === 'accept-edits' || value === 'auto' || value === 'unrestricted'
 }
 
 /**
@@ -288,6 +290,16 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   if (typeof input.profileName === 'string') patch.profileName = input.profileName.trim().slice(0, 80)
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
   if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
+
+  if (input.browser && typeof input.browser === 'object') {
+    patch.browser = {
+      mode:
+        input.browser.mode === 'chrome-existing' || input.browser.mode === 'playwright'
+          ? input.browser.mode
+          : 'auto',
+      groupBySession: input.browser.groupBySession !== false
+    }
+  }
 
   if (Array.isArray(input.environments)) {
     patch.environments = input.environments.slice(0, 12).map((raw, index) => {
@@ -608,6 +620,8 @@ function registerIpc(): void {
   handle(CH.appUpdateSettings, async (raw) => {
     const patch = sanitizeSettingsPatch(raw)
     const next = await need().settings.update(patch)
+    // Browser target changes must reconstruct idle runners, otherwise they
+    // would keep the BrowserLayer created under the previous mode.
     need().settingsChanged()
     if (patch.mcpServers) await need().restartMcp()
     if (patch.voice) dictation.register(next.voice?.shortcut ?? 'Control+Alt+Space')
@@ -672,6 +686,35 @@ function registerIpc(): void {
   handle(CH.appMcpInstall, async (id, env, headers) =>
     need().installMcp({ id: str(id, 'id', 200), env: env as Record<string, string> | undefined, headers: headers as Record<string, string> | undefined })
   )
+  handle(CH.appMcpOAuthStatus, async (serverName) =>
+    need().mcpOAuthStatus(serverName ? str(serverName, 'serverName', 80) : undefined)
+  )
+  handle(CH.appMcpOAuthAuthorize, async (serverName) =>
+    need().authorizeMcp(str(serverName, 'serverName', 80))
+  )
+  handle(CH.appChromeCompanion, async () => chromeCompanionStatus())
+  handle(CH.appChromeInstall, async () => installChromeCompanion())
+  handle(CH.appChromeExtensions, async () => openChromeExtensions())
+  handle(CH.appEnvironmentCheck, async (environmentId) => {
+    const id = str(environmentId, 'environmentId', 60)
+    const profile = (need().settings.get().environments ?? []).find((item) => item.id === id)
+    if (!profile) throw new Error('ambiente não encontrado')
+    const command = process.platform === 'win32' ? 'echo openclod-env-ok && cd' : 'printf "openclod-env-ok\\n" && pwd'
+    const spec = environmentSpawn(command, process.cwd(), profile)
+    return new Promise<{ ok: boolean; kind: string; detail: string; stdout: string; stderr: string; exitCode: number | null }>((resolve) => {
+      execFile(spec.file, spec.args, { cwd: process.cwd(), shell: spec.shell, timeout: 20_000, windowsHide: true }, (error, stdout, stderr) => {
+        const code = typeof (error as { code?: unknown } | null)?.code === 'number' ? (error as { code: number }).code : error ? 1 : 0
+        resolve({
+          ok: !error && String(stdout).includes('openclod-env-ok'),
+          kind: profile.kind,
+          detail: error ? (error as Error).message : `Resposta real recebida de ${profile.label}.`,
+          stdout: String(stdout).slice(0, 4_000),
+          stderr: String(stderr).slice(0, 2_000),
+          exitCode: code
+        })
+      })
+    })
+  })
   handle(CH.appCreateSkill, async (rawName, rawDescription, rawBody) => {
     const name = str(rawName, 'nome', 64).trim()
     if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(name)) throw new Error('nome da skill: use letras minúsculas, números e hífens (2 a 63 caracteres)')
@@ -964,6 +1007,57 @@ function registerIpc(): void {
       files.push({ name: entry.name, content: fs.readFileSync(path.join(dir, entry.name), 'utf8') })
     }
     return need().memoryImportMarkdown(id, files)
+  })
+  handle(CH.memoryImportZip, async (projectId) => {
+    const id = str(projectId, 'projectId', 80)
+    const options = {
+      title: 'Importar memória (ZIP Markdown)',
+      properties: ['openFile'] as Array<'openFile'>,
+      filters: [{ name: 'Memória Markdown', extensions: ['zip'] }]
+    }
+    const chosen =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options)
+    if (chosen.canceled || !chosen.filePaths[0]) return 0
+    const zip = path.resolve(chosen.filePaths[0])
+    const stat = fs.statSync(zip)
+    if (!stat.isFile() || stat.size > 100 * 1024 * 1024) throw new Error('ZIP inválido ou maior que 100 MB')
+    const extraction = await fs.promises.mkdtemp(path.join(app.getPath('temp'), 'openclod-memory-'))
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile('powershell.exe', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          'Expand-Archive -LiteralPath $env:OPENCLOD_MEMORY_ZIP -DestinationPath $env:OPENCLOD_MEMORY_DIR -Force'
+        ], {
+          windowsHide: true,
+          timeout: 60_000,
+          env: { ...process.env, OPENCLOD_MEMORY_ZIP: zip, OPENCLOD_MEMORY_DIR: extraction }
+        }, (error) => error ? reject(new Error(`falha ao abrir ZIP: ${error.message}`)) : resolve())
+      })
+      const files: Array<{ name: string; content: string }> = []
+      const visit = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name)
+          const relative = path.relative(extraction, full)
+          if (relative.startsWith('..') || path.isAbsolute(relative)) continue
+          if (entry.isDirectory()) {
+            visit(full)
+            continue
+          }
+          if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue
+          const content = fs.readFileSync(full, 'utf8')
+          if (content.length <= 1_000_000) files.push({ name: relative, content })
+          if (files.length >= 2_000) return
+        }
+      }
+      visit(extraction)
+      return need().memoryImportMarkdown(id, files)
+    } finally {
+      await fs.promises.rm(extraction, { recursive: true, force: true }).catch(() => undefined)
+    }
   })
   handle(CH.memoryOpen, async (projectId) => {
     const root = need().memoryRoot(str(projectId, 'projectId', 80))

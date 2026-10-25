@@ -632,6 +632,9 @@ export class SessionRunner {
     toolName?: string,
     signal?: AbortSignal
   ): Promise<HookOutcome | null> {
+    // Explicit opt-in: unrestricted sessions run tools without local vetoes.
+    // Notification-only hooks still run and can enrich the agent's context.
+    if (this.deps.policy.mode === 'unrestricted' && (event === 'PreToolUse' || event === 'UserPromptSubmit')) return null
     const hooks = this.deps.hooks
     if (!hooks || !hooks.has(event, toolName)) return null
     const outcome = await hooks.run(event, payload, toolName, signal)

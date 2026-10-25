@@ -387,6 +387,12 @@ export default function App(): ReactElement {
       if (event.type === 'session_start' || (event.type === 'turn_end' && event.sessionId !== activeSessionRef.current)) {
         void refreshSessions()
       }
+      if (event.type === 'settings_changed') {
+        void window.forja.app.settings().then((result) => {
+          if (result.ok) setSettings(result.value)
+        })
+        if (event.scope === 'mcp' || event.scope === 'browser') void refreshCapabilities()
+      }
       if (event.sessionId !== activeSessionRef.current) return
       switch (event.type) {
         case 'turn_start':

@@ -58,7 +58,8 @@ export const mcpInstallTool: ToolDef = {
   name: 'mcp_install',
   description:
     'Instala um MCP na configuração do Openclod, reinicia os servidores e devolve as ferramentas que ficaram disponíveis. Aceita um id do catálogo/registro (ex.: "jira", "atlassian", "com.atlassian/atlassian-mcp-server") ou um servidor customizado com command/args ou url. Se faltar credencial, retorna exatamente o que pedir ao usuário.',
-  risk: 'exec',
+  // Installing code and granting an external integration is always approved.
+  risk: 'destructive',
   parallelSafe: false,
   requires: 'network',
   schema: z
@@ -110,9 +111,15 @@ export const mcpInstallTool: ToolDef = {
       : await mcp.install({ id, env: args.env, headers: args.headers, name: args.name })
     if (result.needsOAuth) {
       return {
-        ok: false,
-        text: `"${id}" usa login OAuth, que ainda não é automatizado pelo Openclod. Peça ao usuário para criar um token de acesso e passar em headers (ex.: Authorization: Bearer ...), ou escolha uma variante com token/local pelo mcp_search.`,
-        summary: 'requer OAuth'
+        ok: true,
+        text: [
+          `MCP "${result.name ?? id}" configurado. O servidor usa OAuth; o primeiro uso abre o login no navegador padrão e retoma automaticamente após o callback em 127.0.0.1.`,
+          result.state === 'ready'
+            ? `${result.tools?.length ?? 0} ferramenta(s) disponíveis.`
+            : 'A conexão será concluída depois que o usuário autorizar o provedor.'
+        ].join('\n'),
+        summary: 'OAuth configurado',
+        data: { name: result.name, state: result.state, oauth: true }
       }
     }
     if (result.missing?.length) {
@@ -126,7 +133,8 @@ export const mcpInstallTool: ToolDef = {
       return { ok: false, text: result.error ?? `não foi possível instalar "${id}"`, summary: 'falhou' }
     }
     const tools = result.tools ?? []
-    const connected = result.state === 'ready'
+    // OAuth may be completed asynchronously by the provider after the server has been saved.
+    const connected = result.state === 'ready' || Boolean(result.needsOAuth)
     return {
       ok: connected,
       text: [

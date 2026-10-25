@@ -1,0 +1,1047 @@
+# MÓDULO 06 — TERMINAL, SHELL, PROCESSOS E EXECUÇÃO DE COMANDOS NO AI DEVELOPMENT HARNESS
+
+## 1. MISSÃO PRINCIPAL
+
+Implemente no nosso AI Development Harness um sistema completo de execução de comandos e gerenciamento de processos, permitindo que o agente de IA utilize terminais reais, execute ferramentas de desenvolvimento, acompanhe processos longos, leia resultados, identifique falhas e continue tarefas de programação de forma estruturada.
+
+Este módulo deve funcionar integrado aos módulos anteriores:
+
+- **Módulo 01:** Agent Core e ciclo de execução do agente.
+- **Módulo 02:** subagents e orquestração.
+- **Módulo 03:** skills, comandos personalizados e hooks.
+- **Módulo 04:** Computer Use e automação desktop.
+- **Módulo 05:** Browser Automation.
+- **Módulo 06:** terminal, shell, execução de processos e sessões de terminal.
+
+O objetivo é que o agente consiga realizar tarefas reais de desenvolvimento, como:
+
+1. Abrir um projeto existente.
+2. Identificar a tecnologia utilizada.
+3. Verificar as dependências instaladas.
+4. Executar comandos de instalação.
+5. Iniciar um servidor de desenvolvimento.
+6. Manter o servidor em execução enquanto trabalha em outras tarefas.
+7. Ler logs e identificar erros.
+8. Executar testes.
+9. Corrigir problemas.
+10. Reiniciar os processos necessários.
+11. Verificar se a aplicação está funcionando.
+12. Informar o resultado real da execução.
+
+O sistema deve ser compatível com os ambientes disponíveis no Windows, incluindo PowerShell, CMD e WSL, quando instalados. Outros shells podem ser adicionados por configuração.
+
+**Não implemente apenas uma função que executa um comando e devolve o texto de saída.** Implemente um sistema de execução de processos com sessões persistentes, controle de ciclo de vida, streaming, cancelamento, gerenciamento de saída, recuperação e integração com o agente central.
+
+## 2. REGRAS OBRIGATÓRIAS
+
+Antes de modificar o código:
+
+1. Inspecione a estrutura atual do harness.
+2. Identifique sua linguagem, seu framework e sua arquitetura.
+3. Examine o registro de ferramentas do Agent Core.
+4. Verifique como o sistema armazena sessões e tarefas.
+5. Identifique qualquer implementação existente de terminal ou execução de processos.
+6. Examine como a interface atual apresenta resultados e progresso.
+7. Execute os testes existentes.
+8. Preserve as funcionalidades que já funcionam.
+
+Depois, clone os repositórios listados neste documento e examine o código-fonte.
+
+Para cada repositório:
+
+- Analise a implementação real.
+- Identifique os componentes reutilizáveis.
+- Compare as soluções com as existentes no harness.
+- Reutilize ou adapte os componentes que trouxerem melhorias concretas.
+- Implemente as funcionalidades ausentes.
+- Evite sistemas duplicados.
+- Respeite as licenças.
+- Execute os testes relevantes.
+- Documente o que foi efetivamente aproveitado.
+
+Não entregue apenas um plano de arquitetura. Implemente o módulo dentro do projeto existente.
+
+Não reescreva o Agent Core nem crie um sistema independente de ferramentas para contornar os contratos já implementados.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+### 3.1. Node.js — gerenciamento de processos
+
+https://github.com/nodejs/node
+
+Se o harness utilizar Node.js ou Electron, examine as APIs e implementações relacionadas a:
+
+- `child_process`.
+- Processos filhos.
+- Pipes de entrada e saída.
+- Encerramento de processos.
+- Códigos de saída.
+- Sinais.
+- Streams.
+- Tratamento de erros.
+- Comportamento específico do Windows.
+
+Utilize as APIs apropriadas para implementar a execução de processos sem bloquear a interface principal.
+
+### 3.2. node-pty
+
+https://github.com/microsoft/node-pty
+
+Analise a implementação de pseudoterminais.
+
+Investigue:
+
+- Criação de sessões de terminal.
+- Integração com shells.
+- Entrada e saída interativas.
+- Streaming de dados.
+- Resize do terminal.
+- Encerramento de sessões.
+- Comportamento em Windows, incluindo ConPTY quando aplicável.
+- Particularidades de instalação de módulos nativos.
+
+Avalie se essa biblioteca pode fornecer a base do terminal interativo do harness.
+
+### 3.3. xterm.js
+
+https://github.com/xtermjs/xterm.js
+
+Examine a implementação do emulador de terminal.
+
+Analise:
+
+- Renderização de texto.
+- Cores ANSI.
+- Sequências de controle.
+- Entrada do usuário.
+- Redimensionamento.
+- Buffer de terminal.
+- Scrollback.
+- Seleção e cópia de texto.
+- Integração com pseudoterminais.
+- Extensões disponíveis.
+
+Se o harness possuir uma interface web ou Electron, avalie a integração do xterm.js para exibir terminais reais dentro da interface existente.
+
+O xterm.js é um emulador de terminal, não um shell. Conecte-o a um processo ou pseudoterminal real quando for necessário executar comandos.
+
+### 3.4. Windows Terminal
+
+https://github.com/microsoft/terminal
+
+Examine a arquitetura e as implementações relacionadas ao ambiente de terminal do Windows.
+
+Utilize como referência para compreender:
+
+- Integração com shells.
+- Comportamento de terminal.
+- Pseudoterminais.
+- Sequências de controle.
+- Configuração.
+- Particularidades da plataforma Windows.
+
+Não incorpore o Windows Terminal inteiro ao harness. Aproveite apenas as partes relevantes à arquitetura e aos requisitos do projeto.
+
+### 3.5. PowerShell
+
+https://github.com/PowerShell/PowerShell
+
+Analise as características do PowerShell, sua integração com processos e seus mecanismos de automação.
+
+Investigue:
+
+- Execução de comandos.
+- Scripts.
+- Parâmetros.
+- Tratamento de erros.
+- Streams de saída.
+- Códigos de saída.
+- Processos filhos.
+- Cancelamento.
+- Compatibilidade com Windows.
+- Diferenças entre Windows PowerShell e PowerShell moderno.
+
+Implemente um adaptador específico para PowerShell quando necessário, sem misturar suas particularidades com o núcleo genérico de processos.
+
+### 3.6. OpenSSH
+
+https://github.com/openssh/openssh-portable
+
+Examine os mecanismos relevantes para compreender a execução remota de comandos por SSH.
+
+O objetivo é preparar uma arquitetura extensível para ambientes remotos, caso essa funcionalidade faça parte dos requisitos existentes.
+
+Não implemente um cliente SSH próprio se uma implementação estabelecida e compatível atender aos requisitos.
+
+### 3.7. Rust portable-pty
+
+https://github.com/wez/wezterm
+
+Analise os componentes de pseudoterminal associados ao ecossistema WezTerm, incluindo o projeto `portable-pty` quando disponível na árvore do repositório.
+
+Avalie:
+
+- Abstração de pseudoterminais.
+- Integração com shells.
+- Portabilidade.
+- Ciclo de vida das sessões.
+- Entrada e saída.
+- Compatibilidade entre sistemas operacionais.
+
+Se o harness for desenvolvido em Rust, compare essa abordagem com alternativas equivalentes.
+
+### 3.8. ShellCheck
+
+https://github.com/koalaman/shellcheck
+
+Analise como o ShellCheck identifica problemas em scripts de shell.
+
+Utilize-o como referência para melhorar o diagnóstico de scripts, quando aplicável.
+
+Não confunda validação estática com garantia de que um comando é seguro ou produzirá o resultado esperado.
+
+### 3.9. ripgrep
+
+https://github.com/BurntSushi/ripgrep
+
+Examine a implementação de busca rápida em arquivos, incluindo o tratamento de:
+
+- Diretórios grandes.
+- Exclusões.
+- Arquivos binários.
+- Codificação.
+- Saída estruturada.
+- Desempenho.
+
+O harness pode precisar dessa capacidade para localizar informações nos logs e resultados de execução. Reutilize a ferramenta quando fizer sentido, sem transformar o módulo de terminal em um substituto para o sistema de busca de código.
+
+### 3.10. Microsoft Playwright
+
+https://github.com/microsoft/playwright
+
+Utilize como referência complementar para executar testes de aplicações web a partir do terminal, monitorar processos de teste e integrar resultados ao harness.
+
+Não duplique a implementação do Módulo 05. Integre os comandos de teste ao sistema central de execução de processos.
+
+### Regra de seleção
+
+Não adicione todas essas bibliotecas como dependências obrigatórias.
+
+Escolha a arquitetura mais apropriada à tecnologia do projeto. Se uma biblioteca existente já oferecer uma implementação adequada, preserve-a ou melhore-a em vez de substituí-la sem necessidade.
+
+---
+
+## 4. ARQUITETURA DO MÓDULO
+
+Implemente os componentes abaixo ou amplie os equivalentes já existentes.
+
+### 4.1. Process Execution Service
+
+Serviço central para iniciar e gerenciar processos.
+
+Responsabilidades:
+
+- Receber uma solicitação de execução.
+- Validar os parâmetros.
+- Selecionar o ambiente de execução.
+- Iniciar o processo.
+- Capturar stdout e stderr.
+- Monitorar o estado.
+- Registrar o código de saída.
+- Detectar falhas de inicialização.
+- Aplicar timeouts.
+- Permitir cancelamento.
+- Gerenciar o encerramento.
+- Retornar resultados estruturados.
+
+O serviço deve ser independente do provedor de IA.
+
+### 4.2. Shell Adapter Registry
+
+Registro dos adaptadores de shell disponíveis.
+
+Implemente adaptadores conforme os ambientes realmente suportados:
+
+- PowerShell.
+- CMD.
+- WSL.
+- Bash.
+- Outros shells configurados pelo usuário.
+
+Cada adaptador deve informar:
+
+- Identificador.
+- Executável.
+- Argumentos de inicialização.
+- Diretório padrão.
+- Variáveis de ambiente aplicáveis.
+- Capacidades.
+- Particularidades de quoting.
+- Estratégia de encerramento.
+- Requisitos de instalação.
+
+Não presuma que todos os shells utilizam a mesma sintaxe de comandos ou as mesmas regras de expansão de argumentos.
+
+### 4.3. Terminal Session Manager
+
+Gerenciador de sessões persistentes de terminal.
+
+Deve permitir:
+
+- Criar uma sessão.
+- Identificar a sessão.
+- Listar sessões.
+- Consultar o estado.
+- Enviar entrada.
+- Receber saída.
+- Redimensionar o terminal.
+- Interromper a execução atual.
+- Encerrar a sessão.
+- Detectar processos encerrados.
+- Recuperar informações após falhas.
+- Reutilizar uma sessão quando apropriado.
+
+Cada sessão deve ter um identificador estável dentro do contexto do harness.
+
+Diferencie uma sessão interativa de terminal de uma execução pontual de comando.
+
+### 4.4. PTY Manager
+
+Quando a tecnologia escolhida oferecer suporte a pseudoterminais, implemente um gerenciador de PTY.
+
+Deve suportar:
+
+- Inicialização de shells interativos.
+- Entrada e saída em tempo real.
+- Redimensionamento.
+- Sequências ANSI.
+- Controle de encerramento.
+- Gerenciamento de buffers.
+- Tratamento de desconexões.
+
+Não utilize pseudoterminal quando uma execução simples de processo for mais apropriada.
+
+### 4.5. Output Stream Manager
+
+Gerencie as saídas dos processos.
+
+Implemente:
+
+- Captura de stdout.
+- Captura de stderr.
+- Streaming de saída.
+- Identificação da origem dos dados.
+- Bufferização.
+- Limites de memória.
+- Scrollback.
+- Paginação de resultados.
+- Detecção de encerramento.
+- Tratamento de saída incompleta.
+- Cancelamento de consumidores.
+
+Não acumule indefinidamente toda a saída de processos longos na memória.
+
+Permita consultar os trechos recentes e recuperar resultados anteriores por meio do mecanismo de persistência, quando apropriado.
+
+### 4.6. Process Registry
+
+Mantenha um registro dos processos iniciados pelo harness.
+
+Cada registro deve conter, quando aplicável:
+
+- ID do processo no harness.
+- PID do sistema operacional.
+- Sessão de terminal associada.
+- Tarefa responsável.
+- Comando ou executável.
+- Argumentos não sensíveis.
+- Diretório de trabalho.
+- Horário de início.
+- Estado atual.
+- Código de saída.
+- Última atividade.
+- Resultado de encerramento.
+
+Não confunda o PID do sistema operacional com o identificador interno do processo.
+
+### 4.7. Process Lifecycle Manager
+
+Responsável por controlar o ciclo de vida dos processos.
+
+Estados sugeridos:
+
+- `created`
+- `starting`
+- `running`
+- `waiting_for_input`
+- `stopping`
+- `completed`
+- `failed`
+- `cancelled`
+- `unknown`
+
+Adapte os estados ao modelo já existente no Agent Core.
+
+O sistema deve distinguir processos que estão em execução, aguardando entrada, encerrados ou cujo estado não pode ser determinado.
+
+### 4.8. Command Result Analyzer
+
+Componente para estruturar os resultados das execuções.
+
+Deve identificar:
+
+- Código de saída.
+- Mensagens de erro.
+- Falhas de inicialização.
+- Timeouts.
+- Encerramento solicitado.
+- Sinais ou códigos de interrupção, quando disponíveis.
+- Indícios de compilação malsucedida.
+- Resultados de testes.
+- Avisos relevantes.
+
+A análise pode utilizar regras determinísticas e, quando necessário, o Agent Core.
+
+Não classifique toda saída escrita em stderr como falha. Alguns programas utilizam stderr para avisos e mensagens informativas.
+
+---
+
+## 5. CONTRATOS DAS FERRAMENTAS
+
+Integre as ferramentas ao registro central do harness.
+
+Os nomes a seguir são sugestões. Reutilize ferramentas equivalentes já existentes.
+
+### 5.1. Execução pontual
+
+- `terminal.execute`
+- `terminal.get_execution_result`
+- `terminal.get_execution_status`
+- `terminal.cancel_execution`
+
+### 5.2. Sessões
+
+- `terminal.create_session`
+- `terminal.list_sessions`
+- `terminal.get_session_info`
+- `terminal.send_input`
+- `terminal.resize`
+- `terminal.interrupt`
+- `terminal.close_session`
+
+### 5.3. Processos
+
+- `process.list`
+- `process.get_info`
+- `process.get_output`
+- `process.wait`
+- `process.terminate`
+
+### 5.4. Diagnóstico
+
+- `terminal.get_recent_output`
+- `terminal.search_output`
+- `terminal.get_exit_status`
+- `terminal.get_environment_info`
+
+Cada ferramenta deve ter:
+
+- Nome.
+- Descrição.
+- Esquema de entrada.
+- Validação de parâmetros.
+- Resultado estruturado.
+- Erros tipados.
+- Timeout.
+- Suporte a cancelamento, quando aplicável.
+- Regras de autorização.
+- Identificação da sessão ou do processo.
+
+Não crie um executor separado para cada agente. Centralize a execução no serviço compartilhado.
+
+---
+
+## 6. EXECUÇÃO DE COMANDOS
+
+### 6.1. Execução pontual
+
+Permita iniciar um processo, aguardar sua conclusão e retornar o resultado.
+
+O resultado deve incluir:
+
+- Status.
+- Código de saída, quando disponível.
+- Saída padrão.
+- Saída de erro.
+- Duração.
+- Identificador da execução.
+- Indicação de timeout ou cancelamento.
+- Diagnóstico de falhas de inicialização.
+
+Para comandos longos, ofereça uma execução assíncrona e um mecanismo para consultar os resultados posteriormente.
+
+### 6.2. Execução interativa
+
+Permita que o agente mantenha uma sessão de terminal aberta.
+
+Exemplos:
+
+- Servidor de desenvolvimento.
+- Shell interativo.
+- REPL.
+- Ferramenta que solicita entrada.
+- Processo que apresenta resultados progressivamente.
+
+O agente deve conseguir enviar entrada, receber saída e continuar trabalhando sem precisar reiniciar o processo.
+
+### 6.3. Processos persistentes
+
+Implemente suporte a processos que devam continuar em execução enquanto outras tarefas acontecem.
+
+Exemplos:
+
+- Servidor web.
+- Metro bundler.
+- Expo development server.
+- Vite.
+- Next.js.
+- Watchers.
+- Compiladores em modo de observação.
+- Serviços locais.
+
+O harness deve conseguir identificar que o processo continua ativo, consultar os logs e encerrá-lo explicitamente quando necessário.
+
+Não considere que um processo falhou apenas porque não produziu saída durante um curto intervalo.
+
+### 6.4. Execução de comandos encadeados
+
+Permita executar sequências de comandos quando apropriado.
+
+O sistema deve distinguir:
+
+- Comandos independentes.
+- Comandos dependentes.
+- Execução sequencial.
+- Execução paralela.
+- Pipelines.
+- Scripts.
+- Sessões interativas.
+
+Não concatene automaticamente entradas fornecidas pelo modelo em strings de shell sem considerar as regras de quoting e os riscos de interpretação.
+
+Sempre que possível, utilize a execução estruturada de um executável com uma lista de argumentos.
+
+Quando a tarefa realmente exigir sintaxe de shell, utilize o adaptador do shell correspondente.
+
+### 6.5. Diretório de trabalho
+
+Permita definir o diretório de trabalho por execução ou sessão.
+
+O sistema deve:
+
+- Validar o caminho.
+- Identificar diretórios inexistentes.
+- Respeitar o workspace selecionado.
+- Preservar o diretório atual de uma sessão interativa.
+- Evitar misturar diretórios de projetos diferentes.
+- Informar claramente o diretório utilizado.
+
+Não altere o diretório global do aplicativo para executar uma tarefa específica.
+
+### 6.6. Variáveis de ambiente
+
+Permita configurar variáveis de ambiente por processo ou sessão.
+
+Implemente:
+
+- Herança controlada.
+- Sobrescrita explícita.
+- Remoção de variáveis quando necessário.
+- Validação dos nomes.
+- Separação entre configurações do usuário e do projeto.
+- Proteção de valores sensíveis.
+- Evitar exposição de segredos nos logs.
+
+Não copie automaticamente todas as variáveis de ambiente para o contexto do modelo.
+
+Quando o agente precisar consultar informações do ambiente, forneça somente os dados relevantes à tarefa.
+
+---
+
+## 7. CANCELAMENTO, TIMEOUT E RECUPERAÇÃO
+
+### 7.1. Timeouts
+
+Implemente timeouts configuráveis para:
+
+- Inicialização.
+- Execução pontual.
+- Espera por saída.
+- Espera por encerramento.
+- Entrada interativa.
+- Encerramento de processo.
+
+Um timeout de espera por saída não deve necessariamente encerrar o processo. Diferencie o tempo limite de observação do limite total de execução.
+
+### 7.2. Cancelamento
+
+Permita que o usuário ou o Agent Core cancele uma tarefa.
+
+O cancelamento deve:
+
+1. Identificar a execução ou sessão.
+2. Solicitar a interrupção apropriada.
+3. Aguardar o resultado do encerramento.
+4. Registrar o estado final.
+5. Liberar os recursos.
+6. Informar se o processo foi efetivamente encerrado.
+
+### 7.3. Encerramento no Windows
+
+Implemente o encerramento de processos considerando as particularidades do Windows.
+
+Quando necessário, utilize mecanismos apropriados para grupos de processos, árvores de processos ou Job Objects.
+
+Não presuma que encerrar o processo pai encerrará automaticamente todos os processos filhos.
+
+Evite encerrar processos que não foram iniciados ou autorizados pelo harness.
+
+### 7.4. Recuperação
+
+Quando uma execução falhar:
+
+- Classifique o erro.
+- Preserve as informações relevantes.
+- Verifique se o processo ainda está ativo.
+- Identifique se a sessão continua utilizável.
+- Permita nova tentativa quando apropriado.
+- Evite repetir automaticamente comandos com efeitos externos importantes.
+- Informe o Agent Core sobre o resultado.
+
+Não execute indefinidamente o mesmo comando sem uma estratégia de recuperação.
+
+---
+
+## 8. INTEGRAÇÃO COM O AGENT CORE
+
+O Agent Core deve utilizar o terminal por meio do registro central de ferramentas.
+
+Implemente integração para:
+
+- Seleção do shell.
+- Execução de comandos.
+- Recebimento de saída.
+- Monitoramento de processos.
+- Consulta de resultados.
+- Interrupção de tarefas.
+- Recuperação de erros.
+- Planejamento de comandos subsequentes.
+- Registro dos resultados no histórico da tarefa.
+
+O agente deve compreender a diferença entre:
+
+- Comando concluído com sucesso.
+- Comando concluído com falha.
+- Processo ainda em execução.
+- Processo aguardando entrada.
+- Execução cancelada.
+- Execução cujo resultado não foi confirmado.
+
+Não marque uma tarefa como concluída enquanto os processos necessários ainda estiverem executando, a menos que a própria tarefa exija deixar esses processos ativos.
+
+Não crie um segundo ciclo de agente para controlar o terminal.
+
+---
+
+## 9. INTEGRAÇÃO COM OS SUBAGENTS
+
+O Módulo 02 deve poder delegar tarefas que exijam terminal.
+
+Exemplos:
+
+- Agente de backend executa testes de API.
+- Agente de frontend inicia o servidor de desenvolvimento.
+- Agente de testes executa a suíte automatizada.
+- Agente de debugging consulta logs.
+- Agente de infraestrutura verifica dependências.
+- Agente de documentação executa ferramentas de geração de documentação.
+
+Implemente:
+
+- Identificação do agente responsável.
+- Associação entre processo e tarefa.
+- Isolamento de sessões quando necessário.
+- Limites de concorrência.
+- Controle de processos compartilhados.
+- Cancelamento.
+- Entrega de resultados estruturados ao orquestrador.
+
+Dois agentes não devem encerrar, reiniciar ou alterar simultaneamente um processo compartilhado sem coordenação.
+
+Evite iniciar servidores duplicados para o mesmo projeto sem necessidade.
+
+---
+
+## 10. INTEGRAÇÃO COM SKILLS, COMANDOS E HOOKS
+
+O Módulo 03 deve poder utilizar o terminal por meio das ferramentas centrais.
+
+Exemplos de skills:
+
+- Executar testes.
+- Diagnosticar erros de compilação.
+- Configurar um projeto.
+- Iniciar um servidor de desenvolvimento.
+- Instalar dependências.
+- Executar linters.
+- Preparar builds.
+- Investigar logs.
+
+Exemplos de comandos:
+
+- `/run`
+- `/test`
+- `/build`
+- `/dev-server`
+- `/logs`
+- `/stop-process`
+
+Verifique se esses comandos já existem antes de criá-los.
+
+Implemente hooks relacionados a eventos como:
+
+- `terminal.before_execute`
+- `terminal.after_execute`
+- `terminal.execution_failed`
+- `terminal.session_created`
+- `terminal.session_closed`
+- `process.started`
+- `process.exited`
+- `process.cancelled`
+
+Utilize o dispatcher de eventos existente. Não implemente um sistema de hooks paralelo.
+
+---
+
+## 11. INTEGRAÇÃO COM A INTERFACE
+
+Integre os terminais à interface atual do harness.
+
+Quando apropriado, disponibilize:
+
+- Painel de terminal.
+- Seletor de sessões.
+- Nome do shell.
+- Diretório de trabalho.
+- Estado do processo.
+- Indicador de execução.
+- Saída em tempo real.
+- Códigos de saída.
+- Histórico de comandos.
+- Identificação de erros.
+- Botão de interrupção.
+- Botão de encerramento da sessão.
+- Indicador de processo persistente.
+- Controles de redimensionamento.
+- Scrollback.
+- Seleção e cópia de texto.
+
+Se o projeto utilizar Electron ou uma interface web, avalie a integração com xterm.js.
+
+Se já existir um terminal visual, aprimore-o em vez de criar outro painel independente.
+
+A interface deve distinguir sessões ativas de execuções pontuais já concluídas.
+
+Não bloqueie a interface enquanto um processo estiver executando.
+
+---
+
+## 12. LOGS E SAÍDAS DE GRANDE VOLUME
+
+O sistema precisa lidar com processos que produzem milhares de linhas de saída.
+
+Implemente:
+
+- Buffers limitados.
+- Scrollback configurável.
+- Captura incremental.
+- Separação entre stdout e stderr.
+- Paginação.
+- Pesquisa de logs.
+- Filtragem de mensagens.
+- Limites de tamanho.
+- Persistência quando apropriado.
+- Recuperação de trechos relevantes.
+
+Quando um processo produzir uma grande quantidade de dados, não envie toda a saída ao modelo automaticamente.
+
+Permita que o agente solicite:
+
+- Últimas linhas.
+- Linhas próximas a um erro.
+- Trechos que correspondam a um padrão.
+- Resumo de uma saída longa.
+- Informações estruturadas de testes.
+
+Preserve o conteúdo original quando necessário para diagnóstico e deixe claro quando um trecho estiver truncado.
+
+---
+
+## 13. CONFIGURAÇÃO E COMPATIBILIDADE
+
+Utilize o sistema de configuração existente.
+
+Permita configurar:
+
+- Shell padrão.
+- Caminho dos executáveis.
+- Diretórios de trabalho.
+- Timeouts.
+- Limites de saída.
+- Número máximo de processos simultâneos.
+- Limites de sessões.
+- Variáveis de ambiente.
+- Preferências de terminal.
+- Opções de streaming.
+- Política de encerramento.
+- Configurações específicas do WSL.
+
+O harness deve detectar os shells disponíveis e informar quais podem ser utilizados.
+
+Não assuma que o WSL está instalado ou que uma distribuição específica existe.
+
+Não assuma que o shell padrão de todos os usuários é PowerShell.
+
+Se um executável estiver ausente, informe o problema e permita selecionar uma alternativa compatível.
+
+Documente os requisitos de cada integração.
+
+---
+
+## 14. SEGURANÇA E CONTROLE DE EXECUÇÃO
+
+O terminal concede acesso a capacidades importantes do sistema operacional. Por isso, as permissões devem ser aplicadas no executor real.
+
+Implemente controles proporcionais à arquitetura:
+
+- Validação de parâmetros.
+- Identificação do diretório de trabalho.
+- Controle de processos.
+- Limites de tempo e recursos.
+- Tratamento de argumentos.
+- Proteção contra exposição de segredos.
+- Registro de operações.
+- Cancelamento.
+- Isolamento de sessões.
+- Política de execução.
+- Proteção contra encerramento de processos alheios à tarefa.
+
+Não confie exclusivamente no prompt do modelo para decidir se um comando pode ser executado.
+
+Não interprete automaticamente uma string arbitrária como um comando confiável.
+
+Diferencie execução estruturada de executáveis e execução de sintaxe de shell.
+
+Para comandos que exijam uma política específica de autorização, utilize o mecanismo já existente no harness.
+
+Não transforme o sistema em um executor que ignora todas as regras de autorização existentes.
+
+### 14.1. Processos privilegiados
+
+Não eleve privilégios automaticamente.
+
+Se uma operação exigir privilégios administrativos, informe a necessidade e utilize o fluxo apropriado já existente no sistema.
+
+### 14.2. Segredos
+
+Evite incluir nos logs e nas mensagens do modelo:
+
+- Senhas.
+- Tokens.
+- Chaves de API.
+- Credenciais.
+- Variáveis sensíveis.
+- Conteúdo privado desnecessário.
+
+Se a saída de um processo contiver dados sensíveis, aplique os mecanismos de proteção disponíveis antes de disponibilizá-la ao modelo ou à interface.
+
+### 14.3. Scripts e projetos externos
+
+Não execute automaticamente scripts de instalação apenas porque foram encontrados em um repositório.
+
+O agente deve distinguir inspeção, preparação e execução.
+
+Quando uma operação puder alterar substancialmente o sistema, aplique as políticas de autorização do harness.
+
+---
+
+## 15. TESTES AUTOMATIZADOS
+
+Utilize o framework de testes existente.
+
+### 15.1. Testes unitários
+
+Teste:
+
+- Validação de parâmetros.
+- Construção de argumentos.
+- Resolução de executáveis.
+- Estados de processos.
+- Classificação de erros.
+- Códigos de saída.
+- Timeouts.
+- Cancelamento.
+- Buffers de saída.
+- Streaming.
+- Limites de memória.
+- Configuração de sessões.
+
+### 15.2. Testes de execução pontual
+
+Crie testes que:
+
+1. Executem um comando simples.
+2. Capturem stdout.
+3. Capturem stderr.
+4. Validem o código de saída.
+5. Testem um comando inexistente.
+6. Testem um processo que falha.
+7. Testem um processo que demora.
+8. Testem o cancelamento.
+9. Verifiquem a liberação dos recursos.
+
+### 15.3. Testes de terminal interativo
+
+Verifique:
+
+- Inicialização de uma sessão.
+- Entrada de texto.
+- Recebimento de saída.
+- Execução de múltiplos comandos.
+- Redimensionamento.
+- Interrupção de um processo.
+- Encerramento da sessão.
+- Recuperação após falhas.
+
+### 15.4. Testes de processos persistentes
+
+Crie um processo de teste que permaneça ativo até receber um sinal ou comando de encerramento.
+
+Verifique:
+
+- Identificação do processo.
+- Estado de execução.
+- Recebimento de logs.
+- Cancelamento.
+- Encerramento.
+- Ausência de processos órfãos.
+
+### 15.5. Testes de integração com o Agent Core
+
+Simule uma tarefa em que o agente:
+
+1. Executa um comando de diagnóstico.
+2. Analisa a saída.
+3. Identifica um erro.
+4. Executa outro comando.
+5. Verifica o resultado.
+6. Apresenta um relatório.
+
+### 15.6. Testes de integração com a interface
+
+Quando aplicável, verifique:
+
+- Criação de sessões.
+- Exibição de saída em tempo real.
+- Atualização dos estados.
+- Cancelamento.
+- Encerramento.
+- Recuperação após desconexões.
+
+Execute os testes reais e registre os resultados. Não declare uma funcionalidade testada se apenas compilou o código.
+
+---
+
+## 16. CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] O sistema executa comandos pontuais.
+- [ ] O sistema captura stdout e stderr.
+- [ ] O código de saída é registrado corretamente.
+- [ ] É possível manter sessões interativas.
+- [ ] É possível enviar entrada para um processo.
+- [ ] O sistema suporta processos longos.
+- [ ] É possível acompanhar logs em tempo real.
+- [ ] É possível consultar o estado dos processos.
+- [ ] Timeouts são tratados corretamente.
+- [ ] O cancelamento funciona.
+- [ ] O encerramento considera processos filhos.
+- [ ] A saída de grande volume não causa crescimento ilimitado de memória.
+- [ ] PowerShell e CMD são suportados quando disponíveis.
+- [ ] WSL e outros ambientes podem ser integrados quando instalados.
+- [ ] A interface existente apresenta o terminal adequadamente.
+- [ ] O Agent Core utiliza o executor central.
+- [ ] Os subagents conseguem utilizar processos de forma coordenada.
+- [ ] Skills e comandos podem utilizar o terminal.
+- [ ] O controle de execução é aplicado no ponto correto.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam operacionais.
+- [ ] Não existem processos órfãos após os testes.
+
+---
+
+## 17. ORDEM DE IMPLEMENTAÇÃO
+
+Execute as etapas abaixo:
+
+1. Inspecionar a arquitetura atual e executar os testes iniciais.
+2. Clonar e analisar os repositórios indicados.
+3. Escolher as bibliotecas apropriadas.
+4. Definir os contratos de execução, processos e sessões.
+5. Implementar o Process Execution Service.
+6. Implementar os adaptadores de shell.
+7. Implementar o Process Registry e o ciclo de vida.
+8. Implementar o gerenciamento de stdout e stderr.
+9. Implementar sessões persistentes e PTY, quando necessário.
+10. Implementar cancelamento e recuperação.
+11. Integrar as ferramentas ao Agent Core.
+12. Integrar os processos aos subagents.
+13. Integrar os eventos, skills e comandos.
+14. Integrar o terminal à interface existente.
+15. Implementar testes unitários e de integração.
+16. Corrigir regressões e verificar processos órfãos.
+17. Documentar instalação, configuração e uso.
+
+Ajuste a ordem quando necessário para respeitar as dependências técnicas, mas não deixe de validar cada parte.
+
+## 18. RELATÓRIO FINAL OBRIGATÓRIO
+
+Ao concluir, apresente:
+
+1. Arquitetura inicial encontrada.
+2. Repositórios efetivamente clonados e analisados.
+3. Componentes externos aproveitados.
+4. Bibliotecas adicionadas e justificativas.
+5. Componentes criados ou aprimorados.
+6. Arquivos modificados.
+7. Integração com os módulos anteriores.
+8. Shells realmente suportados e testados.
+9. Comandos para instalação e inicialização.
+10. Testes executados e resultados.
+11. Limitações conhecidas.
+12. Exemplos de processos testados.
+13. Situação do cancelamento e do gerenciamento de processos filhos.
+14. Próximos passos para o módulo seguinte.
+
+Diferencie claramente o que foi implementado, o que foi testado e o que ainda está pendente.
+
+## 19. DIRETRIZ FINAL
+
+Implemente o Módulo 06 diretamente no nosso AI Development Harness.
+
+Não entregue somente um plano ou um terminal demonstrativo.
+
+Clone os repositórios indicados, examine os códigos-fonte e aproveite as implementações que trouxerem melhorias reais. Preserve o que já funciona e evite criar sistemas duplicados.
+
+O resultado deve oferecer execução estruturada de comandos, sessões interativas, streaming, gerenciamento de processos e integração real com o Agent Core.
+
+Deixe o projeto funcional, testado e documentado, preparado para receber os próximos módulos.

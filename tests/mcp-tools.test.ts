@@ -67,11 +67,12 @@ describe('MCP self-install tools', () => {
     expect(result.text).toContain('próximo passo')
   })
 
-  it('explains OAuth-only connectors instead of claiming success', async () => {
+  it('installs OAuth connectors and explains that login completes in the browser', async () => {
     const install = vi.fn(async () => ({ ok: false, needsOAuth: true }))
     const result = await mcpInstallTool.execute({ id: 'notion' }, context({ install }))
-    expect(result.ok).toBe(false)
+    expect(result.ok).toBe(true)
     expect(result.text).toContain('OAuth')
+    expect(result.text).toContain('navegador padrão')
   })
 
   it('lists configured servers and their state', async () => {

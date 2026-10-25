@@ -32,6 +32,8 @@ extraResources:
       - '**/*'
       - '!**/__pycache__/**'
       - '!**/*.pyc'
+  - from: resources/chrome-extension
+    to: resources/chrome-extension
 
 win:
   target:

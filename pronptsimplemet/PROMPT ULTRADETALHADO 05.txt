@@ -1,0 +1,1150 @@
+# MÓDULO 05 — BROWSER AUTOMATION AVANÇADA PARA O NOSSO AI DEVELOPMENT HARNESS
+
+## 1. MISSÃO PRINCIPAL
+
+Implemente no nosso AI Development Harness um sistema completo de automação de navegadores, permitindo que os agentes de IA controlem navegadores reais, naveguem por sites, interajam com páginas web, preencham formulários, gerenciem abas, acompanhem mudanças de estado e executem tarefas web de várias etapas.
+
+O sistema deve aproveitar os recursos já implementados nos módulos anteriores:
+
+- **Módulo 01 — Agent Core:** execução das tarefas, chamadas aos modelos, ferramentas, contexto, erros e recuperação.
+- **Módulo 02 — Subagents e Orchestration:** delegação de tarefas e coordenação entre agentes.
+- **Módulo 03 — Skills, Commands e Hooks:** habilidades, comandos personalizados, instruções e eventos.
+- **Módulo 04 — Computer Use:** controle do desktop, mouse, teclado, screenshots e automação visual.
+
+O Módulo 05 deverá acrescentar uma camada especializada em navegadores. Ele não deve substituir os módulos anteriores nem criar outro agente central.
+
+O resultado deve permitir solicitações como:
+
+- Abrir um site e navegar até uma página específica.
+- Pesquisar informações em páginas públicas.
+- Preencher formulários.
+- Trabalhar com várias abas.
+- Interagir com menus, botões, campos e tabelas.
+- Esperar que páginas carreguem e que elementos apareçam.
+- Consultar informações estruturadas da página.
+- Capturar screenshots.
+- Realizar operações repetitivas em sites.
+- Trabalhar com aplicações web que utilizem JavaScript intensivamente.
+- Diagnosticar erros de navegação e interação.
+- Utilizar sessões de navegador persistentes, quando configuradas.
+- Executar testes de interfaces web.
+- Integrar a navegação com tarefas de programação e desenvolvimento.
+
+**Não construa apenas um script de Selenium ou Playwright.** Implemente uma camada de Browser Automation reutilizável, orientada a ferramentas estruturadas e integrada à arquitetura do harness.
+
+## 2. REGRAS OBRIGATÓRIAS DE IMPLEMENTAÇÃO
+
+Antes de escrever código:
+
+1. Inspecione o projeto atual.
+2. Identifique a linguagem e o framework principal.
+3. Examine o Módulo 01 e os contratos de ferramentas.
+4. Examine o Módulo 02 e a coordenação dos agentes.
+5. Examine o Módulo 03 e o registro de skills, comandos e hooks.
+6. Examine o Módulo 04 e os recursos de Computer Use.
+7. Identifique as integrações de navegador já existentes.
+8. Execute os testes atuais.
+9. Registre as funcionalidades que devem ser preservadas.
+
+Depois, clone os repositórios listados abaixo e examine o código-fonte.
+
+Não entregue apenas uma pesquisa ou um plano de implementação. Utilize os projetos como fontes de código, arquitetura e técnicas concretas para aprimorar nosso harness.
+
+Para cada repositório:
+
+- Faça o clone.
+- Examine a estrutura dos diretórios.
+- Leia a documentação relevante.
+- Localize os pontos de entrada e os componentes principais.
+- Analise as implementações que correspondam às funcionalidades desejadas.
+- Compare as soluções com o código existente.
+- Identifique o que está ausente ou pode ser melhorado.
+- Reutilize ou adapte as melhores soluções compatíveis.
+- Evite duplicar capacidades que já funcionam.
+- Respeite as licenças e obrigações de atribuição.
+- Teste as integrações realizadas.
+
+Se uma implementação externa for incompatível, aproveite as ideias ou os componentes que puderem ser adaptados, em vez de introduzir uma dependência desnecessária.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+### 3.1. Browser Use
+
+https://github.com/browser-use/browser-use
+
+Analise este projeto para identificar abordagens de automação web orientada por agentes de IA.
+
+Examine:
+
+- Abstrações de navegador.
+- Navegação por páginas.
+- Descoberta de elementos.
+- Interação com formulários.
+- Seleção de elementos.
+- Captura de estado.
+- Uso de screenshots.
+- Gerenciamento de abas.
+- Esperas e condições de carregamento.
+- Execução de tarefas com várias etapas.
+- Integração com modelos de linguagem.
+- Tratamento de erros.
+- Configuração de sessões.
+- Estratégias de observação e ação.
+
+Adapte as implementações que trouxerem benefícios concretos ao nosso sistema.
+
+Não substitua o Agent Core por outro agente autônomo apenas para utilizar a biblioteca.
+
+### 3.2. Microsoft Playwright
+
+https://github.com/microsoft/playwright
+
+Este é um dos principais projetos de referência para automação confiável de navegadores.
+
+Examine:
+
+- APIs de páginas e contextos.
+- Localizadores semânticos.
+- Seletores.
+- Esperas automáticas.
+- Eventos de navegação.
+- Gerenciamento de abas.
+- Interação com formulários.
+- Downloads e uploads.
+- Capturas de tela.
+- Cookies e armazenamento de sessão.
+- Tratamento de diálogos.
+- Controle de múltiplos contextos.
+- Erros e timeouts.
+- Acessibilidade.
+- Interceptação e monitoramento de rede.
+- Testes de aplicações web.
+
+Utilize Playwright como candidato principal para automação web estruturada, desde que seja compatível com a arquitetura do projeto.
+
+Não confunda a biblioteca Playwright com um agente autônomo. O nosso harness continuará responsável pelo planejamento, seleção de ferramentas e tomada de decisões.
+
+### 3.3. Playwright MCP
+
+https://github.com/microsoft/playwright-mcp
+
+Examine a integração entre automação de navegador e ferramentas disponíveis para agentes.
+
+Analise:
+
+- Ferramentas de navegação.
+- Esquemas de entrada.
+- Resultados estruturados.
+- Representação acessível de páginas.
+- Interação com elementos.
+- Capturas de tela.
+- Espera por estados.
+- Integração com clientes MCP.
+- Tratamento de erros.
+- Estratégias de descoberta de elementos.
+
+Se o harness já possuir um registro próprio de ferramentas, utilize o repositório como referência para adaptar os contratos, evitando a criação de um servidor MCP separado sem necessidade.
+
+### 3.4. Puppeteer
+
+https://github.com/puppeteer/puppeteer
+
+Examine:
+
+- Automação de Chromium.
+- Controle de páginas.
+- Sessões.
+- Navegação.
+- Seletores.
+- Interação com elementos.
+- Screenshots.
+- Downloads.
+- Execução de JavaScript na página.
+- Eventos.
+- Monitoramento de rede.
+- Protocolo Chrome DevTools.
+- Tratamento de erros.
+
+Compare suas vantagens com Playwright e escolha a melhor estratégia para o harness.
+
+Não incorpore Playwright e Puppeteer integralmente se um único mecanismo atender aos requisitos. Uma integração adicional só deve ser criada quando houver uma vantagem técnica demonstrável.
+
+### 3.5. Stagehand
+
+https://github.com/browserbase/stagehand
+
+Analise a automação web assistida por IA.
+
+Investigue:
+
+- Interação orientada por linguagem natural.
+- Identificação de elementos.
+- Extração estruturada de informações.
+- Uso de seletores.
+- Estratégias de execução de ações.
+- Integração entre modelos e navegador.
+- Tratamento de falhas.
+- Reutilização de resultados.
+- Mecanismos para reduzir chamadas desnecessárias ao modelo.
+
+Aproveite as abordagens úteis para construir uma camada de abstração entre as intenções do agente e as operações do navegador.
+
+Não torne serviços externos pagos uma dependência obrigatória. Verifique quais capacidades podem funcionar localmente e quais exigem serviços adicionais.
+
+### 3.6. Selenium
+
+https://github.com/SeleniumHQ/selenium
+
+Analise o projeto para identificar recursos que possam ser úteis em compatibilidade com navegadores e automação padronizada.
+
+Examine:
+
+- WebDriver.
+- Gerenciamento de sessões.
+- Localização de elementos.
+- Esperas explícitas.
+- Controle de janelas.
+- Gerenciamento de abas.
+- Compatibilidade com navegadores.
+- Tratamento de erros.
+- Execução remota.
+
+Não adicione Selenium automaticamente se Playwright já cobrir os requisitos. Considere-o uma alternativa ou integração complementar quando houver uma necessidade real de compatibilidade.
+
+### 3.7. BrowserGym
+
+https://github.com/ServiceNow/BrowserGym
+
+Examine os recursos de avaliação e ambientes de interação web orientados por agentes.
+
+Investigue:
+
+- Representação do estado do navegador.
+- Ambientes de tarefas.
+- Ações estruturadas.
+- Observações.
+- Execução de cenários.
+- Métricas.
+- Avaliação de sucesso.
+- Testes repetíveis de tarefas web.
+
+Utilize essas ideias para criar uma infraestrutura de avaliação do nosso agente navegador.
+
+### 3.8. Chrome DevTools Protocol
+
+https://github.com/ChromeDevTools/devtools-protocol
+
+Analise as definições do Chrome DevTools Protocol quando for necessário compreender ou implementar recursos específicos do Chromium.
+
+Investigue:
+
+- Sessões.
+- Eventos.
+- Controle de páginas.
+- Runtime.
+- Network.
+- Target.
+- Capturas de tela.
+- Informações de execução.
+- Eventos de carregamento.
+- Inspeção de estado.
+
+Prefira APIs de alto nível quando elas já oferecerem os recursos necessários. Use o protocolo diretamente somente quando houver uma necessidade técnica que justifique o nível adicional de complexidade.
+
+### 3.9. Model Context Protocol — Servers
+
+https://github.com/modelcontextprotocol/servers
+
+Examine os exemplos de integração de ferramentas externas e os padrões que possam ser aproveitados na exposição das capacidades de navegação.
+
+Reutilize a arquitetura de ferramentas existente no harness sempre que possível.
+
+### Regra sobre as referências
+
+Clone os repositórios e analise as implementações relevantes. Não é necessário incorporar todos eles como dependências do produto.
+
+Se um repositório estiver indisponível, registre a ocorrência e prossiga. Não invente arquivos, APIs ou resultados de testes.
+
+---
+
+## 4. ARQUITETURA DO BROWSER AUTOMATION
+
+Implemente os componentes seguintes ou aprimore os equivalentes já existentes.
+
+### 4.1. Browser Manager
+
+Responsável pelo ciclo de vida dos navegadores.
+
+Deve permitir:
+
+- Inicializar o navegador.
+- Conectar a uma instância existente quando suportado.
+- Identificar navegadores disponíveis.
+- Criar sessões.
+- Criar contextos isolados.
+- Gerenciar páginas.
+- Encerrar sessões.
+- Consultar o estado da sessão.
+- Recuperar-se de falhas.
+- Reutilizar sessões quando configurado.
+- Impedir que tarefas diferentes compartilhem acidentalmente um contexto privado.
+
+O navegador pode ser gerenciado pelo próprio harness ou conectado a uma instância compatível já aberta.
+
+Documente as diferenças entre os modos disponíveis.
+
+### 4.2. Browser Session Manager
+
+Implemente um gerenciador de sessões que permita:
+
+- Criar sessões temporárias.
+- Manter sessões persistentes quando configurado.
+- Identificar a sessão associada a uma tarefa.
+- Isolar cookies e armazenamento entre contextos.
+- Gerenciar autenticação sem expor credenciais.
+- Recuperar sessões quando possível.
+- Encerrar sessões explicitamente.
+- Detectar contextos inválidos.
+- Gerenciar timeouts.
+
+Não misture automaticamente sessões pessoais do usuário com sessões isoladas do agente.
+
+Quando for necessário conectar-se a um navegador existente, utilize um mecanismo explícito de conexão e informe suas limitações.
+
+### 4.3. Tab Manager
+
+Responsável pelo gerenciamento das abas.
+
+Deve permitir:
+
+- Listar abas.
+- Abrir uma aba.
+- Selecionar uma aba.
+- Fechar uma aba.
+- Navegar para uma URL.
+- Consultar o título.
+- Consultar a URL atual.
+- Esperar pela criação de uma aba.
+- Detectar navegações que abrem novas páginas.
+- Identificar redirecionamentos.
+- Alternar entre páginas.
+- Atribuir identificadores estáveis dentro da sessão.
+
+Não utilize o índice da aba como único identificador persistente, porque a ordem pode mudar.
+
+### 4.4. Navigation Controller
+
+Responsável pela navegação.
+
+Deve suportar:
+
+- Abrir URLs.
+- Navegar para trás e para frente.
+- Atualizar páginas.
+- Aguardar carregamento.
+- Esperar por elementos específicos.
+- Detectar redirecionamentos.
+- Tratar falhas de DNS e conexão.
+- Detectar timeouts.
+- Identificar páginas de erro.
+- Verificar o destino final.
+- Aplicar políticas de navegação existentes.
+
+Diferencie os estados de navegação:
+
+- Navegação iniciada.
+- Documento carregado.
+- DOM disponível.
+- Aplicação em execução.
+- Elemento desejado disponível.
+- Navegação concluída.
+- Navegação malsucedida.
+
+Não considere que a página está pronta apenas porque o evento de carregamento inicial ocorreu.
+
+### 4.5. DOM Inspector
+
+Implemente um componente para consultar a estrutura da página.
+
+Deve conseguir, conforme as capacidades do navegador:
+
+- Consultar a estrutura DOM.
+- Localizar elementos.
+- Ler textos.
+- Consultar atributos relevantes.
+- Identificar links.
+- Identificar botões.
+- Identificar campos.
+- Identificar formulários.
+- Consultar tabelas.
+- Consultar listas.
+- Identificar elementos visíveis.
+- Detectar elementos desabilitados.
+- Consultar relações entre elementos.
+- Identificar iframes.
+- Detectar elementos que ainda não estão disponíveis.
+
+Não envie indiscriminadamente todo o DOM ao modelo.
+
+Implemente consultas seletivas, limites de tamanho e representações estruturadas para reduzir o consumo de contexto.
+
+### 4.6. Accessibility Inspector
+
+Quando possível, utilize a árvore de acessibilidade para localizar elementos por propriedades semânticas.
+
+Permita consultas por:
+
+- Papel.
+- Nome acessível.
+- Texto.
+- Estado.
+- Relação com outros elementos.
+- Tipo de controle.
+
+Exemplos de alvos:
+
+- Botão com nome “Entrar”.
+- Campo de texto “E-mail”.
+- Caixa de seleção com uma descrição específica.
+- Link com o texto “Configurações”.
+
+Priorize os localizadores semânticos quando forem confiáveis.
+
+Se o site não fornecer informações acessíveis suficientes, utilize DOM, seletores ou outras estratégias compatíveis.
+
+### 4.7. Element Resolver
+
+Implemente uma camada única para resolver os alvos de interação.
+
+A resolução deve poder utilizar:
+
+1. Localizadores semânticos.
+2. Árvore de acessibilidade.
+3. Seletores CSS.
+4. Identificadores ou atributos específicos.
+5. Estrutura DOM.
+6. Coordenadas obtidas de uma observação recente.
+7. Computer Use visual, quando necessário.
+
+Não force todas as estratégias a seguir uma ordem fixa. A escolha deve depender do alvo, da aplicação e da disponibilidade das informações.
+
+O resolvedor deve detectar casos em que:
+
+- Nenhum elemento corresponde ao seletor.
+- Vários elementos correspondem ao mesmo seletor.
+- O elemento está oculto.
+- O elemento está desabilitado.
+- O elemento não pode receber interação.
+- O elemento foi substituído durante uma atualização da página.
+
+Quando houver ambiguidade, obtenha mais informações ou utilize uma estratégia alternativa antes de executar uma ação potencialmente destrutiva.
+
+### 4.8. Browser Action Executor
+
+Executor central das ações do navegador.
+
+Deve:
+
+- Receber ações estruturadas.
+- Validar os argumentos.
+- Identificar a sessão e a aba.
+- Resolver o alvo.
+- Aplicar as políticas de execução.
+- Executar a ação.
+- Aguardar o resultado relevante.
+- Registrar evidências.
+- Retornar um resultado estruturado.
+
+Não misture o planejamento da tarefa com a implementação de baixo nível dos comandos do navegador.
+
+### 4.9. Browser State Observer
+
+Responsável por observar o estado atual do navegador.
+
+Deve fornecer, conforme necessário:
+
+- URL.
+- Título.
+- Estado de carregamento.
+- Aba ativa.
+- Elementos relevantes.
+- Textos selecionados.
+- Informações de acessibilidade.
+- Mudanças no DOM.
+- Erros de página.
+- Estado de formulários.
+- Screenshots.
+- Metadados da sessão.
+
+A observação deve ser seletiva e eficiente.
+
+### 4.10. Browser Action Verifier
+
+Responsável por verificar se as ações produziram os resultados esperados.
+
+Exemplos:
+
+- Confirmar que a navegação chegou ao destino correto.
+- Confirmar que um formulário recebeu os dados esperados.
+- Confirmar que um botão produziu uma alteração de estado.
+- Confirmar que uma aba foi aberta.
+- Confirmar que uma pesquisa apresentou resultados.
+- Confirmar que um arquivo foi baixado.
+- Confirmar que um elemento foi selecionado.
+
+Diferencie a confirmação de que uma ação foi enviada da confirmação de que o objetivo foi alcançado.
+
+---
+
+## 5. FERRAMENTAS E CONTRATOS
+
+Integre as ferramentas ao registro central do harness.
+
+Os nomes a seguir são propostas. Reutilize ferramentas existentes quando forem equivalentes.
+
+### 5.1. Navegador e sessões
+
+- `browser.get_status`
+- `browser.launch`
+- `browser.connect`
+- `browser.create_session`
+- `browser.close_session`
+- `browser.list_sessions`
+- `browser.get_session_info`
+
+### 5.2. Abas
+
+- `browser.list_tabs`
+- `browser.open_tab`
+- `browser.select_tab`
+- `browser.close_tab`
+- `browser.get_tab_info`
+
+### 5.3. Navegação
+
+- `browser.navigate`
+- `browser.go_back`
+- `browser.go_forward`
+- `browser.reload`
+- `browser.wait_for_navigation`
+- `browser.wait_for_url`
+- `browser.wait_for_load_state`
+
+### 5.4. Inspeção
+
+- `browser.get_page_info`
+- `browser.inspect_dom`
+- `browser.inspect_accessibility`
+- `browser.find_elements`
+- `browser.get_element_info`
+- `browser.get_text`
+- `browser.get_attribute`
+- `browser.capture_screenshot`
+
+### 5.5. Interação
+
+- `browser.click`
+- `browser.double_click`
+- `browser.hover`
+- `browser.fill`
+- `browser.type_text`
+- `browser.press_key`
+- `browser.select_option`
+- `browser.check`
+- `browser.uncheck`
+- `browser.scroll`
+- `browser.focus`
+- `browser.submit_form`
+
+### 5.6. Downloads e arquivos
+
+- `browser.download_file`
+- `browser.get_download_status`
+- `browser.list_downloads`
+
+Implemente essas operações apenas quando houver suporte real do navegador e do sistema de arquivos.
+
+### 5.7. Verificação e recuperação
+
+- `browser.verify_action`
+- `browser.wait_for_element`
+- `browser.wait_for_text`
+- `browser.get_action_history`
+- `browser.cancel_action`
+
+Cada ferramenta deve ter um esquema de entrada explícito, validação, resultado estruturado, erros tipados, timeout e suporte a cancelamento quando aplicável.
+
+Não crie uma ferramenta que apenas repasse texto arbitrário para executar JavaScript irrestrito na página quando uma API mais específica puder realizar a tarefa.
+
+---
+
+## 6. INTERAÇÃO COM PÁGINAS WEB
+
+Implemente estratégias para os principais elementos de páginas.
+
+### 6.1. Links e botões
+
+O agente deve conseguir:
+
+- Identificar links e botões.
+- Consultar seus nomes.
+- Verificar se estão disponíveis.
+- Clicar.
+- Aguardar o resultado.
+- Detectar navegações.
+- Detectar novas abas.
+- Confirmar mudanças de estado.
+
+### 6.2. Formulários
+
+O sistema deve suportar:
+
+- Campos de texto.
+- Campos numéricos.
+- E-mail.
+- Senhas.
+- Áreas de texto.
+- Checkboxes.
+- Radio buttons.
+- Selects.
+- Campos de data, quando suportados.
+- Upload de arquivos.
+- Botões de envio.
+- Validação de campos.
+- Mensagens de erro.
+
+Antes de enviar um formulário, verifique se os campos obrigatórios estão preenchidos e se o envio corresponde ao objetivo solicitado.
+
+Quando a operação puder produzir consequências externas importantes, respeite as regras de confirmação existentes no harness.
+
+### 6.3. Tabelas e listas
+
+Permita:
+
+- Consultar linhas e colunas.
+- Extrair valores estruturados.
+- Localizar registros.
+- Identificar paginação.
+- Navegar entre páginas.
+- Consultar filtros.
+- Identificar resultados vazios.
+- Comparar valores.
+
+Limite o volume de informações retornado ao modelo e permita consultas direcionadas.
+
+### 6.4. Menus e elementos dinâmicos
+
+Suporte:
+
+- Menus suspensos.
+- Modais.
+- Popovers.
+- Elementos carregados sob demanda.
+- Conteúdo que aparece após hover.
+- Listas dinâmicas.
+- Atualizações parciais.
+- Aplicações de página única.
+
+Utilize esperas baseadas em condições e evite atrasos fixos sempre que houver uma condição observável mais confiável.
+
+### 6.5. Iframes
+
+Implemente suporte à identificação e à interação com iframes acessíveis por meio da API de automação.
+
+O sistema deve distinguir elementos da página principal e elementos dentro de frames.
+
+Quando um frame estiver inacessível por restrições do navegador ou da página, informe a limitação e tente uma alternativa apropriada.
+
+### 6.6. Shadow DOM
+
+Investigue o suporte do mecanismo escolhido para elementos dentro de Shadow DOM.
+
+Implemente a estratégia compatível com a biblioteca adotada e teste os casos suportados.
+
+### 6.7. Aplicações web dinâmicas
+
+Considere aplicações React, Vue, Angular e outras que atualizem a interface sem recarregar a página.
+
+O sistema deve:
+
+- Detectar substituição de elementos.
+- Evitar manter referências inválidas indefinidamente.
+- Aguardar alterações relevantes.
+- Refazer a resolução do alvo quando necessário.
+- Diferenciar atualização de estado de navegação completa.
+
+---
+
+## 7. NAVEGAÇÃO ORIENTADA POR IA
+
+Integre o navegador ao Agent Core por meio de ferramentas estruturadas.
+
+O ciclo esperado será:
+
+1. O usuário solicita uma tarefa.
+2. O Agent Core identifica que precisa utilizar o navegador.
+3. O agente consulta o estado atual.
+4. O agente determina o próximo objetivo.
+5. O resolvedor identifica os elementos necessários.
+6. O executor realiza a ação.
+7. O observador obtém o novo estado.
+8. O verificador avalia o resultado.
+9. O Agent Core continua, corrige ou encerra a tarefa.
+
+O modelo deve receber informações relevantes, não necessariamente a página inteira.
+
+Quando o modelo aceitar imagens, permita a utilização de screenshots. Quando não aceitar, disponibilize informações estruturadas.
+
+Não invente que um site foi consultado, que um formulário foi enviado ou que um download ocorreu sem evidências da execução.
+
+### 7.1. Planejamento de tarefas web
+
+Permita a decomposição de tarefas em etapas.
+
+Exemplo:
+
+“Pesquise uma documentação técnica, encontre a seção necessária e extraia os passos de instalação.”
+
+O agente deve:
+
+- Abrir a página.
+- Localizar a documentação.
+- Consultar o conteúdo.
+- Encontrar a seção relevante.
+- Extrair as informações.
+- Verificar se a resposta está completa.
+- Apresentar o resultado com as fontes consultadas.
+
+O planejamento deve ser flexível e adaptado ao estado real da página.
+
+### 7.2. Recuperação
+
+Se uma interação falhar, o agente deve poder:
+
+- Consultar o estado atualizado.
+- Verificar se o elemento mudou.
+- Refazer a busca.
+- Tentar um localizador alternativo.
+- Esperar por uma condição.
+- Replanejar a tarefa.
+- Encerrar se não for possível continuar.
+
+Estabeleça limites de tentativas para impedir ciclos infinitos.
+
+---
+
+## 8. SESSÕES, COOKIES E AUTENTICAÇÃO
+
+Implemente gerenciamento explícito das sessões do navegador.
+
+Suporte, conforme a arquitetura e as bibliotecas escolhidas:
+
+- Contextos isolados.
+- Cookies.
+- Local storage.
+- Sessões persistentes.
+- Autenticação já existente.
+- Expiração de sessão.
+- Logout.
+- Limpeza de dados.
+- Separação entre workspaces.
+
+Não extraia nem apresente cookies, tokens ou credenciais ao modelo quando não forem necessários.
+
+Não armazene senhas em texto simples nos arquivos de configuração ou logs.
+
+Se for necessário utilizar uma conta pessoal, permita que o usuário autentique a sessão pelo mecanismo apropriado. Não tente contornar CAPTCHA, autenticação multifator, controles de acesso ou desafios de segurança.
+
+Quando uma página exigir intervenção humana, informe o estado e permita que o usuário conclua a etapa necessária.
+
+---
+
+## 9. DOWNLOADS E UPLOADS
+
+Implemente mecanismos confiáveis para lidar com arquivos.
+
+### Downloads
+
+- Detectar o início de um download.
+- Aguardar sua conclusão.
+- Identificar o nome do arquivo.
+- Registrar a localização.
+- Verificar se o arquivo existe.
+- Tratar timeouts.
+- Detectar falhas.
+- Evitar sobrescrever arquivos sem uma política definida.
+
+### Uploads
+
+- Localizar o campo apropriado.
+- Selecionar o arquivo autorizado.
+- Verificar o arquivo selecionado.
+- Acompanhar o envio.
+- Confirmar o resultado quando possível.
+
+Não suponha que um download ou upload foi concluído apenas porque o usuário clicou no botão correspondente.
+
+Utilize as APIs do navegador sempre que disponíveis, em vez de depender exclusivamente de diálogos gráficos do Windows.
+
+Quando for necessário interagir com um seletor de arquivos nativo, delegue essa operação ao Módulo 04.
+
+---
+
+## 10. NETWORK, CONSOLE E DIAGNÓSTICO
+
+Quando houver suporte no mecanismo escolhido, disponibilize diagnósticos para tarefas de desenvolvimento e debugging.
+
+Inclua:
+
+- Erros de console.
+- Exceções JavaScript.
+- Falhas de carregamento de recursos.
+- Requisições malsucedidas.
+- Códigos HTTP relevantes.
+- Redirecionamentos.
+- Tempos de navegação.
+- Estado de carregamento.
+- Informações de execução.
+
+Os dados devem ser filtrados e limitados para evitar a transmissão desnecessária de conteúdo privado.
+
+Não registre cabeçalhos de autenticação, cookies, tokens ou corpos sensíveis de requisições indiscriminadamente.
+
+Essas ferramentas devem permitir que um agente de debugging investigue uma aplicação web sem criar uma implementação paralela de observabilidade.
+
+---
+
+## 11. INTEGRAÇÃO COM COMPUTER USE
+
+O Módulo 05 deve utilizar o Módulo 04 quando a automação estruturada do navegador não for suficiente.
+
+Exemplos:
+
+- Uma aplicação web aberta em um navegador sem conexão de automação.
+- Um diálogo nativo do sistema operacional.
+- Uma janela externa ao navegador.
+- Uma interface que não exponha elementos acessíveis por APIs web.
+- Uma operação que dependa de uma interação gráfica específica.
+
+Defina uma interface clara para solicitar a intervenção do Computer Use.
+
+O fluxo deve ser:
+
+1. Detectar que a ação necessária não pode ser executada pelo mecanismo web disponível.
+2. Identificar a janela e o estado relevantes.
+3. Delegar a operação ao Módulo 04.
+4. Obter o resultado.
+5. Retornar ao Browser Automation.
+6. Verificar se a tarefa pode continuar.
+
+Não crie um segundo sistema de mouse e teclado dentro do módulo de navegador.
+
+Quando uma tarefa puder ser realizada diretamente por Playwright ou outra API estruturada, prefira esse mecanismo.
+
+---
+
+## 12. SKILLS, COMANDOS E HOOKS
+
+Integre o navegador ao Módulo 03.
+
+Exemplos de skills:
+
+- Pesquisa web.
+- Navegação em documentação técnica.
+- Preenchimento de formulários.
+- Testes de aplicações web.
+- Depuração de páginas.
+- Extração estruturada de informações.
+- Verificação de links.
+- Testes de acessibilidade.
+
+Exemplos de comandos:
+
+- `/browse`
+- `/research-web`
+- `/test-web`
+- `/inspect-page`
+- `/check-links`
+
+Esses nomes são sugestões. Verifique os comandos já existentes e evite conflitos.
+
+Implemente hooks úteis, caso o sistema de eventos existente ainda não possua equivalentes:
+
+- `browser.before_navigate`
+- `browser.after_navigate`
+- `browser.before_action`
+- `browser.after_action`
+- `browser.navigation_failed`
+- `browser.download_started`
+- `browser.download_completed`
+- `browser.task_completed`
+
+Os hooks devem utilizar o dispatcher já existente e obedecer às políticas de execução do harness.
+
+---
+
+## 13. EXECUÇÃO CONCORRENTE E SUBAGENTS
+
+Integre o navegador ao Módulo 02.
+
+Permita que diferentes agentes realizem tarefas web, desde que exista controle sobre suas sessões e recursos.
+
+Implemente:
+
+- Identificação da sessão associada a cada tarefa.
+- Isolamento entre contextos.
+- Limites de concorrência.
+- Coordenação de acesso a abas compartilhadas.
+- Cancelamento de tarefas.
+- Recuperação de falhas.
+- Propagação de resultados estruturados.
+
+Não permita que dois agentes alterem simultaneamente a mesma página sem coordenação.
+
+Se duas tarefas forem independentes, considere executá-las em contextos separados, respeitando os limites de recursos.
+
+O resultado de cada agente deve ser entregue ao orquestrador por um contrato estruturado.
+
+---
+
+## 14. CONFIGURAÇÃO E DESEMPENHO
+
+Utilize a configuração existente do harness.
+
+Permita configurar, quando aplicável:
+
+- Navegador preferido.
+- Caminho do executável.
+- Modo headless ou com interface visível.
+- Timeout padrão.
+- Timeout de navegação.
+- Limites de abas.
+- Diretórios de download.
+- Persistência de sessões.
+- Diretórios de perfis.
+- Limites de captura.
+- Opções de diagnóstico.
+- Política de reutilização de sessões.
+- Configurações de proxy, se já houver suporte compatível.
+
+Não introduza uma segunda camada de configuração sem necessidade.
+
+Implemente cache para metadados que possam ser reutilizados com segurança, mas não mantenha referências a elementos que tenham sido invalidadas por mudanças na página.
+
+Reduza o consumo de contexto por meio de consultas seletivas, extração estruturada e carregamento progressivo.
+
+---
+
+## 15. SEGURANÇA E CONFIABILIDADE
+
+O navegador pode acessar páginas externas, dados privados e sistemas que executam operações importantes.
+
+Implemente controles compatíveis com a arquitetura do harness:
+
+- Validação de URLs.
+- Tratamento de redirecionamentos.
+- Políticas configuráveis para domínios.
+- Separação de sessões.
+- Proteção dos dados de autenticação.
+- Proteção contra vazamento de cookies.
+- Validação de caminhos de download.
+- Limites de tamanho de arquivos.
+- Tratamento de conteúdo não confiável.
+- Limites de tempo e recursos.
+- Cancelamento de operações.
+- Registro de ações.
+- Proteção contra loops de navegação.
+- Controle de ferramentas por meio do executor central.
+
+Considere riscos de acesso a endereços locais, serviços internos e recursos de rede privada quando a navegação puder alcançar esses destinos. A política deve ser aplicada no ponto de execução, e não apenas nas instruções do modelo.
+
+Trate o conteúdo das páginas como dados não confiáveis. Um site pode conter instruções destinadas a manipular o agente; essas instruções não devem alterar as políticas do harness nem conceder permissões.
+
+Não execute automaticamente downloads, scripts ou arquivos apenas porque uma página os recomendou.
+
+Operações importantes, como publicar conteúdo, enviar formulários com consequências externas, excluir registros ou efetuar compras, devem seguir as regras de autorização e confirmação já existentes no harness.
+
+Não tente contornar autenticação, CAPTCHA ou controles de segurança dos sites.
+
+---
+
+## 16. TESTES AUTOMATIZADOS
+
+Utilize o framework de testes já adotado pelo projeto.
+
+### 16.1. Testes unitários
+
+Teste:
+
+- Validação de URLs.
+- Parsing de argumentos.
+- Contratos de ferramentas.
+- Resolução de alvos.
+- Classificação de erros.
+- Estados de navegação.
+- Gerenciamento de sessões.
+- Timeout.
+- Cancelamento.
+- Políticas de redirecionamento.
+- Transformação de resultados.
+
+### 16.2. Aplicação de teste local
+
+Crie uma aplicação web local destinada aos testes, com:
+
+- Links.
+- Botões.
+- Formulários.
+- Campos obrigatórios.
+- Menus.
+- Tabelas.
+- Paginação.
+- Iframes.
+- Elementos dinâmicos.
+- Modais.
+- Estados de carregamento.
+- Páginas de erro.
+- Links que abrem novas abas.
+- Downloads de arquivos de teste.
+
+Não dependa de um site externo para validar os comportamentos fundamentais.
+
+### 16.3. Testes de integração
+
+Verifique:
+
+- Inicialização do navegador.
+- Criação de sessões.
+- Abertura de abas.
+- Navegação.
+- Inspeção DOM.
+- Consulta de acessibilidade.
+- Localização de elementos.
+- Preenchimento de formulários.
+- Interação com menus.
+- Espera por elementos.
+- Capturas de tela.
+- Downloads.
+- Tratamento de redirecionamentos.
+- Recuperação após falhas.
+
+### 16.4. Testes com o Agent Core
+
+Simule tarefas como:
+
+**Teste A — Navegação**
+
+O agente abre uma página local de teste, identifica um link, navega e confirma o destino.
+
+**Teste B — Formulário**
+
+O agente identifica os campos, preenche valores de teste, envia o formulário e verifica a confirmação.
+
+**Teste C — Elemento dinâmico**
+
+O agente aguarda um elemento que aparece depois de uma operação assíncrona e interage com ele.
+
+**Teste D — Recuperação**
+
+Um seletor falha. O agente atualiza a observação, tenta uma alternativa e encerra corretamente se não houver solução.
+
+**Teste E — Múltiplas abas**
+
+O agente abre páginas independentes, alterna entre elas e identifica corretamente o contexto de cada uma.
+
+**Teste F — Computer Use**
+
+O agente encontra um diálogo nativo que não pode ser controlado pela API web e solicita a intervenção do Módulo 04.
+
+**Teste G — Segurança de sessão**
+
+Verifique se cookies, dados e contextos de tarefas independentes permanecem isolados conforme a configuração.
+
+Execute os testes e registre os resultados reais. Não declare uma funcionalidade aprovada apenas porque o código foi escrito.
+
+---
+
+## 17. CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] O navegador pode ser inicializado e controlado.
+- [ ] O sistema suporta gerenciamento de sessões.
+- [ ] É possível abrir, listar e alternar entre abas.
+- [ ] A navegação pode ser monitorada.
+- [ ] O DOM pode ser inspecionado.
+- [ ] A árvore de acessibilidade pode ser utilizada quando disponível.
+- [ ] O agente consegue localizar e interagir com elementos.
+- [ ] Formulários podem ser preenchidos e verificados.
+- [ ] Elementos dinâmicos são tratados adequadamente.
+- [ ] O sistema possui timeouts e cancelamento.
+- [ ] Downloads podem ser monitorados quando suportados.
+- [ ] Os resultados das ações podem ser verificados.
+- [ ] Falhas podem provocar recuperação ou replanejamento.
+- [ ] O módulo integra-se ao Agent Core.
+- [ ] O módulo integra-se aos subagents.
+- [ ] Skills, comandos e hooks podem utilizar as capacidades do navegador.
+- [ ] O Computer Use pode complementar a automação web.
+- [ ] Os dados das sessões são tratados adequadamente.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam operacionais.
+- [ ] O sistema não depende exclusivamente de coordenadas ou screenshots.
+- [ ] O relatório distingue ações executadas de resultados confirmados.
+
+---
+
+## 18. ORDEM DE IMPLEMENTAÇÃO
+
+Execute as etapas abaixo:
+
+1. Inspecionar o projeto e executar os testes iniciais.
+2. Mapear as integrações existentes dos Módulos 01 a 04.
+3. Clonar e analisar os repositórios indicados.
+4. Comparar as bibliotecas e escolher a arquitetura mais adequada.
+5. Definir os contratos de sessões, abas, navegação e ações.
+6. Implementar o Browser Manager.
+7. Implementar o Tab Manager e o Navigation Controller.
+8. Implementar inspeção DOM e acessibilidade.
+9. Implementar o Element Resolver.
+10. Implementar o executor de ações e a verificação de resultados.
+11. Implementar downloads e diagnósticos, conforme necessário.
+12. Integrar com o Agent Core.
+13. Integrar com Computer Use, skills, hooks e subagents.
+14. Integrar as informações à interface existente.
+15. Criar testes unitários, de integração e ponta a ponta.
+16. Corrigir regressões.
+17. Documentar instalação, configuração e uso.
+
+Ajuste a sequência quando houver dependências técnicas, mas não pule as etapas de validação.
+
+## 19. RELATÓRIO FINAL OBRIGATÓRIO
+
+Ao concluir, informe:
+
+1. Arquitetura inicial encontrada.
+2. Repositórios efetivamente clonados e analisados.
+3. Bibliotecas escolhidas e justificativas.
+4. Código externo aproveitado ou adaptado.
+5. Componentes novos e aprimorados.
+6. Arquivos modificados.
+7. Dependências adicionadas.
+8. Integração com os módulos anteriores.
+9. Instruções de instalação.
+10. Instruções de execução.
+11. Testes executados e seus resultados.
+12. Limitações conhecidas.
+13. Funcionalidades ainda pendentes.
+14. Exemplos de tarefas web realmente testadas.
+15. Preparação necessária para o próximo módulo.
+
+## 20. DIRETRIZ FINAL
+
+Implemente o Módulo 05 diretamente no nosso AI Development Harness.
+
+Não entregue somente documentação, exemplos isolados ou uma demonstração sem integração.
+
+Clone os repositórios, examine o código-fonte, aproveite as melhores implementações compatíveis e melhore o que já existe.
+
+Preserve as funcionalidades anteriores. Evite duplicações. Utilize o Agent Core para planejar e executar tarefas e o sistema central de ferramentas para aplicar as políticas existentes.
+
+O resultado deve permitir que o harness navegue por páginas web, interaja com elementos estruturados, verifique os resultados das ações e recupere-se de falhas, com integração real ao Computer Use quando necessário.
+
+Finalize com testes executados, documentação e um relatório fiel do estado do projeto.

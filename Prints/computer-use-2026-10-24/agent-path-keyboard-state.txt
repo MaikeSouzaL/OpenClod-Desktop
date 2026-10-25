@@ -1,0 +1,16 @@
+<ax_tree target="janela 1639704" snapshot="snap_7_mvna4kly">
+{
+  "window": {
+    "app": "notepad",
+    "id": 1639704,
+    "title": "*Sem título - Bloco de Notas"
+  },
+  "accessibility": {
+    "tree": "\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}",
+    "document_text": "Openclod Computer Use LIVE\nUnicode áéíóú\nBackground input\nCoordinate input\nFinal stateTYPEKEY-END",
+    "focused_element": "document Editor de Texto"
+  },
+  "screenshots": [
+    {
+      "id": "shot-1639704-6",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAy8UlEQVR4nOzdfXBd5Z0n+HONwMYvJDT0pDPu3e2xJWdiTBXGwTWRk+liu01bsrtipgpnm+5OSGpGapwEKZsyXcU43dvBS23jmc0VSaCl6c1AZ5remNrFsxPrUvakXFOMRdqOMVsIQ3RlZv8YKpsiBMsmWcBYd+vec9+k+6J7pasX+/l8oFzSc895nuece111v35+55y2NTd+JKqwds0NlY0AAABc0d64eKGysa3W1n/96H+Z5/kAAACwcP75g/+oavuyBZ8JAAAAS0jN1cLYnfcu1EQAAACYH8efrvfqDLEwiqI1165q5XQAAABYQBcv/bL+BopIAQAAgiYWAgAABG2usfAr/+pgnT8BAABY4mYfC//H7/8fn9j5e13/7J9t2fG7v/37n9my43dv37Fzy47f7fjvf2/Ljt9dc8e2f/nD/9R152+1dLYAAAC02Cxj4co1qzMrVz7+1//bh5Zfe3Dor1dd17b/23+1vO2avf/qsUQi+h8ePvjue+9NZjJbP3V7qycMAABAK80yFv7mx2+J/r9fTWYmJyejycnM5ez/k5cnJ7MtUfbXDz64/GvXr2j1bAEAAObRW++er/P/Qs7kPz7/w8/e+9nK9s/e+9n/+PwPWzvWLGPhb93+icw7F38xceEXFyfOX7xw/sKFiQ

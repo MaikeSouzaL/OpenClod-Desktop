@@ -1,0 +1,1106 @@
+# MÓDULO 08 — GIT INTELIGENTE, DIFF, BRANCHES, WORKTREES E COORDENAÇÃO DE ALTERAÇÕES
+
+## 1. MISSÃO PRINCIPAL
+
+Implemente no nosso AI Development Harness um sistema completo de gerenciamento inteligente de versões e alterações de código, utilizando Git como infraestrutura principal.
+
+O objetivo é permitir que o harness controle as modificações realizadas pelo agente principal e pelos subagents, preserve o trabalho preexistente do usuário, crie ambientes isolados para tarefas paralelas, identifique conflitos e integre alterações de maneira controlada.
+
+O módulo deverá funcionar em conjunto com:
+
+- **Módulo 01:** Agent Core.
+- **Módulo 02:** Subagents e Orchestration.
+- **Módulo 03:** Skills, Custom Commands e Hooks.
+- **Módulo 06:** Terminal, Shell e Execução de Processos.
+- **Módulo 07:** Code Intelligence e Manipulação de Repositórios.
+
+Não implemente apenas uma interface para executar comandos Git. Construa uma camada de gerenciamento de versões que compreenda o estado do repositório, acompanhe as alterações de cada tarefa e ajude a coordenar o trabalho de múltiplos agentes.
+
+O harness deverá conseguir:
+
+1. Detectar se um projeto utiliza Git.
+2. Identificar o estado atual do repositório.
+3. Distinguir arquivos modificados, adicionados, removidos e não rastreados.
+4. Examinar diffs e alterações por arquivo.
+5. Criar branches para tarefas específicas.
+6. Criar worktrees isoladas para subagents.
+7. Acompanhar as modificações de cada agente.
+8. Detectar conflitos entre tarefas.
+9. Validar alterações antes da integração.
+10. Realizar commits quando solicitado e autorizado.
+11. Integrar alterações compatíveis.
+12. Recuperar o estado anterior a uma operação realizada pelo próprio harness, quando possível.
+13. Registrar um histórico das operações.
+14. Apresentar relatórios claros sobre o que mudou e por quê.
+
+**Princípio central:** nenhuma tarefa automatizada deve apagar ou sobrescrever silenciosamente alterações preexistentes do usuário.
+
+## 2. REGRAS OBRIGATÓRIAS
+
+Antes de implementar:
+
+1. Inspecione a arquitetura atual do harness.
+2. Identifique os mecanismos existentes de leitura e edição de arquivos.
+3. Examine a integração com o Módulo 06.
+4. Examine a integração com o Módulo 07.
+5. Identifique como as tarefas e sessões são armazenadas.
+6. Verifique como os subagents recebem seus diretórios de trabalho.
+7. Execute os testes existentes.
+8. Identifique funcionalidades de Git que já estejam implementadas.
+
+Depois, clone e analise os repositórios indicados abaixo.
+
+Para cada repositório, examine o código real, compare as implementações e identifique componentes que possam melhorar o harness.
+
+Implemente as melhorias diretamente no projeto.
+
+Não entregue apenas uma análise ou um plano de implementação.
+
+Não reescreva funcionalidades existentes sem necessidade. Reutilize a arquitetura atual, preserve o que funciona e evite criar mecanismos paralelos para operações que o Git já oferece de forma confiável.
+
+Não presuma a linguagem de programação do harness. Selecione as bibliotecas e integrações de acordo com a arquitetura real do projeto.
+
+---
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+### 3.1. Git — implementação de referência
+
+https://github.com/git/git
+
+Analise o código e a documentação relacionados às operações necessárias ao módulo.
+
+Investigue:
+
+- Estado do repositório.
+- Index e staging area.
+- Commits.
+- Branches.
+- Tags.
+- Diffs.
+- Merge.
+- Rebase.
+- Cherry-pick.
+- Stash.
+- Worktrees.
+- Detecção de conflitos.
+- Histórico.
+- Recuperação por reflog.
+- Hooks do Git.
+- Lockfiles e concorrência.
+
+Utilize o Git como fonte principal de verdade para o estado das versões.
+
+Prefira executar o Git de maneira estruturada pelo Módulo 06 quando isso for apropriado, em vez de recriar operações complexas em código próprio.
+
+### 3.2. libgit2 — biblioteca para operações Git
+
+https://github.com/libgit2/libgit2
+
+Examine a biblioteca libgit2 e avalie se ela oferece vantagens para a arquitetura existente.
+
+Investigue:
+
+- Leitura do estado do repositório.
+- Branches.
+- Commits.
+- Árvores de arquivos.
+- Diffs.
+- Merge.
+- Index.
+- Referências.
+- Histórico.
+
+Se o harness utilizar uma linguagem compatível e a biblioteca trouxer benefícios concretos, avalie sua integração.
+
+Não mantenha duas implementações concorrentes de Git sem uma razão técnica clara.
+
+### 3.3. isomorphic-git
+
+https://github.com/isomorphic-git/isomorphic-git
+
+Examine a implementação JavaScript de operações Git.
+
+Avalie sua adequação caso o harness utilize JavaScript ou TypeScript e precise realizar determinadas operações sem depender diretamente do executável Git para cada tarefa.
+
+Compare as limitações de compatibilidade, desempenho e suporte a operações complexas com o Git tradicional.
+
+### 3.4. simple-git
+
+https://github.com/steveukx/git-js
+
+Analise a biblioteca simple-git para projetos Node.js.
+
+Avalie como ela organiza:
+
+- Execução de comandos Git.
+- Estado do repositório.
+- Branches.
+- Commits.
+- Diffs.
+- Staging.
+- Histórico.
+- Operações assíncronas.
+- Tratamento de erros.
+
+Se o harness utilizar Node.js, determine se essa biblioteca pode simplificar a integração sem esconder informações importantes sobre o resultado das operações.
+
+### 3.5. OpenCode
+
+https://github.com/anomalyco/opencode
+
+Examine as implementações relacionadas a:
+
+- Gerenciamento de alterações.
+- Integração com Git.
+- Diffs.
+- Sessões de programação.
+- Aplicação de patches.
+- Fluxo de execução do agente.
+- Gerenciamento de workspaces.
+
+Identifique padrões que possam melhorar a experiência de revisão de alterações e o controle das tarefas.
+
+### 3.6. OpenAI Codex
+
+https://github.com/openai/codex
+
+Analise os componentes públicos relacionados a:
+
+- Alterações de arquivos.
+- Execução de comandos Git.
+- Inspeção do estado do workspace.
+- Diffs.
+- Isolamento de tarefas.
+- Aplicação de patches.
+- Fluxo de trabalho do agente de programação.
+
+Utilize somente as funcionalidades presentes no código efetivamente analisado. Não presuma acesso à implementação interna de produtos que não esteja publicada.
+
+### 3.7. OpenHands
+
+https://github.com/All-Hands-AI/OpenHands
+
+Examine como o projeto organiza ambientes de execução e tarefas de agentes de programação.
+
+Avalie:
+
+- Workspaces.
+- Isolamento de tarefas.
+- Execução de comandos.
+- Gerenciamento de arquivos.
+- Integração com Git.
+- Persistência do trabalho.
+- Recuperação de estado.
+
+Aproveite as ideias compatíveis com o harness sem importar toda a arquitetura do OpenHands desnecessariamente.
+
+### 3.8. Cline
+
+https://github.com/cline/cline
+
+Examine a integração entre o agente de programação, os arquivos modificados e a interface de revisão.
+
+Avalie como apresentar:
+
+- Alterações de arquivos.
+- Diffs.
+- Estado das operações.
+- Histórico de ações.
+- Resultados de comandos.
+- Revisão das modificações.
+
+Utilize os componentes ou padrões que realmente se encaixarem na interface existente.
+
+### 3.9. Git Town
+
+https://github.com/git-town/git-town
+
+Analise o Git Town como referência para fluxos de branches e operações de desenvolvimento.
+
+Investigue os mecanismos relacionados a:
+
+- Organização de branches.
+- Dependências entre branches.
+- Sincronização.
+- Integração de alterações.
+- Automação de fluxos Git.
+- Resolução de situações intermediárias.
+
+Não adote automaticamente o fluxo de trabalho do Git Town. Selecione somente as ideias úteis ao harness.
+
+### 3.10. GitHub CLI
+
+https://github.com/cli/cli
+
+Examine a integração com operações do GitHub, especialmente se o harness já possuir ou planejar um módulo de integração remota.
+
+Avalie:
+
+- Pull requests.
+- Revisões.
+- Estado de verificações.
+- Issues.
+- Branches remotas.
+- Publicação de alterações.
+
+Mantenha as operações locais do Git independentes das integrações remotas. O funcionamento básico do módulo não deve exigir uma conta GitHub.
+
+---
+
+## 4. ARQUITETURA DO MÓDULO
+
+Implemente os componentes abaixo ou amplie os equivalentes já existentes.
+
+### 4.1. Repository State Manager
+
+Responsável por identificar o estado real do repositório.
+
+Deve consultar e representar:
+
+- Raiz do repositório.
+- Branch atual.
+- Commit atual.
+- Branches locais.
+- Branches remotas conhecidas.
+- Arquivos modificados.
+- Arquivos adicionados.
+- Arquivos removidos.
+- Arquivos não rastreados.
+- Arquivos ignorados, quando necessários.
+- Estado do index.
+- Alterações staged e unstaged.
+- Estado de merge ou rebase.
+- Worktrees existentes.
+- Conflitos pendentes.
+- Alterações ainda não commitadas.
+
+O resultado deve ser estruturado para consumo pelo Agent Core.
+
+Não utilize apenas uma interpretação simplificada de `git status` quando forem necessárias informações adicionais.
+
+### 4.2. Git Operation Service
+
+Centralize as operações Git em um serviço compartilhado.
+
+Ele deverá implementar ou encapsular:
+
+- Consulta de estado.
+- Branches.
+- Worktrees.
+- Diffs.
+- Staging.
+- Commits.
+- Merge.
+- Rebase.
+- Cherry-pick.
+- Stash.
+- Histórico.
+- Tags.
+- Verificação de conflitos.
+- Recuperação de operações.
+
+Cada operação deve ter:
+
+- Identificador.
+- Parâmetros validados.
+- Estado.
+- Resultado.
+- Erros tipados.
+- Registro de execução.
+- Associação com a tarefa que a solicitou.
+
+Não crie executores Git independentes para cada subagent.
+
+### 4.3. Diff Engine
+
+Implemente uma camada para obter, interpretar e apresentar alterações.
+
+Ela deve conseguir produzir:
+
+- Diff do workspace.
+- Diff do index.
+- Diff de um arquivo.
+- Diff entre commits.
+- Diff entre branches.
+- Diff de uma worktree.
+- Resumo das alterações.
+- Estatísticas de inserções e remoções.
+- Lista de arquivos afetados.
+- Trechos relevantes.
+- Identificação de arquivos binários.
+
+Preserve as informações originais do diff sempre que necessário.
+
+Não considere que todos os arquivos podem ser representados corretamente como texto.
+
+### 4.4. Patch Manager
+
+Centralize a aplicação de alterações.
+
+O serviço deve:
+
+1. Identificar o arquivo alvo.
+2. Verificar o estado atual.
+3. Confirmar que o patch corresponde ao conteúdo esperado.
+4. Aplicar a alteração.
+5. Validar o resultado.
+6. Gerar o diff.
+7. Registrar a operação.
+8. Permitir recuperação quando a operação puder ser revertida com segurança.
+
+Se o conteúdo tiver mudado desde a criação do patch, detecte o conflito em vez de sobrescrever silenciosamente.
+
+Utilize o mecanismo de edição do Módulo 07 sempre que possível.
+
+### 4.5. Branch Manager
+
+Gerencie branches associadas a tarefas.
+
+Implemente:
+
+- Criação de branches.
+- Consulta de branches.
+- Verificação de existência.
+- Troca de branch quando apropriado.
+- Renomeação.
+- Exclusão condicionada.
+- Relação entre branch e tarefa.
+- Detecção de branches já utilizadas.
+- Verificação de alterações pendentes antes de operações que possam afetá-las.
+
+Não troque automaticamente a branch do workspace principal enquanto outro agente ou o usuário estiver utilizando esse mesmo workspace.
+
+### 4.6. Worktree Manager
+
+Este é um dos componentes mais importantes do módulo.
+
+Implemente gerenciamento de worktrees reais do Git.
+
+Deve permitir:
+
+- Criar uma worktree para uma tarefa.
+- Associar uma branch à worktree.
+- Registrar o agente responsável.
+- Identificar o diretório da worktree.
+- Consultar seu estado.
+- Listar arquivos modificados.
+- Executar testes isoladamente.
+- Comparar alterações com a referência apropriada.
+- Finalizar a tarefa.
+- Integrar o resultado.
+- Remover a worktree quando não houver alterações que precisem ser preservadas.
+
+Cada worktree deve ter um registro persistente contendo, quando aplicável:
+
+- ID da tarefa.
+- ID do agente.
+- Caminho do workspace.
+- Branch.
+- Commit base.
+- Data de criação.
+- Estado.
+- Processos ativos associados.
+- Resultado dos testes.
+- Estado de integração.
+- Pendências.
+
+Não crie diretórios independentes e os chame de worktrees sem utilizar os mecanismos reais do Git.
+
+### 4.7. Conflict Detector
+
+Implemente mecanismos para identificar conflitos entre tarefas.
+
+Considere:
+
+- Arquivos modificados por mais de um agente.
+- Regiões sobrepostas.
+- Símbolos compartilhados.
+- Arquivos de configuração.
+- Dependências entre alterações.
+- Mudanças na branch base.
+- Diferenças de contexto.
+- Alterações incompatíveis em interfaces.
+
+Não confunda dois agentes modificando arquivos diferentes com a ausência absoluta de conflitos. Uma mudança pode afetar semanticamente outro arquivo.
+
+Utilize as informações do Módulo 07 para melhorar a análise de impacto.
+
+### 4.8. Merge Coordinator
+
+Coordene a integração das alterações concluídas.
+
+Deve:
+
+1. Identificar a tarefa concluída.
+2. Obter o diff da tarefa.
+3. Verificar o estado do workspace de destino.
+4. Identificar conflitos conhecidos.
+5. Verificar a compatibilidade com a base atual.
+6. Executar validações pertinentes.
+7. Aplicar a estratégia de integração escolhida.
+8. Registrar o resultado.
+9. Atualizar o estado da tarefa.
+10. Preservar informações suficientes para investigar falhas.
+
+Não integre automaticamente todas as branches apenas porque os agentes informaram que terminaram.
+
+### 4.9. Git Operation Journal
+
+Mantenha um histórico estruturado das operações executadas pelo harness.
+
+Registre:
+
+- Operação.
+- Repositório.
+- Branch.
+- Worktree.
+- Tarefa.
+- Agente.
+- Horário.
+- Parâmetros não sensíveis.
+- Resultado.
+- Erro.
+- Referências aos commits.
+- Arquivos afetados.
+
+Esse histórico deve ajudar a compreender como o repositório chegou ao estado atual.
+
+Não armazene credenciais, tokens ou segredos desnecessários nos registros.
+
+---
+
+## 5. GESTÃO INTELIGENTE DE BRANCHES
+
+### 5.1. Estratégia de branches
+
+Permita configurar estratégias como:
+
+- Trabalhar na branch atual.
+- Criar uma branch por tarefa.
+- Criar uma branch por subagent.
+- Utilizar branches temporárias para alterações experimentais.
+- Utilizar worktrees para tarefas paralelas.
+
+A estratégia deve ser compatível com o fluxo de trabalho existente do usuário.
+
+Não force o uso de branches novas para tarefas triviais se a configuração não exigir isso.
+
+### 5.2. Nomes de branches
+
+Gere nomes previsíveis, legíveis e válidos.
+
+Exemplos:
+
+- `agent/fix-login-validation`
+- `agent/add-terminal-session`
+- `agent/refactor-api-client`
+- `agent/test-database-service`
+
+Implemente:
+
+- Normalização.
+- Limite de comprimento.
+- Detecção de colisões.
+- Identificação da tarefa.
+- Configuração de prefixos.
+- Tratamento de caracteres inválidos.
+
+Não use apenas o nome da tarefa como identificador único.
+
+### 5.3. Proteção da branch principal
+
+Antes de modificar branches importantes:
+
+- Verifique o estado atual.
+- Verifique alterações pendentes.
+- Identifique operações Git em andamento.
+- Preserve as modificações do usuário.
+- Evite reescrever histórico compartilhado sem autorização.
+- Registre a operação.
+
+Não presuma que a branch principal sempre se chama `main` ou `master`.
+
+Descubra a configuração real do repositório.
+
+---
+
+## 6. WORKTREES PARA SUBAGENTS
+
+### 6.1. Objetivo
+
+Permitir que vários agentes trabalhem simultaneamente no mesmo repositório sem disputar o mesmo diretório de trabalho.
+
+Exemplo:
+
+- Agente A modifica o frontend.
+- Agente B implementa uma API.
+- Agente C cria testes.
+- Agente D revisa a arquitetura.
+
+Cada agente pode trabalhar em uma worktree separada quando as tarefas forem adequadas à execução paralela.
+
+### 6.2. Criação de worktrees
+
+Implemente um fluxo que:
+
+1. Identifique o repositório principal.
+2. Consulte o estado atual.
+3. Selecione um commit base.
+4. Escolha uma branch.
+5. Crie a worktree.
+6. Registre a associação com a tarefa.
+7. Configure o ambiente de execução.
+8. Confirme que o workspace está pronto.
+
+Considere dependências locais que não são versionadas, arquivos ignorados, configurações de ambiente e diretórios de build.
+
+Não copie segredos para novas worktrees desnecessariamente.
+
+### 6.3. Isolamento de processos
+
+Integre as worktrees com o Módulo 06.
+
+Cada processo iniciado para uma tarefa deve ter seu diretório de trabalho correto.
+
+O harness deve conseguir identificar quais servidores, testes e comandos pertencem a cada tarefa.
+
+Evite que um agente execute comandos no diretório principal por engano quando deveria trabalhar em uma worktree isolada.
+
+### 6.4. Limpeza
+
+Implemente um processo de finalização que verifique:
+
+- Se existem processos ativos.
+- Se há alterações não commitadas.
+- Se a tarefa já foi integrada.
+- Se existem commits que precisam ser preservados.
+- Se há arquivos não rastreados relevantes.
+- Se o workspace ainda está em uso.
+
+Não remova automaticamente uma worktree com trabalho não integrado.
+
+Ofereça opções para preservar, integrar ou descartar alterações conforme o estado e as permissões existentes.
+
+---
+
+## 7. DIFF E REVISÃO DE ALTERAÇÕES
+
+A interface deve permitir compreender o que mudou.
+
+Implemente, conforme a tecnologia da interface:
+
+- Visualização de diff por arquivo.
+- Linhas adicionadas.
+- Linhas removidas.
+- Contexto ao redor da alteração.
+- Resumo das mudanças.
+- Comparação com a branch base.
+- Comparação entre commits.
+- Lista de arquivos modificados.
+- Identificação de arquivos renomeados.
+- Identificação de arquivos binários.
+- Filtros por arquivo e status.
+- Atualização do diff após novas edições.
+
+Quando houver múltiplas tarefas, permita filtrar por:
+
+- Agente.
+- Tarefa.
+- Branch.
+- Worktree.
+- Estado de integração.
+
+Não misture silenciosamente as alterações de tarefas distintas em um único relatório.
+
+### 7.1. Revisão assistida por IA
+
+Utilize o Agent Core e o Módulo 07 para revisar diffs.
+
+A revisão deve procurar:
+
+- Erros de lógica.
+- Regressões.
+- Problemas de compatibilidade.
+- Alterações não relacionadas.
+- Testes ausentes.
+- Mudanças em interfaces públicas.
+- Código duplicado.
+- Alterações em configurações.
+- Riscos de conflitos com outras tarefas.
+
+As conclusões da IA devem ser apresentadas como achados que precisam de evidência, não como garantias de correção.
+
+---
+
+## 8. STAGING E COMMITS
+
+### 8.1. Staging seletivo
+
+Permita adicionar alterações específicas ao index.
+
+O agente deve conseguir selecionar:
+
+- Arquivos completos.
+- Arquivos específicos.
+- Trechos de diff, quando suportados.
+- Alterações pertencentes à tarefa atual.
+
+Evite adicionar automaticamente todo o workspace quando houver alterações preexistentes de outros agentes ou do usuário.
+
+### 8.2. Commits
+
+Permita que o harness crie commits quando isso fizer parte do fluxo configurado.
+
+Implemente:
+
+- Mensagens descritivas.
+- Identificação da tarefa.
+- Validação do estado do index.
+- Verificação de conflitos pendentes.
+- Registro do hash do commit.
+- Tratamento de hooks que falham.
+- Tratamento de assinaturas ou configurações de usuário ausentes.
+
+Não configure automaticamente nome e e-mail globais do Git sem uma solicitação apropriada.
+
+Não crie commits vazios ou que misturem alterações alheias à tarefa sem uma justificativa explícita.
+
+### 8.3. Commits por agente
+
+Quando houver múltiplos agentes, permita associar commits a tarefas.
+
+Utilize mensagens que ajudem a identificar o objetivo da mudança sem incluir dados sensíveis.
+
+Não dependa exclusivamente do texto da mensagem para determinar quais arquivos pertencem a uma tarefa.
+
+---
+
+## 9. MERGE, REBASE E RESOLUÇÃO DE CONFLITOS
+
+### 9.1. Detecção
+
+Antes de integrar uma branch:
+
+- Identifique a base.
+- Compare os commits.
+- Detecte arquivos conflitantes.
+- Verifique mudanças recentes na branch de destino.
+- Consulte as alterações relacionadas.
+- Identifique os testes relevantes.
+
+### 9.2. Estratégias de integração
+
+Permita configurar estratégias como:
+
+- Merge tradicional.
+- Fast-forward quando possível.
+- Rebase quando apropriado.
+- Cherry-pick de commits específicos.
+- Aplicação controlada de patches.
+
+Não utilize rebase automaticamente em branches compartilhadas sem considerar o impacto.
+
+Não execute `reset --hard`, `clean -fd` ou operações equivalentes para solucionar conflitos de forma automática.
+
+### 9.3. Resolução assistida
+
+Quando ocorrer um conflito:
+
+1. Preserve o estado conflitante.
+2. Identifique os arquivos envolvidos.
+3. Apresente os trechos em conflito.
+4. Consulte o histórico e os diffs de origem.
+5. Utilize o Módulo 07 para entender o código afetado.
+6. Solicite ao agente uma proposta de resolução.
+7. Valide a proposta.
+8. Execute testes pertinentes.
+9. Registre o resultado.
+
+Se a resolução automática não for confiável, mantenha o conflito explícito em vez de escolher arbitrariamente uma versão.
+
+### 9.4. Integração após validação
+
+Antes de finalizar a integração:
+
+- Confirme que os testes exigidos foram executados.
+- Verifique o diff resultante.
+- Verifique se existem conflitos pendentes.
+- Confirme que as alterações pertencem às tarefas esperadas.
+- Registre o commit resultante, quando houver.
+
+A aprovação de uma tarefa pelo subagent não deve, sozinha, comprovar que a integração foi bem-sucedida.
+
+---
+
+## 10. RECUPERAÇÃO E OPERAÇÕES REVERSÍVEIS
+
+Implemente mecanismos para investigar e recuperar operações realizadas pelo próprio harness.
+
+Considere:
+
+- Identificadores de operação.
+- Hashes de commits.
+- Estado anterior.
+- Estado posterior.
+- Branches temporárias.
+- Reflog.
+- Stash quando apropriado.
+- Patches de recuperação.
+- Registro de arquivos afetados.
+
+Antes de executar uma operação destrutiva, verifique se existem modificações que não podem ser recuperadas pelo Git.
+
+Não considere o reflog ou o stash uma garantia absoluta de recuperação de todos os arquivos.
+
+Arquivos não rastreados, arquivos ignorados e dados externos ao repositório exigem tratamento próprio.
+
+Não execute operações de restauração global para desfazer uma única mudança quando houver uma alternativa localizada.
+
+---
+
+## 11. INTEGRAÇÃO COM O AGENT CORE
+
+O Agent Core deve utilizar as operações Git através de ferramentas centrais.
+
+Fluxo esperado:
+
+1. Receber a tarefa.
+2. Consultar o estado do repositório.
+3. Identificar alterações preexistentes.
+4. Selecionar a estratégia de trabalho.
+5. Criar branch ou worktree quando apropriado.
+6. Executar as alterações.
+7. Consultar os diffs.
+8. Validar o resultado.
+9. Integrar as alterações conforme a configuração.
+10. Registrar o resultado final.
+
+O agente deve conseguir diferenciar:
+
+- Alterações próprias da tarefa.
+- Alterações preexistentes.
+- Alterações de outros agentes.
+- Alterações já integradas.
+- Alterações ainda pendentes.
+
+Não considere que todo arquivo modificado durante uma tarefa foi necessariamente modificado por ela.
+
+Utilize o estado inicial, os diffs e os registros de operações para atribuir mudanças com maior precisão.
+
+---
+
+## 12. INTEGRAÇÃO COM SUBAGENTS E ORQUESTRADOR
+
+O Módulo 02 deve utilizar este módulo para coordenar alterações concorrentes.
+
+Implemente:
+
+- Associação entre tarefa, agente, branch e worktree.
+- Criação de worktrees isoladas.
+- Registro de commits.
+- Monitoramento de alterações.
+- Detecção de arquivos compartilhados.
+- Verificação de dependências entre tarefas.
+- Integração sequencial quando necessário.
+- Integração paralela quando for viável.
+- Tratamento de conflitos.
+- Recuperação de falhas.
+- Limpeza controlada.
+
+O orquestrador deve conseguir identificar tarefas que podem ser executadas paralelamente e tarefas que dependem de alterações anteriores.
+
+Não permita que dois agentes executem operações conflitantes sobre a mesma branch sem coordenação.
+
+Quando uma tarefa depender da saída de outra, estabeleça explicitamente a ordem de integração ou atualize a base da tarefa dependente.
+
+---
+
+## 13. FERRAMENTAS DO MÓDULO
+
+Registre as ferramentas no sistema central do harness.
+
+Os nomes abaixo são sugestões. Reutilize os contratos existentes quando forem equivalentes.
+
+### Estado e histórico
+
+- `git.get_status`
+- `git.get_diff`
+- `git.get_file_diff`
+- `git.get_history`
+- `git.get_branches`
+- `git.get_worktrees`
+- `git.get_conflicts`
+
+### Branches e commits
+
+- `git.create_branch`
+- `git.switch_branch`
+- `git.delete_branch`
+- `git.stage_changes`
+- `git.unstage_changes`
+- `git.commit`
+- `git.compare_branches`
+- `git.compare_commits`
+
+### Worktrees
+
+- `git.create_worktree`
+- `git.get_worktree_status`
+- `git.list_worktrees`
+- `git.finalize_worktree`
+- `git.remove_worktree`
+
+### Integração
+
+- `git.merge`
+- `git.rebase`
+- `git.cherry_pick`
+- `git.resolve_conflict`
+- `git.validate_integration`
+- `git.get_integration_result`
+
+### Recuperação
+
+- `git.get_operation_history`
+- `git.create_recovery_point`
+- `git.restore_operation`
+- `git.abort_operation`
+
+Cada ferramenta deve possuir:
+
+- Entrada estruturada.
+- Validação de parâmetros.
+- Identificação do repositório.
+- Identificação da tarefa.
+- Resultado estruturado.
+- Tratamento de erros.
+- Registro da operação.
+- Verificação do estado do repositório antes e depois.
+
+Operações destrutivas devem passar pelas regras de autorização existentes no harness.
+
+Não exponha uma ferramenta chamada `restore_operation` que prometa recuperar qualquer estado sem verificar se os dados necessários ainda existem.
+
+---
+
+## 14. INTEGRAÇÃO COM O MÓDULO 07
+
+Utilize o Code Intelligence para melhorar a precisão do gerenciamento Git.
+
+Exemplos:
+
+- Identificar os símbolos afetados por um diff.
+- Encontrar arquivos relacionados a uma mudança.
+- Avaliar alterações de interfaces públicas.
+- Identificar testes potencialmente afetados.
+- Detectar alterações semanticamente conflitantes.
+- Validar renomeações.
+- Comparar a estrutura do código antes e depois da integração.
+
+Quando possível, combine a análise textual do Git com a análise sintática e semântica do Módulo 07.
+
+Não substitua o diff real do Git por uma interpretação produzida pelo modelo.
+
+O diff do Git deve permanecer a referência para as alterações efetivamente registradas no repositório.
+
+---
+
+## 15. INTEGRAÇÃO COM O MÓDULO 06
+
+Execute as operações Git pelo executor central de processos quando essa abordagem for adequada.
+
+Implemente:
+
+- Captura de stdout e stderr.
+- Códigos de saída.
+- Timeouts.
+- Cancelamento.
+- Logs.
+- Associação entre processo e tarefa.
+- Tratamento de comandos que exigem interação.
+
+Evite executar Git por strings de shell construídas sem validação.
+
+Prefira argumentos estruturados e tratamento explícito de caminhos, opções e referências.
+
+Quando um processo Git falhar, preserve o diagnóstico real e informe o estado da operação.
+
+Não repita automaticamente operações de integração cujo resultado seja incerto sem verificar primeiro o estado do repositório.
+
+---
+
+## 16. TESTES AUTOMATIZADOS
+
+Utilize o framework de testes existente.
+
+Crie repositórios temporários e isolados para os testes. Não utilize o repositório real do usuário como ambiente descartável.
+
+### 16.1. Testes de estado
+
+Verifique:
+
+- Repositório limpo.
+- Arquivo modificado.
+- Arquivo adicionado.
+- Arquivo removido.
+- Arquivo não rastreado.
+- Alterações staged.
+- Alterações unstaged.
+- Branches.
+- Commits.
+- Worktrees.
+- Conflitos pendentes.
+
+### 16.2. Testes de branches
+
+Verifique:
+
+- Criação.
+- Colisões de nomes.
+- Troca de branch.
+- Branch inexistente.
+- Exclusão de branch não utilizada.
+- Proteção contra exclusão de branches com trabalho relevante.
+- Tratamento de alterações pendentes.
+
+### 16.3. Testes de worktrees
+
+Verifique:
+
+- Criação de worktree.
+- Associação com a tarefa.
+- Associação com a branch.
+- Execução de comandos no diretório correto.
+- Alterações independentes.
+- Listagem.
+- Finalização.
+- Preservação de trabalho não integrado.
+- Remoção após validação.
+
+### 16.4. Testes de integração entre agentes
+
+Simule dois ou mais agentes:
+
+1. Cada agente recebe uma tarefa.
+2. Cada tarefa obtém um workspace isolado.
+3. Os agentes modificam arquivos.
+4. O harness registra os diffs.
+5. As tarefas são concluídas.
+6. O orquestrador tenta integrar as alterações.
+7. Os conflitos são detectados.
+8. As alterações compatíveis são integradas.
+9. Os resultados são verificados.
+
+Teste tanto alterações em arquivos diferentes quanto alterações conflitantes no mesmo arquivo.
+
+### 16.5. Testes de preservação
+
+Crie cenários contendo alterações preexistentes do usuário.
+
+Verifique que:
+
+- As alterações continuam presentes.
+- O staging não inclui arquivos indevidos.
+- O merge não elimina modificações sem aviso.
+- A limpeza não remove arquivos importantes.
+- A recuperação não desfaz mudanças fora do escopo.
+
+### 16.6. Testes de falhas
+
+Simule:
+
+- Merge com conflito.
+- Rebase interrompido.
+- Processo Git cancelado.
+- Branch removida externamente.
+- Worktree indisponível.
+- Arquivos modificados durante uma operação.
+- Falha de permissão.
+- Repositório corrompido ou incompleto.
+- Operação repetida.
+- Desconexão entre o agente e o processo.
+
+Verifique que o estado final seja identificado corretamente.
+
+---
+
+## 17. CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] O harness consulta o estado real do Git.
+- [ ] Os diffs são exibidos corretamente.
+- [ ] Branches podem ser criadas e gerenciadas.
+- [ ] O sistema distingue staging e alterações não staged.
+- [ ] Commits são associados às tarefas quando aplicável.
+- [ ] Worktrees reais podem ser criadas.
+- [ ] Os subagents conseguem trabalhar em worktrees separadas.
+- [ ] Os processos utilizam o diretório correto.
+- [ ] As alterações preexistentes são preservadas.
+- [ ] O sistema identifica arquivos modificados por múltiplos agentes.
+- [ ] Conflitos são detectados e apresentados.
+- [ ] A integração de alterações possui validação.
+- [ ] O sistema não descarta silenciosamente trabalho não integrado.
+- [ ] O histórico de operações é consultável.
+- [ ] A recuperação verifica o estado real antes de agir.
+- [ ] O Agent Core utiliza as ferramentas centrais.
+- [ ] O Módulo 07 contribui para a análise de impacto.
+- [ ] O Módulo 06 executa as operações necessárias.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam funcionando.
+
+---
+
+## 18. ORDEM DE IMPLEMENTAÇÃO
+
+1. Inspecionar o harness e executar os testes existentes.
+2. Clonar e analisar os repositórios indicados.
+3. Definir os contratos de estado, diff, branch e worktree.
+4. Implementar o Repository State Manager.
+5. Implementar o Git Operation Service.
+6. Implementar o Diff Engine.
+7. Implementar o Branch Manager.
+8. Implementar o Worktree Manager.
+9. Integrar as worktrees aos subagents.
+10. Implementar o Conflict Detector.
+11. Implementar o Merge Coordinator.
+12. Implementar o histórico de operações.
+13. Integrar o Code Intelligence.
+14. Integrar as ferramentas ao Agent Core.
+15. Implementar a interface de revisão de diffs.
+16. Implementar testes de integração e recuperação.
+17. Corrigir regressões.
+18. Documentar o uso e a configuração.
+
+Ajuste a ordem conforme as dependências reais do projeto, mas não deixe de implementar e testar o núcleo funcional.
+
+## 19. RELATÓRIO FINAL OBRIGATÓRIO
+
+Ao concluir, apresente:
+
+1. Arquitetura inicial encontrada.
+2. Repositórios efetivamente clonados e analisados.
+3. Bibliotecas utilizadas e justificativas.
+4. Componentes implementados ou aprimorados.
+5. Arquivos modificados.
+6. Operações Git suportadas.
+7. Estratégia de branches implementada.
+8. Estratégia de worktrees implementada.
+9. Integração com os subagents.
+10. Tratamento de conflitos.
+11. Estratégia de recuperação.
+12. Testes executados e resultados.
+13. Problemas encontrados e corrigidos.
+14. Limitações conhecidas.
+15. Instruções para executar e validar o módulo.
+
+Diferencie claramente o que foi implementado, o que foi testado e o que ainda está pendente.
+
+## 20. DIRETRIZ FINAL
+
+Implemente o Módulo 08 diretamente no AI Development Harness existente.
+
+Clone e examine os repositórios listados, aproveite as soluções que trouxerem melhorias reais e implemente o gerenciamento inteligente de versões integrado aos módulos anteriores.
+
+O resultado deve permitir que o harness controle alterações, crie worktrees para tarefas paralelas, coordene subagents, detecte conflitos e integre código sem destruir trabalho existente.
+
+Não entregue somente um plano ou uma interface demonstrativa. Entregue código funcional, testes executados e documentação.

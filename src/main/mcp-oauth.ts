@@ -83,6 +83,19 @@ export class McpOAuthManager {
     this.save()
   }
 
+  status(serverName?: string): { total: number; connected: number; expiresAt?: number } {
+    this.load()
+    const records = serverName
+      ? [this.records.get(serverName)].filter((record): record is OAuthRecord => Boolean(record))
+      : [...this.records.values()]
+    const connected = records.filter((record) => !record.expiresAt || record.expiresAt - 30_000 > Date.now())
+    return {
+      total: records.length,
+      connected: connected.length,
+      expiresAt: serverName ? records[0]?.expiresAt : undefined
+    }
+  }
+
   private async refresh(serverName: string, record: OAuthRecord): Promise<string | null> {
     const body = new URLSearchParams({
       grant_type: 'refresh_token',

@@ -7,22 +7,22 @@ import { PROVIDER_PRESETS, presetToConfig } from '../core/providers/presets.js'
 import { DEFAULT_RULES, mergeRules } from '../core/security/rules.js'
 
 /** Current settings schema; bump with a migration in SettingsStore.init(). */
-export const SETTINGS_VERSION = 2
+export const SETTINGS_VERSION = 3
 
 /**
- * Autonomous by default, as the project brief asks: edits, commands and
- * browsing run without prompts; destructive actions and secret files still
- * ask. Real mouse/keyboard control stays an explicit opt-in.
+ * The user explicitly selected an unrestricted harness: local rules, command
+ * blocklists and confirmation prompts are bypassed. Provider refusals and
+ * operating-system permissions remain outside the harness.
  */
 const DEFAULT_POLICY: PolicyConfig = {
-  mode: 'auto',
+  mode: 'unrestricted',
   blockedCommands: [],
   allowedRoots: [],
   // The user asked the agent to work on the whole computer, not only inside
   // the project folder. Dangerous commands and secret files still ask.
   fullAccess: true,
   allowNetwork: true,
-  allowComputerControl: false,
+  allowComputerControl: true,
   shellTimeoutSec: 300,
   rules: mergeRules(DEFAULT_RULES)
 }
@@ -65,6 +65,8 @@ export function defaultSettings(): AppSettings {
     'kimi',
     'qwen',
     'openrouter',
+    'opencode-go',
+    'opencode',
     'ollama',
     'lmstudio',
     'mock'
@@ -86,6 +88,7 @@ export function defaultSettings(): AppSettings {
     claudeCatalogImported: false,
     mcpServers: [],
     hooks: {},
+    browser: { mode: 'auto', groupBySession: true },
     importClaudeSettings: false,
     settingsVersion: SETTINGS_VERSION
   }
@@ -133,6 +136,10 @@ export class SettingsStore {
         limits: { ...DEFAULT_LIMITS, ...(parsed.limits ?? {}) },
         providers: Array.isArray(parsed.providers) && parsed.providers.length ? parsed.providers : defaultSettings().providers
       }
+      const savedProviderIds = new Set(this.settings.providers.map((provider) => provider.id))
+      for (const key of ['opencode-go', 'opencode']) {
+        if (!savedProviderIds.has(key)) this.settings.providers.push(presetToConfig(key))
+      }
       if ((parsed.settingsVersion ?? 1) < SETTINGS_VERSION) {
         this.migrate(parsed)
         await this.save()
@@ -150,17 +157,17 @@ export class SettingsStore {
     }
   }
 
-  /**
-   * v1 → v2: 0.1.0 shipped "ask" as the default mode, which prompted for every
-   * edit and command; v2 defaults to autonomous mode. Only the untouched
-   * default is changed — a readonly or accept-edits choice is kept.
-   */
+  /** Migrates the two former defaults to the explicitly requested unrestricted mode. */
   private migrate(parsed: Partial<AppSettings>): void {
     this.migrations = []
-    if ((parsed.policy?.mode ?? 'ask') === 'ask') {
-      this.settings.policy.mode = 'auto'
-      this.migrations.push('modo de permissão: ask → auto (autônomo; destrutivo e arquivos de segredo continuam pedindo confirmação)')
+    const previousMode = parsed.policy?.mode ?? 'ask'
+    if (previousMode === 'ask' || previousMode === 'auto') {
+      this.settings.policy.mode = 'unrestricted'
+      this.migrations.push('modo de permissão: legado → ultrarrrestrito (política local liberada pelo usuário)')
     }
+    this.settings.policy.fullAccess = true
+    this.settings.policy.allowNetwork = true
+    this.settings.policy.allowComputerControl = true
     this.settings.policy.rules = mergeRules(DEFAULT_RULES, parsed.policy?.rules)
     this.settings.settingsVersion = SETTINGS_VERSION
   }

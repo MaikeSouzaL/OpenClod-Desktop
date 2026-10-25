@@ -1,0 +1,703 @@
+# HARNESS DE IA — PROMPTS DE IMPLEMENTAÇÃO DOS MÓDULOS 16 AO 30
+
+## Instruções gerais para todos os módulos
+
+Os prompts deste documento devem ser executados um módulo por vez, na ordem apresentada. Antes de começar cada módulo, o agente de programação deve inspecionar o estado atual do projeto e identificar o que já existe. O projeto pode ter mudado desde a execução do módulo anterior.
+
+Regras gerais de implementação:
+- Não presuma a linguagem, framework, arquitetura ou estrutura de pastas. Descubra-os inspecionando o repositório real.
+- Não substitua componentes funcionais sem demonstrar uma razão técnica.
+- Não produza apenas planos, pseudocódigo, interfaces vazias ou arquivos de exemplo. Implemente funcionalidades reais e integradas.
+- Analise os repositórios de referência indicados em cada módulo. Clone-os em uma área temporária de pesquisa, inspecione o código relevante e compare as implementações com o harness.
+- Reaproveite código e bibliotecas somente quando forem compatíveis com a arquitetura e licença do projeto. Não copie repositórios inteiros indiscriminadamente.
+- Use os contratos, serviços, ferramentas e módulos já implementados sempre que possível, evitando sistemas duplicados.
+- Mantenha compatibilidade com o sistema operacional e o ambiente realmente utilizados pelo projeto.
+- Preserve alterações preexistentes do usuário e evite operações destrutivas sem uma estratégia explícita de recuperação.
+- Crie testes unitários e de integração para as funcionalidades novas e execute testes de regressão.
+- Não invente resultados. Registre o que foi executado, o que passou, o que falhou e o que não pôde ser testado.
+- Atualize a documentação, configurações de exemplo e instruções de instalação/uso.
+- Ao terminar cada módulo, apresente arquivos alterados, decisões técnicas, dependências, resultados reais dos testes, limitações e próximos passos.
+- Se uma biblioteca, serviço ou API não estiver disponível, implemente a alternativa viável e documente claramente a limitação. Não declare integração funcional sem validação.
+
+---
+
+# MÓDULO 16 — AUTOMAÇÃO DE TAREFAS, AGENDAMENTO E ROTINAS EM SEGUNDO PLANO
+
+## Objetivo
+Implemente um sistema para criar, agendar, executar, monitorar, pausar, retomar e cancelar tarefas automatizadas. Deve funcionar com tarefas únicas, recorrentes e condicionais, integrado ao Agent Core, ao planejador, às ferramentas, aos plugins e à interface existente.
+
+## Repositórios para analisar
+- n8n: https://github.com/n8n-io/n8n
+- Node-RED: https://github.com/node-red/node-red
+- Temporal: https://github.com/temporalio/temporal
+- Prefect: https://github.com/PrefectHQ/prefect
+- Apache Airflow: https://github.com/apache/airflow
+- BullMQ: https://github.com/taskforcesh/bullmq
+- Agenda: https://github.com/agenda/agenda
+- APScheduler: https://github.com/agronholm/apscheduler
+- Kestra: https://github.com/kestra-io/kestra
+
+Verifique linguagens, licenças e requisitos antes de selecionar componentes. Não instale uma plataforma inteira se uma biblioteca menor atender ao caso.
+
+## Implementação
+1. Crie um registro persistente de tarefas agendadas com ID, nome, descrição, gatilho, frequência, fuso horário, próxima execução, estado, política de repetição, timeout e histórico.
+2. Suporte execução imediata, execução em data/hora, recorrência por regras claras e gatilhos por eventos internos.
+3. Trate fuso horário, horário de verão, reinicialização do aplicativo e mudanças de relógio de forma previsível.
+4. Crie um scheduler com fila de execução, limites de concorrência, prioridades e prevenção de execuções duplicadas.
+5. Permita tarefas com várias etapas, dependências, condições e ações de compensação quando apropriado.
+6. Implemente retry com backoff e jitter, limites de tentativas, timeout, cancelamento e tratamento de falhas permanentes.
+7. Persista estado e progresso para recuperar tarefas após reiniciar o harness.
+8. Permita rotinas como verificar repositórios, executar testes, gerar relatórios, indexar arquivos, consultar fontes configuradas e resumir alterações.
+9. Implemente gatilhos de eventos internos, como arquivo alterado, tarefa concluída, teste falhou ou agente terminou.
+10. Integre tarefas com subagentes e seleção de modelos sem criar outro motor de agentes.
+11. Crie ferramentas para criar, listar, inspecionar, executar, pausar, retomar, cancelar e excluir agendamentos.
+12. Crie interface com calendário ou lista de rotinas, próxima execução, histórico, logs e ações de controle.
+13. Registre o resultado de cada etapa e permita reexecução manual.
+14. Implemente limites de recursos e um mecanismo para impedir loops de automação acidentais.
+15. Permita exportar e importar definições de tarefas em um formato documentado.
+
+## Testes e aceitação
+Teste execução imediata e futura, recorrência, fuso horário, reinicialização, tarefas duplicadas, concorrência, timeout, cancelamento, retry, falhas de etapa, persistência e integração com o Agent Core. Use relógio simulado quando possível para evitar testes lentos.
+Aceite o módulo somente quando as rotinas sobreviverem a reinicializações e seus estados refletirem execuções reais. Entregue relatório com testes executados e limitações.
+
+---
+
+# MÓDULO 17 — INTERFACE PRINCIPAL, PAINEL DE CONTROLE E EXPERIÊNCIA DO USUÁRIO
+
+## Objetivo
+Melhore a interface existente para que o harness possa ser usado como um ambiente de trabalho completo, sem criar uma UI fictícia desconectada dos serviços reais.
+
+## Repositórios para analisar
+- OpenCode: https://github.com/anomalyco/opencode
+- Cline: https://github.com/cline/cline
+- Continue: https://github.com/continuedev/continue
+- VS Code: https://github.com/microsoft/vscode
+- Open WebUI: https://github.com/open-webui/open-webui
+- LibreChat: https://github.com/danny-avila/LibreChat
+- Tauri: https://github.com/tauri-apps/tauri
+- Electron: https://github.com/electron/electron
+- React: https://github.com/facebook/react
+- Radix UI: https://github.com/radix-ui/primitives
+
+## Implementação
+1. Inspecione a UI atual e preserve os fluxos que já funcionam.
+2. Organize a experiência em áreas claras: conversa/tarefa atual, arquivos e workspace, execução e terminal, agentes e tarefas, alterações Git, ferramentas, provedores e configurações.
+3. Mostre estado real do agente: planejamento, execução, espera de ferramenta, aprovação, recuperação, conclusão, falha e cancelamento.
+4. Exiba plano, subtarefas, agentes ativos, chamadas de ferramentas, saída de comandos, resultados de testes e diffs de alterações.
+5. Permita iniciar, pausar, retomar e cancelar tarefas quando os serviços correspondentes suportarem essas ações.
+6. Implemente navegação por projetos/workspaces e preserve o contexto correto ao alternar.
+7. Ofereça histórico de conversas e tarefas, com busca e retomada quando suportado pela persistência existente.
+8. Crie estados vazios, carregamento, erro, desconexão e indisponibilidade de forma clara.
+9. Implemente acessibilidade básica, navegação por teclado, foco visível, rótulos e layouts responsivos.
+10. Evite renderizações excessivas em logs extensos e listas grandes; use virtualização quando apropriado.
+11. Mantenha a UI separada dos serviços de domínio e use os contratos reais do backend.
+12. Adicione telemetria de interface apenas quando útil e sem registrar conteúdo sensível desnecessário.
+13. Não adicione botões sem ação funcional. Se uma capacidade ainda não existir, identifique-a claramente como indisponível.
+14. Inclua testes de componentes e fluxos críticos.
+
+## Testes e aceitação
+Valide o fluxo de uma tarefa do início ao fim, alternância de workspace, cancelamento, exibição de erros, visualização de diffs, histórico, responsividade e acessibilidade. Não considere concluído se a interface for apenas uma maquete.
+
+---
+
+# MÓDULO 18 — NOTIFICAÇÕES, EVENTOS E CENTRO DE ATIVIDADES
+
+## Objetivo
+Implemente um sistema central de eventos e notificações para que o usuário acompanhe tarefas longas, falhas, solicitações de intervenção, resultados e automações.
+
+## Repositórios para analisar
+- Novu: https://github.com/novuhq/novu
+- ntfy: https://github.com/binwiederhier/ntfy
+- Apprise: https://github.com/caronc/apprise
+- Node-RED: https://github.com/node-red/node-red
+- n8n: https://github.com/n8n-io/n8n
+- OpenTelemetry: https://github.com/open-telemetry/opentelemetry-specification
+
+## Implementação
+1. Defina um esquema de evento comum com ID, tipo, horário, origem, tarefa relacionada, severidade, mensagem e metadados.
+2. Centralize eventos emitidos pelo Agent Core, subagentes, terminal, Git, testes, scheduler, plugins e provedores.
+3. Implemente um Event Bus desacoplado com assinaturas, filtragem e tratamento de falhas dos consumidores.
+4. Crie um centro de atividades persistente com filtros por tipo, estado, projeto e período.
+5. Diferencie informação, sucesso, aviso, erro e ação necessária.
+6. Suporte notificações internas na interface e, opcionalmente, canais externos configuráveis por plugins.
+7. Permita preferências por tipo de evento, horário silencioso e nível de prioridade.
+8. Agrupe notificações repetidas para evitar excesso de mensagens.
+9. Garanta que falhas de um canal de notificação não interrompam a execução principal.
+10. Inclua links ou ações para abrir a tarefa, o arquivo, o log ou o diff relacionado.
+11. Permita marcar como lida, arquivar e pesquisar notificações.
+12. Não envie conteúdo de arquivos, credenciais ou dados sensíveis para serviços externos por padrão.
+13. Registre falhas de entrega e permita tentar novamente de maneira controlada.
+
+## Testes e aceitação
+Teste publicação, assinatura, persistência, filtros, deduplicação, preferências, falha de canal, retentativas e integração com eventos reais. Documente quais canais foram realmente implementados.
+
+---
+
+# MÓDULO 19 — CONFIGURAÇÕES, PERFIS E AMBIENTES DE EXECUÇÃO
+
+## Objetivo
+Implemente gerenciamento unificado de configurações para aplicação, projetos, provedores, agentes, ferramentas, automações e preferências do usuário.
+
+## Repositórios para analisar
+- Viper: https://github.com/spf13/viper
+- Pydantic Settings: https://github.com/pydantic/pydantic-settings
+- dotenv: https://github.com/motdotla/dotenv
+- Zod: https://github.com/colinhacks/zod
+- Cosmiconfig: https://github.com/cosmiconfig/cosmiconfig
+- VS Code: https://github.com/microsoft/vscode
+- OpenCode: https://github.com/anomalyco/opencode
+
+## Implementação
+1. Identifique os mecanismos de configuração já existentes e consolide-os sem quebrar compatibilidade.
+2. Defina hierarquia explícita de configuração: padrões, usuário, projeto/workspace, ambiente e substituições temporárias.
+3. Valide esquemas, tipos, valores obrigatórios e referências a recursos.
+4. Permita perfis como desenvolvimento, testes, uso local e uso remoto, sem presumir que todos sejam necessários.
+5. Implemente importação e exportação de configurações sem incluir segredos por padrão.
+6. Diferencie valores secretos de configurações comuns; use armazenamento seguro compatível com o sistema operacional quando disponível.
+7. Ofereça interface para editar, validar, restaurar padrões e testar configurações.
+8. Detecte conflitos entre configurações e explique qual valor efetivo está sendo utilizado e por quê.
+9. Permita recarregar configurações que possam ser alteradas em tempo de execução; para outras, indique quando é necessário reiniciar.
+10. Valide configurações de provedores, plugins, MCP, ferramentas, terminal, limites de execução e indexação.
+11. Crie migrações versionadas para configurações antigas.
+12. Evite sobrescrever arquivos de configuração existentes sem backup ou migração explícita.
+13. Documente variáveis de ambiente e arquivos suportados.
+
+## Testes e aceitação
+Teste precedência, validação, migrações, valores inválidos, configurações ausentes, segredos, importação/exportação e compatibilidade com configurações antigas. Entregue exemplos seguros e documentação.
+
+---
+
+# MÓDULO 20 — INSTALAÇÃO, ATUALIZAÇÃO E DISTRIBUIÇÃO PARA WINDOWS
+
+## Objetivo
+Prepare o harness para instalação, atualização, diagnóstico e desinstalação consistentes no Windows, respeitando a tecnologia de empacotamento já utilizada pelo projeto.
+
+## Repositórios para analisar
+- Tauri: https://github.com/tauri-apps/tauri
+- Electron: https://github.com/electron/electron
+- electron-builder: https://github.com/electron-userland/electron-builder
+- Squirrel.Windows: https://github.com/Squirrel/Squirrel.Windows
+- WiX Toolset: https://github.com/wixtoolset/wix
+- Velopack: https://github.com/velopack/velopack
+- winget-pkgs: https://github.com/microsoft/winget-pkgs
+- GitHub CLI: https://github.com/cli/cli
+
+## Implementação
+1. Descubra o método atual de execução e empacotamento. Não migre de framework sem uma justificativa concreta.
+2. Crie um processo reproduzível de build para Windows.
+3. Separe artefatos de desenvolvimento e distribuição.
+4. Verifique inclusão de recursos, ícones, configurações padrão e dependências necessárias.
+5. Implemente verificações de pré-requisitos e mensagens de erro úteis.
+6. Preserve dados do usuário, projetos, histórico e configurações durante atualizações.
+7. Implemente migrações de banco/configuração compatíveis com versões anteriores.
+8. Permita consultar versão instalada e verificar atualizações.
+9. Se houver atualização automática, valide origem, integridade e compatibilidade do pacote antes de aplicar.
+10. Permita recuperação em caso de atualização incompleta, quando tecnicamente viável.
+11. Produza logs de diagnóstico acessíveis ao usuário.
+12. Documente instalação limpa, atualização, reparo e desinstalação.
+13. Não embuta tokens de API, credenciais ou segredos nos binários.
+14. Gere artefatos de build reais e valide sua inicialização em um ambiente de teste.
+
+## Testes e aceitação
+Teste build limpo, instalação, inicialização, persistência de dados, atualização a partir de uma versão anterior e diagnóstico de falhas. Não declare suporte a atualização automática se apenas houver um botão de “verificar atualizações”.
+
+---
+
+# MÓDULO 21 — MEMÓRIA AVANÇADA, DECISÕES E APRENDIZADO DO PROJETO
+
+## Objetivo
+Aprimore a memória de projeto para registrar decisões, padrões, soluções e informações reutilizáveis sem misturar projetos nem transformar hipóteses em fatos.
+
+## Repositórios para analisar
+- Mem0: https://github.com/mem0ai/mem0
+- Graphiti: https://github.com/getzep/graphiti
+- LlamaIndex: https://github.com/run-llama/llama_index
+- LangGraph: https://github.com/langchain-ai/langgraph
+- Continue: https://github.com/continuedev/continue
+- Aider: https://github.com/Aider-AI/aider
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- Qdrant: https://github.com/qdrant/qdrant
+- Chroma: https://github.com/chroma-core/chroma
+
+## Implementação
+1. Inspecione o sistema de memória e recuperação existente antes de acrescentar novos armazenamentos.
+2. Defina tipos de memória: decisões arquiteturais, preferências do projeto, convenções, soluções verificadas, tarefas pendentes e fatos temporários.
+3. Registre origem, data, projeto, confiança, evidência e contexto de cada item.
+4. Diferencie informações observadas, inferências e sugestões do modelo.
+5. Recupere memória por relevância semântica, termos, símbolos, arquivos e contexto da tarefa.
+6. Evite duplicações e contradições; sinalize conflitos em vez de apagar silenciosamente informações anteriores.
+7. Permita atualizar, invalidar e excluir memórias.
+8. Mantenha isolamento por workspace e escopo explicitamente configurado.
+9. Conecte decisões a arquivos, commits, tarefas e testes quando houver evidência.
+10. Permita produzir um resumo atualizado do projeto, incluindo arquitetura, decisões e trabalho pendente.
+11. Atualize memórias a partir de resultados verificados, não apenas de afirmações do agente.
+12. Use embeddings ou banco vetorial apenas se houver benefício comprovado e uma opção viável para o ambiente.
+13. Implemente retenção e limites de tamanho.
+14. Exponha ferramentas de consulta e manutenção aos agentes e uma interface para inspecionar as fontes.
+
+## Testes e aceitação
+Teste recuperação, isolamento entre projetos, deduplicação, contradições, proveniência, exclusão, atualização incremental e uso de memórias em uma tarefa real reproduzível. Documente o mecanismo de armazenamento e as limitações.
+
+---
+
+# MÓDULO 22 — MULTIMODALIDADE: IMAGENS, ÁUDIO E CONTEÚDO VISUAL
+
+## Objetivo
+Implemente uma camada multimodal que permita aos agentes receber e processar imagens e áudio quando o modelo ou serviço configurado suportar essas capacidades.
+
+## Repositórios para analisar
+- OpenAI Python SDK: https://github.com/openai/openai-python
+- OpenAI Node SDK: https://github.com/openai/openai-node
+- Anthropic SDK TypeScript: https://github.com/anthropics/anthropic-sdk-typescript
+- Google Gen AI SDK: https://github.com/googleapis/js-genai
+- Transformers: https://github.com/huggingface/transformers
+- Whisper: https://github.com/openai/whisper
+- faster-whisper: https://github.com/SYSTRAN/faster-whisper
+- FFmpeg: https://github.com/FFmpeg/FFmpeg
+- OpenCV: https://github.com/opencv/opencv
+- Tesseract OCR: https://github.com/tesseract-ocr/tesseract
+
+## Implementação
+1. Crie uma abstração multimodal compatível com o contrato de mensagens já usado pelo Agent Core.
+2. Suporte anexos de imagem e áudio, com metadados de formato, tamanho e origem.
+3. Detecte capacidades do modelo selecionado antes de enviar conteúdo.
+4. Permita analisar capturas de tela, diagramas, fotografias de documentos e imagens relacionadas a projetos.
+5. Permita transcrição de áudio usando serviços locais ou remotos configurados.
+6. Quando aplicável, suporte segmentação, timestamps e identificação de idioma.
+7. Integre OCR para documentos e capturas de tela quando necessário.
+8. Normalize erros de formato, tamanho e modalidade não suportada.
+9. Evite converter arquivos em representações que destruam informação relevante sem informar a limitação.
+10. Mantenha referência ao arquivo de origem e aos resultados extraídos.
+11. Implemente limites de tamanho e processamento para evitar consumo excessivo de memória.
+12. Permita cancelar operações demoradas.
+13. Não envie conteúdo multimodal para serviços externos sem que o provedor escolhido esteja configurado para isso.
+14. Integre os resultados ao contexto e às ferramentas existentes.
+
+## Testes e aceitação
+Teste imagens válidas e inválidas, áudio curto e longo, transcrição, OCR, modelo sem suporte multimodal, cancelamento, erros de serviço e preservação da origem. Identifique quais capacidades funcionam localmente e quais dependem de APIs externas.
+
+---
+
+# MÓDULO 23 — VOZ, DITADO E INTERAÇÃO FALADA
+
+## Objetivo
+Adicione interação por voz ao harness, permitindo ditar tarefas, ouvir respostas e controlar uma sessão falada, sem substituir a interface textual.
+
+## Repositórios para analisar
+- Whisper: https://github.com/openai/whisper
+- faster-whisper: https://github.com/SYSTRAN/faster-whisper
+- whisper.cpp: https://github.com/ggml-org/whisper.cpp
+- Piper: https://github.com/rhasspy/piper
+- Kokoro: https://github.com/hexgrad/kokoro
+- Coqui TTS: https://github.com/coqui-ai/TTS
+- FFmpeg: https://github.com/FFmpeg/FFmpeg
+- ElevenLabs Python SDK: https://github.com/elevenlabs/elevenlabs-python
+- WebRTC: https://github.com/webrtc
+
+Verifique a manutenção, a licença, os modelos necessários e a compatibilidade com o ambiente real antes de selecionar componentes.
+
+## Implementação
+1. Implemente interfaces para captura de áudio, transcrição, síntese de voz e reprodução.
+2. Permita escolher serviços locais ou remotos.
+3. Adicione modo de ditado para preencher a entrada de tarefas.
+4. Adicione opção de leitura em voz alta das respostas.
+5. Se houver suporte adequado, implemente interação contínua com estados claros de escuta, processamento, fala e interrupção.
+6. Permita interromper a fala e retomar a interação textual.
+7. Trate permissões de microfone, dispositivo ausente, ruído, silêncio e falhas de áudio.
+8. Permita selecionar idioma, voz, velocidade e outras opções suportadas.
+9. Não bloqueie o uso do teclado enquanto a voz estiver ativa.
+10. Implemente tratamento de erros e indicadores de atividade.
+11. Evite manter o microfone ativo sem indicação visual clara e configuração explícita.
+12. Preserve transcrições somente de acordo com as configurações do usuário e as políticas de retenção documentadas.
+13. Integre voz ao Agent Core, aos provedores e ao sistema multimodal.
+14. Não presuma que todos os modelos de chat suportam áudio em tempo real.
+
+## Testes e aceitação
+Teste captura, transcrição, síntese, interrupção, dispositivos ausentes, falhas de rede, configuração de idioma e alternância entre voz e texto. Documente dependências e quais recursos exigem serviços externos.
+
+---
+
+# MÓDULO 24 — GERAÇÃO E EDIÇÃO DE IMAGENS E RECURSOS VISUAIS
+
+## Objetivo
+Implemente uma camada de ferramentas para gerar, transformar, analisar e organizar recursos visuais para projetos, respeitando os provedores e modelos efetivamente disponíveis.
+
+## Repositórios para analisar
+- ComfyUI: https://github.com/comfyanonymous/ComfyUI
+- AUTOMATIC1111 Stable Diffusion Web UI: https://github.com/AUTOMATIC1111/stable-diffusion-webui
+- InvokeAI: https://github.com/invoke-ai/InvokeAI
+- Diffusers: https://github.com/huggingface/diffusers
+- ControlNet: https://github.com/lllyasviel/ControlNet
+- OpenCV: https://github.com/opencv/opencv
+- ImageMagick: https://github.com/ImageMagick/ImageMagick
+- Pillow: https://github.com/python-pillow/Pillow
+- Krita: https://github.com/KDE/krita
+
+## Implementação
+1. Crie uma interface unificada para provedores de geração de imagem, modelos locais e ferramentas de edição.
+2. Implemente descoberta e validação de recursos disponíveis, sem presumir que GPU, memória ou modelos estejam instalados.
+3. Permita gerar imagens a partir de texto e, quando suportado, transformar imagens fornecidas.
+4. Permita configurar dimensões, formato, qualidade e parâmetros compatíveis com cada provedor.
+5. Integre operações básicas de recorte, redimensionamento, conversão, composição e transparência.
+6. Mantenha arquivos originais e salve resultados em destinos configuráveis.
+7. Registre prompts, parâmetros, modelo, provedor e arquivos gerados para permitir reprodução quando possível.
+8. Crie ferramentas para listar, inspecionar, gerar, editar, converter e comparar recursos visuais.
+9. Integre os resultados ao gerenciador de arquivos e ao contexto dos agentes.
+10. Permita que o agente use imagens geradas em projetos apenas quando a tarefa solicitar ou quando o usuário autorizar essa etapa.
+11. Trate falhas de geração, limites de serviço, falta de memória e modelos ausentes.
+12. Evite downloads de modelos enormes sem confirmação e estimativa de espaço quando aplicável.
+13. Valide formatos e dimensões dos arquivos gerados.
+14. Não declare suporte a um modelo que não esteja acessível no ambiente.
+
+## Testes e aceitação
+Teste conversão, transparência, dimensões, caminhos de saída, falhas de provedor, recursos ausentes e integração com arquivos. Para modelos locais, diferencie testes de integração simulados de geração real.
+
+---
+
+# MÓDULO 25 — EXTRAÇÃO AVANÇADA DE DOCUMENTOS E CONHECIMENTO
+
+## Objetivo
+Amplie o processamento de documentos para PDFs complexos, documentos digitalizados, tabelas, apresentações e coleções de arquivos, com rastreabilidade das fontes.
+
+## Repositórios para analisar
+- Docling: https://github.com/docling-project/docling
+- Unstructured: https://github.com/Unstructured-IO/unstructured
+- Marker: https://github.com/datalab-to/marker
+- PaddleOCR: https://github.com/PaddlePaddle/PaddleOCR
+- Tesseract: https://github.com/tesseract-ocr/tesseract
+- PyMuPDF: https://github.com/pymupdf/PyMuPDF
+- Apache Tika: https://github.com/apache/tika
+- LlamaIndex: https://github.com/run-llama/llama_index
+- Haystack: https://github.com/deepset-ai/haystack
+
+## Implementação
+1. Inspecione os leitores implementados no Módulo 15 e estenda-os sem duplicar funcionalidades.
+2. Adicione extração estruturada de títulos, parágrafos, tabelas, listas, cabeçalhos e metadados.
+3. Para PDFs digitalizados, permita OCR quando necessário e disponível.
+4. Preserve número de página e posição ou referência do bloco quando a ferramenta permitir.
+5. Processe DOCX, XLSX, PPTX, HTML, CSV e formatos adicionais conforme bibliotecas compatíveis.
+6. Implemente divisão em segmentos com sobreposição configurável e referências de origem.
+7. Integre recuperação semântica e pesquisa textual para coleções documentais.
+8. Permita responder perguntas com citações a arquivo, página, seção ou planilha.
+9. Diferencie texto extraído literalmente de resumos ou interpretações gerados por IA.
+10. Detecte documentos vazios, protegidos por senha, corrompidos ou parcialmente extraídos.
+11. Permita reprocessar documentos com outro extrator quando o primeiro falhar.
+12. Registre versões do extrator e parâmetros relevantes para diagnósticos.
+13. Evite inserir todo o corpus no prompt; recupere somente trechos pertinentes.
+14. Implemente exclusões e isolamento por workspace.
+
+## Testes e aceitação
+Utilize documentos de amostra com texto, tabelas, páginas digitalizadas e casos inválidos. Verifique se as referências apontam para as páginas ou seções corretas e se a resposta não atribui conteúdo a uma fonte errada.
+
+---
+
+# MÓDULO 26 — SEGURANÇA OPERACIONAL E CONTROLE DE AÇÕES
+
+## Objetivo
+Implemente uma camada consistente para configurar permissões e registrar ações de agentes e ferramentas, preservando a capacidade de automação sem permitir que uma falha de configuração produza efeitos inesperados.
+
+## Repositórios para analisar
+- Open Policy Agent: https://github.com/open-policy-agent/opa
+- Casbin: https://github.com/casbin/casbin
+- OPA Gatekeeper: https://github.com/open-policy-agent/gatekeeper
+- gVisor: https://github.com/google/gvisor
+- bubblewrap: https://github.com/containers/bubblewrap
+- Docker: https://github.com/moby/moby
+- Microsoft Windows Sandbox: https://learn.microsoft.com/windows/security/application-security/application-isolation/windows-sandbox/
+- OWASP ASVS: https://github.com/OWASP/ASVS
+- OWASP Top 10: https://github.com/OWASP/Top10
+
+## Implementação
+1. Faça inventário das ferramentas, operações e permissões existentes.
+2. Crie um modelo central de política com escopo global, projeto, agente, ferramenta e operação.
+3. Diferencie leitura, escrita, execução, rede, instalação de dependências, alteração de configurações e operações irreversíveis.
+4. Permita políticas configuráveis e explicáveis, evitando verificações duplicadas espalhadas pelo código.
+5. Registre decisão, política aplicada, ferramenta, parâmetros sanitizados, resultado e justificativa.
+6. Permita configurar quais operações são automáticas e quais exigem confirmação explícita.
+7. Integre o controle ao Agent Core, MCP, plugins, terminal, arquivos, navegador, Git e Computer Use.
+8. Evite que ferramentas executadas por subagentes ignorem as políticas do núcleo.
+9. Trate segredos de forma centralizada e evite incluí-los em logs, prompts de diagnóstico ou mensagens de erro.
+10. Implemente limites de tempo, consumo, concorrência e tamanho de saída.
+11. Quando o sistema operacional oferecer isolamento apropriado, avalie execução em sandbox para tarefas compatíveis.
+12. Não prometa isolamento forte quando a implementação for apenas uma restrição lógica do aplicativo.
+13. Crie logs de auditoria pesquisáveis e uma forma de revisar ações recentes.
+14. Implemente testes para bypass de permissões, parâmetros inválidos e falhas de ferramentas.
+15. Documente as limitações reais de segurança e os privilégios exigidos.
+
+## Testes e aceitação
+Demonstre que uma política é aplicada de forma consistente a chamadas diretas, subagentes, MCP e plugins. Teste permissões, auditoria, segredos em logs e recuperação após falha. Não afirme que o harness está isolado de forma segura sem evidências técnicas.
+
+---
+
+# MÓDULO 27 — OBSERVABILIDADE, LOGS, MÉTRICAS E DIAGNÓSTICO
+
+## Objetivo
+Crie observabilidade para compreender o comportamento do harness, diagnosticar falhas e medir desempenho, uso de modelos e execução de ferramentas.
+
+## Repositórios para analisar
+- OpenTelemetry: https://github.com/open-telemetry/opentelemetry-specification
+- OpenTelemetry Collector: https://github.com/open-telemetry/opentelemetry-collector
+- Prometheus: https://github.com/prometheus/prometheus
+- Grafana: https://github.com/grafana/grafana
+- Loki: https://github.com/grafana/loki
+- Sentry: https://github.com/getsentry/sentry
+- Pino: https://github.com/pinojs/pino
+- structlog: https://github.com/hynek/structlog
+
+## Implementação
+1. Padronize logs estruturados, níveis de severidade e identificadores de correlação.
+2. Conecte cada execução de agente, tarefa, subagente, ferramenta e requisição a identificadores rastreáveis.
+3. Registre duração, latência, tentativas, resultado, consumo de tokens quando disponível e erros.
+4. Crie métricas de filas, tarefas ativas, falhas, retries, duração e uso de recursos.
+5. Implemente rastreamento de etapas sem armazenar conteúdo sensível por padrão.
+6. Crie visualizações de diagnóstico na interface existente.
+7. Permita filtrar logs por projeto, tarefa, agente, ferramenta, provedor e período.
+8. Implemente rotação, retenção e limites de armazenamento.
+9. Diferencie erro interno, erro de provedor, erro de ferramenta e erro de configuração.
+10. Permita exportar um pacote de diagnóstico com informações sanitizadas.
+11. Se integrar serviços externos de observabilidade, torne-os opcionais e configuráveis.
+12. Evite enviar logs para serviços remotos sem configuração explícita.
+13. Adicione verificações de saúde dos componentes principais.
+14. Meça o custo de observabilidade para não gerar excesso de logs e eventos.
+
+## Testes e aceitação
+Teste correlação de eventos, logs estruturados, métricas, rotação, filtros, sanitização e falhas de exportação. Demonstre a investigação de uma falha simulada do início ao fim.
+
+---
+
+# MÓDULO 28 — DESEMPENHO, CONCORRÊNCIA E GERENCIAMENTO DE RECURSOS
+
+## Objetivo
+Melhore a eficiência do harness em projetos grandes e sessões longas, sem comprometer a integridade das tarefas ou a qualidade dos resultados.
+
+## Repositórios para analisar
+- Tokio: https://github.com/tokio-rs/tokio
+- Piscina: https://github.com/piscinajs/piscina
+- BullMQ: https://github.com/taskforcesh/bullmq
+- SQLite: https://github.com/sqlite/sqlite
+- DuckDB: https://github.com/duckdb/duckdb
+- ripgrep: https://github.com/BurntSushi/ripgrep
+- OpenTelemetry: https://github.com/open-telemetry/opentelemetry-specification
+- vLLM: https://github.com/vllm-project/vllm
+- llama.cpp: https://github.com/ggml-org/llama.cpp
+
+## Implementação
+1. Faça medições de desempenho antes de alterar a arquitetura.
+2. Identifique gargalos de CPU, memória, I/O, banco, interface, indexação e chamadas de modelos.
+3. Implemente limites de concorrência por tipo de tarefa e provedor.
+4. Evite executar várias indexações completas do mesmo workspace simultaneamente.
+5. Use cache com invalidação explícita para metadados, resultados e dados derivados.
+6. Implemente limites de memória e tamanho para logs, saídas de terminal, imagens e documentos.
+7. Evite bloquear a interface com operações longas.
+8. Use streaming e paginação para grandes volumes de dados.
+9. Otimize consultas de persistência e indexação somente após medir o gargalo.
+10. Implemente backpressure para filas e produtores de eventos.
+11. Evite duplicar requisições de modelo e ferramentas quando uma tarefa já estiver em andamento.
+12. Gerencie processos locais e encerre recursos quando uma tarefa for cancelada.
+13. Se houver inferência local, detecte recursos disponíveis e permita configurar limites sem presumir que toda GPU ou modelo cabe na memória.
+14. Inclua benchmark reproduzível para operações críticas.
+15. Registre os resultados antes e depois das otimizações.
+
+## Testes e aceitação
+Teste concorrência, cancelamento, pressão de fila, memória limitada, tarefas longas, indexação incremental e comportamento sob carga. Não declare ganhos de desempenho sem medições comparáveis.
+
+---
+
+# MÓDULO 29 — BACKUP, RESTAURAÇÃO, MIGRAÇÕES E RECUPERAÇÃO
+
+## Objetivo
+Implemente mecanismos para proteger dados do harness, recuperar sessões e configurações e atualizar o formato de armazenamento sem perda silenciosa de informações.
+
+## Repositórios para analisar
+- Restic: https://github.com/restic/restic
+- Kopia: https://github.com/kopia/kopia
+- BorgBackup: https://github.com/borgbackup/borg
+- SQLite: https://github.com/sqlite/sqlite
+- Flyway: https://github.com/flyway/flyway
+- Liquibase: https://github.com/liquibase/liquibase
+- Alembic: https://github.com/sqlalchemy/alembic
+
+## Implementação
+1. Identifique todos os dados persistentes: configurações, sessões, tarefas, memória, índices, histórico e metadados.
+2. Separe dados recuperáveis por reconstrução de dados únicos que precisam de backup.
+3. Implemente exportação e restauração de dados da aplicação com versões de formato explícitas.
+4. Permita backups manuais e, se apropriado, agendados.
+5. Verifique integridade dos arquivos de backup e registre seus metadados.
+6. Implemente migrações versionadas de bancos e configurações.
+7. Crie verificação de compatibilidade antes de restaurar ou migrar.
+8. Não inclua segredos em exportações por padrão; ofereça tratamento explícito para itens que exigem migração segura.
+9. Preserve projetos e arquivos do usuário; não os inclua ou altere sem a configuração correspondente.
+10. Permita restaurar sessões e tarefas quando os estados persistidos permitirem retomada consistente.
+11. Detecte backups incompletos e falhas de gravação.
+12. Implemente política de retenção configurável.
+13. Documente procedimentos de backup, restauração e recuperação após falha.
+14. Teste migração a partir de uma versão anterior do esquema.
+15. Se houver suporte a criptografia de backup, use uma implementação consolidada e documente a gestão das chaves.
+
+## Testes e aceitação
+Teste backup, integridade, restauração, dados ausentes, backup corrompido, migração de esquema, preservação de configurações e recuperação após interrupção. Demonstre uma restauração completa em ambiente de teste.
+
+---
+
+# MÓDULO 30 — INTEGRAÇÃO FINAL, AUDITORIA E TESTES DE PONTA A PONTA
+
+## Objetivo
+Realize uma auditoria técnica do harness completo e integre os módulos desenvolvidos, corrigindo inconsistências, funcionalidades duplicadas, falhas de comunicação e lacunas de testes.
+
+Este módulo não deve ser apenas uma revisão documental. Corrija os problemas identificados e demonstre o funcionamento integrado.
+
+## Repositórios para comparar
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- OpenAI Codex: https://github.com/openai/codex
+- Cline: https://github.com/cline/cline
+- Continue: https://github.com/continuedev/continue
+- Aider: https://github.com/Aider-AI/aider
+- Goose: https://github.com/block/goose
+- SWE-agent: https://github.com/SWE-agent/SWE-agent
+- MCP TypeScript SDK: https://github.com/modelcontextprotocol/typescript-sdk
+- Playwright: https://github.com/microsoft/playwright
+
+Use esses projetos como referências comparativas. Não presuma que todos oferecem exatamente as mesmas capacidades ou que seus códigos possam ser combinados diretamente.
+
+## 1. INVENTÁRIO REAL
+
+Produza um inventário de funcionalidades existentes, com estados:
+
+- Implementado e testado.
+- Implementado parcialmente.
+- Presente, mas não integrado.
+- Planejado, mas ausente.
+- Bloqueado por dependência ou ambiente.
+
+Verifique os módulos de Agent Core, subagentes, skills, hooks, Computer Use, navegador, terminal, inteligência de código, Git, memória, MCP, plugins, provedores, planejamento, testes, arquivos, automações, interface, notificações, configurações, empacotamento, multimodalidade, segurança, observabilidade, desempenho e recuperação.
+
+Não marque uma funcionalidade como concluída apenas porque existe uma classe, interface ou botão com seu nome.
+
+## 2. AUDITORIA ARQUITETURAL
+
+1. Identifique contratos duplicados e serviços que realizam a mesma função.
+2. Verifique ciclos de dependência.
+3. Confirme que módulos utilizam os serviços centrais, em vez de implementações paralelas.
+4. Verifique tratamento de erros, cancelamento e timeouts.
+5. Verifique persistência e retomada de sessões.
+6. Verifique configuração, credenciais e segredos.
+7. Verifique compatibilidade entre provedores e chamadas de ferramentas.
+8. Verifique consistência de estados exibidos na interface.
+9. Identifique operações lentas que bloqueiam o aplicativo.
+10. Avalie dependências não utilizadas, versões incompatíveis e licenças.
+
+## 3. TESTE DE PONTA A PONTA
+
+Implemente e execute cenários completos que correspondam às capacidades realmente disponíveis:
+
+### Cenário A — Tarefa de programação
+- Abrir um workspace.
+- Analisar sua estrutura.
+- Planejar uma alteração pequena.
+- Localizar os arquivos relevantes.
+- Modificar o código.
+- Executar testes.
+- Inspecionar o diff.
+- Registrar o resultado.
+
+### Cenário B — Falha e recuperação
+- Executar um teste que falha em um projeto de teste controlado.
+- Capturar e analisar a saída.
+- Aplicar uma correção.
+- Executar novamente.
+- Confirmar o resultado com evidências.
+
+### Cenário C — Trabalho com agentes
+- Criar subtarefas independentes.
+- Distribuí-las entre agentes disponíveis.
+- Acompanhar o progresso.
+- Consolidar os resultados.
+- Detectar falhas e dependências.
+
+### Cenário D — Ferramentas externas
+- Conectar um servidor MCP de teste.
+- Descobrir ferramentas.
+- Executar uma ferramenta.
+- Normalizar o resultado.
+- Registrar eventos e erros.
+- Verificar o encerramento da conexão.
+
+### Cenário E — Arquivos e documentos
+- Ler um documento de amostra.
+- Recuperar trechos relevantes.
+- Criar um relatório.
+- Salvar o resultado.
+- Verificar o arquivo produzido e suas referências.
+
+### Cenário F — Automação
+- Agendar uma tarefa de teste.
+- Confirmar a execução.
+- Reiniciar o serviço ou simular recuperação.
+- Verificar persistência, histórico e estado final.
+
+### Cenário G — Operação prolongada
+- Executar uma tarefa que produza eventos durante algum tempo.
+- Acompanhar a interface.
+- Cancelar a tarefa.
+- Confirmar que processos e recursos associados foram tratados corretamente.
+
+Não dependa de credenciais reais nem de serviços pagos para todos os testes. Use simuladores e serviços locais para testes reproduzíveis, mantendo testes de integração reais separados quando necessários.
+
+## 4. CORREÇÕES E INTEGRAÇÃO
+
+Após os testes:
+
+1. Classifique os problemas por gravidade e impacto.
+2. Corrija os bloqueadores primeiro.
+3. Elimine duplicações que causem inconsistência.
+4. Ajuste contratos entre módulos.
+5. Corrija problemas de persistência, cancelamento e tratamento de erros.
+6. Atualize testes afetados.
+7. Execute novamente as verificações relevantes.
+8. Preserve alterações existentes do usuário.
+9. Documente problemas que não possam ser resolvidos no ambiente atual.
+
+Não faça uma reescrita geral sem necessidade. Priorize mudanças incrementais e verificáveis.
+
+## 5. DOCUMENTAÇÃO FINAL
+
+Atualize ou crie documentação para:
+
+- Arquitetura geral.
+- Diagrama de componentes e dependências.
+- Instalação e execução.
+- Configuração de provedores.
+- Ferramentas e permissões.
+- Workspaces e projetos.
+- MCP e plugins.
+- Execução de agentes.
+- Testes e diagnóstico.
+- Backup e recuperação.
+- Limitações conhecidas.
+- Desenvolvimento e contribuição.
+
+A documentação deve corresponder ao código atual, não a funcionalidades apenas planejadas.
+
+## 6. RELATÓRIO FINAL
+
+Entregue um relatório com:
+
+1. Estado real de cada módulo.
+2. Problemas encontrados.
+3. Correções implementadas.
+4. Arquivos e componentes alterados.
+5. Testes executados, com comandos e resultados.
+6. Cenários de ponta a ponta concluídos.
+7. Falhas ainda abertas.
+8. Dependências externas necessárias.
+9. Limitações do ambiente.
+10. Recomendações para a próxima etapa.
+
+## CRITÉRIO FINAL DE ACEITAÇÃO
+
+Considere o trabalho concluído somente quando os cenários de ponta a ponta que correspondam às funcionalidades implementadas forem executados, os resultados estiverem registrados e os bloqueadores restantes forem documentados.
+
+Não declare que o harness é equivalente a qualquer produto comercial apenas por possuir módulos semelhantes. Apresente capacidades demonstradas, limitações e evidências objetivas.
+
+O objetivo final é ter uma aplicação integrada, testável, recuperável e extensível, na qual os módulos trabalhem em conjunto em vez de existirem apenas como componentes isolados.

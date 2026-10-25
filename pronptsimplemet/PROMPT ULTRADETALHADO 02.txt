@@ -1,0 +1,902 @@
+# PROMPT ULTRADETALHADO 02 — SISTEMA DE SUBAGENTES, ORQUESTRAÇÃO MULTIAGENTE E EXECUÇÃO PARALELA
+
+## 1. MISSÃO PRINCIPAL
+
+Você é responsável por implementar ou aprimorar o sistema de subagentes do nosso AI Development Harness.
+
+Sua missão é transformar o harness em uma plataforma capaz de coordenar múltiplos agentes de inteligência artificial, cada um com responsabilidades, ferramentas, contexto e objetivos próprios, trabalhando sob a coordenação de um agente principal.
+
+O sistema deverá permitir que uma tarefa complexa seja dividida em subtarefas, distribuída entre agentes especializados, executada sequencialmente ou em paralelo, acompanhada em tempo real e consolidada em um resultado coerente.
+
+O objetivo é alcançar capacidades comparáveis às dos sistemas modernos de desenvolvimento assistido por IA, sem copiar cegamente a arquitetura de qualquer projeto externo.
+
+Não construa somente uma demonstração em que vários agentes conversam entre si. Implemente um mecanismo de orquestração que produza trabalho útil, controle dependências, evite conflitos, acompanhe resultados e permita verificar o que realmente foi concluído.
+
+**Trabalhe sobre o projeto existente e integre este módulo ao Agent Core desenvolvido no Módulo 01.**
+
+Não reescreva o núcleo, não crie um sistema paralelo de execução e não substitua funcionalidades existentes sem uma justificativa técnica concreta.
+
+---
+
+## 2. OBJETIVOS DO SISTEMA
+
+O sistema de subagentes deverá possibilitar:
+
+- Criar agentes especializados.
+- Definir suas responsabilidades.
+- Delegar tarefas do agente principal.
+- Executar subtarefas independentes em paralelo.
+- Executar tarefas dependentes em sequência.
+- Compartilhar resultados entre agentes.
+- Manter contexto independente por agente.
+- Disponibilizar ferramentas conforme as necessidades de cada agente.
+- Controlar o uso de modelos de linguagem.
+- Acompanhar estados e progresso.
+- Interromper ou cancelar tarefas.
+- Recuperar falhas quando possível.
+- Evitar alterações conflitantes no mesmo projeto.
+- Consolidar os resultados.
+- Verificar a qualidade do trabalho entregue.
+- Persistir execuções para permitir acompanhamento e retomada.
+- Apresentar a atividade dos agentes na interface desktop.
+
+O sistema deverá funcionar tanto para tarefas pequenas quanto para operações complexas envolvendo muitos arquivos, ferramentas e etapas.
+
+Não obrigue toda solicitação a utilizar múltiplos agentes. O Agent Core deverá continuar capaz de executar tarefas diretamente quando a delegação não trouxer benefício real.
+
+---
+
+## 3. PRIMEIRA ETAPA — AUDITAR O SISTEMA EXISTENTE
+
+Antes de modificar o código, examine o harness e identifique:
+
+1. Como o Agent Core executa tarefas.
+2. Como as sessões são armazenadas.
+3. Como o sistema envia solicitações aos modelos.
+4. Como as ferramentas são registradas.
+5. Como os resultados das ferramentas retornam ao agente.
+6. Como o contexto é construído.
+7. Como as tarefas são canceladas.
+8. Como o streaming funciona.
+9. Como os eventos chegam à interface.
+10. Como a persistência funciona.
+11. Como os erros são registrados.
+12. Quais componentes já permitem delegação ou execução paralela.
+13. Quais testes cobrem os fluxos existentes.
+
+Procure implementações de subagentes que estejam incompletas, isoladas ou duplicadas.
+
+Produza uma matriz técnica interna classificando cada capacidade como existente e funcional, parcial, ausente, inadequada ou duplicada.
+
+Execute os testes existentes antes de alterar qualquer coisa, quando possível.
+
+Preserve as alterações locais do usuário e não sobrescreva dados ou configurações existentes.
+
+---
+
+## 4. ARQUITETURA GERAL
+
+Implemente o sistema como uma extensão do Agent Core.
+
+A arquitetura deverá distinguir os seguintes componentes, adaptando os nomes à estrutura existente:
+
+### 4.1. Agent Registry
+
+Responsável por registrar e descobrir os tipos de agentes disponíveis.
+
+Deverá permitir identificar:
+
+- Nome e identificador.
+- Descrição.
+- Responsabilidades.
+- Instruções específicas.
+- Ferramentas disponíveis.
+- Capacidades exigidas.
+- Modelo preferencial, quando configurado.
+- Limites de execução.
+- Política de delegação.
+- Versão da configuração.
+- Estado de disponibilidade.
+
+### 4.2. Agent Factory
+
+Responsável por criar instâncias de execução a partir de definições registradas.
+
+A criação de uma instância deverá produzir um agente com identidade e estado próprios, sem compartilhar acidentalmente o histórico de outra execução.
+
+### 4.3. Task Planner
+
+Responsável por representar a tarefa principal e suas subtarefas, incluindo dependências, critérios de conclusão e resultados esperados.
+
+Deverá permitir planos simples e grafos de tarefas complexos.
+
+### 4.4. Orchestrator
+
+Responsável por coordenar a execução, delegar subtarefas, acompanhar estados, controlar dependências, gerenciar paralelismo e consolidar resultados.
+
+### 4.5. Agent Runtime
+
+Responsável por executar cada agente utilizando o Agent Core e os serviços compartilhados.
+
+Não implemente um segundo loop principal de LLM quando o núcleo existente puder executar o agente por meio de configurações e contextos próprios.
+
+### 4.6. Result Store
+
+Responsável por persistir os resultados, estados, referências aos artefatos e informações necessárias para retomar a execução.
+
+### 4.7. Event Dispatcher
+
+Responsável por emitir eventos de criação, início, progresso, conclusão, falha e cancelamento das tarefas e dos agentes.
+
+### 4.8. Result Merger
+
+Responsável por reunir resultados independentes, resolver incompatibilidades e preparar o material para revisão final.
+
+### 4.9. Verifier
+
+Responsável por verificar se os resultados satisfazem os critérios definidos antes de considerar uma subtarefa ou tarefa principal concluída.
+
+Não crie esses componentes como classes obrigatórias se a tecnologia atual utilizar outra organização mais adequada. O importante é que as responsabilidades estejam claramente separadas.
+
+---
+
+## 5. AGENTE PRINCIPAL E SUBAGENTES
+
+O sistema deverá distinguir o agente principal dos subagentes delegados.
+
+### 5.1. Agente principal
+
+O agente principal deverá:
+
+- Receber a solicitação do usuário.
+- Compreender o objetivo geral.
+- Determinar se a delegação é necessária.
+- Elaborar um plano.
+- Selecionar agentes especializados.
+- Distribuir tarefas.
+- Fornecer o contexto necessário.
+- Definir os resultados esperados.
+- Acompanhar a execução.
+- Reagir a falhas.
+- Consolidar resultados.
+- Solicitar verificações.
+- Apresentar a conclusão ao usuário.
+
+O agente principal não precisa executar pessoalmente todas as subtarefas.
+
+### 5.2. Subagentes
+
+Cada subagente deverá receber uma tarefa delimitada, com um objetivo claro e condições de conclusão.
+
+Deverá possuir, conforme necessário:
+
+- Identificador da instância.
+- Tipo de agente.
+- Identificador da tarefa principal.
+- Identificador da subtarefa.
+- Instruções específicas.
+- Contexto de entrada.
+- Ferramentas autorizadas.
+- Estado de execução.
+- Resultados produzidos.
+- Histórico próprio.
+- Limites de execução.
+- Erros encontrados.
+- Critérios de conclusão.
+
+Um subagente não deverá receber automaticamente todo o histórico de todas as outras instâncias.
+
+Forneça apenas o contexto necessário para a tarefa, mantendo referências aos materiais originais quando for útil.
+
+### 5.3. Especialização
+
+Permita criar perfis de agentes como:
+
+- Arquiteto de software.
+- Programador.
+- Analista de repositórios.
+- Especialista em frontend.
+- Especialista em backend.
+- Especialista em bancos de dados.
+- Especialista em testes.
+- Revisor de código.
+- Especialista em depuração.
+- Pesquisador técnico.
+- Especialista em documentação.
+- Especialista em segurança de aplicações.
+- Especialista em refatoração.
+
+Esses perfis deverão ser configurações reutilizáveis, não implementações independentes e rígidas.
+
+A lista é inicial. O sistema deverá permitir criar, editar, versionar, habilitar e desabilitar perfis posteriormente.
+
+---
+
+## 6. DEFINIÇÃO DE TAREFAS E SUBTAREFAS
+
+Implemente uma representação estruturada das tarefas.
+
+Cada tarefa deverá conter, conforme aplicável:
+
+- ID.
+- Título.
+- Descrição.
+- Objetivo.
+- Critérios de aceitação.
+- Estado.
+- Prioridade.
+- Agente responsável.
+- Dependências.
+- Entradas.
+- Resultados esperados.
+- Arquivos relacionados.
+- Ferramentas necessárias.
+- Tentativas.
+- Erros.
+- Data de criação.
+- Data de início.
+- Data de conclusão.
+- Identificador da tarefa principal.
+
+Utilize estados coerentes, como:
+
+- `pending`
+- `ready`
+- `assigned`
+- `running`
+- `waiting`
+- `blocked`
+- `completed`
+- `failed`
+- `cancelled`
+- `skipped`
+
+Os estados deverão ter transições definidas.
+
+Uma tarefa dependente não poderá começar antes de suas dependências estarem satisfeitas.
+
+Uma tarefa cancelada não poderá ser tratada como concluída.
+
+Uma tarefa que falhou deverá permanecer distinguível de uma tarefa que nunca foi executada.
+
+---
+
+## 7. PLANEJAMENTO COMO GRAFO DE DEPENDÊNCIAS
+
+Permita representar as subtarefas como um grafo direcionado acíclico quando o plano possuir dependências entre etapas.
+
+Exemplo:
+
+- Agente A analisa o projeto.
+- Agente B examina o frontend.
+- Agente C examina o backend.
+- Agente D revisa os resultados de B e C.
+- Agente E implementa as alterações aprovadas.
+- Agente F executa testes.
+- Agente G revisa o resultado final.
+
+B e C podem executar em paralelo se não houver dependências adicionais.
+
+D deverá aguardar os resultados necessários.
+
+F deverá executar depois das alterações relevantes.
+
+Detecte dependências circulares antes de iniciar a execução.
+
+Se um plano contiver um ciclo impossível de resolver, informe o problema e solicite ou produza uma correção do plano.
+
+Permita tarefas condicionais, tarefas opcionais e etapas que sejam ignoradas quando seus pré-requisitos não forem aplicáveis.
+
+---
+
+## 8. DELEGAÇÃO INTELIGENTE
+
+O sistema deverá determinar quando vale a pena utilizar subagentes.
+
+Considere:
+
+- Complexidade.
+- Número de arquivos envolvidos.
+- Independência das tarefas.
+- Necessidade de conhecimentos especializados.
+- Tempo estimado.
+- Custo de inferência.
+- Limites dos modelos.
+- Risco de conflitos.
+- Disponibilidade de ferramentas.
+
+Não crie agentes apenas para aumentar artificialmente o número de participantes.
+
+Uma pergunta simples poderá ser atendida pelo agente principal.
+
+Uma tarefa complexa poderá ser dividida em atividades especializadas.
+
+### Regras de delegação
+
+Cada delegação deverá especificar:
+
+1. O objetivo.
+2. O contexto relevante.
+3. As entradas disponíveis.
+4. O resultado esperado.
+5. Os critérios de aceitação.
+6. Os limites de execução.
+7. As ferramentas necessárias.
+8. As dependências.
+9. As condições de conclusão.
+10. O formato do resultado.
+
+Evite instruções vagas, como simplesmente pedir a um subagente que “resolva o projeto”.
+
+O resultado deve ser suficientemente específico para permitir a avaliação posterior.
+
+---
+
+## 9. EXECUÇÃO PARALELA E CONCORRÊNCIA
+
+Implemente execução concorrente para subtarefas independentes.
+
+O paralelismo deverá ser configurável e limitado por recursos disponíveis.
+
+Considere limites de:
+
+- Agentes simultâneos.
+- Chamadas simultâneas por provedor.
+- Processos em execução.
+- Uso de ferramentas.
+- Tempo total.
+- Consumo de tokens, quando disponível.
+- Recursos do computador.
+
+Não inicie um número ilimitado de agentes.
+
+Quando o limite for atingido, coloque as tarefas prontas em uma fila.
+
+Implemente uma política de agendamento que priorize tarefas de acordo com dependências, prioridade e disponibilidade.
+
+### Controle de concorrência
+
+Se duas tarefas tentarem modificar o mesmo arquivo ou recurso compartilhado, o sistema deverá detectar ou prevenir o conflito.
+
+Utilize mecanismos apropriados à arquitetura, como:
+
+- Exclusão mútua.
+- Reservas de recursos.
+- Worktrees Git.
+- Diretórios de trabalho isolados.
+- Patches separados.
+- Revisão de diffs antes da integração.
+
+Não suponha que agentes trabalhando simultaneamente sempre produzirão alterações compatíveis.
+
+### Isolamento
+
+Quando apropriado, execute agentes em diretórios de trabalho separados ou em branches/worktrees independentes.
+
+Permita tarefas de pesquisa e análise sem escrita concorrente no projeto principal.
+
+A integração final de alterações deverá ser coordenada.
+
+---
+
+## 10. CONTEXTO INDEPENDENTE E COMPARTILHAMENTO DE RESULTADOS
+
+Cada agente deverá manter seu próprio contexto operacional.
+
+O sistema deverá distinguir:
+
+- Contexto da tarefa principal.
+- Contexto do subagente.
+- Histórico de chamadas de ferramentas.
+- Resultados compartilhados.
+- Arquivos e artefatos produzidos.
+- Decisões relevantes.
+- Instruções herdadas.
+
+Compartilhe informações por mecanismos explícitos, evitando que todos os agentes tenham de carregar todo o histórico.
+
+Permita que um agente publique um resultado estruturado contendo:
+
+- Resumo.
+- Conclusões.
+- Evidências.
+- Arquivos analisados.
+- Arquivos modificados.
+- Testes realizados.
+- Problemas encontrados.
+- Limitações.
+- Recomendações.
+- Referências a artefatos.
+
+Resultados de pesquisa deverão ser distinguíveis de alterações efetivamente aplicadas.
+
+Não permita que um subagente declare que modificou um arquivo sem evidências de que a operação ocorreu.
+
+---
+
+## 11. CONTRATOS DE RESULTADOS
+
+Estabeleça formatos consistentes para a comunicação entre o orquestrador e os subagentes.
+
+Considere um contrato equivalente a:
+
+- Identificador do agente.
+- Identificador da tarefa.
+- Estado final.
+- Resumo do trabalho.
+- Resultados estruturados.
+- Referências a arquivos.
+- Diffs produzidos.
+- Testes executados.
+- Erros.
+- Pendências.
+- Evidências de verificação.
+
+Adapte a estrutura à linguagem do projeto.
+
+Valide os resultados recebidos.
+
+Se um subagente devolver dados incompletos, malformados ou incompatíveis com a tarefa, não os aceite automaticamente como resultado válido.
+
+O orquestrador poderá solicitar correção, realizar uma nova tentativa ou marcar a tarefa como falha.
+
+---
+
+## 12. CONSOLIDAÇÃO E REVISÃO
+
+Quando os subagentes terminarem, o agente principal deverá consolidar seus resultados.
+
+A consolidação deverá:
+
+1. Reunir os resultados relevantes.
+2. Identificar contradições.
+3. Detectar dependências não satisfeitas.
+4. Identificar arquivos modificados.
+5. Examinar conflitos entre alterações.
+6. Verificar os critérios de aceitação.
+7. Solicitar revisão adicional quando necessário.
+8. Produzir uma conclusão coerente.
+
+Não faça uma concatenação simples de respostas de agentes.
+
+Quando dois agentes apresentarem conclusões incompatíveis, o sistema deverá preservar as evidências e solicitar análise adicional.
+
+Quando várias tarefas modificarem arquivos relacionados, a integração deverá ser verificada antes da conclusão.
+
+### Agente revisor
+
+Permita que uma tarefa de revisão seja delegada a um agente independente.
+
+O revisor deverá avaliar os resultados com base nos critérios definidos, sem assumir que o trabalho está correto apenas porque outro agente o declarou concluído.
+
+Para tarefas de programação, a revisão poderá incluir:
+
+- Análise de diffs.
+- Verificação de requisitos.
+- Detecção de regressões.
+- Avaliação de testes.
+- Identificação de erros lógicos.
+- Verificação de consistência entre arquivos.
+
+---
+
+## 13. FALHAS, RETENTATIVAS E RECUPERAÇÃO
+
+Implemente recuperação por subtarefa.
+
+Se um subagente falhar, o orquestrador deverá avaliar se é possível:
+
+- Repetir a tarefa.
+- Corrigir o contexto.
+- Alterar o modelo.
+- Selecionar outro agente.
+- Redefinir a subtarefa.
+- Dividir a tarefa em partes menores.
+- Continuar com outras tarefas independentes.
+- Cancelar a execução inteira.
+
+Estabeleça limites configuráveis de tentativas.
+
+Não repita indefinidamente uma operação que continua falhando.
+
+Antes de repetir uma tarefa que produza efeitos externos ou altere arquivos, verifique o estado atual para evitar duplicação de efeitos.
+
+Quando uma subtarefa falhar, preserve seus logs e resultados parciais.
+
+Uma falha isolada não deverá necessariamente invalidar todo o plano.
+
+Entretanto, tarefas dependentes deverão permanecer bloqueadas quando seus pré-requisitos essenciais não forem satisfeitos.
+
+---
+
+## 14. CANCELAMENTO E INTERRUPÇÃO
+
+Implemente cancelamento nos níveis apropriados:
+
+- Subtarefa individual.
+- Instância de subagente.
+- Grupo de tarefas.
+- Tarefa principal.
+- Sessão completa.
+
+Quando uma tarefa principal for cancelada:
+
+1. Marque a solicitação de cancelamento.
+2. Impeça o início de novas subtarefas.
+3. Solicite cancelamento aos agentes ativos.
+4. Interrompa chamadas e processos quando suportado.
+5. Preserve os resultados já obtidos.
+6. Atualize os estados.
+7. Notifique a interface.
+
+Não marque todos os agentes como cancelados enquanto seus processos continuam ativos.
+
+Se uma operação não puder ser interrompida imediatamente, registre sua condição e evite iniciar etapas dependentes de um resultado inexistente.
+
+---
+
+## 15. SELEÇÃO DE MODELOS POR AGENTE
+
+Permita que agentes diferentes utilizem modelos diferentes quando isso oferecer benefício.
+
+O sistema poderá considerar:
+
+- Modelo padrão.
+- Modelo preferencial por agente.
+- Disponibilidade do provedor.
+- Capacidade de chamada de ferramentas.
+- Contexto disponível.
+- Latência.
+- Custo.
+- Qualidade esperada.
+- Necessidades de visão.
+- Limites de execução.
+
+A seleção deverá passar pela camada de provedores do Agent Core.
+
+Não implemente chamadas diretas a fornecedores dentro de cada tipo de agente se já existir uma abstração comum.
+
+Permita utilizar um único modelo para todos os agentes quando isso for suficiente.
+
+Não presuma que um modelo mais caro será sempre melhor para todas as subtarefas.
+
+---
+
+## 16. FERRAMENTAS E PERMISSÕES DOS SUBAGENTES
+
+Cada agente deverá receber apenas as ferramentas necessárias à sua tarefa.
+
+Exemplos:
+
+- Um agente de pesquisa pode precisar de ferramentas de leitura e pesquisa.
+- Um agente de revisão pode precisar de acesso de leitura ao código e aos testes.
+- Um agente de implementação pode precisar de ferramentas de edição e execução.
+- Um agente de documentação pode precisar de leitura e escrita em arquivos específicos.
+
+A atribuição de ferramentas deverá ser configurável.
+
+O sistema deverá verificar se a ferramenta está realmente disponível antes de delegar uma tarefa que dependa dela.
+
+As permissões deverão ser aplicadas pelo executor de ferramentas, e não apenas descritas nas instruções do agente.
+
+Não confie somente no prompt para impedir ações não autorizadas.
+
+A aprovação do usuário deverá ser respeitada quando exigida pela política de execução.
+
+---
+
+## 17. EVENTOS E ACOMPANHAMENTO EM TEMPO REAL
+
+Integre o sistema ao mecanismo de eventos do Agent Core.
+
+Considere eventos como:
+
+- `agent.created`
+- `agent.started`
+- `agent.progress`
+- `agent.waiting`
+- `agent.completed`
+- `agent.failed`
+- `agent.cancelled`
+- `task.created`
+- `task.assigned`
+- `task.started`
+- `task.blocked`
+- `task.completed`
+- `task.failed`
+- `task.cancelled`
+- `orchestration.started`
+- `orchestration.updated`
+- `orchestration.completed`
+- `orchestration.failed`
+
+Os nomes são ilustrativos e deverão seguir as convenções existentes.
+
+Cada evento deverá incluir identificadores suficientes para associá-lo à sessão, à tarefa e ao agente.
+
+A interface deverá conseguir acompanhar o progresso sem consultar continuamente o banco de dados de maneira ineficiente.
+
+Quando houver streaming de eventos, trate desconexões e reconexões de forma consistente.
+
+---
+
+## 18. INTERFACE DESKTOP DOS SUBAGENTES
+
+Se o harness possuir interface gráfica, integre a orquestração a ela.
+
+O usuário deverá conseguir visualizar:
+
+- Tarefa principal.
+- Plano geral.
+- Lista de subagentes.
+- Subtarefas.
+- Estados de execução.
+- Dependências.
+- Progresso.
+- Ferramentas utilizadas.
+- Resultados produzidos.
+- Erros.
+- Ações aguardando aprovação.
+- Tempo de execução.
+- Consumo de modelos, quando disponível.
+
+Permita abrir os detalhes de um agente para examinar seu trabalho.
+
+Quando aplicável, apresente:
+
+- Histórico de eventos.
+- Resumo do contexto.
+- Arquivos analisados.
+- Arquivos modificados.
+- Diffs.
+- Testes realizados.
+- Pendências.
+
+A interface deverá distinguir visualmente execução ativa, espera, conclusão, falha e cancelamento.
+
+Não construa uma nova interface isolada se a aplicação já possuir componentes de sessões, tarefas e eventos que possam ser estendidos.
+
+---
+
+## 19. PERSISTÊNCIA E RETOMADA DAS ORQUESTRAÇÕES
+
+Permita persistir o estado das execuções multiagente.
+
+Armazene, conforme necessário:
+
+- Tarefa principal.
+- Grafo de subtarefas.
+- Instâncias de agentes.
+- Estados.
+- Dependências.
+- Resultados.
+- Histórico de eventos.
+- Identificadores de execução.
+- Tentativas.
+- Erros.
+- Referências a artefatos.
+- Informações de retomada.
+
+Após uma reinicialização, o sistema deverá conseguir identificar quais tarefas foram concluídas, quais falharam e quais ficaram interrompidas.
+
+Não retome automaticamente operações potencialmente irreversíveis sem verificar seu estado.
+
+Uma tarefa em execução no momento da queda poderá precisar ser marcada como interrompida e reconciliada antes de continuar.
+
+A retomada deverá ser compatível com a estratégia de persistência existente.
+
+---
+
+## 20. LIMITES E CONTROLE DE CUSTOS
+
+Implemente controles configuráveis para:
+
+- Número máximo de agentes ativos.
+- Profundidade de delegação.
+- Número de subtarefas.
+- Tentativas por tarefa.
+- Tempo máximo de execução.
+- Chamadas simultâneas por provedor.
+- Consumo de tokens, quando disponível.
+- Orçamento por tarefa, quando suportado.
+- Número máximo de chamadas de ferramentas.
+
+Não permita que agentes criem subagentes indefinidamente.
+
+Se houver delegação recursiva, imponha limites de profundidade e quantidade.
+
+Quando os limites forem atingidos, o sistema deverá interromper novas delegações, aguardar tarefas existentes quando apropriado ou informar o motivo do bloqueio.
+
+Os limites deverão ser configuráveis sem exigir alterações no código-fonte.
+
+---
+
+## 21. REFERÊNCIAS DE CÓDIGO PARA ESTUDO
+
+Clone os repositórios abaixo em uma área temporária, separada do projeto principal, e examine suas implementações relevantes.
+
+### Agentes de programação
+
+1. OpenCode  
+   https://github.com/anomalyco/opencode
+
+2. OpenAI Codex  
+   https://github.com/openai/codex
+
+3. OpenHands  
+   https://github.com/All-Hands-AI/OpenHands
+
+4. Goose  
+   https://github.com/block/goose
+
+5. Cline  
+   https://github.com/cline/cline
+
+### Orquestração e coordenação
+
+6. LangGraph  
+   https://github.com/langchain-ai/langgraph
+
+7. CrewAI  
+   https://github.com/crewAIInc/crewAI
+
+8. AutoGen  
+   https://github.com/microsoft/autogen
+
+9. Agno  
+   https://github.com/agno-agi/agno
+
+10. Pydantic AI  
+    https://github.com/pydantic/pydantic-ai
+
+Utilize esses projetos como referências para identificar implementações de delegação, estados, grafos de tarefas, agentes especializados, execução paralela e persistência.
+
+Não adicione todos como dependências do produto.
+
+Verifique a linguagem, a licença, a manutenção, as dependências e a compatibilidade de cada projeto.
+
+Aproveite componentes específicos quando houver benefício concreto. Se a integração direta de um framework introduzir complexidade excessiva, utilize suas ideias ou implementações compatíveis sem acoplar todo o harness a ele.
+
+---
+
+## 22. TESTES OBRIGATÓRIOS
+
+Implemente testes automatizados para os cenários abaixo.
+
+### Testes de delegação
+
+- O agente principal consegue criar uma subtarefa.
+- A subtarefa é atribuída ao agente correto.
+- O contexto necessário é fornecido.
+- O resultado retorna ao orquestrador.
+- O agente principal consegue continuar o trabalho usando o resultado.
+
+### Testes de dependências
+
+- Tarefas independentes podem executar em paralelo.
+- Tarefas dependentes aguardam os pré-requisitos.
+- Dependências circulares são detectadas.
+- Tarefas bloqueadas não são executadas indevidamente.
+
+### Testes de concorrência
+
+- O limite de agentes simultâneos é respeitado.
+- Tarefas conflitantes não modificam simultaneamente o mesmo recurso sem coordenação.
+- Resultados de agentes diferentes não são misturados.
+- Falhas de um agente não corrompem o estado dos outros.
+
+### Testes de falha e recuperação
+
+- Uma subtarefa pode falhar sem invalidar tarefas independentes.
+- Retentativas respeitam os limites.
+- O cancelamento interrompe novas etapas.
+- A retomada preserva resultados concluídos.
+- Uma operação já executada não é repetida cegamente.
+
+### Testes de integração
+
+- O Agent Core executa subagentes por meio da interface comum.
+- Os eventos chegam à interface.
+- A persistência registra o estado.
+- Os resultados são consolidados.
+- Os critérios de conclusão são verificados.
+- O sistema funciona com modelos e ferramentas simulados.
+
+Não dependa de chamadas pagas a modelos reais para a suíte de testes.
+
+---
+
+## 23. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo somente poderá ser considerado funcional quando:
+
+1. O registro de agentes estiver integrado ao harness.
+2. O agente principal conseguir delegar tarefas.
+3. Os subagentes possuírem contextos e estados independentes.
+4. As dependências forem respeitadas.
+5. A execução paralela tiver limites.
+6. Os conflitos de alterações forem tratados.
+7. Os resultados forem validados e consolidados.
+8. As falhas forem registradas e tratadas.
+9. O cancelamento funcionar nos níveis suportados.
+10. A persistência permitir recuperar as informações necessárias.
+11. Os eventos permitirem acompanhar o progresso.
+12. A interface apresentar estados reais, e não estimativas fictícias.
+13. Os testes relevantes forem executados.
+14. As funcionalidades preexistentes continuarem funcionando.
+
+Se algum critério não for concluído, informe precisamente o que falta e por quê.
+
+---
+
+## 24. ORDEM DE IMPLEMENTAÇÃO
+
+Execute o trabalho nesta sequência:
+
+### Etapa A — Diagnóstico
+
+Mapeie o Agent Core, as ferramentas, as sessões, os eventos e a persistência existentes.
+
+### Etapa B — Contratos
+
+Defina as interfaces de agentes, tarefas, resultados e eventos.
+
+### Etapa C — Execução sequencial
+
+Implemente primeiro a criação, a delegação e a conclusão de subtarefas sem paralelismo complexo.
+
+### Etapa D — Dependências
+
+Adicione o grafo de tarefas e o controle de pré-requisitos.
+
+### Etapa E — Paralelismo
+
+Adicione fila de execução, limites de concorrência e coordenação de recursos.
+
+### Etapa F — Consolidação
+
+Implemente validação de resultados, resolução de incompatibilidades e revisão.
+
+### Etapa G — Persistência e recuperação
+
+Adicione retomada, cancelamento e recuperação de estados interrompidos.
+
+### Etapa H — Interface
+
+Integre o acompanhamento dos agentes à interface existente.
+
+### Etapa I — Verificação
+
+Execute os testes, corrija regressões e documente o resultado.
+
+Implemente em incrementos verificáveis. Não tente construir todas as funcionalidades simultaneamente sem validar a base.
+
+---
+
+## 25. RELATÓRIO FINAL
+
+Ao terminar, apresente:
+
+- Diagnóstico inicial.
+- Componentes já existentes que foram preservados.
+- Componentes criados ou aprimorados.
+- Arquivos modificados.
+- Repositórios efetivamente examinados.
+- Código externo efetivamente aproveitado.
+- Estratégia de delegação.
+- Estratégia de concorrência.
+- Estratégia de persistência.
+- Testes executados e seus resultados.
+- Problemas encontrados.
+- Limitações restantes.
+- Próximas etapas recomendadas.
+
+Diferencie claramente recursos implementados, recursos testados e recursos ainda pendentes.
+
+## INSTRUÇÃO FINAL
+
+Construa um sistema de subagentes real, integrado ao Agent Core, capaz de coordenar tarefas especializadas, respeitar dependências, executar trabalhos independentes em paralelo e consolidar resultados verificáveis.
+
+Não transforme o projeto em um conjunto de agentes desconectados. O objetivo é construir uma equipe coordenada pelo mesmo harness, compartilhando contratos, ferramentas, contexto controlado, persistência e observabilidade.
+
+**Preserve o que já funciona, implemente as melhorias viáveis e comprove o funcionamento com testes.**

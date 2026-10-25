@@ -1,0 +1,205 @@
+# MÓDULO 13 — PLANEJAMENTO, EXECUÇÃO AUTÔNOMA E VERIFICAÇÃO DE RESULTADOS
+
+## 1. OBJETIVO
+
+Implemente uma camada de planejamento e execução de tarefas que permita ao harness receber um objetivo amplo, dividi-lo em etapas, executá-las, avaliar os resultados e corrigir falhas até atingir critérios de conclusão verificáveis.
+
+O sistema deve transformar solicitações como “implemente esta funcionalidade”, “corrija os testes” ou “construa este módulo” em um fluxo operacional rastreável.
+
+Não crie apenas um planejador que produz listas de tarefas. Implemente um ciclo de execução conectado ao Agent Core, aos subagentes, ao terminal, à inteligência de código, ao Git, à memória e aos provedores de modelos.
+
+## 2. REPOSITÓRIOS PARA CLONAR E ANALISAR
+
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- SWE-agent: https://github.com/SWE-agent/SWE-agent
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenAI Codex: https://github.com/openai/codex
+- Aider: https://github.com/Aider-AI/aider
+- LangGraph: https://github.com/langchain-ai/langgraph
+- Microsoft AutoGen: https://github.com/microsoft/autogen
+- CrewAI: https://github.com/crewAIInc/crewAI
+- Pydantic AI: https://github.com/pydantic/pydantic-ai
+- Agno: https://github.com/agno-agi/agno
+
+Clone e inspecione os componentes relevantes de planejamento, execução em ciclos, gerenciamento de estado, avaliação, recuperação e verificação. Confirme a implementação real antes de decidir o que aproveitar.
+
+## 3. COMPONENTES
+
+### 3.1. Task Planner
+
+Deve:
+
+- Interpretar o objetivo do usuário.
+- Identificar requisitos e restrições.
+- Dividir o trabalho em subtarefas.
+- Definir dependências.
+- Identificar etapas paralelizáveis.
+- Estabelecer critérios de conclusão.
+- Estimar esforço e recursos quando possível.
+- Registrar incertezas que exigem investigação.
+
+O plano deve ser estruturado em dados, não apenas em texto livre.
+
+### 3.2. Execution Graph
+
+Represente as tarefas como um grafo de dependências.
+
+Cada tarefa deverá possuir:
+
+- Identificador.
+- Descrição.
+- Pré-requisitos.
+- Estado.
+- Agente responsável.
+- Ferramentas necessárias.
+- Arquivos relacionados.
+- Critérios de aceitação.
+- Tentativas realizadas.
+- Resultados.
+- Evidências de validação.
+
+Detecte dependências circulares e tarefas bloqueadas.
+
+### 3.3. Execution Coordinator
+
+Coordene a execução respeitando dependências e limites de concorrência.
+
+Permita:
+
+- Executar etapas sequenciais.
+- Executar etapas independentes em paralelo.
+- Distribuir tarefas entre subagentes.
+- Atualizar o plano após novas descobertas.
+- Interromper tarefas.
+- Retomar tarefas persistidas.
+- Replanejar após falhas.
+- Consolidar resultados.
+
+A concorrência deve respeitar a arquitetura e os recursos disponíveis. Não execute simultaneamente tarefas que alterem os mesmos arquivos sem coordenação.
+
+### 3.4. Progress Monitor
+
+Registre estados como:
+
+- Pendente.
+- Pronta para execução.
+- Em execução.
+- Bloqueada.
+- Em validação.
+- Concluída.
+- Falhou.
+- Cancelada.
+
+Disponibilize eventos de progresso para a interface e mantenha o histórico persistente.
+
+### 3.5. Verification Engine
+
+Toda tarefa importante deve possuir critérios de verificação.
+
+Conforme o tipo de trabalho, utilize:
+
+- Testes automatizados.
+- Build.
+- Análise estática.
+- Diagnósticos do LSP.
+- Inspeção de diffs.
+- Validação de arquivos gerados.
+- Verificação de interfaces e contratos.
+- Testes de integração.
+- Verificação de requisitos.
+
+Não aceite como concluída uma tarefa apenas porque o modelo afirmou que terminou.
+
+Quando não for possível validar um requisito, marque-o como não verificado e explique a limitação.
+
+### 3.6. Recovery and Replanning
+
+Ao detectar uma falha:
+
+1. Capture o erro.
+2. Recupere o contexto relevante.
+3. Identifique as tentativas anteriores.
+4. Evite repetir indefinidamente a mesma estratégia.
+5. Formule uma alternativa.
+6. Atualize o plano.
+7. Execute novamente dentro de limites configuráveis.
+8. Registre o resultado.
+
+Defina limites de tentativas, tempo e consumo.
+
+Quando o bloqueio exigir informação ou intervenção do usuário, apresente uma pergunta específica em vez de continuar indefinidamente.
+
+## 4. EXECUÇÃO CONTROLADA
+
+Integre o planejador aos módulos anteriores:
+
+- Agent Core para execução.
+- Subagentes para divisão de responsabilidades.
+- Memória para recuperação de decisões.
+- MCP e plugins para ferramentas adicionais.
+- Terminal para comandos e testes.
+- Inteligência de código para análise.
+- Git e worktrees para isolamento e revisão.
+- Provedores de IA para seleção de modelos.
+
+O sistema deve utilizar os mecanismos existentes, evitando criar uma segunda implementação de ferramentas, sessões ou processos.
+
+Cada execução deve manter um registro de tarefas, chamadas relevantes, alterações, testes e resultados.
+
+## 5. INTERFACE
+
+Implemente uma visualização de execução com:
+
+- Objetivo principal.
+- Plano atual.
+- Etapas concluídas.
+- Etapas em andamento.
+- Etapas bloqueadas.
+- Dependências.
+- Agentes responsáveis.
+- Resultados dos testes.
+- Erros e tentativas.
+- Próximas ações.
+
+Permita pausar, retomar e cancelar uma execução.
+
+A interface deve refletir o estado persistido real, não apenas o estado local dos componentes visuais.
+
+## 6. TESTES OBRIGATÓRIOS
+
+- Planejamento de uma tarefa simples.
+- Decomposição de uma tarefa complexa.
+- Detecção de ciclos.
+- Execução sequencial.
+- Execução paralela de tarefas independentes.
+- Bloqueio por dependências.
+- Falha e replanejamento.
+- Limite de tentativas.
+- Cancelamento.
+- Retomada após reinicialização.
+- Verificação de conclusão baseada em evidências.
+- Conflitos entre subtarefas.
+- Integração com Git e worktrees.
+- Regressão dos módulos existentes.
+
+Use tarefas de teste reproduzíveis e valide o resultado final nos arquivos e nos comandos executados.
+
+## 7. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo deve permitir executar um objetivo de ponta a ponta, com plano persistente, dependências, agentes responsáveis, recuperação de falhas e critérios de conclusão verificáveis.
+
+O sistema deve diferenciar claramente entre tarefas concluídas, falhas e resultados não verificados.
+
+## 8. ENTREGA
+
+Implemente o módulo, execute os testes e apresente:
+
+- Arquivos modificados.
+- Componentes reaproveitados.
+- Fluxo de execução.
+- Exemplo real de uma tarefa executada.
+- Testes e resultados.
+- Limitações.
+- Instruções de uso.
+
+Não declare autonomia completa se ainda houver etapas que dependam de intervenção manual.

@@ -1,0 +1,1093 @@
+# MÓDULO 03 — IMPLEMENTAÇÃO COMPLETA DE SKILLS, COMANDOS PERSONALIZADOS E HOOKS NO NOSSO AI DEVELOPMENT HARNESS
+
+## 1. OBJETIVO PRINCIPAL
+
+Você está trabalhando no desenvolvimento de um AI Development Harness próprio, com o objetivo de alcançar capacidades avançadas de ferramentas como Claude Code, OpenAI Codex, OpenCode, Cline, Goose e outros agentes de programação.
+
+Sua tarefa atual é implementar, integrar e aprimorar o **Módulo 03 — Skills, Custom Commands e Hooks**.
+
+Este módulo deve funcionar em conjunto com os módulos anteriores:
+
+- **Módulo 01 — Agent Core:** execução central do agente, interação com modelos, ferramentas, contexto, erros e conclusão de tarefas.
+- **Módulo 02 — Subagents e Orchestration:** delegação de tarefas, agentes especializados, execução paralela e consolidação de resultados.
+- **Módulo 03 — Skills, Custom Commands e Hooks:** habilidades reutilizáveis, comandos personalizados, instruções contextuais e automações acionadas por eventos.
+
+Não construa um aplicativo isolado ou uma demonstração. Implemente as capacidades no projeto existente, respeitando sua arquitetura, sua interface, seu sistema de configuração e os contratos dos módulos anteriores.
+
+O resultado deve ser um sistema real, funcional, testável, extensível e preparado para receber novos módulos.
+
+## 2. REGRA FUNDAMENTAL: ANALISAR, CLONAR, COMPARAR E IMPLEMENTAR
+
+Antes de modificar qualquer arquivo:
+
+1. Examine a estrutura completa do projeto atual.
+2. Identifique a linguagem, o framework, os módulos, as interfaces, os contratos e os sistemas de configuração existentes.
+3. Identifique o que já existe de skills, comandos, instruções, eventos, extensões, automações e carregamento de arquivos.
+4. Execute os testes existentes e registre o estado inicial.
+5. Identifique funcionalidades já implementadas que não podem ser quebradas.
+6. Crie uma estratégia de integração compatível com o código existente.
+
+Em seguida, clone os repositórios indicados neste documento para um diretório temporário de análise, fora da árvore de produção do harness.
+
+Não quero apenas uma pesquisa, uma lista de recomendações ou um documento de arquitetura. Quero que você examine os códigos-fonte e implemente as melhorias concretas no projeto.
+
+Para cada repositório:
+
+- Examine o README e a documentação técnica.
+- Analise os arquivos de implementação relevantes.
+- Identifique a arquitetura, os formatos de configuração, os contratos e os mecanismos reutilizáveis.
+- Compare a implementação encontrada com a implementação do nosso harness.
+- Reutilize ou adapte a abordagem que for tecnicamente superior e compatível.
+- Implemente as funcionalidades ausentes.
+- Aprimore as funcionalidades existentes quando a implementação externa oferecer vantagens reais.
+- Evite duplicar sistemas que já funcionam adequadamente.
+- Preserve as convenções e os contratos existentes.
+- Respeite as licenças dos projetos e suas obrigações de atribuição.
+- Não copie cegamente dependências, arquivos ou arquiteturas incompatíveis.
+
+Se um repositório estiver indisponível, tiver mudado de endereço ou não possuir o código esperado, registre isso e continue com as demais fontes. Não invente resultados de análise.
+
+## 3. REPOSITÓRIOS OBRIGATÓRIOS PARA ANÁLISE
+
+Clone e examine estes repositórios:
+
+### 3.1. Anthropic Skills
+
+https://github.com/anthropics/skills
+
+Objetivo da análise:
+
+- Formato das skills.
+- Estrutura de diretórios.
+- Arquivos de instruções.
+- Organização de habilidades reutilizáveis.
+- Exemplos de skills especializadas.
+- Padrões de descoberta e reutilização.
+- Separação entre instruções principais e recursos auxiliares.
+
+Utilize as ideias e implementações compatíveis para criar um sistema de skills extensível.
+
+### 3.2. OpenAI Skills
+
+https://github.com/openai/skills
+
+Objetivo da análise:
+
+- Organização das habilidades.
+- Estrutura dos arquivos de definição.
+- Convenções de metadados.
+- Instruções especializadas para agentes.
+- Reutilização de procedimentos.
+- Integração das habilidades com fluxos de trabalho de desenvolvimento.
+
+Compare as convenções com as utilizadas no projeto e adote os formatos que tragam compatibilidade ou benefícios concretos.
+
+### 3.3. Vercel Skills
+
+https://github.com/vercel-labs/skills
+
+Objetivo da análise:
+
+- Descoberta e instalação de skills.
+- Organização e distribuição de habilidades.
+- Compatibilidade com diferentes ferramentas de agentes.
+- Estrutura dos diretórios.
+- Instalação em projetos existentes.
+- Gerenciamento de múltiplas skills.
+- Fluxos de atualização e manutenção.
+
+Implemente mecanismos equivalentes quando forem adequados à arquitetura do nosso harness.
+
+### 3.4. Superpowers
+
+https://github.com/obra/superpowers
+
+Objetivo da análise:
+
+- Composição de habilidades.
+- Procedimentos de desenvolvimento.
+- Planejamento e execução estruturada.
+- Fluxos de debugging.
+- Desenvolvimento orientado por testes.
+- Revisão e validação de código.
+- Encadeamento de procedimentos reutilizáveis.
+
+Aproveite as abordagens aplicáveis para permitir que o agente utilize sequências de trabalho especializadas sem precisar receber todas as instruções manualmente em cada conversa.
+
+### 3.5. GitHub Spec Kit
+
+https://github.com/github/spec-kit
+
+Objetivo da análise:
+
+- Comandos especializados para desenvolvimento.
+- Organização de fluxos de trabalho.
+- Instruções reutilizáveis.
+- Geração e evolução de especificações.
+- Integração entre planejamento, implementação e validação.
+- Organização de templates e recursos auxiliares.
+
+Adapte as ideias úteis ao sistema de comandos personalizados e skills.
+
+### 3.6. AGENTS.md
+
+https://github.com/agentsmd/agents.md
+
+Objetivo da análise:
+
+- Convenções de arquivos AGENTS.md.
+- Instruções específicas por projeto.
+- Instruções aplicáveis a diretórios.
+- Hierarquia de instruções.
+- Compatibilidade com diferentes agentes de programação.
+
+Implemente suporte a AGENTS.md ou aprimore o suporte existente, sem quebrar os arquivos de instruções que nosso harness já utiliza.
+
+### 3.7. Model Context Protocol — Servers
+
+https://github.com/modelcontextprotocol/servers
+
+Objetivo da análise:
+
+- Organização de ferramentas externas.
+- Descrições e esquemas de ferramentas.
+- Descoberta de capacidades.
+- Separação entre definição e execução.
+- Integração de ferramentas de terceiros.
+
+Este repositório deve ser utilizado como referência complementar para as fronteiras entre skills, comandos e ferramentas. Não transforme uma skill em uma ferramenta executável sem necessidade.
+
+### Regra sobre os repositórios
+
+Essas fontes não devem ser tratadas como sistemas que precisam ser incorporados integralmente. A finalidade é identificar implementações, padrões e funcionalidades úteis, aproveitando o que trouxer uma melhoria concreta ao nosso projeto.
+
+Não substitua a arquitetura atual por uma biblioteca externa apenas porque ela é popular.
+
+---
+
+## 4. ARQUITETURA DO MÓDULO
+
+Implemente o módulo utilizando os componentes equivalentes abaixo. Se o projeto já possuir componentes semelhantes, amplie-os em vez de criar duplicatas.
+
+### 4.1. Skill Registry
+
+Registro central de habilidades disponíveis.
+
+Responsabilidades:
+
+- Registrar skills internas e externas.
+- Identificar skills pelo nome e identificador.
+- Armazenar metadados.
+- Detectar duplicidades.
+- Identificar conflitos de nomes.
+- Controlar versões quando necessário.
+- Manter informações sobre origem e localização.
+- Expor uma API para consulta das skills disponíveis.
+- Permitir atualização do registro.
+- Identificar skills desativadas, inválidas ou incompatíveis.
+
+O registro deve separar a descoberta de uma skill de sua execução.
+
+### 4.2. Skill Loader
+
+Responsável por carregar as definições das habilidades.
+
+Deve:
+
+- Localizar os diretórios configurados.
+- Reconhecer os formatos suportados.
+- Ler metadados e instruções.
+- Validar arquivos obrigatórios.
+- Detectar arquivos ausentes ou malformados.
+- Carregar recursos auxiliares sob demanda.
+- Informar erros com detalhes suficientes para diagnóstico.
+- Evitar carregar indiscriminadamente todos os arquivos de todas as skills no contexto do modelo.
+
+Quando possível, utilize carregamento progressivo: metadados primeiro, instruções completas quando a skill for necessária e recursos adicionais somente quando solicitados.
+
+### 4.3. Skill Resolver
+
+Componente que identifica as habilidades adequadas para uma tarefa.
+
+Deve considerar:
+
+- Pedido do usuário.
+- Linguagem de programação.
+- Tipo de projeto.
+- Arquivos relevantes.
+- Framework utilizado.
+- Instruções do repositório.
+- Skills explicitamente solicitadas.
+- Capacidades disponíveis no Agent Core.
+- Disponibilidade de ferramentas necessárias.
+- Restrições de contexto e orçamento de tokens.
+
+O resolvedor deve fornecer justificativas estruturadas para a seleção, permitindo diagnosticar por que determinada habilidade foi escolhida.
+
+A decisão do modelo pode ajudar a selecionar skills, mas não deve substituir a validação determinística de arquivos, capacidades, permissões e compatibilidade.
+
+### 4.4. Skill Runtime
+
+Responsável por disponibilizar e executar o procedimento definido por uma skill.
+
+Deve:
+
+- Carregar as instruções selecionadas.
+- Disponibilizar os recursos necessários.
+- Integrar a skill ao contexto da tarefa.
+- Reutilizar o Agent Core para chamadas ao modelo.
+- Reutilizar o registro e o executor de ferramentas existentes.
+- Registrar eventos e resultados.
+- Detectar falhas de carregamento.
+- Permitir cancelamento.
+- Evitar iniciar um segundo ciclo de agente independente quando o Agent Core já puder executar a tarefa.
+
+Uma skill baseada em instruções não deve ser tratada automaticamente como código executável.
+
+Quando uma skill precisar executar scripts ou comandos, utilize os mecanismos de execução já existentes, respeitando suas políticas de autorização.
+
+### 4.5. Command Registry
+
+Registro central de comandos personalizados.
+
+Responsabilidades:
+
+- Descobrir comandos disponíveis.
+- Registrar nomes e aliases.
+- Interpretar argumentos.
+- Validar parâmetros.
+- Detectar conflitos de nomes.
+- Disponibilizar descrições para a interface.
+- Resolver comandos para suas implementações.
+- Registrar erros de execução.
+- Permitir a inclusão de novos comandos sem modificar o núcleo do agente.
+
+Os comandos devem ser integrados ao sistema de ferramentas e ao Agent Core quando fizerem sentido, evitando criar um executor paralelo desnecessário.
+
+### 4.6. Hook Registry e Hook Dispatcher
+
+Sistema central para registrar e despachar hooks relacionados ao ciclo de vida do agente.
+
+Responsabilidades:
+
+- Registrar hooks.
+- Associar hooks a eventos.
+- Ordenar sua execução quando necessário.
+- Validar configurações.
+- Aplicar limites de execução.
+- Registrar resultados e falhas.
+- Diferenciar hooks informativos de hooks que podem alterar uma decisão.
+- Integrar os hooks ao fluxo real de execução.
+
+Um hook deve ser uma funcionalidade efetivamente conectada aos eventos do agente, não apenas uma função registrada que nunca é chamada.
+
+### 4.7. Instruction Resolver
+
+Componente responsável por descobrir e combinar instruções de diferentes níveis.
+
+Deve resolver instruções globais, de usuário, de workspace, de projeto e de diretórios, conforme o formato e as convenções adotadas pelo projeto.
+
+Deve:
+
+- Identificar os arquivos aplicáveis.
+- Determinar a precedência.
+- Preservar a origem de cada instrução.
+- Evitar duplicação desnecessária.
+- Detectar instruções incompatíveis.
+- Aplicar limites de tamanho.
+- Permitir inspeção das instruções efetivamente carregadas.
+- Atualizar o contexto quando arquivos relevantes forem modificados.
+
+Não assuma que todos os formatos externos utilizam a mesma hierarquia. Documente e implemente as regras de precedência adotadas pelo nosso harness.
+
+---
+
+## 5. SISTEMA DE SKILLS
+
+Implemente um formato de skills documentado, simples de criar e suficientemente flexível para evoluir.
+
+### 5.1. Estrutura sugerida
+
+Adapte a estrutura à tecnologia do projeto:
+
+```text
+skills/
+  code-review/
+    SKILL.md
+    references/
+      review-checklist.md
+    templates/
+      review-report.md
+    scripts/
+      validate.sh
+
+  debugging/
+    SKILL.md
+    references/
+      debugging-guide.md
+
+  testing/
+    SKILL.md
+    templates/
+      test-plan.md
+```
+
+Essa estrutura é uma referência, não uma exigência para reorganizar diretórios já existentes.
+
+### 5.2. Metadados
+
+Cada skill deve poder declarar, conforme o formato escolhido:
+
+- Nome.
+- Identificador.
+- Descrição.
+- Versão opcional.
+- Categorias.
+- Linguagens e frameworks compatíveis.
+- Requisitos.
+- Ferramentas necessárias.
+- Arquivos auxiliares.
+- Parâmetros opcionais.
+- Origem.
+- Estado de disponibilidade.
+
+Os metadados devem ser validados antes de a skill ser disponibilizada ao agente.
+
+Não obrigue todos os campos a existir se isso impedir a compatibilidade com formatos públicos que não os exigem.
+
+### 5.3. Descoberta de skills
+
+O sistema deve procurar skills nos locais configurados, por exemplo:
+
+- Diretório de skills da aplicação.
+- Diretório global do usuário.
+- Diretório do workspace.
+- Diretórios específicos do projeto.
+- Diretórios locais de extensões, caso já existam.
+- Diretórios de skills explicitamente adicionados pelo usuário.
+
+A precedência e o tratamento de nomes duplicados devem ser explícitos e testados.
+
+Não invente caminhos específicos do sistema operacional antes de inspecionar a arquitetura atual. Forneça caminhos padrão adequados ao sistema utilizado e permita configurá-los.
+
+### 5.4. Ativação automática e manual
+
+Implemente dois modos:
+
+**Ativação manual**
+
+O usuário solicita explicitamente uma habilidade ou utiliza um comando que a ativa.
+
+**Ativação contextual**
+
+O agente identifica que uma skill pode ajudar na tarefa, consulta o registro e carrega suas instruções quando necessário.
+
+A ativação contextual deve evitar carregar todas as skills indiscriminadamente. O agente deve conseguir descobrir habilidades relevantes sem consumir o contexto inteiro.
+
+Quando uma skill for obrigatória por configuração, respeite essa configuração e informe erros se ela não puder ser carregada.
+
+### 5.5. Skills compostas
+
+Permita que uma tarefa utilize mais de uma skill quando houver benefício concreto.
+
+Exemplo:
+
+1. Skill de planejamento.
+2. Skill especializada na tecnologia do projeto.
+3. Skill de implementação.
+4. Skill de testes.
+5. Skill de revisão.
+
+A composição deve ser coordenada pelo Agent Core e, quando apropriado, pelo orquestrador do Módulo 02.
+
+Evite carregar instruções redundantes e identifique conflitos entre procedimentos.
+
+Não transforme automaticamente toda tarefa em uma sequência rígida de cinco etapas. A seleção deve considerar o tipo de tarefa.
+
+### 5.6. Recursos auxiliares
+
+Uma skill pode incluir documentação, exemplos, templates e scripts.
+
+Implemente carregamento de recursos sob demanda, validação de caminhos e resolução relativa ao diretório da própria skill.
+
+O sistema não deve permitir que um caminho relativo malicioso escape do diretório autorizado sem uma validação explícita de acesso.
+
+### 5.7. Instalação, atualização e remoção
+
+Quando compatível com o projeto, implemente:
+
+- Instalação de skills locais.
+- Importação de diretórios existentes.
+- Validação antes da ativação.
+- Atualização controlada.
+- Desativação.
+- Remoção de skills instaladas pelo sistema.
+- Detecção de alterações.
+- Registro de origem e versão.
+- Relatório de erros de instalação.
+
+Não apague arquivos de projetos do usuário nem sobrescreva uma skill existente silenciosamente.
+
+Se uma instalação exigir rede, apresente a origem e permita que a operação seja autorizada conforme a política existente. Não execute automaticamente scripts recebidos de fontes externas durante a instalação.
+
+---
+
+## 6. SISTEMA DE COMANDOS PERSONALIZADOS
+
+O usuário deve poder criar comandos que representem tarefas recorrentes.
+
+Exemplos:
+
+- `/review`: revisar alterações de código.
+- `/test`: identificar e executar os testes adequados.
+- `/explain`: explicar um trecho de código.
+- `/refactor`: planejar e realizar uma refatoração.
+- `/debug`: investigar um erro.
+- `/plan`: criar um plano de implementação.
+- `/docs`: atualizar documentação.
+- `/commit`: preparar uma mensagem de commit e, quando autorizado, executar a operação.
+- `/skill`: listar ou ativar habilidades.
+- `/hooks`: inspecionar hooks registrados, quando autorizado.
+- `/agents`: listar agentes especializados disponíveis.
+
+Esses nomes são exemplos. Antes de criar comandos novos, verifique quais já existem no harness.
+
+### 6.1. Definição de comandos
+
+Permita que comandos sejam definidos em arquivos de configuração ou formatos textuais simples.
+
+Uma definição deve poder conter:
+
+- Nome.
+- Descrição.
+- Alias.
+- Argumentos.
+- Instruções.
+- Skill associada.
+- Ferramentas necessárias.
+- Parâmetros padrão.
+- Política de execução.
+- Diretório de trabalho.
+- Opções de interação com o usuário.
+
+Use o mecanismo de configuração que melhor se encaixe no projeto. Evite introduzir formatos incompatíveis sem necessidade.
+
+### 6.2. Parsing de argumentos
+
+Implemente parsing robusto para:
+
+- Comandos sem argumentos.
+- Argumentos posicionais.
+- Argumentos nomeados, quando suportados.
+- Texto livre.
+- Caminhos com espaços.
+- Caracteres especiais.
+- Parâmetros ausentes.
+- Valores inválidos.
+- Aliases.
+- Comandos desconhecidos.
+
+Não use substituições frágeis de strings para montar comandos de shell.
+
+Argumentos devem ser transmitidos por interfaces estruturadas sempre que possível, especialmente quando forem usados para executar processos.
+
+### 6.3. Comandos internos e externos
+
+Diferencie:
+
+**Comandos internos:** operam sobre o próprio harness, consultam sessões, ativam skills, exibem configurações ou controlam tarefas.
+
+**Comandos orientados ao agente:** enviam instruções ao Agent Core e permitem utilizar ferramentas autorizadas.
+
+**Comandos executáveis:** iniciam programas ou scripts externos, quando isso fizer parte das capacidades existentes.
+
+Cada categoria deve utilizar o executor correspondente. Não conceda automaticamente às definições textuais de comandos acesso irrestrito ao sistema operacional.
+
+### 6.4. Escopo e precedência
+
+Permita organizar comandos por escopo:
+
+- Global.
+- Usuário.
+- Workspace.
+- Projeto.
+- Extensão.
+
+Defina precedência, detecção de colisões e mecanismos de desambiguação.
+
+Não permita que um comando de um projeto substitua silenciosamente um comando privilegiado do sistema.
+
+### 6.5. Experiência na interface
+
+Integre os comandos à interface existente.
+
+Quando aplicável, implemente:
+
+- Autocompletar nomes.
+- Exibição da descrição.
+- Sugestões de argumentos.
+- Indicação de comandos indisponíveis.
+- Mensagens de erro compreensíveis.
+- Histórico de comandos.
+- Feedback de execução.
+- Indicação de tarefas em andamento.
+- Cancelamento de tarefas compatíveis.
+
+Não crie uma segunda interface de chat se o harness já possuir uma.
+
+---
+
+## 7. SISTEMA DE HOOKS DO CICLO DE VIDA
+
+Implemente hooks reais e conectados aos eventos internos.
+
+Os nomes a seguir são uma proposta de contrato. Adapte-os aos nomes e padrões da arquitetura existente.
+
+### 7.1. Eventos de sessão
+
+- `session.created`
+- `session.resumed`
+- `session.before_close`
+- `session.closed`
+
+### 7.2. Eventos de solicitação
+
+- `request.received`
+- `request.before_process`
+- `request.after_process`
+
+### 7.3. Eventos de contexto
+
+- `context.before_build`
+- `context.after_build`
+- `context.before_compaction`
+- `context.after_compaction`
+
+### 7.4. Eventos do modelo
+
+- `model.before_call`
+- `model.after_call`
+- `model.call_failed`
+
+### 7.5. Eventos de skills e comandos
+
+- `skill.discovered`
+- `skill.before_load`
+- `skill.after_load`
+- `skill.before_activate`
+- `skill.after_activate`
+- `command.before_execute`
+- `command.after_execute`
+- `command.failed`
+
+### 7.6. Eventos de ferramentas
+
+- `tool.before_execute`
+- `tool.after_execute`
+- `tool.execution_failed`
+- `tool.approval_required`
+
+### 7.7. Eventos de execução
+
+- `task.started`
+- `task.progress`
+- `task.before_complete`
+- `task.completed`
+- `task.failed`
+- `task.cancelled`
+
+Não implemente eventos sem conectá-los aos pontos corretos do fluxo de execução.
+
+### 7.8. Contrato de um hook
+
+Cada hook deve poder definir:
+
+- Identificador.
+- Nome.
+- Eventos associados.
+- Ordem ou prioridade.
+- Condições de ativação.
+- Escopo.
+- Tipo de ação.
+- Tempo limite.
+- Política de falha.
+- Estado habilitado/desabilitado.
+- Origem.
+- Metadados de diagnóstico.
+
+O dispatcher deve fornecer um contexto estruturado contendo somente as informações necessárias ao evento.
+
+### 7.9. Tipos de hook
+
+Implemente tipos distintos, de acordo com as necessidades do projeto:
+
+**Observação:** recebe informações e registra métricas ou logs, sem modificar o fluxo.
+
+**Transformação:** pode modificar dados explicitamente autorizados, como contexto ou parâmetros validados.
+
+**Validação:** verifica uma condição e devolve um resultado estruturado.
+
+**Controle de fluxo:** pode permitir, bloquear ou solicitar intervenção humana nos pontos em que o contrato permite isso.
+
+**Execução externa:** inicia uma ferramenta ou processo através do executor existente, quando permitido.
+
+Não permita que um hook de observação altere silenciosamente parâmetros, decisões ou resultados.
+
+### 7.10. Ordem e concorrência
+
+Defina regras claras para execução:
+
+- Hooks sequenciais quando a ordem for relevante.
+- Hooks paralelos quando forem independentes e seguros.
+- Limites de concorrência.
+- Timeout individual.
+- Cancelamento.
+- Tratamento de falhas.
+- Evitar chamadas recursivas acidentais.
+- Evitar execução duplicada do mesmo hook para o mesmo evento.
+
+A falha de um hook informativo não deve necessariamente interromper uma tarefa. A falha de um hook obrigatório de validação pode impedir a operação, conforme sua política configurada.
+
+### 7.11. Configuração de hooks
+
+Permita ativar, desativar e configurar hooks.
+
+Registre claramente quais hooks estão habilitados, quais eventos recebem e qual política de falha utilizam.
+
+Quando um hook executar comandos externos, registre a operação e aplique as regras de autorização existentes.
+
+---
+
+## 8. INSTRUÇÕES DO PROJETO E ARQUIVOS AGENTS.md
+
+Implemente um carregador de instruções que permita ao agente compreender as regras do repositório antes de editar arquivos.
+
+### 8.1. Descoberta
+
+Localize os arquivos de instruções relevantes no workspace e nos diretórios que fazem parte da tarefa.
+
+Inclua suporte a AGENTS.md e preserve compatibilidade com formatos existentes no harness.
+
+### 8.2. Hierarquia
+
+Defina uma política documentada para:
+
+- Instruções globais.
+- Instruções do usuário.
+- Instruções do projeto.
+- Instruções de subdiretórios.
+- Instruções de ferramentas e skills.
+
+Resolva conflitos de maneira previsível. Não presuma que a ordem de leitura é suficiente para resolver toda contradição.
+
+### 8.3. Escopo por diretório
+
+Quando o agente trabalhar em um arquivo específico, identifique as instruções aplicáveis ao caminho desse arquivo.
+
+Evite aplicar instruções de diretórios não relacionados indiscriminadamente.
+
+### 8.4. Cache e atualização
+
+Implemente cache de instruções quando necessário, com invalidação ao detectar mudanças nos arquivos.
+
+Se o projeto já tiver um mecanismo de observação de arquivos, reutilize-o.
+
+### 8.5. Inspeção
+
+Forneça uma maneira de diagnosticar:
+
+- Quais arquivos foram encontrados.
+- Quais arquivos foram carregados.
+- Quais instruções foram aplicadas.
+- Qual é a precedência.
+- Quais arquivos apresentaram erros.
+- Quais instruções foram excluídas por limites de contexto.
+
+Não exponha informações privadas de outros projetos ou diretórios fora do escopo autorizado.
+
+---
+
+## 9. INTEGRAÇÃO COM O AGENT CORE E OS SUBAGENTS
+
+Este módulo não pode funcionar como uma arquitetura isolada.
+
+### 9.1. Integração com o Módulo 01
+
+O Agent Core deve conseguir:
+
+- Consultar skills disponíveis.
+- Selecionar skills relevantes.
+- Carregar instruções.
+- Executar comandos orientados ao agente.
+- Despachar hooks nos eventos adequados.
+- Registrar as skills utilizadas.
+- Cancelar execuções compatíveis.
+- Relatar falhas de skills e hooks.
+- Retomar tarefas persistidas quando a arquitetura permitir.
+
+O sistema deve reutilizar os contratos já existentes para ferramentas, modelos, eventos, contexto e persistência.
+
+### 9.2. Integração com o Módulo 02
+
+Os subagents devem poder utilizar skills apropriadas às suas especialidades.
+
+Exemplos:
+
+- Agente de frontend: skills de React e acessibilidade.
+- Agente de backend: skills de APIs e validação.
+- Agente de testes: skills de testes automatizados.
+- Agente de revisão: skills de code review.
+- Agente de documentação: skills de documentação técnica.
+
+Cada subagent deve receber somente as habilidades e instruções relevantes à tarefa delegada.
+
+Evite compartilhar indiscriminadamente todo o contexto ou todas as permissões do agente principal.
+
+### 9.3. Compatibilidade entre módulos
+
+Se algum dos módulos anteriores ainda estiver parcialmente implementado, crie adaptadores e interfaces claras.
+
+Não crie uma implementação concorrente do Agent Core, do registro de ferramentas ou do sistema de eventos para contornar funcionalidades incompletas.
+
+Documente os contratos necessários e implemente o módulo de forma que ele possa evoluir sem exigir uma reescrita posterior.
+
+---
+
+## 10. CONTROLE DE CONTEXTO E DESEMPENHO
+
+O sistema deve funcionar em projetos pequenos e grandes.
+
+Implemente, conforme a arquitetura existente:
+
+- Carregamento progressivo de skills.
+- Cache de metadados.
+- Cache de instruções com invalidação.
+- Limites configuráveis de tamanho.
+- Deduplicação de instruções.
+- Descarte de contexto irrelevante.
+- Carregamento sob demanda de referências.
+- Registro de tokens consumidos, quando informado pelo provedor.
+- Métricas de tempo de carregamento e execução.
+- Limites de concorrência de hooks.
+- Detecção de ciclos de ativação.
+
+Não carregue o conteúdo integral de todas as skills em cada chamada ao modelo.
+
+Se o provedor não informar a quantidade de tokens, não invente números. Utilize estimativas identificadas como estimativas, quando houver um mecanismo apropriado.
+
+---
+
+## 11. INTEGRAÇÃO COM PROVEDORES DE MODELOS
+
+O módulo deve ser independente de um provedor específico.
+
+Utilize a camada de provedores já implementada no harness.
+
+Não vincule skills e comandos exclusivamente a um modelo ou fornecedor.
+
+Quando um modelo não suportar determinada capacidade, o sistema deve utilizar uma alternativa compatível ou informar claramente a limitação.
+
+Não crie uma nova camada de integração com APIs de modelos se o Agent Core já oferecer esse recurso.
+
+---
+
+## 12. CONFIGURAÇÃO E PERSISTÊNCIA
+
+Armazene as configurações utilizando o sistema de configuração e persistência existente.
+
+Quando necessário, crie estruturas para:
+
+- Diretórios de skills.
+- Diretórios de comandos.
+- Hooks habilitados.
+- Políticas de execução.
+- Preferências de ativação automática.
+- Limites de contexto.
+- Precedência de instruções.
+- Configurações por workspace.
+- Histórico de erros de carregamento.
+- Versões e origens das skills.
+
+Requisitos:
+
+1. Validar configurações antes de aplicá-las.
+2. Oferecer valores padrão coerentes.
+3. Preservar configurações antigas.
+4. Migrar configurações somente quando necessário.
+5. Permitir recuperação após erros.
+6. Evitar sobrescrever configurações do usuário sem consentimento.
+7. Não armazenar segredos em arquivos de logs.
+
+Se o sistema já possuir um banco de dados, esquema de configuração ou mecanismo de migração, reutilize-o.
+
+---
+
+## 13. SEGURANÇA, ISOLAMENTO E CONFIANÇA
+
+Skills, instruções e comandos podem conter conteúdo externo. Portanto, trate os arquivos carregados como dados potencialmente não confiáveis.
+
+Implemente medidas proporcionais à arquitetura e aos recursos já existentes:
+
+- Validação de caminhos.
+- Proteção contra traversal de diretórios.
+- Validação de metadados.
+- Detecção de definições duplicadas.
+- Separação entre instruções e código executável.
+- Verificação de permissões antes de executar ferramentas.
+- Aprovação para operações sensíveis quando exigida pela política do harness.
+- Registro de comandos externos.
+- Proteção contra execução acidental durante a instalação.
+- Limites de tempo e recursos.
+- Tratamento de conteúdo malformado.
+- Controle de origem das skills.
+- Prevenção de vazamento de segredos em logs e resultados.
+- Isolamento adequado entre projetos e subagents.
+
+O conteúdo de uma skill não pode, por si só, conceder privilégios que o executor não possui.
+
+As instruções encontradas em arquivos de projetos ou skills devem ser consideradas conteúdo de contexto, e não autorização automática para alterar políticas, acessar credenciais ou executar operações externas.
+
+Se o harness já possuir um mecanismo de permissões, reutilize-o. Não crie um segundo sistema incompatível.
+
+---
+
+## 14. TESTES AUTOMATIZADOS OBRIGATÓRIOS
+
+Implemente testes utilizando o framework de testes já adotado pelo projeto.
+
+### 14.1. Testes do Skill Registry
+
+Verifique:
+
+- Registro de uma skill válida.
+- Rejeição de metadados inválidos.
+- Detecção de duplicidades.
+- Resolução de conflitos.
+- Descoberta em diretórios diferentes.
+- Atualização do registro.
+- Desativação de skills.
+- Tratamento de arquivos ausentes.
+
+### 14.2. Testes do Skill Loader
+
+Verifique:
+
+- Carregamento de instruções.
+- Carregamento progressivo.
+- Recursos auxiliares.
+- Caminhos inválidos.
+- Arquivos malformados.
+- Cache.
+- Invalidação após alteração.
+- Erros de permissão.
+
+### 14.3. Testes do Skill Resolver
+
+Verifique:
+
+- Seleção de uma skill explicitamente solicitada.
+- Seleção contextual.
+- Ausência de skills relevantes.
+- Requisitos incompatíveis.
+- Skills que dependem de ferramentas indisponíveis.
+- Seleção de múltiplas skills.
+- Resolução de conflitos entre instruções.
+- Limites de contexto.
+
+### 14.4. Testes de comandos
+
+Verifique:
+
+- Registro e descoberta.
+- Parsing de argumentos.
+- Texto livre.
+- Caminhos com espaços.
+- Aliases.
+- Colisões de nomes.
+- Argumentos inválidos.
+- Comandos desconhecidos.
+- Cancelamento.
+- Erros de execução.
+- Integração com o Agent Core.
+
+### 14.5. Testes de hooks
+
+Verifique:
+
+- Despacho de eventos.
+- Ordem de execução.
+- Execução paralela segura.
+- Timeouts.
+- Cancelamento.
+- Falha de hooks informativos.
+- Falha de hooks obrigatórios.
+- Hooks desativados.
+- Prevenção de execução duplicada.
+- Prevenção de recursão.
+- Integração com eventos reais do agente.
+
+### 14.6. Testes de instruções
+
+Verifique:
+
+- Descoberta de AGENTS.md.
+- Instruções globais e de projeto.
+- Instruções por diretório.
+- Precedência.
+- Arquivos duplicados.
+- Atualização de instruções.
+- Limites de contexto.
+- Isolamento entre workspaces.
+
+### 14.7. Testes de integração
+
+Simule tarefas reais, por exemplo:
+
+1. O usuário solicita uma revisão de código.
+2. O sistema identifica uma skill de revisão.
+3. O loader carrega suas instruções.
+4. O Agent Core utiliza as ferramentas disponíveis.
+5. Os hooks de execução são acionados.
+6. O resultado é produzido.
+7. O sistema registra a skill e os eventos utilizados.
+
+Crie outros cenários para comandos, debugging, testes e utilização de skills por subagents.
+
+Os testes devem usar mocks para chamadas externas quando apropriado, sem depender de APIs pagas ou de credenciais reais.
+
+Não declare os testes aprovados sem executá-los.
+
+---
+
+## 15. IMPLEMENTAÇÃO EM ETAPAS
+
+Execute o trabalho nesta ordem, ajustando-a somente quando a arquitetura existente exigir.
+
+### Etapa 1 — Diagnóstico
+
+- Inspecionar o projeto.
+- Identificar funcionalidades existentes.
+- Executar os testes iniciais.
+- Mapear os contratos dos Módulos 01 e 02.
+- Registrar os pontos de integração.
+
+### Etapa 2 — Análise dos repositórios
+
+- Clonar os repositórios indicados.
+- Inspecionar suas implementações.
+- Comparar abordagens.
+- Identificar componentes que podem ser adaptados.
+- Verificar licenças e dependências.
+- Definir decisões de integração.
+
+### Etapa 3 — Contratos
+
+Definir ou aprimorar as interfaces de:
+
+- Skills.
+- Comandos.
+- Hooks.
+- Instruções.
+- Eventos.
+- Erros.
+- Configuração.
+- Persistência.
+
+Evite interfaces duplicadas.
+
+### Etapa 4 — Sistema de skills
+
+Implementar registro, descoberta, carregamento, resolução, ativação e gerenciamento de recursos.
+
+### Etapa 5 — Comandos personalizados
+
+Implementar registro, parsing, execução, aliases, argumentos, integração com a interface e tratamento de erros.
+
+### Etapa 6 — Hooks
+
+Implementar dispatcher, registro, eventos, ordenação, políticas de falha, cancelamento e observabilidade.
+
+### Etapa 7 — Instruções contextuais
+
+Implementar descoberta, hierarquia, escopo por diretório, cache e compatibilidade com AGENTS.md.
+
+### Etapa 8 — Integração
+
+Conectar os componentes ao Agent Core, ao orquestrador, aos subagents, à interface e à persistência existente.
+
+### Etapa 9 — Testes e correções
+
+Executar os testes novos e existentes. Corrigir regressões e verificar a integração ponta a ponta.
+
+### Etapa 10 — Documentação
+
+Documentar como criar, instalar, configurar, ativar, depurar e testar skills, comandos e hooks.
+
+Inclua exemplos funcionais baseados no código realmente implementado.
+
+---
+
+## 16. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo somente estará concluído quando os seguintes critérios forem atendidos:
+
+- [ ] Skills podem ser descobertas e carregadas a partir dos diretórios configurados.
+- [ ] O sistema valida metadados e detecta erros.
+- [ ] O agente consegue identificar e utilizar skills pertinentes.
+- [ ] É possível ativar skills explicitamente.
+- [ ] O contexto não recebe todas as skills indiscriminadamente.
+- [ ] Recursos auxiliares podem ser carregados sob demanda.
+- [ ] Comandos personalizados podem ser registrados e executados.
+- [ ] Os argumentos dos comandos são tratados corretamente.
+- [ ] Os hooks são disparados nos eventos reais do agente.
+- [ ] A ordem e a política de falha dos hooks são respeitadas.
+- [ ] AGENTS.md e as instruções contextuais são carregados corretamente.
+- [ ] A precedência das instruções está documentada.
+- [ ] O módulo integra-se com o Agent Core existente.
+- [ ] Os subagents conseguem utilizar skills compatíveis.
+- [ ] Configurações e preferências são preservadas.
+- [ ] Há tratamento adequado de erros e cancelamento.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam operacionais.
+- [ ] Não existem componentes duplicados sem justificativa.
+- [ ] A documentação corresponde ao comportamento real.
+
+---
+
+## 17. RELATÓRIO FINAL OBRIGATÓRIO
+
+Ao concluir, apresente um relatório contendo:
+
+1. Arquitetura encontrada inicialmente.
+2. Funcionalidades que já existiam.
+3. Repositórios efetivamente clonados e examinados.
+4. Implementações externas aproveitadas ou adaptadas.
+5. Funcionalidades novas.
+6. Funcionalidades aprimoradas.
+7. Arquivos criados e modificados.
+8. Dependências adicionadas, removidas ou atualizadas.
+9. Alterações na configuração ou no banco de dados.
+10. Testes executados e resultados reais.
+11. Problemas encontrados e correções aplicadas.
+12. Limitações ainda existentes.
+13. Instruções para utilizar skills, comandos e hooks.
+14. Compatibilidade com os Módulos 01 e 02.
+15. Próximos passos necessários para o Módulo 04.
+
+Diferencie claramente o que foi implementado, o que foi testado e o que ficou pendente.
+
+## 18. DIRETRIZ FINAL
+
+**Implemente o módulo no nosso harness. Não entregue somente um plano.**
+
+Utilize o código-fonte dos repositórios indicados como referência prática. Quando uma implementação externa for melhor que a nossa, adapte-a e integre-a de forma consciente. Quando nossa implementação já for adequada, preserve-a.
+
+Não reescreva partes funcionais apenas para padronizar nomes ou reorganizar arquivos.
+
+Não remova funcionalidades existentes sem necessidade comprovada.
+
+Não substitua testes reais por afirmações de sucesso.
+
+Priorize integração, compatibilidade, qualidade do código, extensibilidade, desempenho e manutenção.
+
+Ao terminar, deixe o projeto em um estado funcional e verificável, preparado para receber o próximo módulo do nosso AI Development Harness.

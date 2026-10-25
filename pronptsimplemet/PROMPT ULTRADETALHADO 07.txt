@@ -1,0 +1,999 @@
+# MÓDULO 07 — CODE INTELLIGENCE, ANÁLISE ESTÁTICA E MANIPULAÇÃO INTELIGENTE DE REPOSITÓRIOS
+
+## 1. MISSÃO PRINCIPAL
+
+Implemente no nosso AI Development Harness um sistema avançado de compreensão, navegação, análise e modificação de código-fonte.
+
+O objetivo é permitir que o agente de IA trabalhe em projetos pequenos ou grandes compreendendo sua estrutura, seus símbolos, suas dependências, suas referências e as relações entre os arquivos.
+
+O agente não deve depender exclusivamente de abrir arquivos inteiros, pesquisar palavras ou solicitar que o modelo deduza toda a arquitetura a partir de trechos isolados.
+
+Ele deve conseguir consultar ferramentas especializadas para compreender o código antes de modificá-lo e verificar as consequências das mudanças depois de implementá-las.
+
+O sistema deve oferecer capacidades para:
+
+- Mapear a estrutura de um repositório.
+- Identificar linguagens, frameworks e ferramentas.
+- Analisar a estrutura sintática dos arquivos.
+- Localizar funções, classes, métodos, interfaces, tipos e variáveis.
+- Navegar até a definição de um símbolo.
+- Encontrar referências e usos.
+- Identificar importações e dependências.
+- Construir um mapa de relações entre módulos.
+- Pesquisar código com rapidez.
+- Detectar erros estáticos.
+- Identificar possíveis impactos de uma alteração.
+- Realizar edições precisas.
+- Comparar versões antes e depois da edição.
+- Executar verificações de qualidade.
+- Produzir informações estruturadas para o Agent Core e os subagents.
+
+O módulo deve integrar-se aos módulos anteriores, especialmente:
+
+- Módulo 01 — Agent Core.
+- Módulo 02 — Subagents e Orchestration.
+- Módulo 03 — Skills, Custom Commands e Hooks.
+- Módulo 06 — Terminal, Shell e Execução de Processos.
+
+O Módulo 05 pode ser utilizado quando o projeto de programação envolver código de aplicações web, mas não replique suas funcionalidades de automação de navegador.
+
+**Importante:** não implemente apenas um indexador de arquivos ou um mecanismo de busca textual. Construa uma camada de inteligência sobre o código-fonte, utilizando parsers, analisadores, servidores de linguagem e ferramentas de pesquisa quando forem adequados.
+
+## 2. REGRAS OBRIGATÓRIAS DE IMPLEMENTAÇÃO
+
+Antes de modificar o projeto:
+
+1. Inspecione a arquitetura atual do harness.
+2. Identifique a linguagem e o framework utilizados.
+3. Examine o sistema de leitura e edição de arquivos.
+4. Verifique se já existem ferramentas de busca, indexação ou análise de código.
+5. Examine a integração com o terminal do Módulo 06.
+6. Verifique como o Agent Core registra e executa ferramentas.
+7. Execute os testes existentes.
+8. Identifique os componentes que podem ser reutilizados.
+
+Em seguida, clone e examine os repositórios indicados neste documento.
+
+Para cada repositório, identifique os componentes relevantes e compare suas implementações com o harness existente.
+
+Implemente as melhorias diretamente no projeto.
+
+Não entregue apenas uma pesquisa, uma lista de bibliotecas ou um documento de arquitetura. O resultado esperado é código funcional, integrado e testado.
+
+Não substitua componentes existentes que já funcionam sem demonstrar uma vantagem técnica concreta.
+
+Não crie uma segunda infraestrutura de execução de ferramentas quando o Agent Core já oferecer uma.
+
+Não presuma que o harness foi desenvolvido em TypeScript, Python, Rust ou qualquer outra linguagem. Escolha as integrações conforme a arquitetura real encontrada.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+### 3.1. Tree-sitter — análise sintática incremental
+
+https://github.com/tree-sitter/tree-sitter
+
+Examine a arquitetura do Tree-sitter e seus mecanismos de parsing.
+
+Investigue como implementar:
+
+- Parsing de arquivos de código.
+- Árvores sintáticas.
+- Localização de nós por linha e coluna.
+- Extração de funções, classes, métodos e declarações.
+- Identificação de blocos e estruturas.
+- Parsing incremental após alterações.
+- Recuperação parcial de arquivos com erros sintáticos.
+- Consultas sobre árvores sintáticas.
+
+Avalie se o Tree-sitter pode ser utilizado como base para a análise estrutural de múltiplas linguagens.
+
+Não implemente manualmente um parser para cada linguagem se houver gramáticas adequadas disponíveis.
+
+### 3.2. Gramáticas do Tree-sitter
+
+https://github.com/tree-sitter
+
+Analise as gramáticas mantidas no ecossistema Tree-sitter e identifique as adequadas às linguagens que o harness precisa suportar.
+
+Priorize, conforme os projetos encontrados:
+
+- JavaScript.
+- TypeScript.
+- TSX e JSX.
+- Python.
+- C#.
+- Java.
+- Go.
+- Rust.
+- HTML.
+- CSS.
+- JSON.
+- YAML.
+- SQL.
+- Markdown.
+
+Não declare suporte a uma linguagem apenas porque ela aparece nesta lista. Implemente e teste as gramáticas efetivamente necessárias.
+
+### 3.3. ast-grep — pesquisa e transformação estrutural
+
+https://github.com/ast-grep/ast-grep
+
+Analise como a ferramenta pesquisa código utilizando padrões sintáticos.
+
+Avalie sua aplicação em:
+
+- Busca por estruturas de código.
+- Identificação de padrões.
+- Localização de chamadas de funções.
+- Detecção de construções específicas.
+- Refatorações orientadas por padrões.
+- Aplicação de regras estruturais.
+- Transformações controladas de código.
+
+Compare a pesquisa estrutural com a pesquisa textual tradicional.
+
+Aproveite os recursos existentes em vez de reconstruir desnecessariamente o mecanismo.
+
+### 3.4. ripgrep — pesquisa textual rápida
+
+https://github.com/BurntSushi/ripgrep
+
+Examine como o ripgrep realiza pesquisas rápidas em grandes repositórios.
+
+Avalie:
+
+- Pesquisa de texto.
+- Expressões regulares.
+- Exclusões.
+- Arquivos ignorados pelo Git.
+- Tratamento de arquivos binários.
+- Saída estruturada.
+- Desempenho em repositórios grandes.
+
+Integre a ferramenta ou utilize uma biblioteca equivalente quando fizer sentido.
+
+A pesquisa textual deve continuar disponível, pois nem toda pergunta sobre código exige parsing estrutural.
+
+### 3.5. universal-ctags — indexação de símbolos
+
+https://github.com/universal-ctags/ctags
+
+Analise como o universal-ctags identifica símbolos em diferentes linguagens.
+
+Avalie seu uso para:
+
+- Índices de funções.
+- Classes.
+- Métodos.
+- Variáveis.
+- Símbolos globais.
+- Navegação por definições aproximadas.
+- Projetos com linguagens pouco suportadas por outros componentes.
+
+Compare sua precisão e cobertura com as capacidades do Tree-sitter e dos servidores de linguagem.
+
+### 3.6. Language Server Protocol
+
+https://github.com/microsoft/language-server-protocol
+
+Examine a especificação do Language Server Protocol (LSP).
+
+Implemente uma camada de integração que permita ao harness utilizar servidores de linguagem compatíveis.
+
+Investigue as operações:
+
+- `initialize`.
+- `textDocument/didOpen`.
+- `textDocument/didChange`.
+- `textDocument/didClose`.
+- `textDocument/definition`.
+- `textDocument/references`.
+- `textDocument/hover`.
+- `textDocument/documentSymbol`.
+- `textDocument/workspaceSymbol`.
+- `textDocument/diagnostic`.
+- `textDocument/rename`.
+- `textDocument/codeAction`.
+- `textDocument/completion`.
+
+Implemente somente as operações necessárias e compatíveis com os servidores utilizados.
+
+A comunicação deve respeitar o protocolo, incluindo framing, identificadores de requisição, respostas, notificações e encerramento.
+
+### 3.7. TypeScript Language Server
+
+https://github.com/typescript-language-server/typescript-language-server
+
+Analise a integração com o TypeScript Language Server.
+
+Avalie recursos para:
+
+- Navegação por definições.
+- Referências.
+- Símbolos.
+- Diagnósticos.
+- Tipos.
+- Importações.
+- Renomeações.
+- Refatorações.
+
+Utilize-o quando houver projetos JavaScript ou TypeScript compatíveis.
+
+Não presuma que todos os projetos possuem o mesmo sistema de dependências ou configuração do TypeScript.
+
+### 3.8. Pyright — análise de Python
+
+https://github.com/microsoft/pyright
+
+Examine o analisador estático de Python.
+
+Avalie:
+
+- Verificação de tipos.
+- Diagnósticos.
+- Importações.
+- Resolução de módulos.
+- Análise de código.
+- Configuração por projeto.
+
+Integre os resultados ao sistema de diagnósticos do harness quando Python for utilizado.
+
+### 3.9. Roslyn — compilador e análise de C#
+
+https://github.com/dotnet/roslyn
+
+Analise a infraestrutura do compilador C# e suas APIs de análise.
+
+Avalie como obter informações estruturais mais precisas para projetos .NET:
+
+- Sintaxe.
+- Símbolos.
+- Tipos.
+- Referências.
+- Diagnósticos.
+- Refatorações.
+- Análise semântica.
+
+Quando necessário, prefira APIs oficiais do ecossistema .NET a heurísticas baseadas em expressões regulares.
+
+### 3.10. rust-analyzer
+
+https://github.com/rust-lang/rust-analyzer
+
+Analise a arquitetura do rust-analyzer como exemplo de servidor de linguagem avançado.
+
+Utilize-o como referência para compreender:
+
+- Indexação de projetos.
+- Resolução de símbolos.
+- Navegação por definições.
+- Análise semântica.
+- Diagnósticos.
+- Incrementalidade.
+- Integração com ferramentas externas.
+
+Não adicione suporte a Rust como dependência obrigatória se o projeto não precisar dessa linguagem.
+
+### 3.11. Semgrep — análise estática e padrões de código
+
+https://github.com/semgrep/semgrep
+
+Examine o mecanismo de regras e análise estática do Semgrep.
+
+Avalie recursos para:
+
+- Identificação de padrões.
+- Detecção de problemas recorrentes.
+- Regras personalizadas.
+- Análise de múltiplas linguagens.
+- Relatórios estruturados.
+- Integração com verificações de qualidade.
+
+O Semgrep pode complementar os parsers e os servidores de linguagem, mas não substitui a navegação semântica oferecida pelo LSP.
+
+### 3.12. SCIP — indexação de código
+
+https://github.com/sourcegraph/scip
+
+Examine o protocolo SCIP e as implementações relacionadas disponíveis no ecossistema Sourcegraph.
+
+Avalie se a indexação de símbolos e referências pode ajudar o harness a navegar por grandes repositórios.
+
+Investigue:
+
+- Identificadores de símbolos.
+- Localizações.
+- Relações entre definições e referências.
+- Dados de indexação.
+- Persistência.
+- Consultas eficientes.
+
+Não implemente um servidor Sourcegraph completo se o harness precisar apenas de uma camada local de indexação.
+
+### 3.13. Git
+
+https://github.com/git/git
+
+Analise os mecanismos relevantes do Git para trabalhar com alterações de código.
+
+Integre, por meio das ferramentas já existentes ou do Módulo 06:
+
+- Estado do repositório.
+- Diff.
+- Arquivos modificados.
+- Histórico.
+- Comparação de versões.
+- Verificação de alterações não relacionadas.
+- Identificação de conflitos.
+- Recuperação de versões anteriores.
+
+Não crie um mecanismo próprio de controle de versão.
+
+### 3.14. OpenCode — referência de agente de programação
+
+https://github.com/anomalyco/opencode
+
+Examine os mecanismos relacionados a:
+
+- Leitura e pesquisa de arquivos.
+- Ferramentas de edição.
+- Integração com LSP, quando presente na versão analisada.
+- Contexto de código.
+- Execução de ferramentas.
+- Integração com o ciclo do agente.
+
+Identifique os padrões que podem melhorar o harness sem duplicar funcionalidades existentes.
+
+### 3.15. OpenAI Codex
+
+https://github.com/openai/codex
+
+Analise as partes públicas relevantes para:
+
+- Navegação em repositórios.
+- Operações sobre arquivos.
+- Aplicação de alterações.
+- Uso de ferramentas.
+- Verificação de diffs.
+- Integração com o fluxo de programação do agente.
+
+Utilize o código disponível como referência técnica. Não presuma que o repositório público corresponde a todas as implementações internas ou funcionalidades de outros produtos.
+
+### 3.16. Aider
+
+https://github.com/Aider-AI/aider
+
+Examine os mecanismos relacionados à compreensão de repositórios e ao trabalho com código.
+
+Avalie:
+
+- Mapas de repositório.
+- Identificação de símbolos.
+- Seleção de arquivos relevantes.
+- Uso de Git.
+- Aplicação de edições.
+- Verificação de mudanças.
+
+Compare os resultados com a arquitetura do harness e implemente apenas os recursos que realmente agregarem valor.
+
+---
+
+## 4. ARQUITETURA DO MÓDULO
+
+Implemente os componentes a seguir ou amplie os equivalentes existentes.
+
+### 4.1. Repository Analyzer
+
+Responsável por descobrir e caracterizar o projeto.
+
+Deve identificar:
+
+- Raiz do repositório.
+- Estrutura de diretórios.
+- Arquivos de configuração.
+- Linguagens predominantes.
+- Frameworks identificáveis.
+- Sistemas de build.
+- Gerenciadores de pacotes.
+- Testes.
+- Linters.
+- Configurações de compilação.
+- Arquivos de instrução para agentes.
+- Estado do Git.
+
+O analisador deve construir um mapa inicial do projeto sem ler indiscriminadamente todos os arquivos em sua totalidade.
+
+Deve respeitar arquivos ignorados, diretórios gerados e arquivos binários.
+
+### 4.2. Language Detection Service
+
+Implemente detecção de linguagem com base em evidências como:
+
+- Extensão.
+- Conteúdo.
+- Configuração do projeto.
+- Manifestos.
+- Gramáticas disponíveis.
+- Servidores de linguagem instalados.
+
+Permita que diferentes linguagens coexistam no mesmo repositório.
+
+Não classifique todo um projeto pela extensão de apenas um arquivo.
+
+### 4.3. Symbol Index
+
+Construa um índice de símbolos.
+
+Sempre que possível, registre:
+
+- Nome.
+- Tipo de símbolo.
+- Linguagem.
+- Arquivo.
+- Linha e coluna.
+- Escopo.
+- Assinatura.
+- Visibilidade.
+- Símbolo pai.
+- Relações com outros símbolos.
+- Origem da informação.
+- Confiança ou limitações da análise.
+
+O índice deve distinguir símbolos encontrados por análise sintática de informações obtidas por análise semântica.
+
+### 4.4. Dependency Graph
+
+Construa um grafo de relações entre arquivos, módulos e símbolos.
+
+Considere:
+
+- Importações.
+- Exportações.
+- Chamadas.
+- Herança.
+- Implementação de interfaces.
+- Referências.
+- Dependências entre pacotes.
+- Relações entre testes e código de produção.
+
+Cada relação deve registrar sua origem e, quando possível, sua localização.
+
+Não invente dependências que não tenham sido identificadas.
+
+Quando uma relação for apenas estimada, deixe isso explícito.
+
+### 4.5. Code Search Service
+
+Implemente uma camada de pesquisa que selecione a estratégia apropriada para cada consulta.
+
+Estratégias possíveis:
+
+- Pesquisa textual.
+- Expressões regulares.
+- Pesquisa por símbolo.
+- Pesquisa estrutural.
+- Navegação semântica via LSP.
+- Pesquisa de referências.
+- Pesquisa de diagnósticos.
+
+O agente deve poder combinar resultados quando necessário.
+
+### 4.6. Language Server Manager
+
+Crie um gerenciador de servidores de linguagem.
+
+Deve ser responsável por:
+
+- Descobrir servidores instalados.
+- Iniciar servidores.
+- Configurar o workspace.
+- Negociar capacidades.
+- Enviar solicitações.
+- Receber respostas.
+- Gerenciar notificações.
+- Manter o estado do documento.
+- Detectar desconexões.
+- Reiniciar servidores quando necessário.
+- Encerrar servidores.
+- Controlar recursos.
+
+Não inicie um servidor novo a cada consulta se uma instância válida puder ser reutilizada.
+
+Mantenha servidores separados quando a configuração do projeto exigir ambientes distintos.
+
+### 4.7. Diagnostics Manager
+
+Centralize diagnósticos provenientes de:
+
+- Parsers.
+- Servidores LSP.
+- Compiladores.
+- Linters.
+- Ferramentas de análise estática.
+- Testes.
+
+Cada diagnóstico deve conter, quando disponível:
+
+- Arquivo.
+- Intervalo de linhas e colunas.
+- Severidade.
+- Código.
+- Mensagem.
+- Ferramenta de origem.
+- Possível correção.
+- Estado atual.
+- Relação com alterações recentes.
+
+Não apresente avisos, erros sintáticos e falhas de testes como se fossem a mesma categoria.
+
+### 4.8. Code Change Impact Analyzer
+
+Antes de uma alteração relevante, o agente deve conseguir identificar os componentes potencialmente afetados.
+
+Considere:
+
+- Referências diretas.
+- Importações.
+- Interfaces públicas.
+- Assinaturas.
+- Tipos compartilhados.
+- Testes relacionados.
+- Arquivos de configuração.
+- Dependências conhecidas.
+
+A análise não precisa garantir que todas as consequências sejam descobertas, mas deve separar dependências confirmadas de hipóteses.
+
+### 4.9. Code Editing Engine
+
+Centralize as alterações de código em um serviço capaz de:
+
+- Ler o trecho relevante.
+- Identificar o contexto.
+- Aplicar uma alteração.
+- Verificar se o conteúdo original ainda corresponde ao esperado.
+- Detectar conflitos.
+- Preservar codificação e finais de linha.
+- Gerar diffs.
+- Validar o resultado.
+- Reverter uma alteração quando necessário.
+
+Reutilize o mecanismo de edição existente no harness se ele já atender aos requisitos.
+
+Não crie um editor alternativo sem necessidade.
+
+---
+
+## 5. FERRAMENTAS QUE O AGENTE DEVE PODER UTILIZAR
+
+Integre as ferramentas ao registro central do Agent Core.
+
+Os nomes abaixo são sugestões. Reutilize as ferramentas existentes quando forem equivalentes.
+
+### 5.1. Exploração do repositório
+
+- `codebase.get_overview`
+- `codebase.get_project_structure`
+- `codebase.detect_languages`
+- `codebase.get_project_configuration`
+- `codebase.get_git_status`
+- `codebase.get_file_summary`
+
+### 5.2. Navegação por símbolos
+
+- `code.search_text`
+- `code.search_symbols`
+- `code.get_document_symbols`
+- `code.go_to_definition`
+- `code.find_references`
+- `code.get_hover_information`
+- `code.find_implementations`
+- `code.find_related_tests`
+
+### 5.3. Análise de dependências
+
+- `code.get_imports`
+- `code.get_exports`
+- `code.get_dependencies`
+- `code.get_dependency_graph`
+- `code.analyze_change_impact`
+
+### 5.4. Diagnósticos
+
+- `code.get_diagnostics`
+- `code.analyze_file`
+- `code.analyze_workspace`
+- `code.run_static_analysis`
+- `code.get_related_errors`
+
+### 5.5. Edição
+
+- `code.read_region`
+- `code.apply_patch`
+- `code.replace_symbol`
+- `code.rename_symbol`
+- `code.get_diff`
+- `code.validate_changes`
+- `code.rollback_change`
+
+Cada ferramenta deve ter:
+
+- Esquema de entrada.
+- Validação.
+- Resultado estruturado.
+- Tratamento de erros.
+- Identificação do arquivo e do workspace.
+- Limites de saída.
+- Integração com cancelamento.
+- Registro de eventos.
+
+Não exponha uma ferramenta que prometa renomeação semântica se o backend disponível só conseguir substituir texto.
+
+---
+
+## 6. INDEXAÇÃO E DESEMPENHO
+
+O sistema precisa funcionar em projetos de diferentes tamanhos.
+
+Implemente:
+
+- Indexação incremental.
+- Cache de resultados.
+- Detecção de alterações em arquivos.
+- Invalidação de cache.
+- Exclusão de diretórios irrelevantes.
+- Priorização de arquivos relevantes.
+- Consultas por intervalo.
+- Processamento assíncrono.
+- Cancelamento de indexações.
+- Limites de memória.
+- Reutilização de árvores sintáticas.
+- Persistência do índice quando apropriado.
+
+Considere a utilização de eventos do sistema de arquivos e do estado do Git para identificar mudanças.
+
+Não reconstrua o índice inteiro após cada pequena edição quando for possível atualizar apenas os arquivos afetados.
+
+Não indexe automaticamente diretórios enormes de dependências, arquivos gerados ou builds, a menos que a tarefa exija isso.
+
+O sistema deve continuar útil quando a indexação completa não puder ser concluída.
+
+---
+
+## 7. PRECISÃO DA ANÁLISE
+
+Diferencie explicitamente três níveis de compreensão.
+
+### Nível 1 — Pesquisa textual
+
+Baseada em texto, nomes e padrões.
+
+É rápida, mas pode encontrar falsos positivos e não resolve necessariamente símbolos homônimos.
+
+### Nível 2 — Análise sintática
+
+Baseada em árvores sintáticas e parsers.
+
+Consegue identificar estruturas do código, mas não garante resolução semântica completa.
+
+### Nível 3 — Análise semântica
+
+Baseada em compiladores, índices semânticos ou servidores de linguagem.
+
+Pode resolver tipos, símbolos e referências com maior precisão, dependendo da linguagem e da configuração.
+
+O harness deve informar qual método produziu cada resultado.
+
+Quando o método semântico não estiver disponível, utilize alternativas compatíveis e indique suas limitações.
+
+Não afirme que um símbolo é uma referência confirmada se a ferramenta apenas encontrou uma correspondência textual.
+
+---
+
+## 8. EDIÇÃO PRECISA E PROTEÇÃO CONTRA REGRESSÕES
+
+### 8.1. Alterações localizadas
+
+Antes de editar um arquivo:
+
+1. Leia a região relevante.
+2. Identifique o símbolo ou trecho alvo.
+3. Verifique se o conteúdo corresponde ao esperado.
+4. Aplique a alteração.
+5. Gere um diff.
+6. Confirme que a alteração ocorreu no local correto.
+
+Evite substituir um arquivo inteiro quando uma alteração localizada for suficiente.
+
+### 8.2. Controle de conflitos
+
+Se o arquivo mudar entre a leitura e a edição:
+
+- Detecte a mudança.
+- Não sobrescreva silenciosamente o conteúdo novo.
+- Releia a região afetada.
+- Recalcule a alteração.
+- Preserve modificações de outros agentes.
+
+Utilize hashes, versões ou mecanismos equivalentes para detectar conteúdo desatualizado.
+
+### 8.3. Renomeação de símbolos
+
+Quando houver suporte semântico, implemente renomeações que considerem referências válidas ao símbolo.
+
+Não use substituição textual global como substituto de uma renomeação semântica.
+
+Antes de aplicar uma renomeação em vários arquivos:
+
+- Consulte o servidor ou mecanismo responsável.
+- Examine o conjunto de alterações.
+- Verifique conflitos.
+- Apresente ou registre o diff.
+- Aplique as mudanças de forma coordenada.
+- Valide os resultados.
+
+### 8.4. Preservação de alterações existentes
+
+O repositório pode conter modificações feitas pelo usuário antes da tarefa.
+
+Não descarte essas mudanças.
+
+Antes de aplicar operações em lote, examine o estado do Git e mantenha as alterações fora do escopo intactas.
+
+Não execute comandos destrutivos de restauração apenas para limpar o workspace.
+
+### 8.5. Validação pós-edição
+
+Depois de uma mudança relevante, execute as verificações apropriadas:
+
+- Parsing.
+- Diagnósticos.
+- Lint.
+- Verificação de tipos.
+- Compilação.
+- Testes.
+- Comparação do diff.
+
+Selecione as verificações de acordo com a tecnologia e a magnitude da alteração.
+
+Não execute toda a suíte de testes em cada pequena edição se houver uma estratégia incremental mais adequada.
+
+---
+
+## 9. INTEGRAÇÃO COM O AGENT CORE
+
+O Agent Core deve consultar a inteligência de código durante o planejamento e a execução das tarefas.
+
+Um fluxo esperado:
+
+1. Receber a solicitação.
+2. Identificar o repositório.
+3. Consultar a estrutura do projeto.
+4. Localizar os símbolos relevantes.
+5. Identificar arquivos relacionados.
+6. Consultar referências e dependências.
+7. Planejar as alterações.
+8. Aplicar as mudanças.
+9. Consultar os diagnósticos.
+10. Executar verificações pelo Módulo 06.
+11. Corrigir erros encontrados.
+12. Produzir um resumo baseado nos resultados reais.
+
+A análise deve ser orientada pela tarefa.
+
+Não indexe ou envie todo o repositório ao modelo sem necessidade.
+
+Utilize consultas estruturadas para fornecer somente o contexto relevante.
+
+---
+
+## 10. INTEGRAÇÃO COM SUBAGENTS
+
+Os subagents devem compartilhar a infraestrutura de inteligência de código.
+
+Exemplos:
+
+- Agente arquiteto consulta dependências e interfaces.
+- Agente de frontend localiza componentes e seus usos.
+- Agente de backend encontra rotas, serviços e modelos.
+- Agente de banco identifica consultas e camadas de persistência.
+- Agente de testes localiza testes relacionados.
+- Agente de revisão consulta diffs e referências.
+- Agente de debugging examina diagnósticos e fluxos de chamadas.
+
+Implemente:
+
+- Índice compartilhado quando os agentes trabalham no mesmo workspace.
+- Consultas isoladas por workspace quando necessário.
+- Cache compartilhado com invalidação correta.
+- Identificação da origem dos resultados.
+- Atualização do índice após alterações.
+- Proteção contra conflitos entre edições concorrentes.
+
+Não permita que diferentes agentes utilizem índices desatualizados sem qualquer indicação.
+
+---
+
+## 11. INTEGRAÇÃO COM SKILLS E COMANDOS
+
+Permita que as skills utilizem a camada de inteligência de código.
+
+Exemplos:
+
+- Analisar a arquitetura do projeto.
+- Localizar todas as referências de uma função.
+- Mapear dependências antes de refatorar.
+- Identificar testes relacionados a uma alteração.
+- Revisar um diff.
+- Encontrar implementações semelhantes.
+- Diagnosticar erros de tipos.
+- Identificar arquivos duplicados.
+- Aplicar refatorações estruturais.
+
+Integre os recursos ao sistema de skills e comandos do Módulo 03.
+
+Não crie um segundo mecanismo de instruções para controlar a análise de código.
+
+---
+
+## 12. TESTES AUTOMATIZADOS
+
+Utilize o framework de testes existente no projeto.
+
+### 12.1. Testes de análise sintática
+
+Verifique:
+
+- Identificação de funções.
+- Identificação de classes.
+- Identificação de interfaces.
+- Localização por linha e coluna.
+- Arquivos com erros sintáticos.
+- Arquivos vazios.
+- Arquivos grandes.
+- Diferentes linguagens.
+- Atualização após alterações.
+
+### 12.2. Testes de navegação semântica
+
+Quando houver um servidor de linguagem disponível, teste:
+
+- Ir para definição.
+- Encontrar referências.
+- Listar símbolos.
+- Consultar tipos.
+- Identificar implementações.
+- Consultar diagnósticos.
+- Renomear símbolos.
+
+Diferencie testes reais de servidor de linguagem dos testes que utilizam mocks.
+
+### 12.3. Testes de pesquisa
+
+Verifique:
+
+- Pesquisa textual.
+- Expressões regulares.
+- Pesquisa estrutural.
+- Pesquisa por símbolo.
+- Exclusão de diretórios.
+- Resultados duplicados.
+- Limites de saída.
+- Repositórios grandes.
+
+### 12.4. Testes de edição
+
+Crie cenários para:
+
+- Aplicar um patch válido.
+- Rejeitar um patch incompatível.
+- Detectar arquivo modificado durante a operação.
+- Preservar finais de linha.
+- Preservar alterações fora do escopo.
+- Gerar diffs corretos.
+- Renomear símbolos quando houver suporte.
+- Reverter alterações realizadas pelo próprio mecanismo.
+- Evitar sobrescrever modificações anteriores.
+
+### 12.5. Testes de integração
+
+Simule uma tarefa completa:
+
+1. Criar ou utilizar um pequeno repositório de teste.
+2. Indexar o projeto.
+3. Localizar uma função.
+4. Encontrar suas referências.
+5. Modificar a implementação.
+6. Consultar os diagnósticos.
+7. Executar os testes pelo Módulo 06.
+8. Comparar o diff.
+9. Validar o resultado.
+
+Verifique também se a indexação e o cache são atualizados corretamente depois da edição.
+
+---
+
+## 13. CRITÉRIOS DE ACEITAÇÃO
+
+- [ ] O harness identifica a estrutura dos projetos.
+- [ ] A linguagem dos arquivos é detectada corretamente nos cenários testados.
+- [ ] O sistema identifica símbolos relevantes.
+- [ ] Existe pesquisa textual eficiente.
+- [ ] Existe análise sintática quando há gramática compatível.
+- [ ] A navegação semântica utiliza LSP ou mecanismo equivalente quando disponível.
+- [ ] Os resultados indicam sua origem e limitações.
+- [ ] O sistema consegue identificar importações e dependências conhecidas.
+- [ ] A análise de impacto distingue fatos confirmados de estimativas.
+- [ ] O sistema consegue aplicar alterações localizadas.
+- [ ] O mecanismo detecta conteúdo desatualizado antes de editar.
+- [ ] Os diffs são registrados e verificáveis.
+- [ ] As alterações existentes no workspace são preservadas.
+- [ ] Os índices são atualizados depois de modificações.
+- [ ] O Agent Core utiliza as ferramentas centrais.
+- [ ] Os subagents compartilham informações de forma consistente.
+- [ ] Os diagnósticos podem ser consultados pelo agente.
+- [ ] A integração com o terminal permite validar mudanças.
+- [ ] Os testes automatizados foram executados.
+- [ ] As funcionalidades anteriores continuam funcionando.
+
+---
+
+## 14. ORDEM DE IMPLEMENTAÇÃO
+
+Execute as etapas nesta ordem, ajustando-as conforme as dependências encontradas:
+
+1. Inspecionar o harness e executar os testes existentes.
+2. Clonar e analisar os repositórios indicados.
+3. Escolher os componentes compatíveis com a arquitetura atual.
+4. Implementar o Repository Analyzer.
+5. Implementar a detecção de linguagens.
+6. Implementar pesquisa textual e indexação básica.
+7. Implementar análise sintática com parsers adequados.
+8. Implementar o índice de símbolos.
+9. Integrar servidores LSP quando apropriado.
+10. Implementar diagnósticos unificados.
+11. Implementar o grafo de dependências.
+12. Implementar a análise de impacto.
+13. Aprimorar o mecanismo de edição existente.
+14. Implementar verificação de conflitos e diffs.
+15. Integrar as ferramentas ao Agent Core.
+16. Integrar os recursos aos subagents e às skills.
+17. Implementar testes de regressão e integração.
+18. Executar testes reais com projetos representativos.
+19. Corrigir os problemas encontrados.
+20. Documentar configuração, limitações e utilização.
+
+Não deixe de implementar o núcleo funcional enquanto analisa as bibliotecas. A análise dos repositórios deve orientar o trabalho, não substituí-lo.
+
+---
+
+## 15. RELATÓRIO FINAL OBRIGATÓRIO
+
+Ao concluir, informe:
+
+1. A arquitetura inicial encontrada.
+2. Os repositórios efetivamente clonados e analisados.
+3. As bibliotecas aproveitadas e suas justificativas.
+4. Os componentes criados ou aprimorados.
+5. As linguagens realmente suportadas.
+6. As operações semânticas realmente implementadas.
+7. O mecanismo de indexação e atualização.
+8. As ferramentas de pesquisa e edição disponíveis.
+9. Os arquivos modificados.
+10. A integração com os módulos anteriores.
+11. Os testes executados e seus resultados.
+12. Os problemas encontrados e corrigidos.
+13. As limitações conhecidas.
+14. Os comandos necessários para configurar e executar o sistema.
+15. As funcionalidades que ainda dependem de servidores ou ferramentas externas.
+
+Não afirme que a navegação semântica, a renomeação ou a análise de impacto estão funcionando sem testes que comprovem esses comportamentos.
+
+## 16. DIRETRIZ FINAL
+
+Implemente este módulo diretamente no AI Development Harness existente.
+
+Clone e analise os repositórios listados, reutilize os componentes que realmente melhorarem o projeto e implemente as capacidades necessárias para tornar o agente mais preciso ao compreender e modificar código.
+
+Preserve o que já funciona, integre os recursos ao Agent Core e ao sistema de ferramentas existente, execute testes reais e entregue uma implementação funcional.
+
+O resultado deve permitir que o agente compreenda a estrutura do repositório, navegue por símbolos e dependências, edite código de maneira controlada e valide as alterações com evidências concretas.

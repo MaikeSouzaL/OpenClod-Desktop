@@ -67,6 +67,8 @@ import { InboxStore } from './inbox.js'
 import { McpOAuthManager } from './mcp-oauth.js'
 import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/external-agent.js'
 import { id } from '../core/util/ids.js'
+import { ChromeBridge } from './chrome/bridge.js'
+import { buildNativeMemoryGraph } from '../core/memory/graph.js'
 import type { AgentDefinition, AgentsListing, PolicyConfig, ReasoningEffort } from '../shared/types.js'
 
 interface PendingApproval {
@@ -115,6 +117,7 @@ export class Orchestrator {
   private readonly approvals: ApprovalStore
   private eventQueue: Promise<void> = Promise.resolve()
   private readonly probeBrowser = new BrowserLayer()
+  readonly chromeBridge: ChromeBridge
 
   constructor(private readonly options: OrchestratorOptions) {
     this.store = new SessionStore(userDataPath(options.userData, 'data'))
@@ -125,6 +128,7 @@ export class Orchestrator {
     this.aiMemory = new AiMemoryService(path.join(userDataPath(options.userData, 'data'), 'ai-memory'))
     this.inbox = new InboxStore(path.join(userDataPath(options.userData, 'data'), 'inbox'))
     this.oauth = new McpOAuthManager(path.join(userDataPath(options.userData, 'data'), 'oauth'))
+    this.chromeBridge = new ChromeBridge(options.userData)
     this.baseRegistry = buildBaseRegistry()
   }
 
@@ -154,6 +158,7 @@ export class Orchestrator {
   async init(): Promise<void> {
     await this.settings.init()
     await this.store.init()
+    await this.chromeBridge.start().catch((err) => this.options.log?.(`ponte Chrome: ${(err as Error).message}`))
 
     // Every registered project gets the canonical CLAUDE.md if it is missing.
     // Existing files are never touched.
@@ -290,7 +295,13 @@ export class Orchestrator {
     if (state.changes?.length) tracker.restore(state.changes)
     this.trackers.set(sessionId, tracker)
 
-    const browser = this.browsers.get(sessionId) ?? new BrowserLayer()
+    const browserSettings = settings.browser ?? { mode: 'auto' as const, groupBySession: true }
+    const browser = this.browsers.get(sessionId) ?? new BrowserLayer({
+      sessionId,
+      chrome: this.chromeBridge,
+      mode: browserSettings.mode,
+      groupBySession: browserSettings.groupBySession
+    })
     this.browsers.set(sessionId, browser)
 
     const memory =
@@ -306,13 +317,23 @@ export class Orchestrator {
     this.projectMemories.set(state.meta.projectId, projectMemory)
     await this.syncNativeToAi(state.meta.projectId)
 
+    const effectiveFullAccess = settings.policy.fullAccess === true || settings.policy.mode === 'unrestricted'
+    const effectivePolicy: PolicyConfig = {
+      ...settings.policy,
+      fullAccess: effectiveFullAccess,
+      allowNetwork: settings.policy.mode === 'unrestricted' ? true : settings.policy.allowNetwork,
+      allowComputerControl: settings.policy.mode === 'unrestricted' ? true : settings.policy.allowComputerControl
+    }
     const workspace = new WorkspaceGuard(
       [state.meta.cwd, ...(settings.policy.allowedRoots ?? [])].filter(Boolean),
-      settings.policy.fullAccess === true
+      effectiveFullAccess
     )
     const project = this.store.listProjects().find((p) => p.id === state.meta.projectId)
     const branch = await gitBranch(state.meta.cwd)
-    const { policy, hooks } = this.sessionConfig(state)
+    const { policy: sessionPolicy, hooks } = this.sessionConfig(state)
+    const policy: PolicyConfig = settings.policy.mode === 'unrestricted'
+      ? { ...sessionPolicy, ...effectivePolicy }
+      : sessionPolicy
     this.sessionPolicies.set(sessionId, policy)
     this.sessionHooks.set(sessionId, hooks)
 
@@ -531,6 +552,15 @@ export class Orchestrator {
       },
       findProvider: (providerId) => this.settings.providerConfig(providerId),
       bestModel: () => this.bestProviderConfig(),
+      createBrowser: () => {
+        const browser = this.settings.get().browser ?? { mode: 'auto' as const, groupBySession: true }
+        return new BrowserLayer({
+          sessionId: `agent-${id('child')}`,
+          chrome: this.chromeBridge,
+          mode: browser.mode,
+          groupBySession: browser.groupBySession
+        })
+      },
       emit: (event) => this.onEvent(event),
       approve: (request) => this.approve(request),
       toolOutputDir: this.toolOutputDir(),
@@ -848,6 +878,7 @@ export class Orchestrator {
     for (const client of this.mcpClients.values()) await client.stop()
     await this.aiMemory.stop()
     await this.computer.close()
+    await this.chromeBridge.stop()
   }
 
   /* ------------------------------- approvals ----------------------------- */
@@ -971,7 +1002,9 @@ export class Orchestrator {
 
   async capabilities(): Promise<CapabilityReport> {
     const settings = this.settings.get()
-    const browserStatus = await this.probeBrowser.status()
+    const browserStatus = this.chromeBridge.isAttached()
+      ? await this.chromeBridge.status()
+      : await this.probeBrowser.status().catch(() => this.chromeBridge.status())
     return {
       computer: this.computer.status(),
       browser: browserStatus,
@@ -1006,6 +1039,35 @@ export class Orchestrator {
 
   mcpPresets(): McpPresetInfo[] {
     return listMcpPresets()
+  }
+
+  /** Returns the open flow without exposing tokens or provider secrets. */
+  mcpOAuthStatus(serverName?: string): { available: boolean; connected: boolean; server?: string; expiresAt?: number; detail: string } {
+    const oauth = this.oauth.status(serverName)
+    if (!serverName) {
+      return {
+        available: oauth.total > 0,
+        connected: oauth.connected > 0,
+        detail: oauth.connected ? `${oauth.connected} login(s) OAuth conectado(s)` : 'Nenhum login OAuth conectado'
+      }
+    }
+    return {
+      available: true,
+      connected: oauth.connected > 0,
+      server: serverName,
+      expiresAt: oauth.expiresAt,
+      detail: oauth.connected ? 'Login OAuth ativo neste servidor.' : 'Este servidor não tem login OAuth válido.'
+    }
+  }
+
+  /** Starts the real OAuth flow for a configured remote MCP. */
+  async authorizeMcp(serverName: string): Promise<{ connected: boolean; detail: string }> {
+    const config = (this.settings.get().mcpServers ?? []).find((server) => server.name === serverName)
+    if (!config?.url) throw new Error('o conector selecionado não é remoto')
+    const token = await this.oauth.authorize(serverName, config.url)
+    if (!token) return { connected: false, detail: 'O provedor não concluiu o login OAuth.' }
+    await this.restartMcp()
+    return { connected: true, detail: 'Login OAuth concluído; conector reiniciado.' }
   }
 
   /** Full connector catalog for Personalização → Conectores → Descobrir. */
@@ -1147,10 +1209,11 @@ export class Orchestrator {
         const current = this.settings.get().mcpServers ?? []
         const next = [...current.filter((item) => item.name !== server!.name), server].slice(-20)
         await this.settings.update({ mcpServers: next })
+        this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'mcp' })
         await this.restartMcp()
         const client = this.mcpClients.get(server.name)
         return {
-          ok: true,
+          ok: Boolean(client?.state === 'ready') || Boolean(needsOAuth),
           name: server.name,
           state: client?.state ?? 'stopped',
           tools: client?.toolsList().map((tool) => tool.name) ?? [],
@@ -1192,7 +1255,7 @@ export class Orchestrator {
           { id: 'test', role: 'user', ts: Date.now(), parts: [{ type: 'text', text: 'ping' }] }
         ],
         tools: [],
-        maxTokens: 16,
+        maxTokens: 128,
         signal: controller.signal
       })) {
         if (event.type === 'text_delta') text += event.text
@@ -1203,7 +1266,9 @@ export class Orchestrator {
       error = (err as Error).message
     }
     if (error) return { ok: false, detail: error }
-    return { ok: true, detail: text.trim().slice(0, 120) || 'resposta vazia (mas a conexão funcionou)' }
+    const answer = text.trim()
+    if (!answer) return { ok: false, detail: 'o provedor respondeu sem texto; aumente o limite ou verifique o modelo' }
+    return { ok: true, detail: answer.slice(0, 120) }
   }
 
   /**
@@ -1457,43 +1522,88 @@ export class Orchestrator {
     return this.aiMemory.recall(projectId, query, limit)
   }
 
-  /** Obsidian-style graph of the project's memory (explicit + semantic edges). */
+  /**
+   * Unified memory graph. The markdown wiki is the durable source and the
+   * sidecar contributes extra transcript nodes; both are merged by path/title
+   * so one page can never disappear merely because the sidecar indexed it.
+   */
   async memoryGraph(projectId: string): Promise<import('./ai-memory.js').AiMemoryGraph> {
     this.requireProject(projectId)
     await this.syncNativeToAi(projectId)
-    const graph = await this.aiMemory.graph(projectId).catch(() => null)
-    if (graph?.nodes.length) return graph
+    const summaries = await this.memoryForProject(projectId).listPages()
+    const native = await Promise.all(summaries.map((summary) => this.memoryForProject(projectId).readPage(summary.slug)))
+    const sidecar = await this.aiMemory.graph(projectId).catch(() => null)
 
-    // Fallback: native wiki only. Tags and keywords still give a usable graph.
-    const pages = await this.memoryForProject(projectId).listPages()
-    const nodes = pages.map((page) => ({
-      id: page.slug,
-      path: page.slug,
-      title: page.title,
-      kind: 'page' as const,
-      tags: page.tags,
-      updated: page.updated,
-      degree: 0,
-      terms: graphKeywords(`${page.title} ${page.summary}`)
-    }))
-    const edges: import('./ai-memory.js').AiMemoryGraphEdge[] = []
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const tags = nodes[i].tags.filter((tag) => nodes[j].tags.includes(tag)).length
-        const terms = nodes[i].terms.filter((term) => nodes[j].terms.includes(term)).length
-        if (tags || terms) {
-          edges.push({
-            source: nodes[i].id,
-            target: nodes[j].id,
-            kind: tags ? 'tag' : 'term',
-            weight: tags * 4 + terms * 2
-          })
-          nodes[i].degree++
-          nodes[j].degree++
-        }
-      }
+    const nodes: Array<{
+      id: string
+      path: string
+      title: string
+      kind: 'session' | 'page' | 'fact'
+      tags: string[]
+      updated: string
+      degree: number
+      terms: string[]
+      summary?: string
+    }> = native.flatMap((page) => {
+      if (!page) return []
+      const path = `pages/${page.slug}.md`
+      const twin = sidecar?.nodes.find((node) => node.path === path || node.path === page.slug)
+      return [{
+        id: page.slug,
+        path: page.slug,
+        title: page.title,
+        kind: (page.tags.includes('sessao') ? 'session' : 'page') as 'session' | 'page',
+        tags: page.tags,
+        updated: page.updated,
+        degree: twin?.degree ?? 0,
+        terms: graphKeywords(`${page.title} ${page.body}`, 24),
+        summary: page.body.replace(/\s+/g, ' ').trim().slice(0, 600)
+      }]
+    })
+    const nativeKeys = new Set(nodes.flatMap((node) => [node.path.toLowerCase(), node.title.trim().toLowerCase()]))
+    for (const node of sidecar?.nodes ?? []) {
+      if (nativeKeys.has(node.path.toLowerCase()) || nativeKeys.has(node.title.trim().toLowerCase())) continue
+      const wrapped = await this.aiMemory.readPage(projectId, node.path).catch(() => null)
+      nodes.push({
+        ...node,
+        terms: graphKeywords(`${node.title} ${node.tags.join(' ')} ${wrapped?.body ?? ''}`, 24),
+        summary: (wrapped?.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 600)
+      })
     }
-    return { nodes, edges, truncated: false, source: 'native' }
+
+    const byId = new Map(nodes.map((node) => [node.id, node]))
+    const edges = new Map<string, import('./ai-memory.js').AiMemoryGraphEdge>()
+    const addEdge = (source: string, target: string, kind: 'link' | 'tag' | 'term', weight: number): void => {
+      if (!byId.has(source) || !byId.has(target) || source === target) return
+      const [a, b] = source < target ? [source, target] : [target, source]
+      const key = `${a}|${b}`
+      const current = edges.get(key)
+      if (!current || current.weight < weight) edges.set(key, { source: a, target: b, kind, weight })
+    }
+
+    // Explicit wiki links resolve by slug or title, the same convention used by
+    // Obsidian: [[memory-page]] and [[Memory page]] point to the same node.
+    const nativeGraph = buildNativeMemoryGraph(native.filter((page): page is NonNullable<typeof page> => Boolean(page)))
+    for (const edge of nativeGraph.edges) addEdge(edge.source, edge.target, edge.kind, edge.weight)
+    for (const edge of sidecar?.edges ?? []) {
+      const source = edge.source.startsWith('pages/') ? edge.source.slice(6, -3) : edge.source
+      const target = edge.target.startsWith('pages/') ? edge.target.slice(6, -3) : edge.target
+      addEdge(source, target, edge.kind, edge.weight)
+    }
+
+    for (const node of nodes) node.degree = 0
+    for (const edge of edges.values()) {
+      const source = byId.get(edge.source)
+      const target = byId.get(edge.target)
+      if (source) source.degree++
+      if (target) target.degree++
+    }
+    return {
+      nodes,
+      edges: [...edges.values()].sort((a, b) => b.weight - a.weight),
+      truncated: (sidecar?.nodes.length ?? 0) >= 100,
+      source: sidecar?.nodes.length ? 'ai-memory' : 'native'
+    }
   }
 
   /** Public status used by Configurações → Memória. */
@@ -1579,13 +1689,13 @@ function shortHash(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex').slice(0, 10)
 }
 
-function graphKeywords(text: string): string[] {
+function graphKeywords(text: string, limit = 10): string[] {
   const counts = new Map<string, number>()
   for (const word of text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9_]+/)) {
     if (word.length < 4 || /^\d+$/.test(word)) continue
     counts.set(word, (counts.get(word) ?? 0) + 1)
   }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([word]) => word)
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([word]) => word)
 }
 
 /** Human-readable execution log of one turn, used in the AI-Memory page. */

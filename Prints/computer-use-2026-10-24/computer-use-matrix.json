@@ -1,0 +1,385 @@
+{
+  "generatedAt": "2026-10-25T03:40:17.779Z",
+  "platform": "win32",
+  "backend": {
+    "available": true,
+    "backend": "open-computer-use",
+    "detail": "UI Automation + Win32 + captura nativa · C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\resources\\bin\\open-computer-use.exe (bundled)",
+    "platform": "win32"
+  },
+  "total": 40,
+  "passes": 35,
+  "expectedFailures": 4,
+  "unexpectedFailures": [],
+  "results": [
+    {
+      "call": "computer_list_apps",
+      "ok": true,
+      "text": "Antigravity IDE -- Antigravity IDE [running, pid=26868, window=Openclaudedescktop - Antigravity IDE - 122-projetos-menu-card.png [Administrator]]\nApplicationFrameHost -- ApplicationFrameHost [running, pid=10564, window=Configurações]\nChatGPT -- ChatGPT [running, pid=13400, window=ChatGPT]\nchrome -- chrome [running, pid=30116, window=munimtechnologies/munim-computer-use: Servidor MCP de código aberto para uso de computadores, compatível com qualquer agente de codificação — macOS, Windows e Linux. Acessibilidade em primeiro lugar, entrada em segundo plano, ponteiro do agente, zoom e sua conta Chrome conectada. - Google Chrome]\nexplorer -- explorer [running, pid=6188, window=untitled]\nnotepad -- notepad [running, pid=34636, window=Sem título - Bloco de Notas]\nollama app -- ollama app [running, pid=7012, window=Ollama]\nOpenCode -- OpenCode [running, pid=23444, window=OpenCode]\nsvchost -- svchost [running, pid=18900, window=untitled]\nSystemSettings -- SystemSettings [running, pid=10556, window=Settings]\nTextInputHost -- TextInputHost [running, pid=1728, window=Microsoft Text Input Application]\n[\n  {\n    \"displayName\": \"Antigravity IDE\",\n    \"id\": \"Antigravity IDE\",\n    \"isRunning\": true,\n    \"windows\": [\n      {\n        \"app\": \"Antigravity IDE\",\n        \"id\": 590250,\n        \"title\": \"Openclaudedescktop - Antigravity IDE - 122-projetos-menu-card.png [Administrator]\"\n      }\n    ]\n  },\n  {\n    \"displayName\": \"ApplicationFrameHost\",\n    \"id\": \"ApplicationFrameHost\",\n    \"isRunning\": true,\n    \"windows\": [\n      {\n        \"app\": \"ApplicationFrameHost\",\n        \"id\": 66238,\n        \"title\": \"Configurações\"\n      }\n    ]\n  },\n  {\n    \"displayName\": \"ChatGPT\",\n    \"id\": \"ChatGPT\",\n    \"isRunning\": true,\n    \"windows\": [\n      {\n        \"app\": \"ChatGPT\",\n        \"id\": 9438626,\n        \"title\": \"ChatGPT\"\n      }\n    ]\n  },\n  {\n    \"displayName\": \"chrome\",\n    \"id\": \"chrome\",\n    \"isRunning\": true,\n    \"windows\": [\n      {\n        \"app\": \"chrome\",\n        \"id\": 2032988,\n        \"",
+      "images": 0
+    },
+    {
+      "call": "computer_list_windows",
+      "ok": true,
+      "text": "[\n  {\n    \"app\": \"chrome\",\n    \"id\": 2032988,\n    \"title\": \"munimtechnologies/munim-computer-use: Servidor MCP de código aberto para uso de computadores, compatível com qualquer agente de codificação — macOS, Windows e Linux. Acessibilidade em primeiro lugar, entrada em segundo plano, ponteiro do agente, zoom e sua conta Chrome conectada. - Google Chrome\"\n  },\n  {\n    \"app\": \"ChatGPT\",\n    \"id\": 9438626,\n    \"title\": \"ChatGPT\"\n  },\n  {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"Sem título - Bloco de Notas\"\n  },\n  {\n    \"app\": \"chrome\",\n    \"id\": 4064840,\n    \"title\": \"Google Chrome\"\n  },\n  {\n    \"app\": \"Antigravity IDE\",\n    \"id\": 590250,\n    \"title\": \"Openclaudedescktop - Antigravity IDE - 122-projetos-menu-card.png [Administrator]\"\n  },\n  {\n    \"app\": \"explorer\",\n    \"id\": 4064474,\n    \"title\": \"Openclaudedescktop\"\n  },\n  {\n    \"app\": \"OpenCode\",\n    \"id\": 525796,\n    \"title\": \"OpenCode\"\n  },\n  {\n    \"app\": \"ollama app\",\n    \"id\": 7538274,\n    \"title\": \"Ollama\"\n  },\n  {\n    \"app\": \"svchost\",\n    \"id\": 460962\n  }\n]",
+      "images": 0
+    },
+    {
+      "call": "computer_get_window",
+      "ok": true,
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 1639704,\n  \"title\": \"Sem título - Bloco de Notas\"\n}",
+      "images": 0
+    },
+    {
+      "call": "computer_activate",
+      "ok": true,
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 1639704,\n  \"title\": \"Sem título - Bloco de Notas\"\n}",
+      "images": 0
+    },
+    {
+      "call": "computer_cursor_position",
+      "ok": true,
+      "text": "cursor em (516, 761)",
+      "evidence": {
+        "x": 516,
+        "y": 761
+      },
+      "images": 0
+    },
+    {
+      "call": "computer_snapshot screenshot",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_1_mvna4fbs\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 1, Col 1 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-1\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAh70lEQVR4nOzdfYzc9X3g8d8sg228toFC21D37lo/QIhjyQ/YKiQ04polfiACVyJcyYMAtd5gApiLcCUXkkvMoQtuD2OIHbs5zk0acoDujK4YW94iq3IVLja2OTkOZv3Q+6OIqxzwrpdwftqd08zszs7uzOzj7Oyyn9craLX725nf7zu/+UXat7/fmUlPvfK3kxLTp04r3QgAAMDH2rttZ0o3pivd+odP/dMIjwcAAIDa+dM1v192e13NRwIAAMAYUnG2MO+Wu2s1EAAAAEbGnhf6+m0/WZgkydRL66s5HAAAAGqo7cKv+76BRaQAAAChyUIAAIDQhpuFD/7l+j6+AgAAMMYNPQv//Yv//YblX1j6x3+8cMnnP/fF2xcu+fyCJcsXLvn87H/7hYVLPj910Wf+4vV/WHrL71V1tAAAAFTZELNw8tQpmcmTN/3wv1w+8dL1W39YPyH92HM/mJi+ZNVfbkylkn+3bv3Zc+c6MpnFn11Q7QEDAABQTUPMwt+9fk7y/z7qyHR0dCQdHZn27H8d7R0d2S1J9seLF9t/47JJ1R4tAADACHr/bEsf/9VyJH+/9/W77r6rdPtdd9/193tfr+6xhpiFv7fghsyHbR+0nvmgrbWl7UzLmTOtZ3La2trOtLW2nWltbalPdZS9b+rel7pO60tfzqSGN/7eFjx14P1Xvtr3bVKZr/707IHvLhrioXN3774yfnpvavj77O9w/ey5c0hFD3zkxgMAAOPbVZOuKPtfjYfx15u3PrP5mV5leNfddz2z+Zm/3ry1uscaYhb+1qfmdHzYNnnK1Mn1Uy6bMnXylPpJU6ZMmjJl4uT6ifVTJkyeUnfpxE9O/0TpHVOLnvj55uShiVdeNemKq29uvu6+YY2+V/ykFj3xaLLy6tuT",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_1_mvna4fbs",
+        "generation": 1,
+        "truncated": false,
+        "screenshot_id": "shot-1639704-1"
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_set_value",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"Sem título - Bloco de Notas\", App: notepad.\n\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal state Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 1, Col 1 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_2_mvna4g7h]",
+      "evidence": {
+        "snapshot_id": "snap_2_mvna4g7h",
+        "generation": 2,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_click element",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"Sem título - Bloco de Notas\", App: notepad.\n\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal state Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 12 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_3_mvna4hk0]",
+      "evidence": {
+        "snapshot_id": "snap_3_mvna4hk0",
+        "generation": 3,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_type_text",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPE Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 16 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_4_mvna4ifj]",
+      "evidence": {
+        "snapshot_id": "snap_4_mvna4ifj",
+        "generation": 4,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_press_key normalized",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPE Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 16 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_5_mvna4jc0]",
+      "evidence": {
+        "snapshot_id": "snap_5_mvna4jc0",
+        "generation": 5,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_type_text after key",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_6_mvna4k7h]",
+      "evidence": {
+        "snapshot_id": "snap_6_mvna4k7h",
+        "generation": 6,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot after keyboard",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_7_mvna4kly\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-6\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAy8UlEQVR4nOzdfXBd5Z0n+HONwMYvJDT0pDPu3e2xJWdiTBXGwTWRk+liu01bsrtipgpnm+5OSGpGapwEKZsyXcU43dvBS23jmc0VSaCl6c1AZ5remNrFsxPrUvakXFOMRdqOMVsIQ3RlZv8YKpsiBMsmWcBYd+vec9+k+6J7pasX+/l8oFzSc895nuece111v35+55y2NTd+JKqwds0NlY0AAABc0d64eKGysa3W1n/96H+Z5/kAAACwcP75g/+oavuyBZ8JAAAAS0jN1cLYnfcu1EQAAACYH8efrvfqDLEwiqI1165q5XQAAABYQBcv/bL+BopIAQAAgiYWAgAABG2usfAr/+pgnT8BAABY4mYfC//H7/8fn9j5e13/7J9t2fG7v/37n9my43dv37Fzy47f7fjvf2/Ljt9dc8e2f/nD/9R152+1dLYAAAC02Cxj4co1qzMrVz7+1//bh5Zfe3Dor1dd17b/23+1vO2avf/qsUQi+h8ePvjue+9NZjJbP3V7qycMAABAK80yFv7mx2+J/r9fTWYmJyejycnM5ez/k5cnJ7MtUfbXDz64/GvXr2j1bAEAAObRW++er/P/Qs7kPz7/w8/e+9nK9s/e+9n/+PwPWzvWLGPhb93+icw7F38xceEXFyfOX7xw/sKFiQ",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_7_mvna4kly",
+        "generation": 7,
+        "truncated": false
+      },
+      "images": 0
+    },
+    {
+      "call": "computer_snapshot before scroll",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_8_mvna4l49\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-7\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAvPElEQVR4nOzdbYxc130n6FuMbFKkHNuxx4lnZ5UBWUXLFGWspFCwmjCC3YQKu5nA5ACiEU9iSQamO6JtdXsNKoCGzq4jrrARd1bVsiOlawBHiifOmsKOOJiwSxDHHwIvWxtzLWFXTUruahKwvniTtS02qciSJXYt6t567XrpqupX8jwPBIF96tY5554qAv3j+d97r4tauenGTMt2AAAArl6vvlZobmwdC6Mo+sd/+McVng8AAACr5yO/+pGW7RtWfSYAAACsI2IhAABA0MRCAACAoImFAAAAQRMLAQAAgrbUWPil/+VYh/8DAACwzvUfC//77/zvv7Hvdwb/1b+6fe9v/+bvffr2vb992959t+/97cx/9zu37/3t9+3a/W+/+3eD/+2/XNbZAgAAsMxSLVtvujHT+bmFm993w8i3n/n937jlnfn5t6+U/nvryvzP373y83evvPnOu2+9e+XHr1/cuCH13r97/GsP/8cVmzwAAADd+sivfqTl4+z73C38Fx+/Ofr5m/PF+fn5aH6+eKX03/yV+flSS1T68d13r/zK9ZuWPG0AAIDV89O3Lnb4bzVn8l++993PfPYzze2f+exn/sv3vru8Y/UZC//lbb9RfOPyz+Yu/ezy3MXLly5eujR3KXb58uVLl+cuX5qbu7",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_8_mvna4l49",
+        "generation": 8,
+        "truncated": false,
+        "screenshot_id": "shot-1639704-7"
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_scroll window",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.",
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot after scroll",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_9_mvna4lze\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-8\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAvUUlEQVR4nOzdbYxc130n6FuMbFKkHNuxx4lnZ5UBWUXLFGWspFCwmjCC3YQKu5nA5ACiEU9iSQamO6JtdXsNKoCGzq4jrrARd1bVsiOlawBHiifOmsKOOJiwSxDHHwIvWxtzLWFXTUruahKwvniTtS02qciSJXYt6t567XrpqupX8jwPBIF96tY5554qAv3j+d97r4tauenGTMt2AAAArl6vvlZobmwdC6Mo+sd/+McVng8AAACr5yO/+pGW7RtWfSYAAACsI2IhAABA0MRCAACAoImFAAAAQRMLAQAAgrbUWPil/+VYh/8DAACwzvUfC//77/zvv7Hvdwb/1b+6fe9v/+bvffr2vb992959t+/97cx/9zu37/3t9+3a/W+/+3eD/+2/XNbZAgAAsMxSLVtvujHT+bmFm993w8i3n/n937jlnfn5t6+U/nvryvzP373y83evvPnOu2+9e+XHr1/cuCH13r97/GsP/8cVmzwAAADd+sivfqTl4+z73C38Fx+/Ofr5m/PF+fn5aH6+eKX03/yV+flSS1T68d13r/zK9ZuWPG0AAIDV89O3Lnb4bzVn8l++993PfPYzze2f+exn/sv3vru8Y/UZC//lbb9RfOPyz+Yu/ezy3MXLly5eujR3KXb58uVLl+cuX5qbu7",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_9_mvna4lze",
+        "generation": 9,
+        "truncated": false,
+        "screenshot_id": "shot-1639704-8"
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_click coordinate",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-END Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 23 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_a_mvna4nbm]",
+      "evidence": {
+        "snapshot_id": "snap_a_mvna4nbm",
+        "generation": 10,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_type_text coordinate",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_b_mvna4o80]",
+      "evidence": {
+        "snapshot_id": "snap_b_mvna4o80",
+        "generation": 11,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot before drag",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_c_mvna4orv\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-11\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAzzElEQVR4nOzdfXBd5Z0n+HONwMYvJDT0pDPu3e2xJWdiTBXGwTWRk+liu01bsrtipgpnm+4OJDUjNSRByqZMVzFO93bwUtt4ZiORBNqa3gx0pumNqV08O7EuZU/KNcVYSdsxZgthiK7s2T+GyqYIwbJJFjDW3brnvuu+6F7p6sV6Pp+m3NJzz3me55x7VXW/eX7nnLY1N34kqrB2zQ2VjQAAAFzV3rh0sbKxrdbWf/34f5nj+QAAADB//vnD/6hq+7J5nwkAAACLSM3Vwqw7752viQAAADA3jj9b79VpYmEURWuuXdXK6QAAADCPLl3+Zf0NFJECAAAETSwEAAAI2mxj4Zf/1YE6/wIAALDIzTwW/o/f+z8+sfP3uv7ZP9uy43d/+/c/s2XH796+Y+eWHb/b8d//3pYdv7vmjm3/8gf/qevO32rpbAEAAGixGcbClWtWp1eufPKv/7cPLb/2wNBfr7qubd+3/mp52zUP/qsnEonof3j0wLvvvTeZTm/91O2tnjAAAACtNMNY+JsfvyX6/341mZ6cnIwmJ9NXMv9NXpmczLREmV8/+ODKr12/otWzBQAAmENvvXuhzn/zOZP/+OIPPnvvZyvbP3vvZ//jiz9o7VgzjIW/dfsn0u9c+sXExV9cmrh",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_c_mvna4orv",
+        "generation": 12,
+        "truncated": false,
+        "screenshot_id": "shot-1639704-11"
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_drag window",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.",
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot after drag",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_d_mvna4pup\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-12\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAzt0lEQVR4nOzdfXBd5Z0n+HONwOAXEhp60hn37vbYkjMxpgrj4JrIyXSx3aYt2V0xU4WzTXcHkpqRGpIgZVOmqxinezt4qW08s5FIAm1NbwY60/TG1C6enViXsiflmmKspO0Ys4UwRJI9+8dQ2RQhWDbJ8mbdrXvOfdV90b3S1Yv9fD5NuaXnnvM8zzn3qup+8/zOOW2rb/hIVGHN6usrGwEAALisvX7xQmVjW62t//qx/zLP8wEAAGDh/POH/lHV9mULPhMAAACWkJqrhYk77lmoiQAAADA/jj1T79UZYmEURauvXtnK6QAAALCALr7/y/obKCIFAAAImlgIAAAQtLnGwi//q/11/gUAAGCJm30s/B+/9398Ysfvdf2zf7Z5++/+9u9/ZvP2371t+47N23+347//vc3bf3f17Vv/5Q/+U9cdv9XS2QIAANBis4yFK1avyqxY8cRf/28fWn71/qG/XnlN295v/dXytqse+FePp1LR//DI/nfefXcqk9nyqdtaPWEAAABaaZax8Dc/fnP0//1qKjM1NRVNTWUuZf+bujQ1lW2Jsr9+8MGlX7vu2lbPFgAAYB69+c75Ov8t5Ez+4ws/+Ow9n61s/+w9n/2PL/ygtWPNMhb+1m2fyLx98ReTF35xcfL",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_d_mvna4pup",
+        "generation": 13,
+        "truncated": false,
+        "screenshot_id": "shot-1639704-12"
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_click accessibility method (known backend limitation)",
+      "ok": false,
+      "expected": true,
+      "text": "click_method 'accessibility' could not click the requested element",
+      "images": 0
+    },
+    {
+      "call": "computer_click double",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [ENDCOORD]\n[verificação: estado mudou · snapshot snap_e_mvna4shq]",
+      "evidence": {
+        "snapshot_id": "snap_e_mvna4shq",
+        "generation": 14,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_click right",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [ENDCOORD]\n[verificação: estado mudou · snapshot snap_f_mvna4uq6]",
+      "evidence": {
+        "snapshot_id": "snap_f_mvna4uq6",
+        "generation": 15,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot after right click",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_g_mvna4v4p\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD\",\n    \"focused_element\": \"document Editor de Texto\",\n    \"selected_text\": \"ENDCOORD\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-15\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAA090lEQVR4nOz9e3Bc530neJ+mIFHizVYk+ca878YkQNsUlRJFizUG7UkxMRUCZMrkVEneKLYlu2aASLYFOC4qEw2dbCyushFnYkC2pQCT9Uhxoqyp2hVnx0SryHhRUxrCDmWK2gikZDRI7x8j32hZBCl7RUpEb/W9G31BA2hcyOfzMYsGnj7neZ5zulnVXz2/c07T8mvfGZVZuXxFeSMAAACXtFfOnS1vbKq29d88/MNZng8AAABz51/f/96K7YvmfCYAAAAsIFVXCzM23zlXEwEAAGB2DD5Z69VJYmEURcuvXNrI6QAAADCHzr35y9obKCIFAAAImlgIAAAQtJnGws//+701/gYAAGCBm34s/KNv/e8f3Pa7bf/qX23Y+tHf+r2Pbdj60Vu2btuw9aMtv/27G7Z+dPmtm/7dd/5r2+bfaOhsAQAAaLBpxsIly5cllyx59G/+17ctvnJv/98svapp99f+enHTFff++0diseh/fHDvG+fPjyeTGz98S6MnDAAAQCNNMxb++gdujP7fX40nx8fHo/Hx5MXUn/GL4+Oplij161tvXfy1a65u9GwBAABm0atvnKnxZy5n8o/Pfufjd368vP3jd378H5/9Tm",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_g_mvna4v4p",
+        "generation": 16,
+        "truncated": false
+      },
+      "images": 0
+    },
+    {
+      "call": "computer_scroll global after reobserve (known backend limitation)",
+      "ok": true,
+      "expected": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [ENDCOORD]",
+      "images": 1
+    },
+    {
+      "call": "computer_snapshot after global scroll",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\" snapshot=\"snap_i_mvna4wig\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD\",\n    \"focused_element\": \"document Editor de Texto\",\n    \"selected_text\": \"ENDCOORD\"\n  },\n  \"screenshots\": []\n}\n</ax_tree>",
+      "evidence": {
+        "window": 1639704,
+        "snapshot_id": "snap_i_mvna4wig",
+        "generation": 18,
+        "truncated": false
+      },
+      "images": 0
+    },
+    {
+      "call": "computer_drag global after reobserve",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [ENDCOORD]",
+      "images": 1
+    },
+    {
+      "call": "computer_press_key global",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-ENDCOORD Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 28 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [ENDCOORD]\n[verificação: estado mudou · snapshot snap_k_mvna4yr2]",
+      "evidence": {
+        "snapshot_id": "snap_k_mvna4yr2",
+        "generation": 20,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_type_text global",
+      "ok": true,
+      "text": "App=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-GLOBAL Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 26 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nThe focused UI element is document Editor de Texto.\n[verificação: estado mudou · snapshot snap_l_mvna4zu4]",
+      "evidence": {
+        "snapshot_id": "snap_l_mvna4zu4",
+        "generation": 21,
+        "state_changed": true
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_wait",
+      "ok": true,
+      "text": "aguardou 0.2s",
+      "images": 0
+    },
+    {
+      "call": "computer_wait_for",
+      "ok": true,
+      "text": "<ax_tree target=\"janela 1639704\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 1639704,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\\\nUnicode áéíóú\\\\nBackground input\\\\nCoordinate input\\\\nFinal stateTYPEKEY-GLOBAL Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\\n\\t\\t\\t5 text   Ln 5, Col 26 Frame: {x: 766, y: 496, width: 138, height: 21}\\n\\t\\t\\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\\n\\t\\t\\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\\n\\t\\t\\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\",\n    \"document_text\": \"Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-GLOBAL\",\n    \"focused_element\": \"document Editor de Texto\"\n  },\n  \"screenshots\": [\n    {\n      \"id\": \"shot-1639704-20\",\n      \"url\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAv5UlEQVR4nOzdfYwc530n+GqGNilSju3Y68R7e8qCnKZlkjJOVChYQxjBXUKFM0xgcgHRiDexJAM7E9G2ZnwGFUBL584RT7iIt6ce2aEys4AjxRvnTOFWXGw4LYjrPwIfRxfzLOFOQ0qeHhKw/vElZ1scUpElS5w+dFW/VE+/TPe8k8/nA0HgVFc/z6+qm8B8+fyqan3UzK23ZJtuBwAA4Pr16muFxo3NY2EURf/4D/+4zPUAAACwcj7yqx9pun3dilcCAADAGiIWAgAABE0sBAAACJpYCAAAEDSxEAAAIGiLjYVf+l+Ot/k/AAAAa9zCY+F//53//Tf2/07fv/pXd+z77d/8vU/fse+3d+3bf8e+387+d79zx77fft/uPf/2u3/X99/+yyWtFgAAgCWWabr11luy7Z9buOl9Nw9++5nf/43b3pmdffta6b+3rs3+/N1rP3/32pvvvPvWu9d+/PrlDesy7/27J772yH9ctuIBAADo1Ed+9SNNH2e/wNXCf/HxHdHP35wtzs7ORrOzxWul/2avzc6WtkSlH99999qv3LRx0WUDAACsnJ++dbnNfytZyX/53nc/89nPNG7/zGc/81++992lnWuBsfBf7vqN4htXfzZz5WdXZy5fvXL5ypWZK7GrV69euTpz9crMzOXNmdmm780U7/jTU8d2Fc",
+      "images": 0
+    },
+    {
+      "call": "computer_screenshot desktop",
+      "ok": true,
+      "text": "captura 1600x451 da área de trabalho virtual (3840px de largura real, origem 0,0). Use coordenadas desta imagem.",
+      "evidence": {
+        "width": 1600,
+        "height": 451,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1792899614534.png",
+        "scale": 0.4166666666666667
+      },
+      "images": 1
+    },
+    {
+      "call": "computer_mouse_move",
+      "ok": true,
+      "text": "ponteiro em (400, 220) da captura → tela (960, 528); cursor em (960, 527)",
+      "images": 0
+    },
+    {
+      "call": "computer_mouse_button down",
+      "ok": true,
+      "text": "down left",
+      "images": 0
+    },
+    {
+      "call": "computer_mouse_button up",
+      "ok": true,
+      "text": "up left",
+      "images": 0
+    },
+    {
+      "call": "computer_drag desktop",
+      "ok": true,
+      "text": "arrasto executado",
+      "images": 0
+    },
+    {
+      "call": "global without target refused",
+      "ok": false,
+      "expected": true,
+      "text": "input_method=global exige app ou window; um clique sobre a captura global não tem alvo verificável.",
+      "images": 0
+    },
+    {
+      "call": "secondary Scroll refused by backend",
+      "ok": false,
+      "expected": true,
+      "text": "scroll is not a valid secondary action for 1",
+      "images": 0
+    },
+    {
+      "call": "computer_snapshot app legacy",
+      "ok": true,
+      "text": "<ax_tree target=\"notepad\" snapshot=\"snap_n_mvna52w5\">\nApp=notepad (pid 34636)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod Computer Use LIVE\\nUnicode áéíóú\\nBackground input\\nCoordinate input\\nFinal stateTYPEKEY-GLOBAL Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 5, Col 26 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t\t6 text  100% Frame: {x: 906, y: 496, width: 48, height: 21}\n\t\t\t7 text  Windows (CRLF) Frame: {x: 956, y: 496, width: 118, height: 21}\n\t\t\t8 text  UTF-8 Frame: {x: 1076, y: 496, width: 102, height: 21}\n\nSelected text: [teTYPEKEY-GLOBAL]\n</ax_tree>",
+      "evidence": {
+        "app": "notepad",
+        "snapshot_id": "snap_n_mvna52w5",
+        "generation": 23,
+        "truncated": false
+      },
+      "images": 0
+    },
+    {
+      "call": "stale window rejected",
+      "ok": false,
+      "expected": true,
+      "text": "staleWindowHandle(1): the window is no longer open; re-observe with list_windows.",
+      "images": 0
+    }
+  ]
+}

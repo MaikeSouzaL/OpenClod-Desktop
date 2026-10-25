@@ -86,6 +86,40 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     apiKeyEnv: 'OPENROUTER_API_KEY',
     docs: 'https://openrouter.ai/docs'
   },
+  'opencode-go': {
+    kind: 'openai',
+    label: 'OpenCode Go',
+    baseUrl: 'https://opencode.ai/inference/go/openai/v1',
+    model: 'beam-free',
+    contextWindow: 128_000,
+    supportsVision: true,
+    models: [
+      'beam-free',
+      'deepseek-v4.1-flash',
+      'deepseek-v4-pro',
+      'qwen3.8-max',
+      'glm-5.3',
+      'kimi-k3',
+      'claude-haiku-5-5',
+      'gpt-6-luna',
+      'mimo-v2.6-pro',
+      'minimax-m3.1-flash-free',
+      'longcat-2.5-preview-free'
+    ],
+    apiKeyEnv: 'OPENCODE_API_KEY',
+    docs: 'https://opencode.ai/docs/providers/#opencode-go'
+  },
+  opencode: {
+    kind: 'openai',
+    label: 'OpenCode Zen',
+    baseUrl: 'https://opencode.ai/inference/openai/v1',
+    model: 'qwen3-coder',
+    contextWindow: 128_000,
+    supportsVision: true,
+    models: ['qwen3-coder', 'glm-5.3', 'kimi-k3', 'claude-haiku-5-5', 'gpt-6-luna'],
+    apiKeyEnv: 'OPENCODE_ZEN_API_KEY',
+    docs: 'https://opencode.ai/docs/zen'
+  },
   ollama: {
     kind: 'openai',
     label: 'Ollama (local)',

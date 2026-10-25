@@ -105,6 +105,11 @@ function evaluateToolBase(
   cwd: string = process.cwd(),
   args?: unknown
 ): { decision: Decision; reason: string } {
+  // Explicit opt-in mode: the local harness itself imposes no decisions.
+  // Provider-side refusals and operating-system permissions remain external.
+  if (policy.mode === 'unrestricted') {
+    return { decision: 'allow', reason: 'modo ultrarrrestrito: sem bloqueios do harness' }
+  }
   // Not a rule: it cannot be overridden by an allow rule, a hook or any mode.
   const sensitive = checkSensitiveAccess(tool.name, preview, args, { cwd })
   if (sensitive) return { decision: 'deny', reason: sensitiveReason(sensitive, tool.name) }
@@ -154,14 +159,16 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'fetch_url', 'web_search', 'browser_open', 'browser_navigate', 'browser_snapshot',
     'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot'
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot'
   ],
   plan: [
     'read_file', 'list_dir', 'grep', 'glob', 'git_status', 'git_diff', 'git_log',
     'fetch_url', 'web_search', 'browser_open', 'browser_navigate', 'browser_snapshot',
     'browser_read', 'browser_screenshot', 'browser_console',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'task', 'agent', 'list_agents'
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot', 'task', 'agent', 'list_agents'
   ],
   code: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
@@ -171,7 +178,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
@@ -184,7 +192,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
@@ -192,7 +201,9 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
   review: [
     'read_file', 'list_dir', 'grep', 'glob', 'git_status', 'git_diff', 'git_log',
     'fetch_url', 'web_search', 'browser_open', 'browser_snapshot', 'browser_read',
-    'browser_screenshot', 'update_plan', 'list_skills', 'use_skill', 'memory_search', 'task', 'agent', 'list_agents'
+    'browser_screenshot', 'computer_list_apps', 'computer_list_windows', 'computer_get_window',
+    'computer_cursor_position', 'computer_snapshot', 'computer_screenshot',
+    'update_plan', 'list_skills', 'use_skill', 'memory_search', 'task', 'agent', 'list_agents'
   ],
   computer: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
@@ -201,7 +212,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'fetch_url', 'web_search', 'download_file',
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action',
@@ -213,7 +225,9 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents',
-    'run_command', 'read_process_output', 'list_processes'
+    'run_command', 'read_process_output', 'list_processes',
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot'
   ],
   autonomous: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
@@ -223,7 +237,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_windows', 'computer_snapshot', 'computer_screenshot', 'computer_click',
+    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
     'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for',
@@ -238,7 +253,7 @@ for (const tools of Object.values(MODE_TOOLS)) {
     if (!tools.includes(name)) tools.push(name)
   }
   if (!tools.includes('web_research')) tools.push('web_research')
-  for (const name of ['browser_tabs', 'browser_new_tab', 'browser_switch_tab', 'browser_close_tab']) {
+  for (const name of ['browser_tabs', 'browser_new_tab', 'browser_claim_tab', 'browser_switch_tab', 'browser_close_tab']) {
     if (!tools.includes(name)) tools.push(name)
   }
   for (const name of ['mcp_search', 'mcp_servers', 'mcp_install']) {

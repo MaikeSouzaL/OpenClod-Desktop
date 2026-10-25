@@ -18,6 +18,21 @@ export interface Target {
   window?: number
 }
 
+export type InputMethod = 'auto' | 'global'
+export type ClickMethod = 'auto' | 'accessibility' | 'app_post' | 'global'
+
+export const MAX_SNAPSHOT_CHARS = 80_000
+
+/** Truncates an accessibility tree without cutting the last line in half. */
+export function limitSnapshotText(text: string, maxChars = MAX_SNAPSHOT_CHARS): { text: string; truncated: boolean } {
+  if (text.length <= maxChars) return { text, truncated: false }
+  const marker = `\n…[snapshot truncado em ${maxChars} de ${text.length} caracteres; use um alvo mais específico]`
+  const available = Math.max(0, maxChars - marker.length)
+  const prefix = text.slice(0, available)
+  const lineBreak = prefix.lastIndexOf('\n')
+  return { text: `${lineBreak > available * 0.8 ? prefix.slice(0, lineBreak) : prefix}${marker}`, truncated: true }
+}
+
 export interface CaptureInfo {
   /** Top-left of the virtual desktop in screen coordinates (can be negative). */
   originX: number
@@ -81,6 +96,46 @@ const CONTROL_ENV = {
 }
 const NO_STATE = /No (app|window) state is available/i
 
+/**
+ * Normalize common model-provided key aliases to the Windows runtime's
+ * canonical xdotool-style chord. Without this, `Control_L+End` is accepted by
+ * validation but the main key fails to resolve in the background message path.
+ */
+export function normalizeKeyChord(chord: string): string {
+  const aliases: Record<string, string> = {
+    ctrl: 'ctrl',
+    ctrl_l: 'ctrl',
+    ctrl_r: 'ctrl',
+    control: 'ctrl',
+    control_l: 'ctrl',
+    control_r: 'ctrl',
+    shift_l: 'shift',
+    shift_r: 'shift',
+    alt_l: 'alt',
+    alt_r: 'alt',
+    return: 'Return',
+    enter: 'Return',
+    escape: 'Escape',
+    esc: 'Escape',
+    backspace: 'BackSpace',
+    back_space: 'BackSpace',
+    page_up: 'Page_Up',
+    prior: 'Page_Up',
+    page_down: 'Page_Down',
+    next: 'Page_Down',
+    end: 'End',
+    home: 'Home',
+    delete: 'Delete',
+    del: 'Delete'
+  }
+  return chord
+    .split('+')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => aliases[part.toLowerCase()] ?? part)
+    .join('+')
+}
+
 /** Converts a point from the last screenshot's pixel space to screen coordinates. */
 export function screenshotToScreen(point: { x: number; y: number }, capture: CaptureInfo | null): { x: number; y: number } {
   if (!capture || capture.scale <= 0) return point
@@ -120,8 +175,13 @@ export class ComputerLayer {
   private allowControl = false
   /** Incremented on every successful accessibility snapshot. */
   private generation = 0
+  /** Latest backend screenshot id per window, used to reject stale coordinates. */
+  private readonly windowScreenshots = new Map<number, string>()
   /** Last successful snapshot, used to verify that an action changed the UI. */
   private lastSnapshot: { id: string; target: string; signature: string } | null = null
+  /** Element references are valid only for the snapshot that produced them. */
+  private readonly snapshotRefs = new Map<string, { target: string; indexes: Set<number> }>()
+  private currentSnapshotByTarget = new Map<string, string>()
 
   constructor(ocuPath?: string | null) {
     const found = resolveOcu(ocuPath)
@@ -238,6 +298,11 @@ export class ComputerLayer {
     return this.call('list_apps', {})
   }
 
+  /** Rehydrates a previously returned window id; never construct window handles. */
+  async getWindow(id: number, app?: string): Promise<ToolResult> {
+    return this.call('get_window', { window: { id, ...(app ? { app } : {}) } }, 30_000)
+  }
+
   /** UI Automation tree (with element indices) of an app or a window. */
   async snapshot(target: Target, includeScreenshot = false): Promise<ToolResult> {
     let result =
@@ -251,16 +316,34 @@ export class ComputerLayer {
           ? await this.call('get_app_state', { app: target.app })
           : ({ ok: false, text: 'informe app ou window' } as ToolResult)
     if (!includeScreenshot && result.images) result = { ...result, images: undefined }
+    let screenshotId: string | undefined
     if (result.ok) {
       this.generation++
       const id = `snap_${this.generation.toString(36)}_${Date.now().toString(36)}`
-      this.lastSnapshot = { id, target: targetSignature(target), signature: signatureOf(result.text) }
+      const targetKey = targetSignature(target)
+      const limited = limitSnapshotText(result.text)
+      const indexes = new Set<number>()
+      for (const line of result.text.split('\n')) {
+        const index = /^\s*(\d+)\s/.exec(line)?.[1]
+        if (index !== undefined) indexes.add(Number(index))
+      }
+      this.snapshotRefs.set(id, { target: targetKey, indexes })
+      this.currentSnapshotByTarget.set(targetKey, id)
+      this.lastSnapshot = { id, target: targetKey, signature: signatureOf(result.text) }
+      if (includeScreenshot && target.window != null && result.images?.length) {
+        screenshotId = /"id"\s*:\s*"(shot-\d+-\d+)"/.exec(result.text)?.[1]
+        if (screenshotId) this.windowScreenshots.set(target.window, screenshotId)
+        else this.windowScreenshots.delete(target.window)
+      }
       return {
         ...result,
+        text: limited.text,
         data: {
           ...(typeof result.data === 'object' && result.data ? (result.data as Record<string, unknown>) : {}),
           snapshot_id: id,
-          generation: this.generation
+          generation: this.generation,
+          truncated: limited.truncated,
+          ...(screenshotId ? { screenshot_id: screenshotId } : {})
         }
       }
     }
@@ -275,6 +358,40 @@ export class ComputerLayer {
     })
   }
 
+  async clickElementWithOptions(
+    target: Target,
+    elementIndex: number,
+    clickCount = 1,
+    button?: 'left' | 'right' | 'middle',
+    inputMethod?: InputMethod,
+    clickMethod?: ClickMethod
+  ): Promise<ToolResult> {
+    return this.elementAction('click', target, {
+      element_index: elementIndex,
+      ...(clickCount > 1 ? { click_count: clickCount } : {}),
+      ...(button ? { mouse_button: button } : {}),
+      ...(inputMethod ? { input_method: inputMethod } : {}),
+      ...(clickMethod ? { click_method: clickMethod } : {})
+    })
+  }
+
+  /** Resolves a snapshot-bound ref and rejects stale snapshots before any input. */
+  resolveSnapshotRef(target: Target, snapshotId: string | undefined, ref: string): { index?: number; error?: string } {
+    const match = /^e?(\d+)$/i.exec(ref.trim())
+    if (!match || !snapshotId) return { error: 'informe ref no formato e12 junto com snapshot_id' }
+    const targetKey = targetSignature(target)
+    const snapshot = this.snapshotRefs.get(snapshotId)
+    if (!snapshot || snapshot.target !== targetKey) {
+      return { error: 'element_stale: snapshot desconhecido ou de outro alvo; tire um novo computer_snapshot' }
+    }
+    if (this.currentSnapshotByTarget.get(targetKey) !== snapshotId) {
+      return { error: 'element_stale: snapshot antigo; tire um novo computer_snapshot e use a nova ref' }
+    }
+    const index = Number(match[1])
+    if (!snapshot.indexes.has(index)) return { error: `element_stale: ref e${index} não existe no snapshot ${snapshotId}` }
+    return { index }
+  }
+
   /** Click at window-relative coordinates of the window's own screenshot. */
   async clickInWindow(window: number, x: number, y: number, clickCount = 1, button?: 'left' | 'right' | 'middle'): Promise<ToolResult> {
     return this.elementAction('click', { window }, {
@@ -285,21 +402,99 @@ export class ComputerLayer {
     })
   }
 
+  async clickInWindowWithOptions(
+    window: number,
+    x: number,
+    y: number,
+    clickCount = 1,
+    button?: 'left' | 'right' | 'middle',
+    inputMethod?: InputMethod,
+    clickMethod?: ClickMethod
+  ): Promise<ToolResult> {
+    const screenshotId = this.windowScreenshots.get(window)
+    return this.elementAction('click', { window }, {
+      x,
+      y,
+      ...(clickCount > 1 ? { click_count: clickCount } : {}),
+      ...(button ? { mouse_button: button } : {}),
+      ...(inputMethod ? { input_method: inputMethod } : {}),
+      ...(clickMethod ? { click_method: clickMethod } : {}),
+      ...(screenshotId ? { screenshotId } : {})
+    })
+  }
+
   async setValue(target: Target, elementIndex: number, value: string): Promise<ToolResult> {
     return this.elementAction('set_value', target, { element_index: elementIndex, value })
   }
 
-  async secondaryAction(target: Target, elementIndex: number, action: string): Promise<ToolResult> {
-    return this.elementAction('perform_secondary_action', target, { element_index: elementIndex, action })
+  async setValueWithOptions(target: Target, elementIndex: number, value: string, inputMethod?: InputMethod): Promise<ToolResult> {
+    return this.elementAction('set_value', target, {
+      element_index: elementIndex,
+      value,
+      ...(inputMethod ? { input_method: inputMethod } : {})
+    })
+  }
+
+  async secondaryAction(target: Target, elementIndex: number, action: string, inputMethod?: InputMethod): Promise<ToolResult> {
+    return this.elementAction('perform_secondary_action', target, {
+      element_index: elementIndex,
+      action,
+      ...(inputMethod ? { input_method: inputMethod } : {})
+    })
   }
 
   /** Types into the focused element of a target window (focus it first with a click). */
-  async typeIn(target: Target, text: string): Promise<ToolResult> {
-    return this.elementAction('type_text', target, { text })
+  async typeIn(target: Target, text: string, inputMethod?: InputMethod): Promise<ToolResult> {
+    return this.elementAction('type_text', target, { text, ...(inputMethod ? { input_method: inputMethod } : {}) })
   }
 
-  async pressKeyIn(target: Target, key: string): Promise<ToolResult> {
-    return this.elementAction('press_key', target, { key })
+  async pressKeyIn(target: Target, key: string, inputMethod?: InputMethod): Promise<ToolResult> {
+    return this.elementAction('press_key', target, {
+      key: normalizeKeyChord(key),
+      ...(inputMethod ? { input_method: inputMethod } : {})
+    })
+  }
+
+  /** Window-relative scroll with the backend's screenshot/bounds gate. */
+  async scrollInWindow(
+    window: number,
+    x: number,
+    y: number,
+    deltaX: number,
+    deltaY: number,
+    screenshotId?: string,
+    inputMethod?: InputMethod
+  ): Promise<ToolResult> {
+    const binding = screenshotId ?? this.windowScreenshots.get(window)
+    return this.call('scroll', {
+      window: { id: window },
+      x,
+      y,
+      scrollX: deltaX,
+      scrollY: deltaY,
+      ...(binding ? { screenshotId: binding } : {}),
+      ...(inputMethod ? { input_method: inputMethod } : {})
+    })
+  }
+
+  /** Window-relative drag with the backend's screenshot/bounds gate. */
+  async dragInWindow(
+    window: number,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    screenshotId?: string,
+    inputMethod?: InputMethod
+  ): Promise<ToolResult> {
+    const binding = screenshotId ?? this.windowScreenshots.get(window)
+    return this.call('drag', {
+      window: { id: window },
+      from_x: from.x,
+      from_y: from.y,
+      to_x: to.x,
+      to_y: to.y,
+      ...(binding ? { screenshotId: binding } : {}),
+      ...(inputMethod ? { input_method: inputMethod } : {})
+    }, 45_000)
   }
 
   async launchApp(app: string): Promise<ToolResult> {
@@ -416,7 +611,7 @@ export class ComputerLayer {
   }
 
   async pressKey(chord: string): Promise<OcuResult> {
-    return this.input(['key', chord])
+    return this.input(['key', normalizeKeyChord(chord)])
   }
 
   async wait(seconds: number): Promise<void> {

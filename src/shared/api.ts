@@ -317,6 +317,8 @@ export interface MemoryPageContent {
   created: string
   updated: string
   source: string
+  /** Explicit wikilinks found in the markdown, represented by page id. */
+  links?: string[]
 }
 
 export interface MemoryGraphNodeInfo {
@@ -328,6 +330,8 @@ export interface MemoryGraphNodeInfo {
   updated: string
   degree: number
   terms: string[]
+  /** Text used by quick search in the graph (bounded excerpt of the full page). */
+  summary?: string
 }
 
 export interface MemoryGraphEdgeInfo {
@@ -369,6 +373,12 @@ export const CH = {
   appMcpPresets: 'app:mcpPresets',
   appMcpCatalog: 'app:mcpCatalog',
   appMcpInstall: 'app:mcpInstall',
+  appMcpOAuthStatus: 'app:mcpOAuthStatus',
+  appMcpOAuthAuthorize: 'app:mcpOAuthAuthorize',
+  appChromeCompanion: 'app:chromeCompanion',
+  appChromeInstall: 'app:chromeInstall',
+  appChromeExtensions: 'app:chromeExtensions',
+  appEnvironmentCheck: 'app:environmentCheck',
   appImportClaude: 'app:importClaude',
   appClaudeStatus: 'app:claudeStatus',
   appClaudeLogin: 'app:claudeLogin',
@@ -438,6 +448,7 @@ export const CH = {
   memoryOpen: 'memory:open',
   memoryExport: 'memory:export',
   memoryImport: 'memory:import',
+  memoryImportZip: 'memory:importZip',
   memoryRecall: 'memory:recall',
   memoryAiStatus: 'memory:aiStatus',
   memoryGraph: 'memory:graph',
@@ -493,6 +504,8 @@ export interface OpenclodApi {
       env?: Record<string, string>,
       headers?: Record<string, string>
     ): Promise<IpcResult<{ ok: boolean; name?: string; state?: string; tools?: string[]; missing?: string[]; needsOAuth?: boolean; error?: string }>>
+    mcpOAuthStatus(serverName?: string): Promise<IpcResult<{ available: boolean; connected: boolean; server?: string; expiresAt?: number; detail: string }>>
+    authorizeMcp(serverName: string): Promise<IpcResult<{ connected: boolean; detail: string }>>
     /** Copies skills, agents and MCP servers from Claude Desktop/Code. */
     importClaude(): Promise<IpcResult<ClaudeImportInfo>>
     /** Authentication state of the local Claude Code CLI. */
@@ -504,6 +517,13 @@ export interface OpenclodApi {
     /** Built-in + imported agents available to a project. */
     agents(cwd?: string): Promise<IpcResult<AgentsListing>>
     openSkillsFolder(): Promise<IpcResult<boolean>>
+    chromeCompanion(): Promise<IpcResult<{ installed: boolean; extensionPath: string; hostPath: string; manifestPath: string; chromePath?: string; detail: string; extensionConnected?: boolean }>>
+    /** Installs the native-messaging host and prepares the unpacked extension. */
+    installChromeCompanion(): Promise<IpcResult<{ installed: boolean; extensionPath: string; hostPath: string; manifestPath: string; chromePath?: string; detail: string; extensionConnected?: boolean }>>
+    /** Opens chrome://extensions so the user confirms the local extension once. */
+    openChromeExtensions(): Promise<IpcResult<{ installed: boolean; extensionPath: string; hostPath: string; manifestPath: string; chromePath?: string; detail: string; extensionConnected?: boolean }>>
+    /** Runs a real command in the selected environment and returns its output. */
+    environmentCheck(environmentId: string): Promise<IpcResult<{ ok: boolean; kind: string; detail: string; stdout: string; stderr: string; exitCode: number | null }>>
   }
   projects: {
     list(): Promise<IpcResult<Project[]>>
@@ -592,6 +612,8 @@ export interface OpenclodApi {
     exportMarkdown(projectId: string): Promise<IpcResult<string | null>>
     /** Imports all .md files from a chosen folder as memory pages. */
     importMarkdown(projectId: string): Promise<IpcResult<number>>
+    /** Imports Markdown files from a Claude-style ZIP without extracting outside a temp folder. */
+    importZip(projectId: string): Promise<IpcResult<number>>
   }
   power: {
     keepAwake(enabled: boolean): Promise<IpcResult<boolean>>

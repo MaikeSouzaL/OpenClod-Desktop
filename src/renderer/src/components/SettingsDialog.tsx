@@ -28,6 +28,8 @@ const PROVIDER_VISUALS: Record<string, { icon: IconName; color: string }> = {
   kimi: { icon: 'link', color: '#8b5cf6' },
   qwen: { icon: 'globe', color: '#a855f7' },
   openrouter: { icon: 'globe', color: '#6366f1' },
+  'opencode-go': { icon: 'terminal', color: '#f59e0b' },
+  opencode: { icon: 'sparkles', color: '#eab308' },
   ollama: { icon: 'terminal', color: '#e5e7eb' },
   lmstudio: { icon: 'monitor', color: '#22c55e' },
   mock: { icon: 'terminal', color: '#f59e0b' }
@@ -48,6 +50,12 @@ const PERMISSION_CHOICES: Array<{ id: PermissionMode; title: string; detail: str
     id: 'auto',
     title: 'Automático',
     detail: 'Padrão. Edita, executa e navega sem pedir; operações destrutivas e arquivos de segredo pedem confirmação.',
+    tone: 'warn'
+  },
+  {
+    id: 'unrestricted',
+    title: 'Ultrarrestrito',
+    detail: 'Sem bloqueios do harness: comandos, confirmações, regras e restrições de diretório são removidos. Use com responsabilidade.',
     tone: 'warn'
   }
 ]
@@ -104,6 +112,11 @@ export function SettingsDialog({
     insert: 'focused'
   })
   const [voiceStatus, setVoiceStatus] = useState<SttStatusInfo | null>(null)
+  const [browserMode, setBrowserMode] = useState<NonNullable<AppSettings['browser']>['mode']>(settings.browser?.mode ?? 'auto')
+  const [browserCompanion, setBrowserCompanion] = useState<{ installed: boolean; extensionPath: string; hostPath: string; manifestPath: string; chromePath?: string; detail: string; extensionConnected?: boolean } | null>(null)
+  const [browserBusy, setBrowserBusy] = useState(false)
+  const [environmentChecks, setEnvironmentChecks] = useState<Record<string, { ok: boolean; detail: string; stdout: string; stderr: string }>>({})
+  const [checkingEnvironment, setCheckingEnvironment] = useState('')
   const [memoryStats, setMemoryStats] = useState<MemoryStatsInfo | null>(null)
   const [memoryPages, setMemoryPages] = useState<MemoryPageInfo[]>([])
   const [memoryPage, setMemoryPage] = useState<MemoryPageContent | null>(null)
@@ -144,6 +157,7 @@ export function SettingsDialog({
     setEnvironmentsText(JSON.stringify(settings.environments ?? [], null, 2))
     setHooksText(JSON.stringify(settings.hooks ?? {}, null, 2))
     setImportClaude(Boolean(settings.importClaudeSettings))
+    setBrowserMode(settings.browser?.mode ?? 'auto')
     setVoice({
       model: settings.voice?.model ?? 'base',
       language: settings.voice?.language ?? 'pt',
@@ -153,6 +167,7 @@ export function SettingsDialog({
       insert: settings.voice?.insert ?? 'focused'
     })
     void window.forja.stt.status().then((result) => setVoiceStatus(result.ok ? result.value : null))
+    void window.forja.app.chromeCompanion().then((result) => setBrowserCompanion(result.ok ? result.value : null))
     setKeyDrafts({})
     setKeyStatus({})
     setTestStatus({})
@@ -360,7 +375,8 @@ export function SettingsDialog({
         mcpServers,
         hooks,
         importClaudeSettings: importClaude,
-        voice
+        voice,
+        browser: { mode: browserMode, groupBySession: settings.browser?.groupBySession !== false }
       })
       setNotice('Configurações salvas.')
       setTimeout(() => setNotice(''), 2500)
@@ -896,6 +912,68 @@ export function SettingsDialog({
                 </p>
               </div>
 
+              <h3>Navegador do agente</h3>
+              <p className="field-help">
+                Use o Chrome que já está aberto e preserve a sessão, as abas e os logins. O Openclod cria um grupo de
+                abas por sessão e reaproveita o navegador em vez de iniciar outro.
+              </p>
+              <div className="grid-3">
+                {([
+                  ['auto', 'Automático', 'Chrome existente quando conectado; Playwright como fallback.'],
+                  ['chrome-existing', 'Chrome existente', 'Exige a extensão; usa somente o Chrome já aberto.'],
+                  ['playwright', 'Playwright', 'Instância isolada, sem depender da extensão.']
+                ] as const).map(([id, title, detail]) => (
+                  <label key={id} className={`permission-card ${browserMode === id ? 'active' : ''}`}>
+                    <input type="radio" name="browser-mode" checked={browserMode === id} onChange={() => setBrowserMode(id)} />
+                    <strong>{title}</strong>
+                    <span>{detail}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="field-note">
+                {browserCompanion
+                  ? browserCompanion.installed
+                    ? `Host nativo instalado. Extensão: ${browserCompanion.extensionPath}`
+                    : browserCompanion.detail
+                  : 'Verificando integração com o Chrome…'}
+              </div>
+              <div className="inline-fields">
+                <button
+                  type="button"
+                  className="btn small primary"
+                  disabled={browserBusy}
+                  onClick={async () => {
+                    setBrowserBusy(true)
+                    setError('')
+                    try {
+                      const status = await unwrap(window.forja.app.installChromeCompanion())
+                      setBrowserCompanion(status)
+                      await onRefreshCapabilities()
+                      setNotice('Host do Chrome instalado. Abra as extensões para confirmar o carregamento local.')
+                    } catch (err) {
+                      setError(errorMessage(err))
+                    } finally {
+                      setBrowserBusy(false)
+                    }
+                  }}
+                >
+                  <Icon name="download" size={12} /> Instalar companion
+                </button>
+                <button
+                  type="button"
+                  className="btn small subtle"
+                  onClick={async () => {
+                    try {
+                      setBrowserCompanion(await unwrap(window.forja.app.openChromeExtensions()))
+                    } catch (err) {
+                      setError(errorMessage(err))
+                    }
+                  }}
+                >
+                  <Icon name="external" size={12} /> Abrir extensões
+                </button>
+              </div>
+
               <div className="grid-2">
                 <label className="field">
                   <span>Comandos bloqueados (um por linha)</span>
@@ -957,6 +1035,42 @@ export function SettingsDialog({
                   spellCheck={false}
                 />
               </label>
+              <div className="environment-checks">
+                {(settings.environments ?? []).map((environment) => {
+                  const check = environmentChecks[environment.id]
+                  return (
+                    <div key={environment.id} className="field-note">
+                      <strong>{environment.label}</strong> · {environment.kind}
+                      {check ? (
+                        <span className={check.ok ? 'good' : 'bad'}>
+                          {' '}— {check.ok ? 'conexão real confirmada' : 'falhou'}: {check.detail}
+                        </span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn small subtle"
+                        disabled={checkingEnvironment === environment.id}
+                        onClick={async () => {
+                          setCheckingEnvironment(environment.id)
+                          try {
+                            const result = await unwrap(window.forja.app.environmentCheck(environment.id))
+                            setEnvironmentChecks((current) => ({ ...current, [environment.id]: result }))
+                          } catch (err) {
+                            setEnvironmentChecks((current) => ({
+                              ...current,
+                              [environment.id]: { ok: false, detail: errorMessage(err), stdout: '', stderr: '' }
+                            }))
+                          } finally {
+                            setCheckingEnvironment('')
+                          }
+                        }}
+                      >
+                        <Icon name="plug" size={11} /> {checkingEnvironment === environment.id ? 'Testando…' : 'Testar conexão'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
 
               <h3>Hooks</h3>
               <p className="field-help">

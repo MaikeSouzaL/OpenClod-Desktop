@@ -44,11 +44,94 @@ function elementIndex(args: { element_index?: number; ref?: string }): number {
 
 const elementShape = {
   element_index: z.number().int().min(0).optional().describe('Índice do elemento na última árvore de acessibilidade'),
-  ref: z.string().regex(/^e?\d+$/i).optional().describe('Referência estável do snapshot (ex.: e12)')
+  ref: z.string().regex(/^e?\d+$/i).optional().describe('Referência do snapshot (ex.: e12)'),
+  snapshot_id: z.string().min(1).optional().describe('Id do computer_snapshot que produziu a ref; refs de snapshot antigo são recusadas')
+}
+
+/** Resolves a model-facing element reference only against the latest snapshot. */
+function resolveElement(
+  args: { element_index?: number; ref?: string; snapshot_id?: string; app?: string; window?: number },
+  layer: ComputerLayer
+): number | ToolResult {
+  if (args.ref) {
+    const resolved = layer.resolveSnapshotRef(targetOf(args), args.snapshot_id, args.ref)
+    if (resolved.error) return { ok: false, text: resolved.error, summary: 'element_stale' }
+    return resolved.index!
+  }
+  return elementIndex(args)
+}
+
+const inputMethodShape = {
+  input_method: z
+    .enum(['auto', 'global'])
+    .optional()
+    .describe('auto = UI Automation/mensagem em segundo plano; global = SendInput na janela em primeiro plano')
 }
 
 const computerNote =
   'Percepção híbrida: primeiro a árvore de UI Automation (com element_index/ref), depois screenshot. Cada ação de elemento retorna snapshot_id, generation e state_changed; verifique o estado após cada ação.'
+
+export const computerListAppsTool: ToolDef = {
+  name: 'computer_list_apps',
+  description:
+    'Lista aplicativos instalados e em execução, incluindo janelas utilizáveis. Use antes de computer_launch para obter o id ou nome correto do aplicativo.',
+  risk: 'read',
+  parallelSafe: false,
+  requires: 'computer',
+  schema: z.object({}),
+  describe() {
+    return { title: 'Aplicativos disponíveis', detail: 'listar apps instalados e em execução' }
+  },
+  async execute(_raw, ctx) {
+    const layer = layerFor(ctx)
+    if (isResult(layer)) return layer
+    const result = await layer.listApps()
+    const running = (result.text.match(/\[running/g) ?? []).length
+    return { ...result, summary: result.ok ? `${running} apps em execução` : 'falha ao listar apps' }
+  }
+}
+
+export const computerGetWindowTool: ToolDef = {
+  name: 'computer_get_window',
+  description:
+    'Reidrata uma janela por id retornado anteriormente, útil após perder a referência. Não invente nem ajuste o id.',
+  risk: 'read',
+  parallelSafe: false,
+  requires: 'computer',
+  schema: z.object({ window: z.number().int().min(0), app: z.string().min(1).optional() }),
+  describe(a) {
+    const args = a as { window: number; app?: string }
+    return { title: 'Reidratar janela', detail: `janela ${args.window}`, preview: String(args.window) }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { window: number; app?: string }
+    const layer = layerFor(ctx)
+    if (isResult(layer)) return layer
+    return layer.getWindow(args.window, args.app)
+  }
+}
+
+export const computerCursorPositionTool: ToolDef = {
+  name: 'computer_cursor_position',
+  description: 'Lê a posição real do cursor de mouse na tela, em pixels absolutos.',
+  risk: 'read',
+  parallelSafe: true,
+  requires: 'computer',
+  schema: z.object({}),
+  describe() {
+    return { title: 'Posição do cursor', detail: 'tela absoluta' }
+  },
+  async execute(_raw, ctx) {
+    const position = await ctx.services.computer.cursorPosition()
+    if (!position) return { ok: false, text: 'não foi possível ler a posição do cursor', summary: 'indisponível' }
+    return {
+      ok: true,
+      text: `cursor em (${position.x}, ${position.y})`,
+      summary: `(${position.x}, ${position.y})`,
+      data: position
+    }
+  }
+}
 
 export const computerListWindowsTool: ToolDef = {
   name: 'computer_list_windows',
@@ -141,7 +224,9 @@ export const computerClickTool: ToolDef = {
       x: z.number().min(0).optional(),
       y: z.number().min(0).optional(),
       double: z.boolean().optional(),
-      button: z.enum(['left', 'right', 'middle']).optional()
+      button: z.enum(['left', 'right', 'middle']).optional(),
+      click_method: z.enum(['auto', 'accessibility', 'app_post', 'global']).optional(),
+      ...inputMethodShape
     })
     .refine(
       (v) =>
@@ -165,6 +250,15 @@ export const computerClickTool: ToolDef = {
       y?: number
       double?: boolean
       button?: 'left' | 'right' | 'middle'
+      click_method?: 'auto' | 'accessibility' | 'app_post' | 'global'
+      input_method?: 'auto' | 'global'
+    }
+    if (args.input_method === 'global' && args.window == null && !args.app) {
+      return {
+        ok: false,
+        text: 'input_method=global exige app ou window; um clique sobre a captura global não tem alvo verificável.',
+        summary: 'alvo ausente'
+      }
     }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
@@ -172,13 +266,23 @@ export const computerClickTool: ToolDef = {
     if (isResult(layer)) return layer
     const count = args.double ? 2 : 1
     const target = targetOf(args)
-    const index = elementIndex(args)
+    const resolved = resolveElement(args, layer)
+    if (typeof resolved !== 'number') return resolved
+    const index = resolved
     if (index >= 0 && (args.app || args.window != null)) {
-      const result = await layer.clickElement(target, index, count, args.button)
+      const result = await layer.clickElementWithOptions(target, index, count, args.button, args.input_method, args.click_method)
       return { ...result, summary: `${label(target)}#${index}${result.ok ? '' : ' (falhou)'}` }
     }
     if (args.window != null) {
-      const result = await layer.clickInWindow(args.window, args.x!, args.y!, count, args.button)
+      const result = await layer.clickInWindowWithOptions(
+        args.window,
+        args.x!,
+        args.y!,
+        count,
+        args.button,
+        args.input_method,
+        args.click_method
+      )
       return { ...result, summary: `janela ${args.window} (${args.x}, ${args.y})${result.ok ? '' : ' (falhou)'}` }
     }
     if (args.button && args.button !== 'left') {
@@ -289,12 +393,20 @@ export const computerSetValueTool: ToolDef = {
     }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index?: number; ref?: string; value: string }
+    const args = this.schema.parse(raw) as {
+      app?: string
+      window?: number
+      element_index?: number
+      ref?: string
+      value: string
+    }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.setValue(targetOf(args), elementIndex(args), args.value)
+    const resolved = resolveElement(args, layer)
+    if (typeof resolved !== 'number') return resolved
+    const result = await layer.setValue(targetOf(args), resolved, args.value)
     return { ...result, summary: result.ok ? args.value.slice(0, 40) : 'falhou' }
   }
 }
@@ -309,7 +421,8 @@ export const computerTypeTool: ToolDef = {
   schema: z.object({
     text: z.string(),
     ...targetShape,
-    ...elementShape
+    ...elementShape,
+    ...inputMethodShape
   }),
   describe(a) {
     const args = a as { text: string; app?: string; window?: number }
@@ -317,19 +430,28 @@ export const computerTypeTool: ToolDef = {
     return { title: 'Digitar', detail: `${prefix}${args.text.slice(0, 60)}`, preview: args.text.slice(0, 60) }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { text: string; app?: string; window?: number; element_index?: number; ref?: string }
+    const args = this.schema.parse(raw) as {
+      text: string
+      app?: string
+      window?: number
+      element_index?: number
+      ref?: string
+      input_method?: 'auto' | 'global'
+    }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
     const target = targetOf(args)
-    const index = elementIndex(args)
+    const resolved = resolveElement(args, layer)
+    if (typeof resolved !== 'number') return resolved
+    const index = resolved
     if (args.app || args.window != null) {
       if (index >= 0) {
         const focus = await layer.clickElement(target, index)
         if (!focus.ok) return { ...focus, text: `não foi possível focar o elemento: ${focus.text}` }
       }
-      const result = await layer.typeIn(target, args.text)
+      const result = await layer.typeIn(target, args.text, args.input_method)
       return { ...result, summary: result.ok ? `${args.text.length} caracteres` : 'falhou' }
     }
     const result = await layer.typeText(args.text)
@@ -344,19 +466,19 @@ export const computerKeyTool: ToolDef = {
   risk: 'exec',
   parallelSafe: false,
   requires: 'computer',
-  schema: z.object({ key: z.string().min(1), ...targetShape }),
+  schema: z.object({ key: z.string().min(1), ...targetShape, ...inputMethodShape }),
   describe(a) {
     const args = a as { key: string }
     return { title: 'Tecla', detail: args.key, preview: args.key }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { key: string; app?: string; window?: number }
+    const args = this.schema.parse(raw) as { key: string; app?: string; window?: number; input_method?: 'auto' | 'global' }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
     if (args.app || args.window != null) {
-      const result = await layer.pressKeyIn(targetOf(args), args.key)
+      const result = await layer.pressKeyIn(targetOf(args), args.key, args.input_method)
       return { ...result, summary: args.key }
     }
     const result = await layer.pressKey(args.key)
@@ -366,26 +488,62 @@ export const computerKeyTool: ToolDef = {
 
 export const computerScrollTool: ToolDef = {
   name: 'computer_scroll',
-  description: 'Rola a tela (direção e quantidade de passos) na posição atual do mouse.',
+  description:
+    'Rola a interface. Com window + x/y usa a janela observada e o gate de screenshot; sem window rola a captura global. Use scroll_x/scroll_y em pixels para rolagem precisa ou direction/amount no desktop.',
   risk: 'exec',
   parallelSafe: false,
   requires: 'computer',
   schema: z.object({
-    direction: z.enum(['up', 'down', 'left', 'right']),
+    direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Direção no modo global; omitida no modo por janela com scroll_x/scroll_y'),
     amount: z.number().int().min(1).max(20).optional(),
     x: z.number().min(0).optional().describe('Ponto da última screenshot onde rolar (opcional)'),
-    y: z.number().min(0).optional()
+    y: z.number().min(0).optional(),
+    window: z.number().int().min(0).optional().describe('Janela observada; x/y ficam relativos à janela'),
+    scroll_x: z.number().optional().describe('Delta horizontal em pixels, negativo para a esquerda'),
+    scroll_y: z.number().optional().describe('Delta vertical em pixels, negativo para cima'),
+    ...inputMethodShape
   }),
   describe(a) {
     const args = a as { direction: string; amount?: number }
     return { title: 'Rolar', detail: `${args.direction} x${args.amount ?? 3}`, preview: args.direction }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { direction: 'up' | 'down' | 'left' | 'right'; amount?: number; x?: number; y?: number }
+    const args = this.schema.parse(raw) as {
+      direction?: 'up' | 'down' | 'left' | 'right'
+      amount?: number
+      x?: number
+      y?: number
+      window?: number
+      scroll_x?: number
+      scroll_y?: number
+      input_method?: 'auto' | 'global'
+    }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
+    if (args.window != null) {
+      if (args.x == null || args.y == null) return { ok: false, text: 'com window, informe x e y da captura da janela' }
+      if (args.scroll_x == null && args.scroll_y == null && !args.direction) {
+        return { ok: false, text: 'informe direction ou scroll_x/scroll_y' }
+      }
+      const delta =
+        args.scroll_x != null || args.scroll_y != null
+          ? { x: args.scroll_x ?? 0, y: args.scroll_y ?? 0 }
+          : args.direction === 'down'
+            ? { x: 0, y: (args.amount ?? 3) * 120 }
+            : args.direction === 'up'
+              ? { x: 0, y: -(args.amount ?? 3) * 120 }
+              : args.direction === 'right'
+                ? { x: (args.amount ?? 3) * 120, y: 0 }
+                : { x: -(args.amount ?? 3) * 120, y: 0 }
+      const result = await layer.scrollInWindow(args.window, args.x, args.y, delta.x, delta.y, undefined, args.input_method)
+      return {
+        ...result,
+        summary: result.ok ? `janela ${args.window} · ${args.direction ?? `scroll ${delta.x},${delta.y}`}` : `falhou: ${result.text.slice(0, 140)}`
+      }
+    }
+    if (!args.direction) return { ok: false, text: 'sem window, informe direction para a captura global' }
     const point = args.x != null && args.y != null ? { x: args.x, y: args.y } : undefined
     const result = await layer.scroll(args.direction, args.amount ?? 3, point)
     return { ok: result.code === 0, text: result.code === 0 ? 'rolagem executada' : result.stderr, summary: args.direction }
@@ -394,7 +552,8 @@ export const computerScrollTool: ToolDef = {
 
 export const computerDragTool: ToolDef = {
   name: 'computer_drag',
-  description: 'Arrasta de um ponto a outro, em coordenadas da última computer_screenshot.',
+  description:
+    'Arrasta de um ponto a outro. Com window, as coordenadas são relativas à imagem mais recente da janela. Sem window, usa a última computer_screenshot global.',
   risk: 'exec',
   parallelSafe: false,
   requires: 'computer',
@@ -403,7 +562,9 @@ export const computerDragTool: ToolDef = {
     from_y: z.number().min(0),
     to_x: z.number().min(0),
     to_y: z.number().min(0),
-    button: z.enum(['left', 'right', 'middle']).optional().describe('Botão usado no arrasto (padrão: left)')
+    button: z.enum(['left', 'right', 'middle']).optional().describe('Botão usado no arrasto (padrão: left)'),
+    window: z.number().int().min(0).optional().describe('Janela observada; coordenadas ficam relativas à imagem da janela'),
+    ...inputMethodShape
   }),
   describe(a) {
     const args = a as { from_x: number; from_y: number; to_x: number; to_y: number }
@@ -414,11 +575,32 @@ export const computerDragTool: ToolDef = {
     }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { from_x: number; from_y: number; to_x: number; to_y: number; button?: 'left' | 'right' | 'middle' }
+    const args = this.schema.parse(raw) as {
+      from_x: number
+      from_y: number
+      to_x: number
+      to_y: number
+      button?: 'left' | 'right' | 'middle'
+      window?: number
+      input_method?: 'auto' | 'global'
+    }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
+    if (args.window != null) {
+      const result = await layer.dragInWindow(
+        args.window,
+        { x: args.from_x, y: args.from_y },
+        { x: args.to_x, y: args.to_y },
+        undefined,
+        args.input_method
+      )
+      return {
+        ...result,
+        summary: result.ok ? `janela ${args.window} · drag` : `falhou: ${result.text.slice(0, 140)}`
+      }
+    }
     const result = await layer.drag(
       { x: args.from_x, y: args.from_y },
       { x: args.to_x, y: args.to_y },
@@ -491,12 +673,20 @@ export const computerSecondaryActionTool: ToolDef = {
     return { title: 'Ação secundária', detail: `${label(targetOf(args))}#${elementIndex(args)} ${args.action}`, preview: args.action }
   },
   async execute(raw, ctx) {
-    const args = this.schema.parse(raw) as { app?: string; window?: number; element_index?: number; ref?: string; action: string }
+    const args = this.schema.parse(raw) as {
+      app?: string
+      window?: number
+      element_index?: number
+      ref?: string
+      action: string
+    }
     const blocked = requireControl(ctx)
     if (blocked) return { ok: false, text: blocked }
     const layer = layerFor(ctx)
     if (isResult(layer)) return layer
-    const result = await layer.secondaryAction(targetOf(args), elementIndex(args), args.action)
+    const resolved = resolveElement(args, layer)
+    if (typeof resolved !== 'number') return resolved
+    const result = await layer.secondaryAction(targetOf(args), resolved, args.action)
     return { ...result, summary: `${args.action}${result.ok ? '' : ' (falhou)'}` }
   }
 }
@@ -563,7 +753,10 @@ export const computerWaitForTool: ToolDef = {
 }
 
 export const computerTools: ToolDef[] = [
+  computerListAppsTool,
   computerListWindowsTool,
+  computerGetWindowTool,
+  computerCursorPositionTool,
   computerSnapshotTool,
   computerScreenshotTool,
   computerClickTool,

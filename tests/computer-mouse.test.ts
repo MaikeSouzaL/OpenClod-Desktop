@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ComputerLayer } from '../src/core/computer/layer'
+import { ComputerLayer, normalizeKeyChord } from '../src/core/computer/layer'
 import { makeTempDir, removeTempDir } from './helpers'
 
 describe('computer mouse layer', () => {
@@ -60,5 +60,17 @@ describe('computer mouse layer', () => {
   it('refuses coordinates outside the last screenshot instead of letting Windows clamp them', async () => {
     await expect(layer.moveMouse({ x: 900, y: 520 })).rejects.toThrow(/fora da última captura 1600x400/)
     expect(calls).toHaveLength(0)
+  })
+
+  it('normalizes model key aliases to the backend chord syntax', async () => {
+    expect(normalizeKeyChord('Control_L+End')).toBe('ctrl+End')
+    expect(normalizeKeyChord('Ctrl_L+Shift_L+s')).toBe('ctrl+shift+s')
+    expect(normalizeKeyChord('Page_Up')).toBe('Page_Up')
+    expect(normalizeKeyChord('Enter')).toBe('Return')
+  })
+
+  it('passes input_method to background and foreground key actions', async () => {
+    await layer.pressKey('Control_L+End')
+    expect(calls[0]).toBe('key ctrl+End')
   })
 })

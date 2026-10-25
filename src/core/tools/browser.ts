@@ -289,6 +289,38 @@ export const browserNewTabTool: ToolDef = {
   }
 }
 
+export const browserClaimTabTool: ToolDef = {
+  name: 'browser_claim_tab',
+  description:
+    'Usa uma aba que o usuário já abriu no Chrome e a adiciona ao grupo desta sessão, sem abrir outro navegador. Informe tab_id ou a URL exata; a URL precisa corresponder a uma única aba.',
+  risk: 'network',
+  parallelSafe: false,
+  requires: 'network',
+  schema: z
+    .object({
+      tab_id: z.string().min(1).optional().describe('Id da aba informado pelo usuário ou retornado pela extensão'),
+      url: z.string().url().optional().describe('URL exata de uma única aba já aberta')
+    })
+    .refine((value) => Boolean(value.tab_id?.trim() || value.url?.trim()), {
+      message: 'informe tab_id ou url'
+    }),
+  describe(a) {
+    const args = a as { tab_id?: string; url?: string }
+    return { title: 'Vincular aba existente', detail: args.tab_id ?? args.url ?? '', preview: args.tab_id ?? args.url }
+  },
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { tab_id?: string; url?: string }
+    const id = await ctx.services.browser.claimTab({ tabId: args.tab_id, url: args.url })
+    const snap = await ctx.services.browser.snapshot()
+    return {
+      ok: true,
+      text: `aba existente ${id} vinculada e ativa\n<page url="${snap.url}" title="${snap.title}">\n${snap.tree}\n</page>`,
+      summary: `aba ${id}`,
+      data: { tab: id, url: snap.url, title: snap.title }
+    }
+  }
+}
+
 export const browserSwitchTabTool: ToolDef = {
   name: 'browser_switch_tab',
   description: 'Ativa uma aba existente pelo id retornado por browser_tabs/browser_new_tab e devolve seu snapshot.',
@@ -349,6 +381,7 @@ export const browserTools: ToolDef[] = [
   browserWaitTool,
   browserTabsTool,
   browserNewTabTool,
+  browserClaimTabTool,
   browserSwitchTabTool,
   browserCloseTabTool
 ]

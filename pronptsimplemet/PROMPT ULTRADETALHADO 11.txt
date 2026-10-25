@@ -1,0 +1,601 @@
+# MÓDULO 11 — SISTEMA DE PLUGINS, EXTENSÕES E ECOSSISTEMA MODULAR
+
+## 1. OBJETIVO PRINCIPAL
+
+Implemente um sistema completo de plugins e extensões integrado ao harness existente.
+
+O sistema deverá permitir que o usuário adicione, configure, habilite, desabilite, atualize e remova funcionalidades sem precisar alterar manualmente o código central do aplicativo para cada extensão.
+
+Os plugins poderão ampliar capacidades como:
+
+- Ferramentas disponíveis para os agentes.
+- Integrações com serviços externos.
+- Integrações com servidores MCP.
+- Comandos personalizados.
+- Skills e procedimentos especializados.
+- Hooks e eventos.
+- Provedores de modelos de IA.
+- Recursos de análise e edição de código.
+- Automações de navegador e computador.
+- Integrações com bancos de dados e APIs.
+- Componentes de interface.
+- Fluxos de trabalho e agentes especializados.
+- Diagnósticos, métricas e observabilidade.
+
+O objetivo é criar uma arquitetura modular na qual novas funcionalidades possam ser desenvolvidas independentemente e integradas por contratos estáveis.
+
+**Não entregue apenas uma especificação ou uma demonstração. Implemente o sistema de plugins no harness real, integrando-o aos módulos existentes e validando seu funcionamento.**
+
+## 2. INSPEÇÃO DO PROJETO EXISTENTE
+
+Antes de modificar o código:
+
+1. Identifique a linguagem, os frameworks e a arquitetura real do harness.
+2. Examine o registro central de ferramentas, o Agent Core, os subagentes, as skills, os comandos e os hooks.
+3. Examine o módulo MCP e identifique como servidores e ferramentas externas são registrados.
+4. Identifique o sistema de configuração, persistência, logs, eventos e gerenciamento de processos.
+5. Examine a interface atual e os mecanismos de navegação e configurações.
+6. Localize qualquer implementação existente de extensões, módulos dinâmicos ou carregamento de componentes.
+7. Identifique quais contratos podem ser reutilizados.
+8. Planeje as integrações necessárias sem duplicar funcionalidades existentes.
+
+Não presuma que o projeto utiliza Node.js, TypeScript, Python, React ou qualquer outra tecnologia específica. Adapte a implementação à stack encontrada.
+
+Preserve as funcionalidades atuais e evite reescrever módulos anteriores sem necessidade técnica demonstrável.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+Clone os repositórios relevantes em um diretório de pesquisa separado. Inspecione código-fonte, pontos de entrada, interfaces públicas, ciclo de vida, exemplos, testes e licenças.
+
+Não instale todos os projetos indiscriminadamente. Escolha os componentes que realmente ajudem a implementar a arquitetura do harness.
+
+### 3.1. Arquitetura de plugins e extensões
+
+**Backstage — sistema de plugins**
+https://github.com/backstage/backstage
+
+Analise os conceitos de registro, descoberta, contratos de extensões, composição de funcionalidades e separação entre núcleo e plugins. Não replique toda a arquitetura do Backstage se ela for desproporcional ao harness.
+
+**OpenVSCode Server**
+https://github.com/gitpod-io/openvscode-server
+
+Examine, quando relevante, os padrões de extensibilidade do ecossistema VS Code e a integração de extensões em aplicações baseadas em tecnologias semelhantes.
+
+**Visual Studio Code**
+https://github.com/microsoft/vscode
+
+Investigue os contratos de extensão, o manifesto, os pontos de contribuição, os comandos, os eventos e o gerenciamento de ciclo de vida. Reaproveite apenas os padrões compatíveis com o harness.
+
+**Continue**
+https://github.com/continuedev/continue
+
+Analise a organização de funcionalidades extensíveis para assistentes de programação, ferramentas e integrações.
+
+### 3.2. Agentes e ferramentas extensíveis
+
+**OpenCode**
+https://github.com/anomalyco/opencode
+
+Examine os mecanismos de configuração, ferramentas, comandos, plugins e integração com o ciclo do agente.
+
+**Cline**
+https://github.com/cline/cline
+
+Investigue como extensões e ferramentas se relacionam com o agente, a interface e a configuração.
+
+**Goose**
+https://github.com/block/goose
+
+Analise a integração de extensões e ferramentas ao ambiente de execução de agentes.
+
+**OpenHands**
+https://github.com/All-Hands-AI/OpenHands
+
+Examine como capacidades adicionais são integradas à arquitetura de agentes.
+
+**Model Context Protocol**
+https://github.com/modelcontextprotocol
+
+Utilize os repositórios oficiais para compreender como o sistema de plugins poderá integrar servidores MCP sem duplicar a implementação do protocolo.
+
+### 3.3. Registro de componentes e contratos
+
+**InversifyJS**
+https://github.com/inversify/InversifyJS
+
+Considere somente se a stack TypeScript e a arquitetura atual justificarem uma solução de injeção de dependências.
+
+**Pydantic**
+https://github.com/pydantic/pydantic
+
+Considere para validação de contratos caso a implementação utilize Python e não possua mecanismo equivalente.
+
+**JSON Schema**
+https://github.com/json-schema-org/json-schema-spec
+
+Utilize como referência para manifestos e configurações declarativas quando apropriado.
+
+**Não adicione dependências apenas porque aparecem nesta lista.** O harness deve manter uma arquitetura simples e coerente com a stack existente.
+
+### 3.4. Regras de análise
+
+- Examine o código-fonte real, não apenas a documentação.
+- Identifique quais padrões são adequados para plugins de execução, interface e integração.
+- Confira licenças e compatibilidade.
+- Prefira contratos pequenos e estáveis.
+- Evite incorporar frameworks inteiros quando alguns componentes ou padrões forem suficientes.
+- Documente o que foi efetivamente reaproveitado.
+- Caso um repositório esteja indisponível, prossiga com alternativas compatíveis.
+
+## 4. ARQUITETURA CENTRAL DO SISTEMA DE PLUGINS
+
+Implemente os componentes equivalentes abaixo.
+
+### 4.1. Plugin Registry
+
+Responsável por manter o catálogo de plugins instalados e suas informações.
+
+Cada plugin deverá possuir:
+
+- Identificador único.
+- Nome.
+- Descrição.
+- Versão.
+- Autor ou origem declarada.
+- Versão da API do harness compatível.
+- Categoria.
+- Localização dos arquivos.
+- Ponto de entrada.
+- Estado de instalação.
+- Estado de ativação.
+- Dependências.
+- Permissões declaradas.
+- Configuração.
+- Estado de inicialização.
+- Histórico de erros.
+- Data da última atualização.
+
+O registro deve distinguir plugins instalados, habilitados, inicializados, desabilitados e com falha.
+
+Não considere um plugin funcional apenas porque seus arquivos existem.
+
+### 4.2. Plugin Manifest
+
+Defina um manifesto formal para descrever cada extensão.
+
+O formato deverá permitir declarar, conforme a arquitetura encontrada:
+
+- Identidade e versão.
+- Descrição.
+- Compatibilidade com o harness.
+- Pontos de entrada.
+- Dependências.
+- Capacidades oferecidas.
+- Ferramentas registradas.
+- Comandos.
+- Skills.
+- Hooks.
+- Contribuições à interface.
+- Esquema de configuração.
+- Permissões necessárias.
+- Requisitos de inicialização.
+
+Escolha um formato coerente com a stack existente, como JSON, YAML ou outro formato já utilizado pelo projeto.
+
+Valide os manifestos antes de carregar os plugins.
+
+Detecte campos obrigatórios ausentes, versões incompatíveis, dependências inexistentes e identificadores duplicados.
+
+Não permita que um manifesto declare uma capacidade como implementada quando o plugin não fornece o respectivo contrato.
+
+### 4.3. Plugin API
+
+Crie uma API pública e documentada para extensões.
+
+O contrato deverá permitir, conforme aplicável:
+
+- Inicializar o plugin.
+- Encerrar o plugin.
+- Registrar ferramentas.
+- Registrar comandos.
+- Registrar hooks.
+- Registrar skills.
+- Registrar provedores ou adaptadores.
+- Registrar itens de interface.
+- Consultar configurações.
+- Emitir eventos.
+- Consultar serviços autorizados do harness.
+- Registrar logs.
+- Liberar recursos quando o plugin for desativado.
+
+A API deve possuir versionamento explícito e compatibilidade verificável.
+
+Evite expor desnecessariamente objetos internos do núcleo. Plugins devem depender de interfaces públicas estáveis, não de detalhes privados de implementação.
+
+Quando houver mudanças incompatíveis na API, o harness deve identificar o problema e apresentar uma mensagem clara.
+
+### 4.4. Plugin Lifecycle Manager
+
+Implemente o ciclo de vida completo:
+
+1. Descoberta.
+2. Validação do manifesto.
+3. Resolução de dependências.
+4. Verificação de compatibilidade.
+5. Instalação.
+6. Configuração.
+7. Ativação.
+8. Inicialização.
+9. Registro de capacidades.
+10. Execução.
+11. Desativação.
+12. Encerramento.
+13. Atualização.
+14. Remoção.
+
+Cada etapa deve possuir estado verificável e tratamento de erros.
+
+Se a inicialização falhar, desfaça os registros parcialmente criados e mantenha o restante do harness funcional.
+
+Ao desativar um plugin, remova suas ferramentas e comandos do catálogo ativo e libere os recursos que ele controla.
+
+Não interrompa processos ou conexões de outros plugins ao encerrar uma extensão específica.
+
+### 4.5. Plugin Dependency Resolver
+
+Permita que plugins declarem dependências de outros plugins ou de capacidades do harness.
+
+O resolvedor deverá:
+
+- Identificar dependências ausentes.
+- Verificar intervalos de versões.
+- Detectar ciclos.
+- Calcular a ordem de inicialização.
+- Identificar conflitos de versões.
+- Impedir a ativação quando requisitos essenciais não forem atendidos.
+- Informar quais plugins dependem de uma extensão que o usuário pretende desativar ou remover.
+
+A resolução deve ser determinística e produzir mensagens de diagnóstico compreensíveis.
+
+## 5. PONTOS DE EXTENSÃO
+
+Implemente pontos de integração reais com os módulos existentes.
+
+### 5.1. Ferramentas
+
+Permita que plugins registrem ferramentas no catálogo central utilizado pelo Agent Core.
+
+Cada ferramenta deve possuir nome, descrição, esquema de entrada, executor, origem e metadados.
+
+As chamadas devem passar pelo fluxo normal de validação, execução, cancelamento, logs e retorno de resultados.
+
+### 5.2. Comandos personalizados
+
+Permita registrar comandos acessíveis pela interface, terminal de comandos ou mecanismo equivalente existente.
+
+Os comandos devem aceitar argumentos validados e executar ações definidas pelo plugin.
+
+Evite duplicar o sistema de comandos existente. Utilize-o como ponto de integração.
+
+### 5.3. Skills e procedimentos
+
+Permita que plugins disponibilizem skills, instruções e procedimentos especializados.
+
+As capacidades registradas devem respeitar o sistema de resolução e carregamento de skills existente.
+
+### 5.4. Hooks e eventos
+
+Permita que extensões assinem eventos documentados do ciclo de vida do harness.
+
+Exemplos:
+
+- Inicialização do harness.
+- Início de uma sessão.
+- Início e conclusão de uma tarefa.
+- Antes e depois da execução de uma ferramenta.
+- Alteração do catálogo de ferramentas.
+- Mudança de estado de um agente.
+- Alterações no workspace.
+- Conclusão de testes.
+- Desconexão de um servidor MCP.
+
+Os hooks devem possuir contratos, limites de execução, logs e tratamento de falhas.
+
+Um hook com erro não deve interromper silenciosamente o ciclo principal do agente.
+
+Diferencie hooks de observação de hooks que alteram dados ou o fluxo de execução.
+
+### 5.5. Provedores e adaptadores
+
+Permita adicionar provedores ou adaptadores quando houver contratos apropriados, por exemplo:
+
+- Provedores de modelos.
+- Adaptadores de armazenamento.
+- Integrações com serviços externos.
+- Adaptadores de ferramentas.
+- Adaptadores de recuperação de contexto.
+- Serviços especializados de análise.
+
+A arquitetura não deve obrigar todos os plugins a implementar todos esses tipos de integração.
+
+### 5.6. Interface
+
+Se o harness possuir interface gráfica, permita que plugins registrem contribuições compatíveis com o sistema visual existente.
+
+Exemplos:
+
+- Páginas de configuração.
+- Itens de navegação.
+- Painéis de diagnóstico.
+- Indicadores de estado.
+- Ações contextuais.
+- Seções de configuração.
+- Visualizações especializadas.
+
+Defina um contrato explícito para cada tipo de contribuição.
+
+Não permita que plugins modifiquem arbitrariamente a estrutura interna da interface ou substituam componentes centrais sem passar por pontos de extensão documentados.
+
+Se o projeto não possuir interface gráfica, implemente os contratos de backend e os pontos de extensão adequados, sem criar uma interface paralela desnecessária.
+
+## 6. INSTALAÇÃO, ATUALIZAÇÃO E REMOÇÃO
+
+Implemente um gerenciador de plugins que permita:
+
+- Instalar uma extensão a partir de um pacote local.
+- Instalar a partir de um repositório ou fonte remota suportada.
+- Importar um plugin desenvolvido localmente.
+- Validar o manifesto.
+- Verificar a compatibilidade.
+- Listar plugins instalados.
+- Atualizar uma extensão.
+- Reverter uma atualização quando possível.
+- Desabilitar temporariamente.
+- Remover uma extensão.
+- Consultar dependências e erros.
+
+Não vincule o sistema a uma única loja ou marketplace.
+
+Comece por um fluxo funcional de instalação local, pois ele permite desenvolver e testar plugins sem depender de infraestrutura externa. Depois implemente outras fontes quando forem compatíveis com a arquitetura.
+
+Durante uma atualização:
+
+1. Preserve a configuração anterior.
+2. Valide o novo pacote.
+3. Verifique dependências e compatibilidade.
+4. Aplique a atualização.
+5. Inicialize a nova versão.
+6. Confirme que o plugin funciona.
+7. Se a inicialização falhar, permita recuperar a versão anterior quando houver backup disponível.
+
+A remoção de um plugin não deve excluir automaticamente dados compartilhados ou arquivos do usuário que não pertençam ao plugin.
+
+## 7. EXECUÇÃO E ISOLAMENTO
+
+Projete a execução de plugins de acordo com seu tipo e suas necessidades.
+
+Diferencie:
+
+- Plugins declarativos que apenas fornecem metadados.
+- Plugins que executam código dentro do processo do harness.
+- Plugins executados em subprocessos.
+- Plugins que operam por IPC.
+- Plugins que fornecem ferramentas por MCP.
+- Plugins que contribuem para a interface.
+
+Quando um plugin puder executar código arbitrário, reconheça que carregar esse código dentro do processo principal concede acesso ao processo e não constitui isolamento real.
+
+Para extensões que precisem de isolamento mais forte, considere subprocessos, RPC ou outro mecanismo compatível com a stack.
+
+Defina limites de tempo, tratamento de falhas, encerramento e comunicação para plugins executados fora do processo principal.
+
+Não afirme que um plugin está isolado se ele compartilha o mesmo processo e os mesmos privilégios do harness.
+
+## 8. CONFIGURAÇÃO E PERMISSÕES
+
+Cada plugin deve declarar as capacidades e os acessos de que necessita.
+
+Quando aplicável, permita configurar acesso a:
+
+- Ferramentas do harness.
+- Arquivos do workspace.
+- Terminal e processos.
+- Navegador.
+- Computador.
+- Servidores MCP.
+- Rede.
+- Armazenamento.
+- APIs externas.
+- Eventos do sistema.
+
+Integre essas declarações aos mecanismos de autorização já existentes.
+
+O sistema deve diferenciar permissões declaradas, permissões concedidas e permissões efetivamente disponíveis durante a execução.
+
+Se o harness ainda não possuir um mecanismo de permissões adequado para alguma categoria, documente a lacuna e implemente a menor abstração funcional necessária.
+
+Não trate o manifesto do plugin como prova de que o plugin é confiável.
+
+## 9. GERENCIAMENTO DE CONFIGURAÇÕES
+
+Permita que cada plugin declare seu próprio esquema de configuração.
+
+O harness deverá:
+
+- Validar os valores.
+- Aplicar padrões.
+- Armazenar configurações separadamente dos arquivos do plugin.
+- Permitir editar configurações.
+- Detectar configurações incompatíveis após atualizações.
+- Preservar configurações durante atualizações.
+- Permitir redefinir a configuração quando necessário.
+
+Não grave credenciais diretamente em logs ou mensagens de diagnóstico.
+
+Reutilize o mecanismo de armazenamento de segredos existente, se houver. Caso contrário, crie uma abstração que permita integrar um armazenamento seguro sem acoplar todos os plugins a um único fornecedor.
+
+## 10. DIAGNÓSTICO E OBSERVABILIDADE
+
+Implemente informações de diagnóstico por plugin:
+
+- Estado atual.
+- Versão instalada.
+- Compatibilidade com o harness.
+- Data da instalação.
+- Dependências.
+- Última inicialização.
+- Duração da inicialização.
+- Erros recentes.
+- Ferramentas registradas.
+- Comandos registrados.
+- Hooks ativos.
+- Recursos consumidos, quando mensuráveis.
+- Motivo de falha ou desativação.
+
+Associe logs, chamadas e eventos ao identificador do plugin.
+
+Quando houver uma falha, indique se ela ocorreu durante validação, resolução de dependências, inicialização, execução ou encerramento.
+
+Disponibilize um mecanismo de diagnóstico que verifique a integridade do manifesto, os pontos de entrada, as dependências e os registros ativos.
+
+## 11. INTEGRAÇÃO COM O MCP
+
+O sistema de plugins deve complementar o Módulo 10, não substituí-lo.
+
+Permita que um plugin:
+
+- Registre um servidor MCP.
+- Declare dependência de um servidor MCP existente.
+- Exponha ferramentas MCP por meio de contratos internos.
+- Forneça configuração de integração.
+- Verifique a disponibilidade de ferramentas necessárias.
+- Registre diagnósticos específicos da integração.
+
+Não crie uma segunda implementação do protocolo MCP dentro do sistema de plugins.
+
+Reutilize o gerenciador MCP e seus adaptadores existentes.
+
+Ao desativar um plugin, encerre apenas os recursos que ele próprio controla. Se um servidor MCP for compartilhado com outros componentes, não o encerre indiscriminadamente.
+
+## 12. TESTES OBRIGATÓRIOS
+
+Crie testes automatizados compatíveis com o projeto.
+
+### Testes de manifesto
+- Validar um manifesto correto.
+- Rejeitar campos obrigatórios ausentes.
+- Detectar identificadores duplicados.
+- Detectar versões incompatíveis.
+- Detectar dependências inexistentes.
+- Validar configurações.
+
+### Testes de ciclo de vida
+- Instalar um plugin.
+- Ativá-lo.
+- Inicializá-lo.
+- Registrar suas capacidades.
+- Desativá-lo.
+- Encerrá-lo.
+- Removê-lo.
+- Recuperar o estado após falha de inicialização.
+
+### Testes de dependências
+- Resolver dependências válidas.
+- Detectar ciclos.
+- Identificar conflitos.
+- Recusar ativações com requisitos essenciais ausentes.
+- Informar dependências durante a remoção.
+
+### Testes de integração
+- Registrar uma ferramenta e executá-la pelo Agent Core.
+- Registrar um comando.
+- Registrar um hook.
+- Carregar uma skill.
+- Integrar uma ferramenta MCP.
+- Verificar a disponibilidade de contribuições à interface quando aplicável.
+
+### Testes de atualização
+- Atualizar um plugin.
+- Preservar configurações.
+- Detectar incompatibilidades.
+- Recuperar a versão anterior quando a atualização falhar e houver backup.
+
+### Testes de falhas
+- Plugin com código de inicialização que falha.
+- Plugin que excede o tempo limite.
+- Plugin que termina inesperadamente.
+- Plugin com dependência indisponível.
+- Hook que gera erro.
+- Plugin que registra um identificador conflitante.
+
+### Testes de regressão
+- Confirmar que o harness funciona sem plugins instalados.
+- Confirmar que plugins desabilitados não disponibilizam ferramentas.
+- Confirmar que a falha de um plugin não interrompe o núcleo.
+- Executar os testes dos módulos anteriores.
+
+Utilize fixtures e plugins de teste reais. Mocks podem auxiliar os testes unitários, mas não devem ser a única evidência de funcionamento.
+
+## 13. ORDEM DE IMPLEMENTAÇÃO
+
+Execute nesta ordem:
+
+1. Inspecionar a arquitetura existente.
+2. Clonar e analisar os repositórios selecionados.
+3. Definir os contratos públicos e o manifesto.
+4. Implementar o registro de plugins.
+5. Implementar validação e resolução de dependências.
+6. Implementar o ciclo de vida.
+7. Implementar o sistema de instalação local.
+8. Implementar o registro de ferramentas, comandos, skills e hooks.
+9. Integrar o sistema MCP.
+10. Implementar os mecanismos de configuração.
+11. Implementar contribuições à interface, quando aplicável.
+12. Implementar diagnóstico e logs.
+13. Implementar atualizações e recuperação.
+14. Criar plugins de teste.
+15. Executar os testes unitários, de integração e regressão.
+16. Corrigir os problemas encontrados.
+17. Documentar a API pública para desenvolvedores de extensões.
+
+Não pare na arquitetura ou no planejamento. Implemente os fluxos funcionais e valide-os dentro do ambiente real do projeto.
+
+## 14. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo será considerado concluído quando:
+
+- O harness reconhecer plugins por meio de um manifesto.
+- Plugins puderem ser instalados e removidos.
+- O ciclo de vida estiver implementado.
+- Dependências e compatibilidade forem verificadas.
+- Plugins puderem registrar ferramentas reais no Agent Core.
+- Comandos, skills e hooks puderem ser registrados por extensões.
+- O módulo MCP puder ser integrado sem duplicação.
+- Configurações forem persistidas.
+- Falhas de plugins forem tratadas sem derrubar o núcleo.
+- Plugins desativados deixarem de fornecer capacidades ativas.
+- O sistema registrar diagnósticos úteis.
+- Atualizações preservarem configurações e permitirem recuperação quando possível.
+- A API pública estiver documentada.
+- Os testes demonstrarem funcionamento real.
+- Os módulos existentes continuarem funcionando.
+
+## 15. RELATÓRIO FINAL
+
+Ao terminar, apresente:
+
+1. Arquitetura final do sistema de plugins.
+2. Repositórios analisados e componentes reaproveitados.
+3. Arquivos criados e modificados.
+4. Formato do manifesto.
+5. Contratos públicos e ciclo de vida.
+6. Pontos de extensão implementados.
+7. Integrações com Agent Core, MCP, skills, comandos e interface.
+8. Como desenvolver e instalar um plugin local.
+9. Testes executados e resultados reais.
+10. Dependências adicionadas e justificativas.
+11. Limitações e funcionalidades pendentes.
+
+Não declare como funcional algo que tenha sido apenas planejado ou implementado parcialmente.
+
+**RESULTADO ESPERADO:** um sistema de extensões modular e documentado, que permita adicionar novas capacidades ao harness por meio de plugins instaláveis, mantendo o núcleo organizado e permitindo evoluir o projeto sem reescrever constantemente sua arquitetura central.

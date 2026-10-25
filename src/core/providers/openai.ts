@@ -113,6 +113,8 @@ export class OpenAICompatibleProvider implements Provider {
   readonly label: string
   readonly supportsVision: boolean
   readonly contextWindow: number
+  /** Stable for this provider instance; OpenCode Go uses it for routing/cache. */
+  private readonly opencodeSession = `openclod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
   constructor(
     private readonly config: ProviderConfig,
@@ -135,6 +137,9 @@ export class OpenAICompatibleProvider implements Provider {
       authorization: `Bearer ${apiKey || 'local'}`,
       ...(this.config.baseUrl.includes('openrouter.ai')
         ? { 'http-referer': 'https://forja.local', 'x-title': 'Openclod' }
+        : {}),
+      ...(this.config.baseUrl.includes('/inference/go/')
+        ? { 'x-opencode-session': this.opencodeSession }
         : {})
     }
 

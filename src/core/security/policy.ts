@@ -115,6 +115,7 @@ export interface CommandCheck {
 }
 
 export function checkCommand(command: string, policy: PolicyConfig): CommandCheck {
+  if (policy.mode === 'unrestricted') return { blocked: false }
   for (const rule of DEFAULT_BLOCKED_COMMANDS) {
     if (rule.pattern.test(command)) return { blocked: true, reason: rule.reason }
   }

@@ -20,7 +20,7 @@ const ARTIFACT_KINDS = [
   { id: 'panel', title: 'Painel', detail: 'Gráficos e indicadores', icon: 'gauge' as const, prompt: 'Crie um painel com indicadores e gráficos a partir dos dados do projeto.' }
 ]
 
-const ARTIFACT_EXT = /\.(md|mdx|html?|svg|csv|json|txt|css|js|jsx|ts|tsx|py)$/i
+const ARTIFACT_EXT = /\.(md|mdx|html?|svg|csv|json|openclod-slides\.json|txt|css|js|jsx|ts|tsx|py)$/i
 const IGNORED = /(^|[\\/])(node_modules|\.git|dist|out|build|release|\.next|coverage|_indice|_templates|\.obsidian|\.claude|\.qa|\.forja)([\\/]|$)|(^|[\\/])\.[^\\/]+[\\/]/i
 
 function fileKind(path: string): string {

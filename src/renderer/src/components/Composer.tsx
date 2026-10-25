@@ -29,14 +29,16 @@ const PERMISSION_LABELS: Record<PermissionMode, string> = {
   readonly: 'Somente leitura',
   ask: 'Perguntar',
   'accept-edits': 'Aceitar edições',
-  auto: 'Ignorar permissões'
+  auto: 'Ignorar permissões',
+  unrestricted: 'Ultrarrestrito'
 }
 
 const PERMISSION_HINTS: Record<PermissionMode, string> = {
   readonly: 'Só lê e pesquisa; nada é alterado.',
   ask: 'Pede aprovação para editar arquivos e rodar comandos.',
   'accept-edits': 'Edita arquivos sem perguntar; comandos ainda pedem aprovação.',
-  auto: 'Executa sem perguntar. Regras de bloqueio e os segredos continuam valendo.'
+  auto: 'Executa sem perguntar. Regras de bloqueio e os segredos continuam valendo.',
+  unrestricted: 'Sem bloqueios do harness; confirmações, blocklist e restrições de diretório desativadas.'
 }
 
 const EFFORT_LABELS: Record<ReasoningEffort, string> = {
@@ -433,11 +435,11 @@ export function Composer({
 
   const activeEnvironment = environments.find((environment) => environment.id === (environmentId ?? 'local'))
 
-  const permissionItems: MenuItem[] = (['readonly', 'ask', 'accept-edits', 'auto'] as PermissionMode[]).map((candidate, index) => ({
+  const permissionItems: MenuItem[] = (['readonly', 'ask', 'accept-edits', 'auto', 'unrestricted'] as PermissionMode[]).map((candidate, index) => ({
     id: `perm-${candidate}`,
     label: `${PERMISSION_LABELS[candidate]} · ${PERMISSION_HINTS[candidate]}`,
     heading: index === 0 ? 'Permissões' : undefined,
-    icon: candidate === 'auto' ? 'alert' : 'shield',
+    icon: candidate === 'auto' || candidate === 'unrestricted' ? 'alert' : 'shield',
     checked: permissionMode === candidate,
     onSelect: () => onPermissionChange(candidate)
   }))

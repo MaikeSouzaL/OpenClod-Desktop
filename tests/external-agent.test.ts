@@ -27,7 +27,7 @@ import { makeTempDir, policy, removeTempDir } from './helpers'
 const FAKE_CLI = String.raw`
 const fs = require('node:fs')
 const argv = process.argv.slice(2)
-const kind = argv[0] === 'exec' ? 'codex' : 'claude'
+const kind = argv[0] === 'exec' ? 'codex' : argv[0] === 'run' ? 'opencode' : 'claude'
 const scenario = process.env.FAKE_SCENARIO || 'ok'
 
 let stdin = ''
@@ -44,12 +44,13 @@ process.stdin.on('end', () => {
         cwd: process.cwd(),
         pid: process.pid,
         hasApiKey: Boolean(process.env.FAKE_API_KEY),
+        opencodePermission: process.env.OPENCODE_PERMISSION || null,
         scenarioSeen: scenario,
         noColor: process.env.NO_COLOR
       })
     )
   }
-  Promise.resolve(kind === 'claude' ? claude() : codex()).catch((err) => {
+  Promise.resolve(kind === 'opencode' ? opencode() : kind === 'claude' ? claude() : codex()).catch((err) => {
     process.stderr.write(String(err && err.stack || err) + '\n')
     process.exitCode = 9
   })
@@ -149,6 +150,17 @@ async function codex() {
       emit({ type: 'turn.completed', usage: { input_tokens: 1200, cached_input_tokens: 1000, output_tokens: 80 } })
   }
 }
+
+async function opencode() {
+  emit({ type: 'step_start', sessionID: 'oc-1', part: { id: 'p1', type: 'step-start', agent: 'build', model: 'fake/model' } })
+  emit({ type: 'text', sessionID: 'oc-1', part: { type: 'text', text: 'Resposta do OpenCode' } })
+  emit({ type: 'tool_use', sessionID: 'oc-1', part: { type: 'tool', tool: 'read' } })
+  emit({
+    type: 'step_finish',
+    sessionID: 'oc-1',
+    part: { type: 'step-finish', cost: 0.001, tokens: { input: 30, output: 7, cache: { read: 4 } } }
+  })
+}
 `
 
 let dir: string
@@ -156,7 +168,7 @@ let project: string
 let script: string
 let bins: Record<ExternalAgentName, string>
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ['FORJA_CLAUDE_BIN', 'FORJA_CODEX_BIN', 'PATH', 'FAKE_API_KEY']
+const ENV_KEYS = ['FORJA_CLAUDE_BIN', 'FORJA_CODEX_BIN', 'FORJA_OPENCODE_BIN', 'PATH', 'FAKE_API_KEY']
 
 function writeWrapper(file: string): string {
   if (process.platform === 'win32') {
@@ -175,7 +187,11 @@ beforeEach(async () => {
   fs.mkdirSync(project)
   script = path.join(dir, 'fake-cli.cjs')
   fs.writeFileSync(script, FAKE_CLI, 'utf8')
-  bins = { claude: writeWrapper(path.join(dir, 'fake-claude')), codex: writeWrapper(path.join(dir, 'fake-codex')) }
+  bins = {
+    claude: writeWrapper(path.join(dir, 'fake-claude')),
+    codex: writeWrapper(path.join(dir, 'fake-codex')),
+    opencode: writeWrapper(path.join(dir, 'fake-opencode'))
+  }
   process.env.FAKE_API_KEY = 'segredo-que-nao-deve-vazar'
 })
 
@@ -218,12 +234,13 @@ function harness(mode: PermissionMode = 'ask', cwd = project): Harness {
 }
 
 interface Invocation {
-  kind: 'claude' | 'codex'
+  kind: 'claude' | 'codex' | 'opencode'
   argv: string[]
   stdin: string
   cwd: string
   pid: number
   hasApiKey: boolean
+  opencodePermission: string | null
   noColor?: string
 }
 
@@ -249,20 +266,22 @@ function alive(pid: number): boolean {
 }
 
 describe('permission mapping', () => {
-  it('maps Openclod modes to Claude Code modes, never bypassing permissions', () => {
+  it('maps Openclod modes to Claude Code modes, with bypass only when explicitly unrestricted', () => {
     expect(claudePermissionMode('readonly')).toBe('plan')
     expect(claudePermissionMode('ask')).toBe('default')
     expect(claudePermissionMode('accept-edits')).toBe('acceptEdits')
     expect(claudePermissionMode('auto')).toBe('acceptEdits')
+    expect(claudePermissionMode('unrestricted')).toBe('bypassPermissions')
     // A corrupted setting falls back to the most restrictive mode.
     expect(claudePermissionMode('whatever' as PermissionMode)).toBe('plan')
   })
 
-  it('maps Openclod modes to Codex sandboxes, never full access', () => {
+  it('maps Openclod modes to Codex sandboxes, with full access only when explicitly unrestricted', () => {
     expect(codexSandbox('readonly')).toBe('read-only')
     expect(codexSandbox('ask')).toBe('read-only')
     expect(codexSandbox('accept-edits')).toBe('workspace-write')
     expect(codexSandbox('auto')).toBe('workspace-write')
+    expect(codexSandbox('unrestricted')).toBe('danger-full-access')
     expect(codexSandbox('whatever' as PermissionMode)).toBe('read-only')
   })
 })
@@ -303,13 +322,15 @@ describe('external_agent: Claude Code', () => {
     expect(seen.noColor).toBe('1')
     // Provider secrets of the parent are not inherited.
     expect(seen.hasApiKey).toBe(false)
+    expect(seen.opencodePermission).toBeNull()
   })
 
   it.each([
     ['readonly', 'plan'],
     ['ask', 'default'],
     ['accept-edits', 'acceptEdits'],
-    ['auto', 'acceptEdits']
+    ['auto', 'acceptEdits'],
+    ['unrestricted', 'bypassPermissions']
   ] as Array<[PermissionMode, string]>)('passes --permission-mode for %s as %s and nothing dangerous', async (mode, expected) => {
     const log = path.join(dir, `claude-${mode}.json`)
     const { ctx } = harness(mode)
@@ -318,7 +339,7 @@ describe('external_agent: Claude Code', () => {
     expect(result.ok).toBe(true)
     const { argv } = readLog(log)
     expect(argv[argv.indexOf('--permission-mode') + 1]).toBe(expected)
-    expect(argv.join(' ')).not.toMatch(/bypassPermissions|dangerously|skip-permissions/i)
+    expect(argv.join(' ').includes('bypassPermissions')).toBe(mode === 'unrestricted')
   })
 
   it('streams progress as info notices when the context has emit', async () => {
@@ -420,15 +441,17 @@ describe('external_agent: Codex', () => {
     ['readonly', 'read-only'],
     ['ask', 'read-only'],
     ['accept-edits', 'workspace-write'],
-    ['auto', 'workspace-write']
-  ] as Array<[PermissionMode, string]>)('uses sandbox %s -> %s and never full access', async (mode, expected) => {
+    ['auto', 'workspace-write'],
+    ['unrestricted', 'danger-full-access']
+  ] as Array<[PermissionMode, string]>)('uses sandbox %s -> %s', async (mode, expected) => {
     const log = path.join(dir, `codex-${mode}.json`)
     const { ctx } = harness(mode)
     await toolFor('ok', log).execute({ agent: 'codex', prompt: 'x' }, ctx)
 
     const { argv } = readLog(log)
     expect(argv[argv.indexOf('-s') + 1]).toBe(expected)
-    expect(argv.join(' ')).not.toMatch(/danger|bypass/i)
+    expect(argv.includes('danger-full-access')).toBe(mode === 'unrestricted')
+    expect(argv.includes('--dangerously-bypass-approvals-and-sandbox')).toBe(mode === 'unrestricted')
   })
 
   it('treats a turn.failed event as failure, with the model message', async () => {
@@ -445,6 +468,38 @@ describe('external_agent: Codex', () => {
 
     expect(result.ok).toBe(true)
     expect(result.text).toContain('Resposta apos reconexao')
+  })
+})
+
+describe('external_agent: OpenCode', () => {
+  it('runs OpenCode JSON mode, collects the answer, session, tools and usage', async () => {
+    const log = path.join(dir, 'opencode.json')
+    const { ctx } = harness('ask')
+    const result = await toolFor('ok', log).execute({ agent: 'opencode', prompt: 'investigue o projeto' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.text).toContain('Resposta do OpenCode')
+    expect(result.data).toMatchObject({
+      agent: 'opencode',
+      sessionId: 'oc-1',
+      usage: { input: 30, output: 7, cachedInput: 4, costUsd: 0.001 }
+    })
+    const seen = readLog(log)
+    expect(seen.kind).toBe('opencode')
+    expect(seen.argv).toEqual(['run', '--format', 'json', '--'])
+    expect(seen.stdin).toBe('investigue o projeto')
+    expect(seen.hasApiKey).toBe(false)
+    expect(seen.opencodePermission).toBeNull()
+  })
+
+  it('passes --auto only in unrestricted mode', async () => {
+    const log = path.join(dir, 'opencode-auto.json')
+    const { ctx } = harness('unrestricted')
+    const result = await toolFor('ok', log).execute({ agent: 'opencode', prompt: 'x' }, ctx)
+    expect(result.ok).toBe(true)
+    const seen = readLog(log)
+    expect(seen.argv).toEqual(['run', '--format', 'json', '--'])
+    expect(seen.opencodePermission).toBe('"allow"')
   })
 })
 
@@ -595,7 +650,7 @@ describe('external_agent: registration and approval', () => {
     const [spec] = registry.specs()
     expect(spec.name).toBe('external_agent')
     const properties = (spec.parameters as { properties: Record<string, { enum?: string[] }> }).properties
-    expect(properties.agent.enum).toEqual(['claude', 'codex'])
+    expect(properties.agent.enum).toEqual(['claude', 'codex', 'opencode'])
     expect(Object.keys(properties)).toEqual(['agent', 'prompt', 'cwd', 'timeout_ms'])
     expect(() => registerExternalAgents(registry)).toThrow(/duplicada/)
   })

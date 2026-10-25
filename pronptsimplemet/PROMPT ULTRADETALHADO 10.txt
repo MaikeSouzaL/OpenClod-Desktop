@@ -1,0 +1,547 @@
+# MÓDULO 10 — MCP, DESCOBERTA DE FERRAMENTAS E INTEGRAÇÃO UNIVERSAL
+
+## 1. OBJETIVO
+
+Implemente no harness atual um sistema completo de integração com o Model Context Protocol (MCP), permitindo conectar, configurar, descobrir, executar e administrar ferramentas externas a partir de uma interface unificada.
+
+O sistema deverá transformar o harness em uma plataforma extensível, na qual novas capacidades possam ser adicionadas conectando servidores MCP, sem exigir a reimplementação do núcleo do agente.
+
+O módulo deve permitir que os agentes:
+
+- Descubram ferramentas disponibilizadas pelos servidores conectados.
+- Consultem descrições, parâmetros e esquemas de entrada das ferramentas.
+- Chamem ferramentas de maneira padronizada.
+- Recebam resultados estruturados, texto, imagens e outros tipos de conteúdo suportados.
+- Acessem recursos e modelos de prompt fornecidos por servidores MCP, quando disponíveis.
+- Conectem servidores locais e remotos compatíveis.
+- Trabalhem com servidores implementados em diferentes linguagens.
+- Utilizem ferramentas MCP no Agent Core e nos subagentes.
+- Atualizem dinamicamente o registro de ferramentas quando um servidor mudar.
+- Identifiquem falhas de conexão e recuperem sessões quando possível.
+- Visualizem e administrem conexões pela interface do harness.
+- Reutilizem o sistema de permissões, logs, eventos, sessões e configurações já existente.
+
+**Não entregue apenas documentação ou um exemplo isolado. Implemente o módulo no harness real, com conexões funcionais e testes de integração.**
+
+## 2. INSPEÇÃO OBRIGATÓRIA DO HARNESS
+
+Antes de modificar o código:
+
+1. Inspecione a arquitetura atual, a linguagem, os frameworks e a estrutura do projeto.
+2. Localize o Agent Core, o registro central de ferramentas, os mecanismos de chamada de ferramentas e os contratos de entrada e saída.
+3. Examine o gerenciamento de processos, terminal, configuração, persistência, eventos e logs.
+4. Identifique integrações existentes com MCP, APIs externas, plugins ou ferramentas customizadas.
+5. Verifique como os agentes e subagentes recebem as ferramentas disponíveis.
+6. Identifique os componentes de interface utilizados para configurações e gerenciamento de integrações.
+7. Aproveite as abstrações existentes e evite criar sistemas concorrentes.
+8. Defina os pontos de integração antes de começar a implementação.
+
+Não presuma que o harness utiliza TypeScript, Python, Node.js ou qualquer stack específica. Adapte a solução à arquitetura real.
+
+Não substitua componentes funcionais apenas para seguir a estrutura sugerida neste prompt.
+
+## 3. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+Clone os repositórios selecionados em um diretório de pesquisa separado do projeto principal. Examine código-fonte, interfaces, exemplos, testes, tratamento de erros e licenças.
+
+A finalidade não é instalar todos os projetos, mas identificar implementações que possam ser reaproveitadas diretamente ou adaptadas.
+
+### 3.1. SDKs oficiais do MCP
+
+**TypeScript SDK**
+https://github.com/modelcontextprotocol/typescript-sdk
+
+Analise a implementação de clientes e servidores, transportes, descoberta de ferramentas, validação de esquemas, notificações, sessões e tratamento de erros.
+
+**Python SDK**
+https://github.com/modelcontextprotocol/python-sdk
+
+Examine os mecanismos equivalentes disponíveis em Python, incluindo comunicação, ciclo de vida de conexões, ferramentas, recursos, prompts e exemplos de servidores.
+
+**Repositório oficial de servidores MCP**
+https://github.com/modelcontextprotocol/servers
+
+Investigue exemplos de servidores e padrões de integração. Verifique o estado atual de cada servidor antes de utilizá-lo como referência, pois os exemplos e os pacotes podem mudar ao longo do tempo.
+
+**Documentação oficial do protocolo**
+https://modelcontextprotocol.io/
+
+Consulte a especificação vigente para identificar as versões do protocolo, mensagens, capacidades, transportes, notificações, inicialização e encerramento de sessões.
+
+### 3.2. Implementações de clientes e ferramentas MCP
+
+**OpenCode**
+https://github.com/anomalyco/opencode
+
+Analise como um agente de programação registra servidores MCP, descobre ferramentas e disponibiliza as ferramentas externas para o modelo.
+
+**Cline**
+https://github.com/cline/cline
+
+Investigue o gerenciamento de conexões, configuração de servidores, descoberta de ferramentas e integração com o ciclo de execução do agente.
+
+**Continue**
+https://github.com/continuedev/continue
+
+Analise como as ferramentas externas se integram ao contexto e aos fluxos de trabalho de um assistente de programação.
+
+**Goose**
+https://github.com/block/goose
+
+Investigue a arquitetura de extensões, ferramentas e integração com agentes.
+
+**OpenHands**
+https://github.com/All-Hands-AI/OpenHands
+
+Examine como ferramentas são disponibilizadas aos agentes e como o ambiente de execução se relaciona com extensões externas.
+
+**OpenAI Codex**
+https://github.com/openai/codex
+
+Inspecione os componentes públicos relevantes para configuração e utilização de servidores MCP, observando a implementação efetiva e a compatibilidade com a arquitetura atual do harness.
+
+### 3.3. Ferramentas de validação e esquemas
+
+**Zod**
+https://github.com/colinhacks/zod
+
+Utilize somente se a stack e os contratos atuais justificarem essa dependência.
+
+**JSON Schema**
+https://github.com/json-schema-org/json-schema-spec
+
+Use a especificação como referência para validar esquemas de ferramentas e parâmetros.
+
+Não adicione bibliotecas redundantes caso o harness já possua mecanismos equivalentes.
+
+### 3.4. Regras para a análise
+
+- Clone e examine os repositórios, não se limite aos READMEs.
+- Localize os componentes responsáveis por conexão, descoberta, chamadas, transporte e ciclo de vida.
+- Confira as versões e a compatibilidade dos SDKs.
+- Prefira SDKs oficiais quando adequados.
+- Reaproveite implementações compatíveis, respeitando as respectivas licenças.
+- Não copie repositórios completos para dentro do harness.
+- Não substitua código funcional sem uma justificativa técnica.
+- Se uma biblioteca estiver descontinuada ou incompatível, escolha uma alternativa mantida e documente a decisão.
+
+## 4. ARQUITETURA DO SISTEMA MCP
+
+Implemente os seguintes componentes ou seus equivalentes na arquitetura existente.
+
+### 4.1. MCP Server Registry
+
+Responsável por cadastrar e gerenciar servidores MCP.
+
+Cada servidor deve possuir, conforme aplicável:
+
+- Identificador estável.
+- Nome.
+- Descrição.
+- Tipo de transporte.
+- Comando de inicialização, quando local.
+- Argumentos de inicialização.
+- Variáveis de ambiente configuradas.
+- Endereço de conexão, quando remoto.
+- Configuração de autenticação suportada.
+- Versão do protocolo negociada.
+- Estado da conexão.
+- Capacidades anunciadas.
+- Data da última conexão.
+- Erros recentes.
+- Configuração de reconexão.
+- Estado habilitado ou desabilitado.
+
+Implemente operações reais para adicionar, editar, conectar, desconectar, reiniciar e remover servidores.
+
+A configuração deve ser persistida de acordo com os padrões existentes no harness.
+
+### 4.2. MCP Client Manager
+
+Crie um gerenciador de clientes MCP.
+
+Responsabilidades:
+
+- Criar clientes usando o SDK apropriado.
+- Inicializar a comunicação com o servidor.
+- Negociar a versão do protocolo.
+- Descobrir as capacidades disponíveis.
+- Gerenciar sessões.
+- Receber notificações.
+- Encerrar conexões corretamente.
+- Tratar desconexões.
+- Evitar conexões duplicadas desnecessárias.
+- Impedir que falhas de um servidor derrubem todo o harness.
+- Recuperar conexões quando isso for suportado e apropriado.
+
+Não considere um servidor conectado apenas porque o processo foi iniciado. Verifique a inicialização do protocolo e a resposta efetiva do servidor.
+
+### 4.3. MCP Transport Manager
+
+Implemente suporte aos transportes necessários, de acordo com a especificação vigente e a compatibilidade dos SDKs escolhidos.
+
+Priorize:
+
+- `stdio`, para servidores locais iniciados como subprocessos.
+- Streamable HTTP, para servidores remotos que utilizem esse transporte.
+- SSE legado somente quando necessário para compatibilidade com servidores existentes e quando suportado pela versão do SDK.
+
+Não implemente transportes inventados ou incompatíveis com a especificação.
+
+Para `stdio`, integre o gerenciamento de processos ao módulo de terminal já existente quando isso for tecnicamente adequado, sem confundir uma sessão MCP com uma sessão interativa de terminal.
+
+Para conexões HTTP, trate sessões, autenticação, cabeçalhos, erros de protocolo, timeouts e encerramento conforme o transporte utilizado.
+
+### 4.4. MCP Tool Discovery
+
+Quando um servidor conectar-se com sucesso:
+
+1. Consulte as ferramentas disponibilizadas.
+2. Leia seus nomes, descrições e esquemas de parâmetros.
+3. Valide os metadados recebidos.
+4. Registre as ferramentas no catálogo MCP.
+5. Associe cada ferramenta ao servidor de origem.
+6. Converta seus contratos para o formato esperado pelo Agent Core.
+7. Notifique os agentes de que o catálogo mudou.
+
+Quando o servidor informar que a lista de ferramentas mudou, atualize o catálogo conforme as notificações e capacidades do protocolo.
+
+Se um servidor desconectar, suas ferramentas não devem continuar aparecendo como disponíveis para execução normal.
+
+Não invente ferramentas a partir do nome do servidor. Registre apenas ferramentas efetivamente anunciadas e validadas.
+
+### 4.5. MCP Tool Adapter
+
+Crie uma camada de adaptação entre as ferramentas MCP e o registro central do harness.
+
+Cada ferramenta deve ter:
+
+- Identificador interno único.
+- Nome original no servidor.
+- Nome ou namespace para apresentação ao agente.
+- Descrição original.
+- Esquema de entrada.
+- Identificador do servidor.
+- Estado de disponibilidade.
+- Metadados de origem.
+- Informações de execução e timeout.
+
+O adaptador deve converter as chamadas do Agent Core em chamadas MCP válidas e normalizar as respostas para o formato interno.
+
+O agente não deve precisar conhecer detalhes de implementação do SDK para utilizar uma ferramenta MCP.
+
+Evite colisões entre ferramentas com nomes iguais em servidores diferentes. Utilize namespaces ou identificadores internos estáveis.
+
+Preserve o nome original da ferramenta e do servidor para permitir diagnóstico e rastreamento.
+
+### 4.6. MCP Result Normalizer
+
+Normalize os resultados sem destruir informações importantes.
+
+O sistema deverá suportar os tipos de conteúdo previstos pelo protocolo e pela implementação selecionada, incluindo:
+
+- Texto.
+- Conteúdo estruturado.
+- Imagens.
+- Referências a recursos.
+- Metadados.
+- Informações de erro.
+- Indicação de resultado de ferramenta com falha, quando aplicável.
+
+Não converta automaticamente todo resultado em uma string gigante.
+
+Preserve o conteúdo original quando necessário e ofereça uma representação resumida para o modelo quando houver limites de contexto.
+
+Se um servidor retornar dados excessivos, aplique limites configuráveis e permita recuperar o resultado completo quando o armazenamento e o tipo de conteúdo possibilitarem isso.
+
+Diferencie erros de transporte, erros de protocolo, erros de validação e erros retornados pela própria ferramenta.
+
+### 4.7. MCP Resources e Resource Templates
+
+Implemente suporte à descoberta e leitura de recursos MCP quando o servidor anunciar essas capacidades.
+
+O sistema deverá permitir:
+
+- Consultar os recursos disponíveis.
+- Ler recursos por URI.
+- Expor os metadados ao agente.
+- Tratar mudanças e notificações de recursos quando suportadas.
+- Aplicar limites de tamanho.
+- Preservar a origem dos dados.
+
+Quando existirem templates de recursos, permita consultar os templates anunciados e utilizá-los de acordo com o protocolo e os contratos da ferramenta.
+
+Não trate um recurso como uma ferramenta executável. Preserve a distinção entre ferramentas, recursos e prompts.
+
+### 4.8. MCP Prompts
+
+Implemente descoberta e utilização dos prompts anunciados pelos servidores MCP.
+
+Permita:
+
+- Listar prompts disponíveis.
+- Consultar suas descrições e argumentos.
+- Solicitar a renderização de um prompt com argumentos válidos.
+- Converter o resultado para o formato interno de mensagens.
+- Preservar a origem do prompt.
+
+A utilização de um prompt externo deve respeitar a hierarquia de instruções do harness. Conteúdo recebido de um servidor MCP não deve substituir silenciosamente as instruções centrais do sistema.
+
+### 4.9. MCP Sampling, Roots e demais capacidades
+
+Analise a especificação vigente e implemente somente as capacidades que fizerem sentido para a arquitetura atual.
+
+Quando houver suporte a sampling, roots, elicitation ou outras capacidades aplicáveis:
+
+- Negocie as capacidades corretamente.
+- Verifique se o cliente e o servidor anunciam suporte.
+- Implemente os contratos e fluxos necessários.
+- Não anuncie uma capacidade que o harness não implementa.
+- Respeite a versão negociada do protocolo.
+- Crie testes específicos para cada capacidade implementada.
+
+Não simule suporte a uma capacidade apenas para exibi-la na interface.
+
+## 5. REGISTRO UNIFICADO DE FERRAMENTAS
+
+O MCP deve funcionar como uma extensão do registro central de ferramentas, não como um sistema separado.
+
+Integre as ferramentas MCP com:
+
+- Agent Core.
+- Subagentes e orquestrador.
+- Skills.
+- Comandos personalizados.
+- Hooks.
+- Montagem de contexto.
+- Gerenciamento de sessões.
+- Logs e eventos.
+- Interface do harness.
+
+As ferramentas MCP deverão ser descobertas dinamicamente e disponibilizadas aos agentes conforme a configuração e o escopo de cada tarefa.
+
+O sistema deverá permitir selecionar quais ferramentas estão disponíveis para cada agente ou perfil de subagente.
+
+Quando o catálogo mudar, atualize as ferramentas oferecidas ao modelo sem reiniciar desnecessariamente o harness.
+
+Se o provedor de IA utilizar um formato específico de definição de ferramentas, utilize o adaptador já existente no Agent Core para converter os esquemas.
+
+## 6. CONFIGURAÇÃO DOS SERVIDORES
+
+Implemente um formato de configuração compatível com a arquitetura existente.
+
+O usuário deve poder definir servidores MCP locais e remotos sem modificar manualmente o código-fonte do harness.
+
+A configuração de cada servidor deve aceitar somente os campos relevantes para seu transporte.
+
+Para servidores locais, permita configurar:
+
+- Comando executável.
+- Argumentos.
+- Diretório de trabalho.
+- Variáveis de ambiente.
+- Tempo limite de inicialização.
+- Estado habilitado.
+- Política de reinicialização.
+
+Para servidores remotos, permita configurar:
+
+- URL.
+- Transporte.
+- Cabeçalhos necessários.
+- Configuração de autenticação compatível.
+- Timeouts.
+- Política de reconexão.
+- Estado habilitado.
+
+A configuração deve ser validada antes de iniciar uma conexão.
+
+Quando uma configuração for inválida, apresente um erro específico e indique qual campo precisa ser corrigido.
+
+Não grave tokens, senhas ou chaves de API diretamente em logs ou mensagens de erro. Utilize o mecanismo de armazenamento de credenciais já existente, se houver, ou implemente uma abstração apropriada.
+
+Permita importar e exportar configurações sem incluir credenciais secretas por padrão.
+
+## 7. INTERFACE DE GERENCIAMENTO MCP
+
+Integre o gerenciamento de MCP à interface existente.
+
+Crie uma área de configurações que permita:
+
+- Listar servidores cadastrados.
+- Adicionar um servidor.
+- Editar sua configuração.
+- Habilitar ou desabilitar um servidor.
+- Conectar e desconectar.
+- Reiniciar uma conexão.
+- Remover um servidor.
+- Visualizar o estado da conexão.
+- Consultar o erro mais recente.
+- Listar ferramentas descobertas.
+- Consultar descrições e esquemas.
+- Verificar a origem de cada ferramenta.
+- Consultar recursos e prompts disponíveis.
+- Testar a conexão.
+- Visualizar logs de diagnóstico.
+
+Utilize os componentes, padrões visuais e mecanismos de configuração existentes.
+
+A interface deve refletir o estado real das conexões. Não apresente um servidor como conectado se a inicialização do protocolo falhou.
+
+O usuário deve conseguir identificar rapidamente qual servidor disponibiliza determinada ferramenta e se ela está acessível.
+
+## 8. CONFIABILIDADE E DESEMPENHO
+
+Implemente:
+
+- Timeouts configuráveis.
+- Cancelamento de chamadas quando suportado.
+- Limites de concorrência.
+- Controle de chamadas simultâneas por servidor.
+- Tratamento de respostas inválidas.
+- Validação de parâmetros.
+- Reconexão configurável.
+- Encerramento correto de subprocessos.
+- Limites de tamanho das respostas.
+- Logs estruturados.
+- Métricas de duração e falha.
+- Identificadores de correlação entre chamada e resultado.
+- Isolamento de falhas entre servidores.
+- Limpeza de sessões e recursos encerrados.
+
+Não implemente tentativas de repetição indiscriminadas para operações que possam produzir efeitos duplicados. Quando uma chamada falhar depois de ter sido enviada, diferencie falha de transporte de confirmação de execução.
+
+O sistema deve conseguir funcionar com nenhum servidor MCP configurado. A ausência de servidores externos não deve impedir o uso das ferramentas nativas do harness.
+
+## 9. INTEGRAÇÃO COM OS MÓDULOS ANTERIORES
+
+### Agent Core
+Registre as ferramentas MCP no catálogo unificado e encaminhe suas chamadas pelo ciclo normal de execução de ferramentas.
+
+### Subagentes
+Permita que cada subagente receba um conjunto específico de ferramentas MCP. O conjunto disponível deve ser configurável por perfil e tarefa.
+
+### Skills e comandos
+Permita que skills documentem ferramentas MCP necessárias e verifiquem se os servidores correspondentes estão disponíveis.
+
+### Computer Use e navegador
+Permita que ferramentas MCP complementem a automação nativa. Não substitua Playwright ou Computer Use quando as ferramentas nativas já oferecerem a capacidade necessária.
+
+### Terminal
+Reaproveite o gerenciamento de processos para iniciar servidores locais quando apropriado. Preserve a distinção entre subprocessos MCP e sessões de terminal destinadas à interação do usuário.
+
+### Contexto e memória
+Disponibilize ao mecanismo de contexto descrições, esquemas e resultados relevantes das ferramentas, evitando carregar indiscriminadamente o catálogo completo quando houver muitas integrações.
+
+### Git e inteligência de código
+Permita que ferramentas MCP relacionadas a repositórios sejam usadas pelos agentes, mantendo compatibilidade com os mecanismos existentes de edição, diffs, validação e controle de alterações.
+
+## 10. TESTES OBRIGATÓRIOS
+
+Crie testes automatizados compatíveis com o projeto.
+
+### Testes de protocolo
+- Inicializar uma conexão MCP.
+- Negociar uma versão compatível.
+- Descobrir ferramentas.
+- Validar esquemas de entrada.
+- Executar uma chamada válida.
+- Receber e normalizar o resultado.
+- Tratar uma resposta inválida.
+- Encerrar a sessão corretamente.
+
+### Testes de transportes
+- Conectar a um servidor local por `stdio`.
+- Conectar a um servidor HTTP de teste quando suportado.
+- Tratar timeout de inicialização.
+- Tratar encerramento inesperado.
+- Tratar falha de comunicação.
+- Verificar a limpeza de processos e sessões.
+
+### Testes de catálogo
+- Registrar ferramentas de servidores diferentes.
+- Tratar nomes duplicados.
+- Atualizar a lista após uma mudança anunciada.
+- Remover a disponibilidade de ferramentas de um servidor desconectado.
+- Confirmar que ferramentas inexistentes não sejam oferecidas ao modelo.
+
+### Testes de recursos e prompts
+- Descobrir recursos e prompts.
+- Ler um recurso.
+- Renderizar um prompt com argumentos.
+- Tratar capacidades não anunciadas.
+- Validar respostas e metadados.
+
+### Testes de integração
+- Disponibilizar uma ferramenta MCP ao Agent Core.
+- Executar a ferramenta por meio de uma chamada do agente.
+- Confirmar que o resultado retorna ao ciclo de execução.
+- Permitir o uso de ferramentas MCP por um subagente autorizado.
+- Desabilitar um servidor e confirmar que suas ferramentas deixam de estar disponíveis.
+- Verificar que uma falha em um servidor não interrompe os demais.
+- Confirmar que o harness funciona sem servidores MCP configurados.
+
+Utilize servidores de teste locais para os fluxos de integração. Não dependa de serviços externos instáveis para os testes automatizados.
+
+## 11. ORDEM DE IMPLEMENTAÇÃO
+
+Execute as etapas nesta ordem:
+
+1. Inspecionar a arquitetura atual do harness.
+2. Clonar e analisar os repositórios selecionados.
+3. Verificar a especificação MCP e a compatibilidade dos SDKs.
+4. Definir os contratos internos e o modelo de configuração.
+5. Implementar o registro de servidores.
+6. Implementar o gerenciador de clientes e transportes.
+7. Implementar descoberta e adaptação de ferramentas.
+8. Implementar normalização de resultados.
+9. Implementar recursos e prompts.
+10. Implementar as capacidades adicionais selecionadas.
+11. Integrar com o Agent Core e os subagentes.
+12. Implementar a interface de gerenciamento.
+13. Implementar logs, diagnóstico e recuperação de conexões.
+14. Criar servidores de teste e testes automatizados.
+15. Executar os testes de integração e regressão.
+16. Corrigir os problemas encontrados.
+17. Documentar configuração, utilização e limitações.
+
+Não pare na análise dos repositórios ou na criação da estrutura inicial. Continue até ter uma implementação funcional e validada dentro das limitações reais do ambiente.
+
+## 12. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo será considerado concluído quando:
+
+- Servidores MCP puderem ser cadastrados e configurados.
+- Conexões reais puderem ser iniciadas e encerradas.
+- Ferramentas forem descobertas a partir das respostas reais dos servidores.
+- Os esquemas das ferramentas forem disponibilizados corretamente ao Agent Core.
+- As chamadas forem executadas pelo protocolo MCP.
+- Os resultados forem normalizados sem perda desnecessária de conteúdo.
+- Recursos e prompts forem suportados quando anunciados.
+- O catálogo for atualizado quando as capacidades mudarem.
+- Os subagentes puderem utilizar ferramentas autorizadas.
+- A interface mostrar o estado real das conexões.
+- Falhas individuais não derrubarem o harness.
+- O sistema funcionar sem servidores externos.
+- Os testes comprovarem os principais fluxos com servidores reais de teste.
+- A arquitetura existente continuar funcional.
+- As dependências e licenças estiverem documentadas.
+
+## 13. RELATÓRIO FINAL
+
+Ao terminar, informe:
+
+1. Arquitetura MCP implementada.
+2. Repositórios analisados e componentes efetivamente aproveitados.
+3. Arquivos criados e modificados.
+4. Transportes implementados e versões compatíveis.
+5. Tipos de ferramentas, recursos e prompts suportados.
+6. Integração com Agent Core, subagentes e interface.
+7. Como cadastrar e conectar um servidor MCP.
+8. Testes executados e seus resultados reais.
+9. Novas dependências e respectivas justificativas.
+10. Limitações encontradas e funcionalidades pendentes.
+
+Não declare recursos como implementados sem evidências no código e nos testes.
+
+**RESULTADO ESPERADO:** uma camada MCP integrada ao harness, capaz de descobrir e executar ferramentas externas de forma dinâmica, reutilizável e extensível, mantendo o funcionamento das ferramentas nativas e permitindo acrescentar novas capacidades sem reescrever o núcleo do agente.

@@ -1,0 +1,504 @@
+# MÓDULO 15 — GERENCIAMENTO INTELIGENTE DE ARQUIVOS, DOCUMENTOS E WORKSPACES
+
+## 1. OBJETIVO PRINCIPAL
+
+Implemente um sistema completo de gerenciamento de arquivos e documentos dentro do harness de IA.
+
+O sistema deverá permitir que os agentes trabalhem com arquivos reais do computador e dos projetos, incluindo leitura, criação, edição, comparação, busca, organização e geração de documentos.
+
+Não implemente apenas uma interface visual de explorador de arquivos. Desenvolva uma camada funcional que possa ser utilizada pelo Agent Core, pelos subagentes, pelo planejador, pelas ferramentas MCP e pelos demais módulos.
+
+O objetivo é que o harness consiga executar solicitações como:
+
+- Encontrar um arquivo específico em um projeto.
+- Ler e resumir documentos extensos.
+- Localizar informações dentro de vários arquivos.
+- Criar e editar documentos.
+- Comparar duas versões de um arquivo.
+- Organizar arquivos de um workspace.
+- Extrair informações de PDFs e planilhas.
+- Gerar relatórios com base em arquivos existentes.
+- Identificar arquivos relacionados a uma tarefa de programação.
+- Criar estruturas de diretórios para novos projetos.
+- Trabalhar com vários arquivos sem perder o contexto.
+- Produzir resultados verificáveis e registrar as alterações realizadas.
+
+Antes de implementar, inspecione a arquitetura atual do harness, o sistema de arquivos já existente e os módulos de contexto, terminal, inteligência de código, Git, plugins e MCP.
+
+Não presuma que o projeto utiliza uma linguagem ou framework específico. Adapte todas as implementações à stack existente.
+
+## 2. REPOSITÓRIOS OPEN SOURCE PARA CLONAR E ANALISAR
+
+Clone os repositórios abaixo, examine o código-fonte relevante e identifique componentes que possam ser reutilizados ou adaptados.
+
+### 2.1. Gerenciamento e busca de arquivos
+
+- ripgrep — busca rápida em arquivos: https://github.com/BurntSushi/ripgrep
+- fd — localização de arquivos: https://github.com/sharkdp/fd
+- fzf — busca e seleção interativa: https://github.com/junegunn/fzf
+- Everything — referência para busca de arquivos no Windows; avalie a integração e as condições de licenciamento: https://www.voidtools.com/
+- Apache Tika — extração de texto e metadados: https://github.com/apache/tika
+- Universal Ctags — indexação de símbolos: https://github.com/universal-ctags/ctags
+
+### 2.2. Documentos e PDFs
+
+- PyMuPDF — leitura e processamento de PDFs: https://github.com/pymupdf/PyMuPDF
+- pypdf — operações com PDFs: https://github.com/py-pdf/pypdf
+- PDF.js — visualização de PDFs: https://github.com/mozilla/pdf.js
+- Apache Tika — extração de conteúdo de documentos: https://github.com/apache/tika
+- python-docx — documentos Word: https://github.com/python-openxml/python-docx
+- LibreOffice — automação e conversão de documentos: https://github.com/LibreOffice/core
+- Pandoc — conversão de formatos documentais: https://github.com/jgm/pandoc
+
+### 2.3. Planilhas e dados tabulares
+
+- openpyxl — leitura e escrita de arquivos Excel: https://github.com/ericgazoni/openpyxl
+- pandas — análise e transformação de dados: https://github.com/pandas-dev/pandas
+- SheetJS — processamento de planilhas em JavaScript: https://github.com/SheetJS/sheetjs
+- DuckDB — consultas e análise de dados: https://github.com/duckdb/duckdb
+
+### 2.4. Arquivos de texto e edição
+
+- Monaco Editor: https://github.com/microsoft/monaco-editor
+- CodeMirror: https://github.com/codemirror/dev
+- diff-match-patch: https://github.com/google/diff-match-patch
+- Prettier: https://github.com/prettier/prettier
+- ast-grep: https://github.com/ast-grep/ast-grep
+
+### 2.5. Integração com agentes
+
+- OpenCode: https://github.com/anomalyco/opencode
+- OpenAI Codex: https://github.com/openai/codex
+- OpenHands: https://github.com/All-Hands-AI/OpenHands
+- Aider: https://github.com/Aider-AI/aider
+- Continue: https://github.com/continuedev/continue
+- MCP TypeScript SDK: https://github.com/modelcontextprotocol/typescript-sdk
+- MCP Python SDK: https://github.com/modelcontextprotocol/python-sdk
+
+Os endereços de projetos que não sejam repositórios Git devem ser tratados como referências de documentação ou produtos, não como comandos de clonagem.
+
+Não clone todos os repositórios indiscriminadamente para dentro do projeto principal. Use uma área temporária de pesquisa e mantenha o workspace do harness organizado.
+
+Examine o código real, as dependências, a licença e a compatibilidade. Reutilize implementações quando isso for tecnicamente e legalmente apropriado. Não copie um projeto inteiro sem avaliar sua arquitetura.
+
+## 3. ARQUITETURA DO MÓDULO
+
+Implemente os componentes equivalentes abaixo, reutilizando os serviços existentes quando disponíveis.
+
+### 3.1. File System Service
+
+Crie uma camada central para operações de arquivos e diretórios.
+
+Deve suportar:
+
+- Listar arquivos e pastas.
+- Consultar metadados.
+- Ler arquivos.
+- Criar arquivos.
+- Editar arquivos.
+- Renomear arquivos.
+- Copiar arquivos.
+- Mover arquivos.
+- Criar diretórios.
+- Consultar tamanhos e datas de modificação.
+- Detectar alterações.
+- Comparar versões.
+- Identificar tipos de arquivo.
+- Obter informações de codificação.
+- Identificar arquivos binários.
+- Consultar permissões quando disponíveis.
+
+Implemente operações assíncronas quando apropriado e evite bloquear a interface enquanto arquivos grandes são processados.
+
+Não carregue automaticamente arquivos enormes inteiros na memória. Utilize leitura em intervalos, streaming ou processamento por partes quando necessário.
+
+### 3.2. Workspace Manager
+
+Implemente gerenciamento de workspaces e projetos.
+
+Cada workspace deve possuir:
+
+- Identificador.
+- Caminho raiz.
+- Nome.
+- Tipo de projeto, quando identificado.
+- Data da última utilização.
+- Arquivos indexados.
+- Configurações próprias.
+- Histórico de operações.
+- Estado da indexação.
+
+Permita abrir, criar, alternar e fechar workspaces.
+
+A seleção do workspace deve ser compartilhada com o Agent Core, o terminal, o Git, a inteligência de código e o sistema de contexto.
+
+Quando o usuário alternar de projeto, os agentes devem receber o contexto do workspace correto, sem misturar indiscriminadamente arquivos ou informações de projetos diferentes.
+
+### 3.3. File Search Engine
+
+Implemente busca por arquivos e conteúdo.
+
+Permita pesquisar por:
+
+- Nome.
+- Extensão.
+- Caminho.
+- Texto contido no arquivo.
+- Expressões regulares.
+- Metadados.
+- Data de modificação.
+- Tipo de arquivo.
+- Símbolos e definições, por meio do módulo de inteligência de código.
+
+Inclua filtros para excluir diretórios de dependências, arquivos gerados, caches e pastas configuradas pelo usuário.
+
+A busca deve funcionar com projetos grandes e apresentar resultados progressivamente quando necessário.
+
+Para código, reutilize o mecanismo de busca e indexação existente, evitando criar uma segunda implementação concorrente.
+
+### 3.4. Document Reader
+
+Implemente um sistema extensível para leitura e extração de conteúdo de diferentes formatos.
+
+Comece pelos formatos mais úteis:
+
+- TXT.
+- Markdown.
+- JSON.
+- XML.
+- YAML.
+- CSV.
+- HTML.
+- PDF.
+- DOCX.
+- XLSX.
+- Logs.
+- Código-fonte.
+
+Quando a ferramenta adequada estiver instalada e integrada, permita adicionar suporte a outros formatos.
+
+O sistema deve separar a extração do conteúdo da interpretação realizada pela IA.
+
+Sempre que possível, preserve:
+
+- Nome do arquivo.
+- Caminho.
+- Número de página.
+- Número da linha.
+- Nome da planilha.
+- Intervalo de células.
+- Títulos e seções.
+- Metadados relevantes.
+
+Essas informações deverão permitir que o agente apresente a origem das informações utilizadas em uma resposta.
+
+### 3.5. Document Writer
+
+Implemente criação e edição de documentos.
+
+Permita que os agentes:
+
+- Criem arquivos Markdown.
+- Produzam documentos estruturados.
+- Gerem relatórios.
+- Criem arquivos CSV.
+- Criem ou editem documentos DOCX.
+- Gerem ou modifiquem planilhas XLSX.
+- Produzam arquivos JSON, YAML e XML válidos.
+- Convertam documentos entre formatos compatíveis.
+- Criem estruturas de pastas para entregas.
+
+Utilize bibliotecas apropriadas para cada formato.
+
+Não simule a criação de um documento apenas retornando seu conteúdo na conversa. O sistema deve salvar o arquivo no destino solicitado e verificar o resultado.
+
+Após criar um arquivo, valide sua existência e, quando aplicável, sua integridade estrutural.
+
+### 3.6. Document Conversion Service
+
+Crie um serviço extensível para conversões entre formatos.
+
+Considere:
+
+- Markdown para HTML.
+- Markdown para PDF, quando houver mecanismo adequado.
+- DOCX para PDF, quando houver LibreOffice ou outro conversor compatível.
+- CSV para XLSX.
+- Extração de texto de PDF.
+- Conversão de documentos para formatos intermediários de análise.
+
+Antes da conversão, verifique se a ferramenta necessária está instalada.
+
+Não declare uma conversão concluída quando a ferramenta estiver ausente ou o comando falhar.
+
+Preserve o arquivo de origem por padrão. A substituição de um arquivo existente deve ser uma operação explícita.
+
+## 4. SISTEMA DE EDIÇÃO E PATCHES
+
+### 4.1. File Editing Engine
+
+Implemente edição confiável de arquivos.
+
+Deve suportar:
+
+- Substituição de conteúdo.
+- Inserção e remoção de trechos.
+- Edição por linhas.
+- Edição por intervalo.
+- Aplicação de patches.
+- Edição estrutural quando houver parser compatível.
+- Verificação do conteúdo após a gravação.
+- Detecção de conflitos com alterações externas.
+
+Antes de modificar um arquivo, registre informações suficientes para identificar a versão utilizada na edição.
+
+Se o arquivo tiver mudado entre a leitura e a gravação, detecte o conflito e evite sobrescrever silenciosamente a alteração mais recente.
+
+Para alterações de código, reutilize o mecanismo de edição estrutural e o sistema de Git já implementados.
+
+### 4.2. Diff Viewer
+
+Implemente comparação visual entre:
+
+- Arquivo original e arquivo modificado.
+- Duas versões de um documento.
+- Conteúdo atual e conteúdo proposto.
+- Alterações produzidas por diferentes agentes.
+- Versões recuperadas do Git.
+
+Quando possível, apresente diferenças por linha e destaque inserções, remoções e modificações.
+
+Para arquivos binários, apresente metadados e indique que não é possível realizar uma comparação textual convencional.
+
+### 4.3. Histórico e recuperação
+
+Registre operações importantes de escrita, edição, renomeação e movimentação.
+
+Permita consultar:
+
+- Arquivo afetado.
+- Operação executada.
+- Horário.
+- Agente responsável.
+- Tarefa relacionada.
+- Versão anterior disponível.
+- Resultado da operação.
+
+Integre o histórico ao Git e ao mecanismo de recuperação existente, em vez de criar cópias redundantes de todos os arquivos.
+
+Quando não houver Git, utilize um mecanismo de histórico apropriado para os arquivos que precisam de recuperação.
+
+Não sobrescreva silenciosamente versões anteriores.
+
+## 5. FERRAMENTAS PARA OS AGENTES
+
+Registre ferramentas padronizadas no sistema de ferramentas do harness.
+
+Implemente, adaptando os nomes às convenções existentes:
+
+- `files.list`
+- `files.stat`
+- `files.read`
+- `files.read_range`
+- `files.search`
+- `files.create`
+- `files.write`
+- `files.edit`
+- `files.apply_patch`
+- `files.copy`
+- `files.move`
+- `files.rename`
+- `files.create_directory`
+- `files.compare`
+- `files.history`
+- `files.restore`
+- `documents.extract`
+- `documents.convert`
+- `documents.create`
+- `documents.inspect`
+- `workspace.list`
+- `workspace.open`
+- `workspace.create`
+- `workspace.get_status`
+
+Cada ferramenta deve possuir um esquema de entrada, validação de parâmetros, saída estruturada e tratamento de erros.
+
+As ferramentas devem informar o caminho real do arquivo, a operação executada e o resultado verificável.
+
+Para leitura de arquivos extensos, ofereça operações de intervalo ou paginação.
+
+Para operações em lote, registre quais itens foram processados e quais falharam.
+
+## 6. INTEGRAÇÃO COM A IA
+
+Integre o módulo ao Agent Core e ao sistema de contexto.
+
+O agente deve poder localizar arquivos relevantes, ler apenas os trechos necessários e consultar o conteúdo conforme a tarefa.
+
+Para documentos extensos:
+
+1. Identifique o formato.
+2. Extraia o conteúdo.
+3. Divida-o em unidades adequadas.
+4. Preserve a origem de cada trecho.
+5. Recupere os trechos relevantes para a solicitação.
+6. Envie o contexto necessário ao modelo.
+7. Produza uma resposta fundamentada no conteúdo recuperado.
+
+Reutilize o indexador e a memória de projeto já existentes.
+
+Não envie indiscriminadamente todos os arquivos de um workspace ao modelo.
+
+Quando uma resposta depender de um documento, preserve referências ao arquivo e às páginas, linhas ou seções que sustentam a resposta, quando disponíveis.
+
+## 7. INDEXAÇÃO E ATUALIZAÇÃO
+
+Implemente um indexador incremental.
+
+Ele deverá:
+
+- Detectar arquivos novos.
+- Detectar alterações.
+- Detectar arquivos removidos.
+- Atualizar apenas os registros afetados quando possível.
+- Permitir reconstruir o índice.
+- Apresentar o estado da indexação.
+- Registrar erros de leitura.
+- Respeitar as exclusões configuradas.
+- Integrar-se ao sistema de contexto e à inteligência de código.
+
+Utilize mecanismos de observação de arquivos compatíveis com a plataforma atual.
+
+Na ausência de suporte confiável a eventos de alteração, implemente uma estratégia de verificação alternativa.
+
+Evite reindexar todo o projeto a cada pergunta.
+
+## 8. INTERFACE GRÁFICA
+
+Se o harness possuir interface gráfica, implemente uma área de arquivos com:
+
+- Navegação por diretórios.
+- Pesquisa.
+- Filtros.
+- Visualização de metadados.
+- Pré-visualização de documentos.
+- Editor de texto.
+- Comparação de versões.
+- Histórico de alterações.
+- Estado da indexação.
+- Acesso aos workspaces.
+- Abertura de arquivos relacionados à tarefa atual.
+
+A interface deverá utilizar os serviços reais do backend.
+
+Não crie botões decorativos que não executem operações.
+
+A abertura e a edição de arquivos devem preservar o estado atual do usuário sempre que possível.
+
+Para formatos sem pré-visualização nativa, apresente uma mensagem clara e permita abrir o arquivo com um aplicativo externo, quando a plataforma oferecer esse recurso.
+
+## 9. DESEMPENHO
+
+Considere projetos grandes e documentos extensos.
+
+Implemente, quando apropriado:
+
+- Leitura em partes.
+- Indexação incremental.
+- Cache de metadados.
+- Cancelamento de buscas.
+- Limites configuráveis de resultados.
+- Processamento assíncrono.
+- Paginação.
+- Evitação de leituras duplicadas.
+- Limpeza de caches obsoletos.
+
+Meça o desempenho em projetos de teste de tamanhos diferentes.
+
+Não introduza dependências pesadas sem justificar sua necessidade.
+
+## 10. TESTES OBRIGATÓRIOS
+
+Crie testes para:
+
+1. Listagem de diretórios.
+2. Leitura de arquivos de texto.
+3. Leitura parcial de arquivos extensos.
+4. Busca por nome e conteúdo.
+5. Criação e edição de arquivos.
+6. Aplicação de patches.
+7. Detecção de conflitos de escrita.
+8. Comparação de versões.
+9. Recuperação de uma versão anterior.
+10. Extração de texto de PDF.
+11. Leitura e escrita de DOCX.
+12. Leitura e escrita de XLSX.
+13. Conversões compatíveis.
+14. Indexação incremental.
+15. Tratamento de formatos inválidos.
+16. Arquivos ausentes e permissões insuficientes.
+17. Cancelamento de buscas.
+18. Integração com o Agent Core.
+19. Integração com o sistema de contexto.
+20. Regressão dos módulos anteriores.
+
+Utilize arquivos de teste pequenos, médios e grandes.
+
+Não dependa de documentos privados ou serviços externos para os testes automatizados.
+
+## 11. ORDEM DE IMPLEMENTAÇÃO
+
+Execute o trabalho nesta sequência:
+
+1. Inspecionar o projeto e identificar funcionalidades existentes.
+2. Mapear a arquitetura de arquivos, workspaces e ferramentas.
+3. Criar ou adaptar o File System Service.
+4. Implementar busca e leitura.
+5. Implementar criação, edição e patches.
+6. Implementar comparação e histórico.
+7. Adicionar extração de documentos.
+8. Adicionar criação e conversão de formatos.
+9. Implementar indexação incremental.
+10. Integrar com o Agent Core e o sistema de contexto.
+11. Integrar a interface gráfica, se existente.
+12. Executar testes unitários, integração e regressão.
+13. Corrigir os problemas encontrados.
+14. Documentar a configuração e a utilização.
+
+Não interrompa o trabalho depois de criar interfaces, contratos ou arquivos vazios. Implemente funcionalidades reais de ponta a ponta.
+
+## 12. CRITÉRIOS DE ACEITAÇÃO
+
+O módulo será considerado implementado quando:
+
+- O harness conseguir listar, localizar e ler arquivos reais.
+- Conseguir criar e editar arquivos no destino correto.
+- Detectar conflitos de edição.
+- Comparar versões.
+- Extrair conteúdo dos formatos suportados.
+- Criar documentos válidos.
+- Registrar operações importantes.
+- Integrar arquivos e documentos ao contexto dos agentes.
+- Atualizar o índice sem reconstruí-lo desnecessariamente.
+- Apresentar erros reais quando operações falharem.
+- Passar nos testes relevantes.
+- Preservar as funcionalidades preexistentes.
+
+## 13. RELATÓRIO FINAL
+
+Ao concluir, apresente:
+
+- Resumo das funcionalidades implementadas.
+- Arquivos criados e modificados.
+- Repositórios efetivamente analisados.
+- Bibliotecas e componentes reutilizados.
+- Formatos suportados e suas limitações.
+- Ferramentas disponíveis para os agentes.
+- Testes executados e resultados.
+- Problemas encontrados e resolvidos.
+- Instruções de configuração e uso.
+- Funcionalidades que ainda dependem de implementação adicional.
+
+Não invente resultados de testes, não declare suporte a um formato que não foi validado e não apresente uma implementação parcial como se estivesse completa.
+
+**RESULTADO ESPERADO:** um sistema de arquivos e documentos funcional, integrado ao harness, capaz de apoiar tarefas reais de programação, pesquisa, edição e produção documental, com histórico, recuperação, indexação e validação.

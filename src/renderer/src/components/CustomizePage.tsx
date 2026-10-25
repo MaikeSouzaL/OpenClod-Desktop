@@ -88,6 +88,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [restarting, setRestarting] = useState(false)
+  const [oauthBusy, setOauthBusy] = useState('')
 
   const loadSkills = useCallback(async (): Promise<void> => {
     try {
@@ -125,7 +126,22 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
 
   const installCatalog = async (entry: McpCatalogInfo): Promise<void> => {
     if (entry.oauth) {
-      setError(`"${entry.name}" exige login OAuth, que ainda não é automatizado. Use um token em Configurações → MCP.`)
+      try {
+        const installed = await unwrap(window.forja.app.installMcp(entry.id))
+        if (!installed.ok) {
+          setError(installed.error ?? 'não foi possível preparar o conector OAuth')
+          return
+        }
+        setOauthBusy(entry.id)
+        const auth = await unwrap(window.forja.app.authorizeMcp(installed.name ?? entry.id))
+        setNotice(auth.detail)
+        await loadCatalog()
+        await onRestartMcp()
+      } catch (err) {
+        setError(errorMessage(err))
+      } finally {
+        setOauthBusy('')
+      }
       return
     }
     const env: Record<string, string> = {}
@@ -370,11 +386,11 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                       <button
                         type="button"
                         className="btn small"
-                        disabled={entry.installed}
+                        disabled={entry.installed || oauthBusy === entry.id}
                         onClick={() => void installCatalog(entry)}
                       >
                         {entry.installed ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}
-                        {entry.installed ? 'Instalado' : 'Adicionar'}
+                        {oauthBusy === entry.id ? 'Conectando…' : entry.installed ? 'Instalado' : 'Adicionar'}
                       </button>
                     </div>
                   </article>

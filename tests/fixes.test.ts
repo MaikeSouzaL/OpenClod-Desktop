@@ -189,16 +189,17 @@ describe('SettingsStore secrets and migration', () => {
     expect(decodeSecretsFile(file, fakeCrypto)).toEqual({ openai: 'sk-legacy' })
   })
 
-  it('migrates the old "ask" default to autonomous mode once and adds secret-file rules', async () => {
+  it('migrates old defaults to unrestricted mode once and adds secret-file rules', async () => {
     fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ policy: { mode: 'ask', rules: { allow: ['Bash(ls)'] } } }))
     const store = new SettingsStore(dir, fakeCrypto)
     await store.init()
     const settings = store.get()
-    expect(settings.policy.mode).toBe('auto')
+    expect(settings.policy.mode).toBe('unrestricted')
     expect(settings.settingsVersion).toBe(SETTINGS_VERSION)
     expect(settings.policy.rules?.allow).toContain('Bash(ls)')
     expect(settings.policy.rules?.ask).toContain('Read(.env)')
     expect(store.migrations.length).toBe(1)
+    expect(settings.policy.allowComputerControl).toBe(true)
 
     // a later "ask" choice by the user is respected
     await store.update({ policy: { ...settings.policy, mode: 'ask' } })

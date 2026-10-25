@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dist": "npm run build && electron-builder --win nsis",
-    "dist:dir": "npm run build && electron-builder --win dir"
+    "dist:dir": "npm run build && electron-builder --win dir",
+    "build:chrome-host": "cd resources/bin/chrome-host && go build -o ../openclod-chrome-host.exe .",
+    "install:chrome-companion": "node scripts/install-chrome-companion.mjs"
   },
   "dependencies": {
     "@lydell/node-pty": "^1.2.0-beta.15",

@@ -300,6 +300,11 @@ export function Sidebar({
             type="button"
             className="side-project-name"
             aria-expanded={isOpen}
+            onDoubleClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onOpenGraph(project)
+            }}
             onClick={() => {
               onSelectProject(project)
               if (isActive) setCollapsed((current) => ({ ...current, [project.id]: isOpen }))
