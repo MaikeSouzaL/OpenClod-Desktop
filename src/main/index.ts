@@ -10,6 +10,7 @@ import { SttService } from './stt.js'
 import { TtsService } from './tts.js'
 import { defaultSettings } from './settings.js'
 import { TerminalManager, availableShells } from './terminal.js'
+import type { TerminalRunner } from '../core/terminal/runner.js'
 import { ComputerOverlay } from './computer-overlay.js'
 import { detectDevServers, startDevServer } from './preview.js'
 import { searchProjectFiles, writeProjectFile } from './project-files.js'
@@ -82,6 +83,13 @@ let orchestrator: Orchestrator | null = null
 const terminals = new TerminalManager((event) => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(CH.terminalEvent, event)
 })
+// Lets the agent's run_in_terminal run commands in the session's VISIBLE terminal (opening one if needed).
+const terminalRunner: TerminalRunner = {
+  run: ({ sessionId, command, cwd, shell, timeoutMs, interrupt }) => {
+    const info = terminals.ensureSessionTerminal({ sessionId, cwd, shell })
+    return terminals.run(info.id, command, { timeoutMs, interrupt })
+  }
+}
 const stt = new SttService({
   emit: (event) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(CH.sttEvent, event)
@@ -2465,7 +2473,8 @@ if (!gotLock) {
       userData: app.getPath('userData'),
       broadcast,
       log: (message) => log('orchestrator', message),
-      colabHost: colabHost()
+      colabHost: colabHost(),
+      terminalRunner
     })
     orchestrator.chromeBridge.appVersion = app.getVersion()
     // A new app version may ship a newer extension: refresh the stable copy Chrome has loaded, then let the

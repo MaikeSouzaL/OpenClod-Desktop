@@ -58,6 +58,7 @@ function TerminalView({ info, active }: { info: TerminalInfo; active: boolean })
     let ready = false
     const early: string[] = []
     const off = window.forja.terminal.onEvent((event: TerminalEvent) => {
+      if (event.type === 'created') return // tratado no nível do painel
       if (event.id !== info.id) return
       if (event.type === 'data') {
         if (ready) term.write(event.data)
@@ -163,10 +164,18 @@ export function TerminalPane({ sessionId, cwd }: TerminalPaneProps): ReactElemen
   useEffect(
     () =>
       window.forja.terminal.onEvent((event) => {
+        if (event.type === 'created') {
+          // O agente abriu um terminal desta sessão (run_in_terminal): mostra a aba e foca,
+          // sem duplicar um que este painel já criou.
+          if (event.info.sessionId !== sessionId) return
+          setTerminals((list) => (list.some((item) => item.id === event.info.id) ? list : [...list, event.info]))
+          setActiveId(event.info.id)
+          return
+        }
         if (event.type !== 'exit') return
         setTerminals((list) => list.map((item) => (item.id === event.id ? { ...item, exited: true, exitCode: event.exitCode } : item)))
       }),
-    []
+    [sessionId]
   )
 
   const close = async (terminalId: string): Promise<void> => {

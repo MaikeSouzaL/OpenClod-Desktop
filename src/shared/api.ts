@@ -330,6 +330,7 @@ export interface TerminalInfo {
 }
 
 export type TerminalEvent =
+  | { type: 'created'; info: TerminalInfo }
   | { type: 'data'; id: string; data: string }
   | { type: 'exit'; id: string; exitCode: number }
 

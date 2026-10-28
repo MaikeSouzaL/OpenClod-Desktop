@@ -299,6 +299,8 @@ for (const tools of Object.values(MODE_TOOLS)) {
   }
   // Inspecting the page's traffic is read-only; every mode that can open the browser can read it.
   if (tools.includes('browser_open') && !tools.includes('browser_network')) tools.push('browser_network')
+  // Rodar no terminal visível vai junto com os modos que já podem rodar comandos (mesma política de segurança).
+  if (tools.includes('run_command') && !tools.includes('run_in_terminal')) tools.push('run_in_terminal')
   for (const name of ['mcp_search', 'mcp_servers', 'mcp_install', 'mcp_resource', 'mcp_prompt', 'mcp_read_resource', 'mcp_get_prompt', 'mcp_reload']) {
     if (!tools.includes(name)) tools.push(name)
   }

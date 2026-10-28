@@ -32,6 +32,7 @@ import { ColabService, type ColabHost } from './colab.js'
 import { SkillLibrary } from '../core/skills/library.js'
 import { MemoryStore } from '../core/memory/store.js'
 import { ProjectMemory } from '../core/memory/project.js'
+import { memoryScopeId } from '../core/memory/scope.js'
 import { BrowserLayer } from '../core/browser/layer.js'
 import { ComputerLayer } from '../core/computer/layer.js'
 import { ToolRegistry } from '../core/tools/registry.js'
@@ -44,6 +45,8 @@ import { fsTools } from '../core/tools/fs.js'
 import { searchTools } from '../core/tools/search.js'
 import { shellTools, killSessionProcesses } from '../core/tools/shell.js'
 import { gitTools } from '../core/tools/git.js'
+import { terminalTools } from '../core/tools/terminal.js'
+import type { TerminalRunner } from '../core/terminal/runner.js'
 import { webTools } from '../core/tools/web.js'
 import { browserTools } from '../core/tools/browser.js'
 import { computerTools } from '../core/tools/computer.js'
@@ -126,6 +129,8 @@ export interface OrchestratorOptions {
   mcpStartRetryDelayMs?: number
   /** What the Google Colab feature needs from Electron (open the browser, show a file, copy text). Tests omit it: nothing is opened. */
   colabHost?: ColabHost
+  /** Runs commands in the visible integrated terminal (node-pty lives in Electron). Tests omit it: run_in_terminal says it is unavailable. */
+  terminalRunner?: TerminalRunner
 }
 
 /** The ways a server's start can run out of time (the client's own timeouts and the orchestrator's last-resort guard). */
@@ -613,24 +618,26 @@ export class Orchestrator {
     })
     this.browsers.set(sessionId, browser)
 
+    // A memória é escopada por projeto no modo Code/Cowork e por SESSÃO nos chats do Início (cada chat tem a sua).
+    const memoryScope = memoryScopeId(state.meta)
     const memory =
       this.memories.get(sessionId) ??
-      new MemoryStore(path.join(userDataPath(this.options.userData, 'data'), 'memory', `${state.meta.projectId}.json`))
+      new MemoryStore(path.join(userDataPath(this.options.userData, 'data'), 'memory', `${memoryScope}.json`))
     this.memories.set(sessionId, memory)
 
-    // One markdown wiki per project (not per session), shared by every agent
-    // and every model working in that project.
+    // One markdown wiki per memory scope (per project in Code/Cowork; per chat session on Início),
+    // shared by every agent and model working in that scope.
     const projectMemory =
-      this.projectMemories.get(state.meta.projectId) ??
-      new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', state.meta.projectId))
-    this.projectMemories.set(state.meta.projectId, projectMemory)
+      this.projectMemories.get(memoryScope) ??
+      new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', memoryScope))
+    this.projectMemories.set(memoryScope, projectMemory)
     // Split legacy session logs and build the per-subject index before the
     // runner reads the briefing.
     await this.slowStep('memória do projeto (init)', projectMemory.init())
     // Copying every wiki page into AI-Memory is two HTTP calls per page: minutes on a project with dozens of pages.
     // It used to run HERE, so the first message after every app start sat in the composer until it finished.
     // It runs in the background now; recall still works from what AI-Memory already has.
-    this.syncNativeToAiInBackground(state.meta.projectId)
+    this.syncNativeToAiInBackground(memoryScope)
 
     const effectiveFullAccess = settings.policy.fullAccess === true || settings.policy.mode === 'unrestricted'
     const effectivePolicy: PolicyConfig = {
@@ -678,9 +685,10 @@ export class Orchestrator {
         memory,
         projectMemory,
         mcp: this.mcpToolService(),
-        aiMemory: this.aiMemory
+        aiMemory: this.aiMemory,
+        terminal: this.options.terminalRunner
       },
-      projectId: state.meta.projectId,
+      projectId: memoryScope,
       project: {
         name: project?.name ?? path.basename(state.meta.cwd),
         branch: branch ?? undefined,
@@ -1024,10 +1032,11 @@ export class Orchestrator {
       }
     })
     if (!files.length) return undefined
-    const projectId = this.store.getSession(sessionId)?.meta.projectId
-    if (!projectId) return undefined
+    const meta = this.store.getSession(sessionId)?.meta
+    if (!meta) return undefined
+    const memoryScope = memoryScopeId(meta)
     return async ({ signal, progress }) => {
-      const memory = this.memoryForProject(projectId)
+      const memory = this.memoryForProject(memoryScope)
       const digests: string[] = []
       const images: ImagePart[] = []
       // A few notices, not a flood: one per phase, and at most one every few seconds within a phase.
@@ -1047,7 +1056,7 @@ export class Orchestrator {
             file,
             memory,
             mirror: async (draft) => {
-              await this.aiMemory.writePage(projectId, { path: `pages/${draft.slug}.md`, title: draft.title, body: draft.body, tags: draft.tags, tier: 'semantic' })
+              await this.aiMemory.writePage(memoryScope, { path: `pages/${draft.slug}.md`, title: draft.title, body: draft.body, tags: draft.tags, tier: 'semantic' })
             },
             signal,
             onProgress: note
@@ -1110,6 +1119,7 @@ export class Orchestrator {
     try {
       const state = await this.store.loadSession(sessionId)
       if (!state) return
+      const memoryScope = memoryScopeId(state.meta)
       const messages = runner.messages
       const lastUser = [...messages].reverse().find((message) => message.role === 'user' && !message.hidden)
       const after = lastUser ? messages.slice(messages.indexOf(lastUser) + 1) : messages
@@ -1120,7 +1130,7 @@ export class Orchestrator {
         .pop() ?? ''
       const tools = [...new Set(after.flatMap((message) => message.parts).filter((part) => part.type === 'tool_call').map((part) => part.name))]
       const files = (this.trackers.get(sessionId)?.changes() ?? []).map((change) => change.path).slice(-12)
-      const memory = this.memoryForProject(state.meta.projectId)
+      const memory = this.memoryForProject(memoryScope)
       const captured = await memory.rememberTurn({
         sessionTitle: state.meta.title,
         sessionId,
@@ -1142,9 +1152,9 @@ export class Orchestrator {
         const related = page.body.includes('## Relacionados')
           ? ''
           : await this.aiMemory
-              .relatedMarkdown(state.meta.projectId, `${page.title}\n${page.body}`, pagePath, 4)
+              .relatedMarkdown(memoryScope, `${page.title}\n${page.body}`, pagePath, 4)
               .catch(() => '')
-        await this.aiMemory.writePage(state.meta.projectId, {
+        await this.aiMemory.writePage(memoryScope, {
           path: pagePath,
           title: page.title,
           body: related ? `${page.body}\n\n## Relacionados\n\n${related}` : page.body,
@@ -1157,7 +1167,7 @@ export class Orchestrator {
       // the atomic pages exist. It is redundant and would dominate recall.
       if (lastUser) {
         const legacyPath = `s/${shortHash(sessionId)}.md`
-        await this.aiMemory.deletePage(state.meta.projectId, legacyPath).catch(() => false)
+        await this.aiMemory.deletePage(memoryScope, legacyPath).catch(() => false)
       }
 
       // The continuity capsule: one page per session saying where the work stands (objective, plan, next step, files),
@@ -1181,7 +1191,7 @@ export class Orchestrator {
         })
         const page = await memory.readPage(capsule.summary.slug)
         if (page) {
-          await this.aiMemory.writePage(state.meta.projectId, {
+          await this.aiMemory.writePage(memoryScope, {
             path: `pages/${capsule.summary.slug}.md`,
             title: page.title,
             body: page.body,
@@ -2645,6 +2655,7 @@ function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => Resolve
     .register(...fsTools)
     .register(...searchTools)
     .register(...shellTools)
+    .register(...terminalTools)
     .register(...gitTools)
     .register(...webTools)
     .register(...browserTools)

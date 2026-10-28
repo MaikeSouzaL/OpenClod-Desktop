@@ -20,6 +20,7 @@ import type {
 import type { WorkspaceGuard } from '../security/policy.js'
 import type { BrowserLayer } from '../browser/layer.js'
 import type { ComputerLayer } from '../computer/layer.js'
+import type { TerminalRunner } from '../terminal/runner.js'
 import type { SkillLibrary } from '../skills/library.js'
 import type { MemoryStore } from '../memory/store.js'
 import type { ProjectMemory } from '../memory/project.js'
@@ -245,6 +246,8 @@ export interface ToolContext {
     projectMemory: ProjectMemory
     mcp?: McpToolService
     aiMemory?: AiMemoryToolService
+    /** The session's visible integrated terminal; absent in isolated harness tests. */
+    terminal?: TerminalRunner
   }
   /** Project scope used by the long-term memory index. */
   projectId?: string

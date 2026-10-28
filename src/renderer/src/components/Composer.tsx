@@ -141,6 +141,8 @@ interface ComposerProps {
   insert?: { id: string; text: string; sessionId?: string | null }
   onSend(text: string, images: ImagePart[]): Promise<boolean>
   onQueue(text: string, images: ImagePart[]): void
+  /** Sending while busy: interrupts the running turn and handles this message next. */
+  onInterruptSend(text: string, images: ImagePart[]): void
   /** Injects a queued prompt into the running turn instead of waiting for it. */
   onSendQueued(id: string): void
   onRemoveQueued(id: string): void
@@ -185,6 +187,7 @@ export function Composer({
   insert,
   onSend,
   onQueue,
+  onInterruptSend,
   onSendQueued,
   onRemoveQueued,
   onCommand,
@@ -380,6 +383,19 @@ export function Composer({
     textareaRef.current?.focus()
   }
 
+  /** Enviar com um turno em andamento: interrompe o turno atual e atende esta mensagem em seguida. */
+  const interruptSend = (): void => {
+    stopDictation()
+    const payload = composed()
+    if ((!payload.text && !payload.images.length) || dictationActive) return
+    onInterruptSend(payload.text, payload.images)
+    setText('')
+    setImages([])
+    setDocuments([])
+    setAttachedPaths([])
+    textareaRef.current?.focus()
+  }
+
   const selectSlash = (row: number): void => {
     if (row < commands.length) {
       const command = commands[row]
@@ -427,7 +443,9 @@ export function Composer({
 
     if (event.key === 'Enter' && !event.shiftKey && !event.altKey) {
       event.preventDefault()
-      if (event.ctrlKey || busy) queue()
+      // Ocupado + Enter simples → interrompe o turno e atende esta mensagem. Ctrl+Enter sempre enfileira.
+      if (busy && !event.ctrlKey) interruptSend()
+      else if (event.ctrlKey || busy) queue()
       else void submit()
     }
   }
@@ -680,10 +698,10 @@ export function Composer({
       ? 'Como posso ajudar você hoje?'
       : variant === 'cowork'
         ? busy
-          ? 'Digite para adicionar à fila…'
+          ? 'Enter interrompe e envia · Ctrl+Enter enfileira'
           : 'Descreva a tarefa que o Openclod deve executar'
         : busy
-          ? 'Digite para adicionar à fila…'
+          ? 'Enter interrompe e envia · Ctrl+Enter enfileira'
           : 'Digite / para comandos'
 
   return (

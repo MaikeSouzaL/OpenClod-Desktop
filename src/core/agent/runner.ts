@@ -30,6 +30,7 @@ import type { FileTracker } from '../session/tracker.js'
 import { WorkspaceGuard } from '../security/policy.js'
 import type { BrowserLayer } from '../browser/layer.js'
 import type { ComputerLayer } from '../computer/layer.js'
+import type { TerminalRunner } from '../terminal/runner.js'
 import type { SkillLibrary } from '../skills/library.js'
 import type { MemoryFact, MemoryStore } from '../memory/store.js'
 import type { ProjectMemory } from '../memory/project.js'
@@ -350,6 +351,8 @@ export interface RunnerDeps {
     mcp?: import('../tools/types.js').McpToolService
     /** Project long-term index (AI-Memory); absent in isolated harness tests. */
     aiMemory?: AiMemoryToolService
+    /** The session's visible integrated terminal; absent in isolated harness tests. */
+    terminal?: TerminalRunner
   }
   project: ProjectMeta
   /** Id of the owning project, used as the AI-Memory scope. */
@@ -1095,13 +1098,18 @@ export class SessionRunner {
       ? `${work.join('\n')}\n(detalhes: memory_page action=read slug=<slug>${handoffs.length ? '; para assumir um handoff: tool_load memory_handoff e chame action=accept id=<id>' : ''})`
       : undefined
     const suggested = this.suggestionsFor(query)
+    // Nos chats do Início a memória é SOB DEMANDA: não empurramos a cápsula de continuidade ("de onde paramos") nem as
+    // páginas que casam com o pedido. Assim o modelo atende a mensagem atual em vez de retomar a tarefa anterior sozinho
+    // ao ver um simples "oi". O mapa continua (para ele saber que há memória) e memory_recall busca o contexto quando ele
+    // sentir que precisa. No modo Code/Cowork o comportamento é o de sempre (contexto do projeto injetado).
+    const onDemandMemory = this.deps.surface === 'chat'
     const result = composeTurnContext(state, {
       plan: this.plan,
       facts,
       mcp: summarizeMcpTools(this.mcpToolDefs()) || undefined,
       map: map || undefined,
-      openWork,
-      recall: pack.text || undefined,
+      openWork: onDemandMemory ? undefined : openWork,
+      recall: onDemandMemory ? undefined : pack.text || undefined,
       suggestions: suggested.text
     })
     this.lastTurnContextSections = result.sections

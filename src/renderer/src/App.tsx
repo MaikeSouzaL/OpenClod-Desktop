@@ -975,6 +975,32 @@ export default function App(): ReactElement {
     if (sessionId) void window.forja.inbox.remove(sessionId, id).catch(() => undefined)
   }, [])
 
+  /**
+   * Enviar com um turno em andamento: põe a mensagem na frente da fila e aborta o turno atual. Quando o turno
+   * cancela, o dreno de fila (efeito abaixo) a envia como um novo turno — então o pedido do usuário é atendido
+   * em vez de só esperar na fila, mesmo que o modelo tenha travado sem responder.
+   */
+  const interruptAndSend = useCallback(
+    async (text: string, images: ImagePart[]): Promise<void> => {
+      if (!text.trim() && !images.length) return
+      const sessionId = activeSessionRef.current
+      if (!sessionId) {
+        void send(text, images, { fresh: true })
+        return
+      }
+      const localId = logId()
+      setQueued((current) => [{ id: localId, text, images }, ...current].slice(0, 25))
+      void window.forja.inbox
+        .add(sessionId, text, images, 'queue', 'ui')
+        .then((result) => {
+          if (result.ok) setQueued((current) => current.map((item) => (item.id === localId ? { ...item, id: result.value.id } : item)))
+        })
+        .catch(() => undefined)
+      await stop()
+    },
+    [send, stop]
+  )
+
   /** Sends a queued prompt right away: inject as steer while busy, or start a turn. */
   const sendQueuedNow = useCallback(
     async (id: string): Promise<void> => {
@@ -1451,6 +1477,7 @@ export default function App(): ReactElement {
       insert={dictationInsert}
       onSend={(text, images) => send(text, images, { fresh: !session })}
       onQueue={enqueue}
+      onInterruptSend={(text, images) => void interruptAndSend(text, images)}
       onSendQueued={(id) => void sendQueuedNow(id)}
       onRemoveQueued={removeQueued}
       onCommand={runCommand}
