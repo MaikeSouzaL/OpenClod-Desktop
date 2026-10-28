@@ -1,0 +1,2082 @@
+{
+  "generatedAt": "2026-10-28T01:28:03.931Z",
+  "platform": "win32",
+  "backend": {
+    "available": true,
+    "backend": "open-computer-use",
+    "detail": "UI Automation + Win32 + captura nativa · C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\resources\\bin\\open-computer-use.exe (bundled)",
+    "platform": "win32"
+  },
+  "iterations": 30,
+  "totalCalls": 137,
+  "unexpectedFailures": [],
+  "expectedFailures": 4,
+  "latencyMs": {
+    "input_p50": 2942,
+    "input_p95": 19652,
+    "input_max": 21281,
+    "snapshot_p95": 3964,
+    "screenshot_p95": 1922
+  },
+  "rssMB": {
+    "before": 103,
+    "after": 96,
+    "delta": -8
+  },
+  "checks": [
+    {
+      "name": "o Bloco de Notas abriu e foi encontrado (launch + wait_for_window)",
+      "pass": true,
+      "detail": "janela 10226452"
+    },
+    {
+      "name": "computer_snapshot devolve árvore, snapshot_id e imagem",
+      "pass": true,
+      "detail": "snapshot_id=snap_1_mvrflw9z imagens=1"
+    },
+    {
+      "name": "ação de elemento devolve imagem da janela (modelo com visão)",
+      "pass": true,
+      "detail": "imagens=1"
+    },
+    {
+      "name": "observe_after ligado por padrão: o resultado traz state_changed",
+      "pass": true,
+      "detail": "{\"state_changed\":true,\"settle_ms\":2137}"
+    },
+    {
+      "name": "ref de um snapshot antigo é rejeitada (element_stale)",
+      "pass": true,
+      "detail": "element_stale: snapshot antigo; tire um novo computer_snapshot e use a nova ref"
+    },
+    {
+      "name": "clique global sem alvo é recusado",
+      "pass": true,
+      "detail": "input_method=global exige app ou window; um clique sobre a captura global não tem alvo verificável."
+    },
+    {
+      "name": "snapshot de janela inexistente é recusado",
+      "pass": true,
+      "detail": "staleWindowHandle(999999999): the window is no longer open; re-observe with list_windows."
+    },
+    {
+      "name": "typing concorrente: todas as chamadas terminaram ok",
+      "pass": true,
+      "detail": "6/6 ok em 21282ms"
+    },
+    {
+      "name": "a fila de input não corrompeu/perdeu nada: todos os tokens aparecem inteiros",
+      "pass": true,
+      "detail": "todos presentes"
+    },
+    {
+      "name": "10 leituras concorrentes: todas ok com snapshot_id",
+      "pass": true,
+      "detail": "10/10 ok, 10 ids distintos"
+    },
+    {
+      "name": "loop de volume (30×: digitar + snapshot) sem falha",
+      "pass": true
+    },
+    {
+      "name": "capturas repetidas (20×) sempre retornam imagem",
+      "pass": true
+    },
+    {
+      "name": "computer_open_path abre a pasta sem derrubar o processo",
+      "pass": true,
+      "detail": "pasta aberto: C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-stress-ZKtttp"
+    }
+  ],
+  "calls": [
+    {
+      "call": "computer_launch notepad",
+      "ok": true,
+      "ms": 1358,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "launch_app"
+      },
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 10226452,\n  \"title\": \"Sem título - Bloco de Notas\"\n}"
+    },
+    {
+      "call": "computer_wait_for_window notepad",
+      "ok": true,
+      "ms": 907,
+      "images": 0,
+      "data": {
+        "app": "notepad",
+        "id": 10226452,
+        "title": "Sem título - Bloco de Notas"
+      },
+      "text": "janela encontrada: Sem título - Bloco de Notas\n{\n  \"app\": \"notepad\",\n  \"id\": 10226452,\n  \"title\": \"Sem título - Bloco de Notas\"\n}"
+    },
+    {
+      "call": "computer_list_apps",
+      "ok": true,
+      "ms": 12882,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "list_apps"
+      },
+      "text": "Antigravity IDE -- Antigravity IDE [running, pid=29428, window=urmobo_crm_front - Antigravity IDE - default-pt-BR.ts (Working Tree) (default-pt-BR.ts) [Administrator]]\nApplicationFrameHost -- ApplicationFrameHost [running, pid=10672, window=Configurações]\nchrome -- chrome [running, pid=8200, window=OliverioSA - Comboio - Google Chrome]\nclaude -- claude [running, pid=13524, window=Claude]\ncmd -- cmd [running, pid=1872, window=Configuracoes do WhatsApp - uv  run python config_ui.py]\ncmd -- cmd [running, pid=23480, window=Administrador:  WhatsApp para Claude Code]\nelectron -- electron [running, p"
+    },
+    {
+      "call": "computer_list_windows",
+      "ok": true,
+      "ms": 969,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "list_windows"
+      },
+      "text": "[\n  {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"Sem título - Bloco de Notas\"\n  },\n  {\n    \"app\": \"claude\",\n    \"id\": 328048,\n    \"title\": \"Claude\"\n  },\n  {\n    \"app\": \"chrome\",\n    \"id\": 132588,\n    \"title\": \"OliverioSA - Comboio - Google Chrome\"\n  },\n  {\n    \"app\": \"electron\",\n    \"id\": 9308280,\n    \"title\": \"Openclod Desktop\"\n  },\n  {\n    \"app\": \"WhatsApp.Root\",\n    \"id\": 66430,\n    \"title\": \"WhatsApp\"\n  },\n  {\n    \"app\": \"Antigravity IDE\",\n    \"id\": 396516,\n    \"title\": \"urmobo_crm_front - Antigravity IDE - default-pt-BR.ts (Working Tree) (default-pt-BR.ts) [Administrator]\"\n  "
+    },
+    {
+      "call": "computer_get_window",
+      "ok": true,
+      "ms": 15,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "get_window"
+      },
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 10226452,\n  \"title\": \"Sem título - Bloco de Notas\"\n}"
+    },
+    {
+      "call": "computer_activate",
+      "ok": true,
+      "ms": 15,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "activate_window"
+      },
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 10226452,\n  \"title\": \"Sem título - Bloco de Notas\"\n}"
+    },
+    {
+      "call": "computer_cursor_position",
+      "ok": true,
+      "ms": 40,
+      "images": 0,
+      "data": {
+        "x": 2749,
+        "y": 578
+      },
+      "text": "cursor em (2749, 578)"
+    },
+    {
+      "call": "computer_wait (janela renderizar)",
+      "ok": true,
+      "ms": 807,
+      "images": 0,
+      "text": "aguardou 0.8s"
+    },
+    {
+      "call": "computer_snapshot + screenshot",
+      "ok": true,
+      "ms": 510,
+      "images": 1,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1_mvrflw9z",
+        "generation": 1,
+        "truncated": false,
+        "screenshot_id": "shot-10226452-1"
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1_mvrflw9z\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\\n\\t\\t\\t4 text  Frame: {x: 8, y: 496, width: 756, h"
+    },
+    {
+      "call": "computer_window_at",
+      "ok": true,
+      "ms": 1833,
+      "images": 0,
+      "data": {
+        "root": 132588,
+        "hit": 22611876,
+        "title": "OliverioSA - Comboio - Google Chrome",
+        "class": "Chrome_WidgetWin_1",
+        "screen": {
+          "x": 300,
+          "y": 220
+        }
+      },
+      "text": "janela sob (300, 220): OliverioSA - Comboio - Google Chrome · classe Chrome_WidgetWin_1 · id 132588 (hit 22611876)"
+    },
+    {
+      "call": "computer_set_value",
+      "ok": true,
+      "ms": 3378,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "set_value",
+        "snapshot_id": "snap_5_mvrfm0as",
+        "generation": 5,
+        "state_changed": true,
+        "settle_ms": 2133,
+        "settle_reacted": true,
+        "settle_timed_out": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"Sem título - Bloco de Notas\", App: notepad.\n\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\n Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 1, Col 1 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t"
+    },
+    {
+      "call": "computer_click element (contrato de visão/observe)",
+      "ok": true,
+      "ms": 5238,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "click",
+        "snapshot_id": "snap_9_mvrfm4ba",
+        "generation": 9,
+        "state_changed": true,
+        "settle_ms": 2137,
+        "settle_reacted": true,
+        "settle_timed_out": true,
+        "cursor": {
+          "x": 3117,
+          "y": 381
+        }
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"Sem título - Bloco de Notas\", App: notepad.\n\t0 window Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\n Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 1 Frame: {x: 766, y: 496, width: 138, height: 21}\n\t\t"
+    },
+    {
+      "call": "computer_type_text (elemento)",
+      "ok": true,
+      "ms": 5067,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_e_mvrfm893",
+        "generation": 14,
+        "state_changed": true,
+        "settle_ms": 2192,
+        "settle_reacted": true,
+        "settle_timed_out": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEM Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 10 Frame: {x: 766, y: 496, width: 138, he"
+    },
+    {
+      "call": "computer_press_key ctrl+End",
+      "ok": true,
+      "ms": 1797,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "press_key",
+        "snapshot_id": "snap_f_mvrfm99i",
+        "generation": 15,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEM Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 10 Frame: {x: 766, y: 496, width: 138, he"
+    },
+    {
+      "call": "computer_type_text (janela em foco)",
+      "ok": true,
+      "ms": 3266,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_k_mvrfmc5q",
+        "generation": 20,
+        "state_changed": true,
+        "settle_ms": 2137,
+        "settle_reacted": true,
+        "settle_timed_out": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUS Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 20 Frame: {x: 766, y: 496, widt"
+    },
+    {
+      "call": "computer_scroll (janela)",
+      "ok": true,
+      "ms": 1203,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "scroll",
+        "cursor": {
+          "x": 3117,
+          "y": 381
+        }
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUS Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 20 Frame: {x: 766, y: 496, widt"
+    },
+    {
+      "call": "computer_drag (janela)",
+      "ok": true,
+      "ms": 1511,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "drag",
+        "cursor": {
+          "x": 3117,
+          "y": 381
+        }
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUS Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 20 Frame: {x: 766, y: 496, widt"
+    },
+    {
+      "call": "computer_secondary_action (falha esperada do backend)",
+      "ok": false,
+      "expected": true,
+      "ms": 52,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "perform_secondary_action"
+      },
+      "text": "scroll is not a valid secondary action for 1"
+    },
+    {
+      "call": "computer_screenshot desktop",
+      "ok": true,
+      "ms": 1962,
+      "images": 1,
+      "data": {
+        "width": 1400,
+        "height": 788,
+        "physicalWidth": 1920,
+        "physicalHeight": 1081,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.7291666666666666,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150688479.png"
+      },
+      "text": "captura 1400x788 do monitor 1 (principal) (1920x1081px reais, origem 0,0). Escala 0.7292: 1 px da imagem = 1.371 px reais. Use x,y em pixels desta imagem (1400x788); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "computer_mouse_move",
+      "ok": true,
+      "ms": 1875,
+      "images": 1,
+      "data": {
+        "screen": {
+          "x": 439,
+          "y": 329
+        },
+        "actual": {
+          "x": 438,
+          "y": 328
+        }
+      },
+      "text": "ponteiro em (320, 240) da captura → tela (439, 329); cursor em (438, 328). Imagem: recorte de 220x220 px reais ao redor do ponteiro (a cruz vermelha é onde ele está). Se a cruz não estiver sobre o alvo, corrija com uma nova computer_screenshot antes de clicar."
+    },
+    {
+      "call": "computer_mouse_button down",
+      "ok": true,
+      "ms": 94,
+      "images": 0,
+      "data": {
+        "cursor": {
+          "x": 438,
+          "y": 328
+        }
+      },
+      "text": "down left"
+    },
+    {
+      "call": "computer_mouse_button up",
+      "ok": true,
+      "ms": 79,
+      "images": 0,
+      "data": {
+        "cursor": {
+          "x": 438,
+          "y": 328
+        }
+      },
+      "text": "up left"
+    },
+    {
+      "call": "computer_wait",
+      "ok": true,
+      "ms": 209,
+      "images": 0,
+      "text": "aguardou 0.2s"
+    },
+    {
+      "call": "computer_wait_for (texto na árvore)",
+      "ok": true,
+      "ms": 520,
+      "images": 0,
+      "text": "<ax_tree target=\"janela 10226452\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUS Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23"
+    },
+    {
+      "call": "computer_snapshot (para ref velha)",
+      "ok": true,
+      "ms": 509,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_o_mvrfmicf",
+        "generation": 24,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_o_mvrfmicf\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUS Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8, y: 4"
+    },
+    {
+      "call": "computer_type_text (muda a árvore)",
+      "ok": true,
+      "ms": 3292,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_s_mvrfmkvw",
+        "generation": 28,
+        "state_changed": true,
+        "settle_ms": 2171,
+        "settle_reacted": true,
+        "settle_timed_out": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOU Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 20 Frame: {x: 766, y: 496,"
+    },
+    {
+      "call": "computer_snapshot (nova geração)",
+      "ok": true,
+      "ms": 506,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_t_mvrfml9y",
+        "generation": 29,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_t_mvrfml9y\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOU Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status bar Barra de Status Frame: {x: 8,"
+    },
+    {
+      "call": "ref de snapshot velho é recusada",
+      "ok": false,
+      "expected": true,
+      "ms": 0,
+      "images": 0,
+      "text": "element_stale: snapshot antigo; tire um novo computer_snapshot e use a nova ref"
+    },
+    {
+      "call": "clique global sem alvo é recusado",
+      "ok": false,
+      "expected": true,
+      "ms": 0,
+      "images": 0,
+      "text": "input_method=global exige app ou window; um clique sobre a captura global não tem alvo verificável."
+    },
+    {
+      "call": "janela inexistente é recusada",
+      "ok": false,
+      "expected": true,
+      "ms": 14,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "get_window_state"
+      },
+      "text": "staleWindowHandle(999999999): the window is no longer open; re-observe with list_windows."
+    },
+    {
+      "call": "computer_activate (foco no notepad)",
+      "ok": true,
+      "ms": 20,
+      "images": 0,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "activate_window"
+      },
+      "text": "{\n  \"app\": \"notepad\",\n  \"id\": 10226452,\n  \"title\": \"*Sem título - Bloco de Notas\"\n}"
+    },
+    {
+      "call": "computer_click editor (foco)",
+      "ok": true,
+      "ms": 3968,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "click",
+        "snapshot_id": "snap_x_mvrfmoc4",
+        "generation": 33,
+        "state_changed": true,
+        "settle_ms": 2128,
+        "settle_reacted": true,
+        "settle_timed_out": true,
+        "cursor": {
+          "x": 3117,
+          "y": 381
+        }
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOU Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 25 Frame: {x: 766, y: 496,"
+    },
+    {
+      "call": "limpa o editor (ctrl+a)",
+      "ok": true,
+      "ms": 1796,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "press_key",
+        "snapshot_id": "snap_y_mvrfmpdd",
+        "generation": 34,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOU Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 25 Frame: {x: 766, y: 496,"
+    },
+    {
+      "call": "limpa o editor (Delete)",
+      "ok": true,
+      "ms": 1632,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "press_key",
+        "snapshot_id": "snap_10_mvrfmqm4",
+        "generation": 36,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOU Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 25 Frame: {x: 766, y: 496,"
+    },
+    {
+      "call": "type concorrente alfa",
+      "ok": true,
+      "ms": 16102,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_18_mvrfn3fn",
+        "generation": 44,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfa Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 29 Frame: {x: 766, y: "
+    },
+    {
+      "call": "type concorrente bravo",
+      "ok": true,
+      "ms": 17342,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_19_mvrfn4e4",
+        "generation": 45,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravo Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 34 Frame: {x: 766"
+    },
+    {
+      "call": "type concorrente charlie",
+      "ok": true,
+      "ms": 18491,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1a_mvrfn5a1",
+        "generation": 46,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharlie Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 41 Frame: "
+    },
+    {
+      "call": "type concorrente delta",
+      "ok": true,
+      "ms": 19652,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1b_mvrfn66a",
+        "generation": 47,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedelta Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 46 Fr"
+    },
+    {
+      "call": "type concorrente echo",
+      "ok": true,
+      "ms": 20784,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1c_mvrfn71q",
+        "generation": 48,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaecho Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3, Col 5"
+    },
+    {
+      "call": "type concorrente foxtrot",
+      "ok": true,
+      "ms": 21281,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1d_mvrfn7fj",
+        "generation": 49,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln 3"
+    },
+    {
+      "call": "computer_wait (deixa assentar)",
+      "ok": true,
+      "ms": 408,
+      "images": 0,
+      "text": "aguardou 0.4s"
+    },
+    {
+      "call": "computer_snapshot (confere os tokens)",
+      "ok": true,
+      "ms": 513,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1e_mvrfn854",
+        "generation": 50,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1e_mvrfn854\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 0",
+      "ok": true,
+      "ms": 496,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1f_mvrfn8iw",
+        "generation": 51,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1f_mvrfn8iw\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 1",
+      "ok": true,
+      "ms": 998,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1g_mvrfn8wv",
+        "generation": 52,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1g_mvrfn8wv\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 2",
+      "ok": true,
+      "ms": 1498,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1h_mvrfn9ar",
+        "generation": 53,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1h_mvrfn9ar\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 3",
+      "ok": true,
+      "ms": 2000,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1i_mvrfn9op",
+        "generation": 54,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1i_mvrfn9op\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 4",
+      "ok": true,
+      "ms": 2500,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1j_mvrfna2l",
+        "generation": 55,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1j_mvrfna2l\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 5",
+      "ok": true,
+      "ms": 2998,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1k_mvrfnagf",
+        "generation": 56,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1k_mvrfnagf\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 6",
+      "ok": true,
+      "ms": 3482,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1l_mvrfnatv",
+        "generation": 57,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1l_mvrfnatv\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 7",
+      "ok": true,
+      "ms": 3964,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1m_mvrfnb79",
+        "generation": 58,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1m_mvrfnb79\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 8",
+      "ok": true,
+      "ms": 4467,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1n_mvrfnbl8",
+        "generation": 59,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1n_mvrfnbl8\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "snapshot concorrente 9",
+      "ok": true,
+      "ms": 4946,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1o_mvrfnbyj",
+        "generation": 60,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1o_mvrfnbyj\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrot Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 status "
+    },
+    {
+      "call": "loop type #0",
+      "ok": true,
+      "ms": 2903,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1q_mvrfne76",
+        "generation": 62,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   Ln"
+    },
+    {
+      "call": "loop snapshot #0",
+      "ok": true,
+      "ms": 506,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1r_mvrfnel8",
+        "generation": 63,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1r_mvrfnel8\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 statu"
+    },
+    {
+      "call": "loop type #1",
+      "ok": true,
+      "ms": 2860,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1t_mvrfngso",
+        "generation": 65,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text   "
+    },
+    {
+      "call": "loop snapshot #1",
+      "ok": true,
+      "ms": 502,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1u_mvrfnh6l",
+        "generation": 66,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1u_mvrfnh6l\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 sta"
+    },
+    {
+      "call": "loop type #2",
+      "ok": true,
+      "ms": 5420,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1w_mvrfnld6",
+        "generation": 68,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 text "
+    },
+    {
+      "call": "loop snapshot #2",
+      "ok": true,
+      "ms": 493,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_1x_mvrfnlqv",
+        "generation": 69,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_1x_mvrfnlqv\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3 s"
+    },
+    {
+      "call": "loop type #3",
+      "ok": true,
+      "ms": 2918,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_1z_mvrfnnzx",
+        "generation": 71,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 tex"
+    },
+    {
+      "call": "loop snapshot #3",
+      "ok": true,
+      "ms": 484,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_20_mvrfnodd",
+        "generation": 72,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_20_mvrfnodd\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\t3"
+    },
+    {
+      "call": "loop type #4",
+      "ok": true,
+      "ms": 2883,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_22_mvrfnqlf",
+        "generation": 74,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5 t"
+    },
+    {
+      "call": "loop snapshot #4",
+      "ok": true,
+      "ms": 495,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_23_mvrfnqz7",
+        "generation": 75,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_23_mvrfnqz7\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\t\\"
+    },
+    {
+      "call": "loop type #5",
+      "ok": true,
+      "ms": 2941,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_25_mvrfnt8w",
+        "generation": 77,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t\t5"
+    },
+    {
+      "call": "loop snapshot #5",
+      "ok": true,
+      "ms": 518,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_26_mvrfntna",
+        "generation": 78,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_26_mvrfntna\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\n\\"
+    },
+    {
+      "call": "loop type #6",
+      "ok": true,
+      "ms": 4149,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_28_mvrfnwuj",
+        "generation": 80,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n\t\t"
+    },
+    {
+      "call": "loop snapshot #6",
+      "ok": true,
+      "ms": 496,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_29_mvrfnx8b",
+        "generation": 81,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_29_mvrfnx8b\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\\"
+    },
+    {
+      "call": "loop type #7",
+      "ok": true,
+      "ms": 2898,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2b_mvrfnzgt",
+        "generation": 83,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21}\n"
+    },
+    {
+      "call": "loop snapshot #7",
+      "ok": true,
+      "ms": 484,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2c_mvrfnzu9",
+        "generation": 84,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2c_mvrfnzu9\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17"
+    },
+    {
+      "call": "loop type #8",
+      "ok": true,
+      "ms": 4189,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2e_mvrfo32m",
+        "generation": 86,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: 21"
+    },
+    {
+      "call": "loop snapshot #8",
+      "ok": true,
+      "ms": 502,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2f_mvrfo3gk",
+        "generation": 87,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2f_mvrfo3gk\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: "
+    },
+    {
+      "call": "loop type #9",
+      "ok": true,
+      "ms": 2916,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2h_mvrfo5pk",
+        "generation": 89,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, height: "
+    },
+    {
+      "call": "loop snapshot #9",
+      "ok": true,
+      "ms": 501,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2i_mvrfo63h",
+        "generation": 90,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2i_mvrfo63h\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height"
+    },
+    {
+      "call": "loop type #10",
+      "ok": true,
+      "ms": 2916,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2k_mvrfo8cg",
+        "generation": 92,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, heigh"
+    },
+    {
+      "call": "loop snapshot #10",
+      "ok": true,
+      "ms": 514,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2l_mvrfo8qr",
+        "generation": 93,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2l_mvrfo8qr\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, hei"
+    },
+    {
+      "call": "loop type #11",
+      "ok": true,
+      "ms": 2984,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2n_mvrfob1n",
+        "generation": 95,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756, he"
+    },
+    {
+      "call": "loop snapshot #11",
+      "ok": true,
+      "ms": 517,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2o_mvrfobg0",
+        "generation": 96,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2o_mvrfobg0\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 17, "
+    },
+    {
+      "call": "loop type #12",
+      "ok": true,
+      "ms": 4305,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2q_mvrfoerl",
+        "generation": 98,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 756,"
+    },
+    {
+      "call": "loop snapshot #12",
+      "ok": true,
+      "ms": 494,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2r_mvrfof5b",
+        "generation": 99,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2r_mvrfof5b\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width: 1"
+    },
+    {
+      "call": "loop type #13",
+      "ok": true,
+      "ms": 2899,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2t_mvrfohdu",
+        "generation": 101,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width: 7"
+    },
+    {
+      "call": "loop snapshot #13",
+      "ok": true,
+      "ms": 501,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2u_mvrfohrr",
+        "generation": 102,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2u_mvrfohrr\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, width"
+    },
+    {
+      "call": "loop type #14",
+      "ok": true,
+      "ms": 2947,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2w_mvrfok1m",
+        "generation": 104,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, width"
+    },
+    {
+      "call": "loop snapshot #14",
+      "ok": true,
+      "ms": 601,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_2x_mvrfokib",
+        "generation": 105,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_2x_mvrfokib\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477, wi"
+    },
+    {
+      "call": "loop type #15",
+      "ok": true,
+      "ms": 2915,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_2z_mvrfomra",
+        "generation": 107,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496, wi"
+    },
+    {
+      "call": "loop snapshot #15",
+      "ok": true,
+      "ms": 483,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_30_mvrfon4o",
+        "generation": 108,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_30_mvrfon4o\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 477,"
+    },
+    {
+      "call": "loop type #16",
+      "ok": true,
+      "ms": 2867,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_32_mvrfopcc",
+        "generation": 110,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 496,"
+    },
+    {
+      "call": "loop snapshot #16",
+      "ok": true,
+      "ms": 501,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_33_mvrfopq9",
+        "generation": 111,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_33_mvrfopq9\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y: 4"
+    },
+    {
+      "call": "loop type #17",
+      "ok": true,
+      "ms": 2902,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_35_mvrforyv",
+        "generation": 113,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y: 4"
+    },
+    {
+      "call": "loop snapshot #17",
+      "ok": true,
+      "ms": 528,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_36_mvrfosdj",
+        "generation": 114,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_36_mvrfosdj\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177, y"
+    },
+    {
+      "call": "loop type #18",
+      "ok": true,
+      "ms": 2942,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_38_mvrfoun9",
+        "generation": 116,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8, y"
+    },
+    {
+      "call": "loop snapshot #18",
+      "ok": true,
+      "ms": 503,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_39_mvrfov18",
+        "generation": 117,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_39_mvrfov18\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1177"
+    },
+    {
+      "call": "loop type #19",
+      "ok": true,
+      "ms": 4145,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3b_mvrfoy8d",
+        "generation": 119,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x: 8"
+    },
+    {
+      "call": "loop snapshot #19",
+      "ok": true,
+      "ms": 500,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3c_mvrfoym9",
+        "generation": 120,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3c_mvrfoym9\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x: 1"
+    },
+    {
+      "call": "loop type #20",
+      "ok": true,
+      "ms": 2899,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3e_mvrfp0us",
+        "generation": 122,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame: {x"
+    },
+    {
+      "call": "loop snapshot #20",
+      "ok": true,
+      "ms": 502,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3f_mvrfp18q",
+        "generation": 123,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3f_mvrfp18q\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame: {x"
+    },
+    {
+      "call": "loop type #21",
+      "ok": true,
+      "ms": 2863,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3h_mvrfp3g8",
+        "generation": 125,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Frame:"
+    },
+    {
+      "call": "loop snapshot #21",
+      "ok": true,
+      "ms": 499,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3i_mvrfp3u4",
+        "generation": 126,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3i_mvrfp3u4\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Frame:"
+    },
+    {
+      "call": "loop type #22",
+      "ok": true,
+      "ms": 2885,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3k_mvrfp628",
+        "generation": 128,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  Fra"
+    },
+    {
+      "call": "loop snapshot #22",
+      "ok": true,
+      "ms": 500,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3l_mvrfp6g5",
+        "generation": 129,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3l_mvrfp6g5\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  Fra"
+    },
+    {
+      "call": "loop type #23",
+      "ok": true,
+      "ms": 2902,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3n_mvrfp8or",
+        "generation": 131,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 text  "
+    },
+    {
+      "call": "loop snapshot #23",
+      "ok": true,
+      "ms": 499,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3o_mvrfp92m",
+        "generation": 132,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3o_mvrfp92m\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevador  "
+    },
+    {
+      "call": "loop type #24",
+      "ok": true,
+      "ms": 2863,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3q_mvrfpba5",
+        "generation": 134,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 tex"
+    },
+    {
+      "call": "loop snapshot #24",
+      "ok": true,
+      "ms": 504,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3r_mvrfpbo5",
+        "generation": 135,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3r_mvrfpbo5\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elevado"
+    },
+    {
+      "call": "loop type #25",
+      "ok": true,
+      "ms": 2864,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3t_mvrfpdvp",
+        "generation": 137,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t\t4 "
+    },
+    {
+      "call": "loop snapshot #25",
+      "ok": true,
+      "ms": 482,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3u_mvrfpe93",
+        "generation": 138,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3u_mvrfpe93\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 elev"
+    },
+    {
+      "call": "loop type #26",
+      "ok": true,
+      "ms": 2974,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3w_mvrfpgjp",
+        "generation": 140,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}\n\t\t"
+    },
+    {
+      "call": "loop snapshot #26",
+      "ok": true,
+      "ms": 536,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_3x_mvrfpgyl",
+        "generation": 141,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_3x_mvrfpgyl\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t2 e"
+    },
+    {
+      "call": "loop type #27",
+      "ok": true,
+      "ms": 4163,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_3z_mvrfpk67",
+        "generation": 143,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: 23}"
+    },
+    {
+      "call": "loop snapshot #27",
+      "ok": true,
+      "ms": 500,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_40_mvrfpkk4",
+        "generation": 144,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_40_mvrfpkk4\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\t\\t"
+    },
+    {
+      "call": "loop type #28",
+      "ok": true,
+      "ms": 2990,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_42_mvrfpmv5",
+        "generation": 146,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L28L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, height: "
+    },
+    {
+      "call": "loop snapshot #28",
+      "ok": true,
+      "ms": 605,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_43_mvrfpnbz",
+        "generation": 147,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_43_mvrfpnbz\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L28L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n\\t\\"
+    },
+    {
+      "call": "loop type #29",
+      "ok": true,
+      "ms": 3014,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "type_text",
+        "snapshot_id": "snap_45_mvrfppnp",
+        "generation": 149,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L29L28L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t2 elevador  Frame: {x: 1177, y: 477, width: 17, height: 17}\n\t\t3 status bar Barra de Status Frame: {x: 8, y: 494, width: 1186, heigh"
+    },
+    {
+      "call": "loop snapshot #29",
+      "ok": true,
+      "ms": 506,
+      "images": 0,
+      "data": {
+        "window": 10226452,
+        "server": "open-computer-use",
+        "tool": "get_window_state",
+        "snapshot_id": "snap_46_mvrfpq1r",
+        "generation": 150,
+        "truncated": false
+      },
+      "text": "<ax_tree target=\"janela 10226452\" snapshot=\"snap_46_mvrfpq1r\">\n{\n  \"window\": {\n    \"app\": \"notepad\",\n    \"id\": 10226452,\n    \"title\": \"*Sem título - Bloco de Notas\"\n  },\n  \"accessibility\": {\n    \"tree\": \"\\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\\n\\t\\t1 document Editor de Texto Value: Openclod stress — linha 1\\\\náéíóú çñü — unicode\\\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L29L28L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\\n"
+    },
+    {
+      "call": "loop screenshot #0",
+      "ok": true,
+      "ms": 1922,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150843680.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #1",
+      "ok": true,
+      "ms": 1722,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150845602.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #2",
+      "ok": true,
+      "ms": 1698,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150847323.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #3",
+      "ok": true,
+      "ms": 1705,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150849021.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #4",
+      "ok": true,
+      "ms": 1682,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150850726.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #5",
+      "ok": true,
+      "ms": 1700,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150852408.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #6",
+      "ok": true,
+      "ms": 1719,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150854108.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #7",
+      "ok": true,
+      "ms": 1686,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150855828.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #8",
+      "ok": true,
+      "ms": 1742,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150857513.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #9",
+      "ok": true,
+      "ms": 1708,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150859256.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #10",
+      "ok": true,
+      "ms": 1728,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150860964.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #11",
+      "ok": true,
+      "ms": 1808,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150862691.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #12",
+      "ok": true,
+      "ms": 1723,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150864500.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #13",
+      "ok": true,
+      "ms": 1681,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150866223.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #14",
+      "ok": true,
+      "ms": 1674,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150867904.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #15",
+      "ok": true,
+      "ms": 1718,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150869577.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #16",
+      "ok": true,
+      "ms": 1677,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150871296.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #17",
+      "ok": true,
+      "ms": 1711,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150872972.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #18",
+      "ok": true,
+      "ms": 1708,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150874684.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "loop screenshot #19",
+      "ok": true,
+      "ms": 1751,
+      "images": 1,
+      "data": {
+        "width": 1200,
+        "height": 675,
+        "physicalWidth": 1920,
+        "physicalHeight": 1080,
+        "originX": 0,
+        "originY": 0,
+        "scale": 0.625,
+        "grid": 0,
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\forja-shots\\shot-1793150876392.png"
+      },
+      "text": "captura 1200x675 do monitor 1 (principal) (1920x1080px reais, origem 0,0). Escala 0.6250: 1 px da imagem = 1.600 px reais. Use x,y em pixels desta imagem (1200x675); o harness converte para a tela real. Monitores: 1 = 1920x1080 em 0,0 (principal); 2 = 1920x1080 em 1920,2. Esta imagem mostra só o monitor 1. Se o que você precisa não estiver nela, capture monitor=2; se o usuário disser em qual tela fazer, use essa."
+    },
+    {
+      "call": "computer_open_path (pasta temporária)",
+      "ok": true,
+      "ms": 723,
+      "images": 0,
+      "data": {
+        "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-stress-ZKtttp",
+        "kind": "folder",
+        "reveal": false
+      },
+      "text": "pasta aberto: C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-stress-ZKtttp"
+    },
+    {
+      "call": "computer_wait (Explorer abrir)",
+      "ok": true,
+      "ms": 609,
+      "images": 0,
+      "text": "aguardou 0.6s"
+    },
+    {
+      "call": "fecha o notepad (alt+F4)",
+      "ok": true,
+      "ms": 1951,
+      "images": 1,
+      "data": {
+        "server": "open-computer-use",
+        "tool": "press_key",
+        "snapshot_id": "snap_47_mvrfqir9",
+        "generation": 151,
+        "state_changed": true
+      },
+      "text": "App=notepad (pid 3184)\nWindow: \"*Sem título - Bloco de Notas\", App: notepad.\n\t0 window *Sem título - Bloco de Notas Frame: {x: 0, y: 0, width: 1202, height: 525}\n\t\t1 window Bloco de notas Frame: {x: 172, y: 312, width: 366, height: 141}\n\t\t2 document Editor de Texto Value: Openclod stress — linha 1\\náéíóú çñü — unicode\\nTYPE-ELEMTYPE-FOCUSMUDOUalfabravocharliedeltaechofoxtrotL0L1L2L3L4L5L6L7L8L29L28L27L26L25L24L23L22L21L20L19L18L17L16L15L14L13L12L11L10L9 Secondary Actions: SetValue, Scroll Frame: {x: 8, y: 51, width: 1186, height: 443}\n\t\t\t3 elevador  Frame: {x: 1177, y: 477, width: 17, height: "
+    },
+    {
+      "call": "computer_wait (diálogo de salvar)",
+      "ok": true,
+      "ms": 605,
+      "images": 0,
+      "text": "aguardou 0.6s"
+    },
+    {
+      "call": "recusa salvar (n)",
+      "ok": true,
+      "ms": 1900,
+      "images": 1,
+      "text": "tecla n\n[captura do monitor 1 anexada: confirme o resultado antes do próximo passo. Pixels desta imagem 1280x720.]"
+    }
+  ]
+}
