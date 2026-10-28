@@ -1032,13 +1032,35 @@ export const computerOpenPathTool: ToolDef = {
       return { ok: false, text: `caminho não encontrado: ${target}` }
     }
     const folder = stat.isDirectory()
-    const argsForExplorer = args.reveal ? [`/select,${target}`] : [target]
-    if (args.reveal || folder) {
-      spawn('explorer.exe', argsForExplorer, { detached: true, windowsHide: true }).unref()
-    } else {
-      spawn('rundll32.exe', ['url.dll,FileProtocolHandler', target], { detached: true, windowsHide: true }).unref()
+    // Absolute paths to the Windows tools so a shell PATH without C:\Windows cannot turn this into ENOENT, and
+    // the spawn's async 'error' is caught: a tool must never crash the harness, only return ok:false.
+    const windows = process.env.SystemRoot || process.env.windir || 'C:\\Windows'
+    const [command, spawnArgs] =
+      args.reveal || folder
+        ? [path.join(windows, 'explorer.exe'), args.reveal ? [`/select,${target}`] : [target]]
+        : [path.join(windows, 'System32', 'rundll32.exe'), ['url.dll,FileProtocolHandler', target]]
+    const spawnError = await new Promise<Error | null>((resolve) => {
+      let child
+      try {
+        child = spawn(command, spawnArgs, { detached: true, windowsHide: true })
+      } catch (err) {
+        resolve(err as Error)
+        return
+      }
+      let settled = false
+      const done = (value: Error | null): void => {
+        if (settled) return
+        settled = true
+        resolve(value)
+      }
+      child.on('error', (err) => done(err))
+      // explorer.exe returns immediately; give a real failure time to surface, then treat it as launched.
+      child.unref()
+      setTimeout(() => done(null), 700)
+    })
+    if (spawnError) {
+      return { ok: false, text: `não consegui abrir ${target}: ${spawnError.message}`, summary: 'falha ao abrir' }
     }
-    await new Promise((resolve) => setTimeout(resolve, 700))
     return {
       ok: true,
       text: `${folder ? 'pasta' : 'arquivo'} aberto: ${target}${args.reveal ? ' (selecionado no Explorer)' : ''}`,

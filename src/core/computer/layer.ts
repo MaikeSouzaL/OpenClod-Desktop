@@ -117,6 +117,9 @@ const NO_STATE = /No (app|window) state is available/i
 const READ_ONLY_TOOL = /^(list_|get_|screenshot|capture|cursor_)/
 /** Failures that mean "try again" rather than "it will not work": flaky UIA, a busy or restarting backend. */
 const TRANSIENT = /timeout|timed out|not ready|is busy|temporar|unavailable|ECONN|EPIPE|socket|closed|reset|restart/i
+/** The backend PROCESS died (it can crash under rapid input): a dead process means the call did not run, so it is
+ * always safe to restart and retry once — even an input tool, which never double-fires because nothing happened. */
+const BACKEND_DOWN = /encerr|exited|exit code|c[óo]digo \d|not running|no longer running|process (exited|closed|killed)|server (closed|stopped|exited)/i
 
 /**
  * Normalize common model-provided key aliases to the Windows runtime's
@@ -288,26 +291,41 @@ export class ComputerLayer {
     return turn
   }
 
-  /** Calls one open-computer-use tool; `isError` becomes `ok: false`. */
+  /** Calls one open-computer-use tool; `isError` becomes `ok: false`. The client is fetched inside `run` so a
+   * restart (after a crash) is picked up on the retry. */
   async call(tool: string, args: Record<string, unknown>, timeoutMs = 90_000): Promise<ToolResult> {
-    const client = await this.backend()
     const run = async (): Promise<ToolResult> => {
       try {
+        const client = await this.backend()
         return await client.callTool(tool, args, timeoutMs)
       } catch (err) {
         return { ok: false, text: `open-computer-use/${tool}: ${(err as Error).message}` }
       }
     }
-    // Reads never move the mouse/keyboard, so they are safe to retry once when the backend flakes (a transient
-    // UIA error or a session still coming up). Input tools are NOT retried here: a click that already happened
-    // must not fire twice; their "did not run" case (NO_STATE) is retried in elementAction instead.
-    if (READ_ONLY_TOOL.test(tool)) {
-      const first = await run()
-      if (first.ok || !TRANSIENT.test(first.text)) return first
+    // The backend process can crash under rapid input. A dead process means THIS call did not run, so restarting
+    // it and retrying once is safe for every tool (no double-click): element snapshots are gone with the old
+    // process, and elementAction then re-snapshots. This keeps a crash from breaking a long desktop task.
+    const recoverFromCrash = async (first: ToolResult): Promise<ToolResult> => {
+      if (first.ok || !BACKEND_DOWN.test(first.text)) return first
+      await this.session?.stop().catch(() => undefined)
+      this.session = null
       await this.wait(0.3)
       return run()
     }
-    return this.serializeInput(run)
+    // Reads never move the mouse/keyboard, so they are also safe to retry once on a transient (non-crash) flake.
+    if (READ_ONLY_TOOL.test(tool)) {
+      const first = await run()
+      if (first.ok) return first
+      if (BACKEND_DOWN.test(first.text)) return recoverFromCrash(first)
+      if (TRANSIENT.test(first.text)) {
+        await this.wait(0.3)
+        return run()
+      }
+      return first
+    }
+    // Input tools are serialized (one shared mouse/keyboard) and retried only on a backend crash, never on a
+    // plain "it failed" (which might mean the action already happened).
+    return this.serializeInput(async () => recoverFromCrash(await run()))
   }
 
   /**
