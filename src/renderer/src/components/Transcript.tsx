@@ -250,7 +250,11 @@ export function Transcript({
       }…`
     : runState === 'tool'
       ? 'Executando ferramenta…'
-      : 'Pensando…'
+      : runState === 'waiting_approval'
+        ? 'Aguardando sua aprovação…'
+        : runState === 'streaming'
+          ? 'Gerando resposta…'
+          : 'Pensando…'
 
   useEffect(() => {
     if (!runningTools.length) return
@@ -552,7 +556,11 @@ export function Transcript({
           </article>
         ) : null}
 
-        {runState === 'thinking' || runState === 'tool' ? (
+        {/* Um indicador de "processando" enquanto o turno está ativo, em QUALQUER estado ocupado (pensando, gerando,
+            ferramenta, aguardando aprovação). Some quando há texto/raciocínio em stream, pois aí o próprio texto já é o sinal. */}
+        {(runState === 'thinking' || runState === 'streaming' || runState === 'tool' || runState === 'waiting_approval') &&
+        !streamingText &&
+        !reasoningText ? (
           <div className="status-line">
             <span className="status-mark spin">
               <OpenclodMark size={14} />
