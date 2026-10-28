@@ -377,6 +377,21 @@
   line-height: 1.5;
 }
 
+/* "Jeito garantido": o caminho colado. Uma faixa discreta logo abaixo do arquivo. */
+.colab-file-hint {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.colab-file-hint strong {
+  color: var(--text-1);
+}
+
 /* O notebook gravado: o arquivo para arrastar e os passos */
 .colab-steps {
   display: grid;

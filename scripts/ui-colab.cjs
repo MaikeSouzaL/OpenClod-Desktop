@@ -260,11 +260,12 @@ async function main() {
     const tile = page.locator('.colab-file')
     const tileText = (await tile.textContent()) || ''
     check(
-      'o cartão mostra o arquivo do notebook como um item para ARRASTAR para dentro do Colab (nome, tamanho, caminho e "Arraste para o Colab")',
-      (await tile.count()) === 1 && (await tile.getAttribute('draggable')) === 'true' && tileText.includes('openclod-servidor-llm.ipynb') && /\d+ KB/.test(tileText) && tileText.includes(file) && /Arraste para o Colab/.test(tileText),
+      'o cartão mostra o arquivo do notebook (nome, tamanho, caminho) e o arrastar como opcional',
+      (await tile.count()) === 1 && (await tile.getAttribute('draggable')) === 'true' && tileText.includes('openclod-servidor-llm.ipynb') && /\d+ KB/.test(tileText) && tileText.includes(file) && /Arraste/.test(tileText),
       tileText.replace(/\s+/g, ' ').slice(0, 200)
     )
-    check('o primeiro passo manda arrastar o arquivo mostrado', /arraste/i.test(steps[0]))
+    check('o primeiro passo leva pelo caminho colado (arrastar é só opcional)', /cole o caminho/i.test(steps[0]))
+    check('o cartão tem o botão "Copiar caminho" e a dica do método garantido', (await page.locator('.colab-copy-path').count()) === 1 && (await page.locator('.colab-file-hint').count()) === 1)
     report.shotSteps = await shot(page, '02-passos-apos-o-clique')
     await tile.dispatchEvent('dragstart')
     await page.locator('.colab-reveal-file').click()

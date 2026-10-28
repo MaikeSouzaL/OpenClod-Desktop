@@ -186,9 +186,10 @@ describe('the file the user drags into Colab', () => {
     expect(calls).toEqual([{ kind: 'reveal', target: info.path }])
   })
 
-  it('tells the user to drag the file in the first step', async () => {
+  it('leads the first step with the reliable paste-the-path method (drag is only optional)', async () => {
     const info = await service().prepare()
-    expect(info.steps[0]).toMatch(/arraste/i)
+    expect(info.steps[0]).toMatch(/Fazer upload de notebook/)
+    expect(info.steps[0]).toMatch(/cole o caminho/i)
   })
 })
 

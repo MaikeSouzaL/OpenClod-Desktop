@@ -64,6 +64,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
   const [reveal, setReveal] = useState(false)
   const [confirmingRemoval, setConfirmingRemoval] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [copiedPath, setCopiedPath] = useState(false)
   const [limitsOpen, setLimitsOpen] = useState(false)
   const limitsRef = useRef<HTMLDetailsElement>(null)
   const lastState = useRef<string>('')
@@ -114,6 +115,19 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
       if (!shown) setPrepareError('O arquivo do notebook não está mais na pasta: clique em “Abrir o Google Colab” de novo.')
     } catch (err) {
       setPrepareError(`Não consegui mostrar a pasta: ${errorMessage(err)}`)
+    }
+  }
+
+  // O método garantido de levar o notebook ao Colab: copiar o caminho e colar em "Fazer upload → Procurar".
+  const copyPath = async (): Promise<void> => {
+    if (!prepared) return
+    try {
+      await navigator.clipboard.writeText(prepared.path)
+      setCopiedPath(true)
+      window.setTimeout(() => setCopiedPath(false), 2000)
+    } catch {
+      // O caminho continua visível no card para o usuário copiar à mão.
+      setCopiedPath(false)
     }
   }
 
@@ -283,11 +297,11 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
             <div
               className="colab-file"
               role="group"
-              aria-label={`Arquivo ${prepared.fileName}: arraste para dentro do Colab`}
-              title="Arraste este arquivo para dentro do Colab"
+              aria-label={`Arquivo ${prepared.fileName}`}
+              title="Você pode arrastar este arquivo para o Colab (opcional) ou usar “Copiar caminho” e colar no upload"
               draggable
               onDragStart={(event) => {
-                // Cancels the browser's own drag so the app can start the native one: a real file the Colab page accepts.
+                // Arrastar para dentro do Colab é opcional e instável (app→navegador); o jeito garantido é o caminho colado.
                 event.preventDefault()
                 window.forja.app.colabStartDrag()
               }}
@@ -302,14 +316,20 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
                 </small>
                 <small className="colab-file-path">{prepared.path}</small>
               </span>
-              <span className="colab-file-grab">Arraste para o Colab</span>
+              <span className="colab-file-grab">Arraste (opcional)</span>
             </div>
             <div className="colab-actions">
+              <button type="button" className="btn small primary colab-copy-path" onClick={() => void copyPath()}>
+                <Icon name="fileCode" size={12} /> {copiedPath ? 'Caminho copiado!' : 'Copiar caminho'}
+              </button>
               <button type="button" className="btn small subtle colab-reveal-file" onClick={() => void revealNotebook()}>
                 <Icon name="folderOpen" size={12} /> Mostrar na pasta
               </button>
             </div>
           </div>
+          <p className="colab-file-hint">
+            Jeito garantido: o caminho já está copiado. No Colab, <strong>Arquivo → Fazer upload de notebook → Procurar → colar (Ctrl+V) → Abrir</strong>. Arrastar o arquivo também funciona em alguns navegadores, mas pode falhar — se falhar, use o caminho colado.
+          </p>
           <ol>
             {prepared.steps.map((step) => (
               <li key={step}>{step}</li>

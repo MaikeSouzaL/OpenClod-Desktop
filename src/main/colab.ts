@@ -53,7 +53,7 @@ export interface ColabServiceDeps {
 }
 
 const STEPS = [
-  'No Colab que abriu: Arquivo → Fazer upload de notebook, e arraste para a janela o arquivo mostrado acima (ou clique em Procurar e cole o caminho, que já está copiado).',
+  'No Colab que abriu: Arquivo → Fazer upload de notebook → Procurar → cole o caminho (Ctrl+V, ele já está copiado) → Abrir. (Arrastar o arquivo para a janela também funciona em alguns navegadores, mas o colar é o jeito garantido.)',
   'Ambiente de execução → Executar tudo (Ctrl+F9). O notebook já pede uma GPU; se o Colab mostrar um aviso de segurança sobre o notebook, confirme (o código está legível na 3ª célula).',
   'Espere: na primeira vez leva de 5 a 15 minutos (baixa o motor e o modelo). O progresso aparece no próprio notebook. Na etapa 2 ele para até 2 minutos numa caixa de seleção para você escolher o modelo (botão "Usar este modelo"); se você não escolher, segue com o automático.',
   'No fim aparece o CÓDIGO DE CONEXÃO. Clique em Copiar.',
