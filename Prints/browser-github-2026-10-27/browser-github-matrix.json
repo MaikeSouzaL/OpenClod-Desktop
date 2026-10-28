@@ -1,0 +1,178 @@
+{
+  "generatedAt": "2026-10-28T01:44:59.619Z",
+  "scenario": "criar repositório pelo navegador (GitHub-fake local)",
+  "totalCalls": 15,
+  "unexpectedFailures": [],
+  "checks": [
+    {
+      "name": "browser_open abre a página e já devolve a captura (conferir o passo)",
+      "pass": true,
+      "detail": "ok=true imagens=1"
+    },
+    {
+      "name": "browser_read html=true traz as tags/atributos (campo e botão existem)",
+      "pass": true,
+      "detail": "728 chars"
+    },
+    {
+      "name": "browser_type preenche o campo e devolve a captura",
+      "pass": true,
+      "detail": "ok=true imagens=1"
+    },
+    {
+      "name": "o valor digitado aparece no HTML do campo",
+      "pass": true,
+      "detail": "OpenClod-Desktop"
+    },
+    {
+      "name": "depois do clique a navegação assentou na página do repo criado (/octocat/…)",
+      "pass": true,
+      "detail": "url=http://127.0.0.1:63905/octocat/OpenClod-Desktop"
+    },
+    {
+      "name": "a página confirma o repositório criado, com o nome e a URL de clone",
+      "pass": true,
+      "detail": "FakeHub octocat/OpenClod-Desktop Repositório criado com sucesso. Clone com HTTPS: http://127.0.0.1/octocat/OpenClod-Desktop.git"
+    },
+    {
+      "name": "browser_network capturou as requisições do fluxo (API, create/navegação)",
+      "pass": true,
+      "detail": "fetch/XHR (com corpos): 200 GET http://127.0.0.1:63905/new 200 GET http://127.0.0.1:63905/api/availability?name=probe 302 POST http://127.0.0.1:63905/create 200"
+    },
+    {
+      "name": "browser_cookies lê o cookie que o site gravou (logged_in)",
+      "pass": true,
+      "detail": "1 cookie(s) em http://127.0.0.1:63905/octocat/OpenClod-Desktop: logged_in=yes [127.0.0.1; sessão, sameSite=Lax]"
+    },
+    {
+      "name": "browser_cookies grava e relê um cookie novo (tema=escuro)",
+      "pass": true,
+      "detail": "2 cookie(s) em http://127.0.0.1:63905/octocat/OpenClod-Desktop: tema=escuro [127.0.0.1/octocat/; sessão, sameSite=Lax] l"
+    },
+    {
+      "name": "browser_new_tab + browser_tabs: duas abas, uma ativa",
+      "pass": true,
+      "detail": " tab_1 · octocat/OpenClod-Desktop · http://127.0.0.1:63905/octocat/OpenClod-Desktop * tab_2 · Novo repositório · http://127.0.0.1:63905/new"
+    }
+  ],
+  "calls": [
+    {
+      "call": "browser_open /new",
+      "ok": true,
+      "ms": 1873,
+      "images": 1,
+      "data": {
+        "url": "http://127.0.0.1:63905/new",
+        "title": "Novo repositório"
+      },
+      "text": "<page url=\"http://127.0.0.1:63905/new\" title=\"Novo repositório\">\n- banner: FakeHub\n- main:\n  - heading \"Criar um novo repositório\" [level=1]\n  - text: Repository name\n  - textbox \"Repository name\"\n  - text: Description\n  - textbox \"Description\"\n  - group:\n    - radio \"Public\" [checked]\n    - text: Public\n    - radio \"Private\"\n    - text: Private\n  - button \"Create repository\"\n</page>\n[captura anexada: a página como ficou depois desta ação, em http://127.0.0.1:63905/new. Olhe a imagem e a lista de elementos e confirme que o passo deu certo antes do próximo; se não deu, mude a abordagem.]"
+    },
+    {
+      "call": "browser_read html",
+      "ok": true,
+      "ms": 7,
+      "images": 0,
+      "text": "<body><header>FakeHub</header><main>\n <h1>Criar um novo repositório</h1>\n <form action=\"/create\" method=\"post\">\n <label for=\"rname\">Repository name</label>\n <input id=\"rname\" name=\"repository[name]\" aria-label=\"Repository name\" placeholder=\"Repository name\" autocomplete=\"off\">\n <label for=\"rdesc\">Description</label>\n <textarea id=\"rdesc\" name=\"repository[description]\" aria-label=\"Description\"></textarea>\n <fieldset>\n <label><input type=\"radio\" name=\"repository[visibility]\" value=\"public\" checked=\"\"> Public</label>\n <label><input type=\"radio\" name=\"repository[visibility]\" value=\"private\"> Private</label>\n </fieldset>\n <button type=\"submit\" aria-label=\"Create repository\">Create repository</button>\n </form>\n</main></body>"
+    },
+    {
+      "call": "browser_type nome",
+      "ok": true,
+      "ms": 104,
+      "images": 1,
+      "text": "campo preenchido\n<page url=\"http://127.0.0.1:63905/new\" title=\"Novo repositório\">\n- banner: FakeHub\n- main:\n  - heading \"Criar um novo repositório\" [level=1]\n  - text: Repository name\n  - textbox \"Repository name\": OpenClod-Desktop\n  - text: Description\n  - textbox \"Description\"\n  - group:\n    - radio \"Public\" [checked]\n    - text: Public\n    - radio \"Private\"\n    - text: Private\n  - button \"Create repository\"\n</page>\n[captura anexada: a página como ficou depois desta ação, em http://127.0.0.1:63905/new. Olhe a imagem e a lista de elementos e confirme que o passo deu certo antes do próximo; se não deu, mude a abordagem.]"
+    },
+    {
+      "call": "browser_read html (confere o valor)",
+      "ok": true,
+      "ms": 2,
+      "images": 0,
+      "text": "<body><header>FakeHub</header><main>\n <h1>Criar um novo repositório</h1>\n <form action=\"/create\" method=\"post\">\n <label for=\"rname\">Repository name</label>\n <input id=\"rname\" name=\"repository[name]\" aria-label=\"Repository name\" placeholder=\"Repository name\" autocomplete=\"off\" value=\"OpenClod-Desktop\">\n <label for=\"rdesc\">Description</label>\n <textarea id=\"rdesc\" name=\"repository[description]\" aria-label=\"Description\"></textarea>\n <fieldset>\n <label><input type=\"radio\" name=\"repository[visibility]\" value=\"public\" checked=\"\"> Public</label>\n <label><input type=\"radio\" name=\"repository[visibility]\" value=\"private\"> Private</label>\n </fieldset>\n <button type=\"submit\" aria-label=\"Create repository\">Create repository</button>\n </form>\n</main></body>"
+    },
+    {
+      "call": "browser_click Create repository",
+      "ok": true,
+      "ms": 390,
+      "images": 1,
+      "text": "clique realizado · agora em http://127.0.0.1:63905/octocat/OpenClod-Desktop\n<page url=\"http://127.0.0.1:63905/octocat/OpenClod-Desktop\" title=\"octocat/OpenClod-Desktop\">\n- banner: FakeHub\n- main:\n  - heading \"octocat/OpenClod-Desktop\" [level=1]\n  - paragraph: Repositório criado com sucesso.\n  - region \"Quick setup\":\n    - paragraph: \"Clone com HTTPS:\"\n    - code: http://127.0.0.1/octocat/OpenClod-Desktop.git\n</page>\n[captura anexada: a página como ficou depois desta ação, em http://127.0.0.1:63905/octocat/OpenClod-Desktop. Olhe a imagem e a lista de elementos e confirme que o passo deu certo antes do próximo; se não deu, mude a abordagem.]"
+    },
+    {
+      "call": "browser_snapshot (página resultante)",
+      "ok": true,
+      "ms": 47,
+      "images": 1,
+      "data": {
+        "url": "http://127.0.0.1:63905/octocat/OpenClod-Desktop",
+        "title": "octocat/OpenClod-Desktop"
+      },
+      "text": "<page url=\"http://127.0.0.1:63905/octocat/OpenClod-Desktop\" title=\"octocat/OpenClod-Desktop\">\n- banner: FakeHub\n- main:\n  - heading \"octocat/OpenClod-Desktop\" [level=1]\n  - paragraph: Repositório criado com sucesso.\n  - region \"Quick setup\":\n    - paragraph: \"Clone com HTTPS:\"\n    - code: http://127.0.0.1/octocat/OpenClod-Desktop.git\n</page>\n[captura anexada: a página como ficou depois desta ação, em http://127.0.0.1:63905/octocat/OpenClod-Desktop. Olhe a imagem e a lista de elementos e confirme que o passo deu certo antes do próximo; se não deu, mude a abordagem.]"
+    },
+    {
+      "call": "browser_read (página do repo)",
+      "ok": true,
+      "ms": 3,
+      "images": 0,
+      "text": "FakeHub\noctocat/OpenClod-Desktop\n\nRepositório criado com sucesso.\n\nClone com HTTPS:\n\nhttp://127.0.0.1/octocat/OpenClod-Desktop.git"
+    },
+    {
+      "call": "browser_network",
+      "ok": true,
+      "ms": 1,
+      "images": 0,
+      "text": "fetch/XHR (com corpos):\n200 GET http://127.0.0.1:63905/new\n200 GET http://127.0.0.1:63905/api/availability?name=probe\n302 POST http://127.0.0.1:63905/create\n200 GET http://127.0.0.1:63905/octocat/OpenClod-Desktop"
+    },
+    {
+      "call": "browser_cookies get",
+      "ok": true,
+      "ms": 3,
+      "images": 0,
+      "text": "1 cookie(s) em http://127.0.0.1:63905/octocat/OpenClod-Desktop:\nlogged_in=yes  [127.0.0.1; sessão, sameSite=Lax]"
+    },
+    {
+      "call": "browser_cookies set",
+      "ok": true,
+      "ms": 1,
+      "images": 0,
+      "text": "cookie \"tema\" gravado"
+    },
+    {
+      "call": "browser_cookies get (depois do set)",
+      "ok": true,
+      "ms": 1,
+      "images": 0,
+      "text": "2 cookie(s) em http://127.0.0.1:63905/octocat/OpenClod-Desktop:\ntema=escuro  [127.0.0.1/octocat/; sessão, sameSite=Lax]\nlogged_in=yes  [127.0.0.1; sessão, sameSite=Lax]"
+    },
+    {
+      "call": "browser_new_tab /new",
+      "ok": true,
+      "ms": 133,
+      "images": 1,
+      "data": {
+        "tab": "tab_2",
+        "url": "http://127.0.0.1:63905/new",
+        "title": "Novo repositório"
+      },
+      "text": "aba tab_2 aberta e ativa\n<page url=\"http://127.0.0.1:63905/new\" title=\"Novo repositório\">\n- banner: FakeHub\n- main:\n  - heading \"Criar um novo repositório\" [level=1]\n  - text: Repository name\n  - textbox \"Repository name\"\n  - text: Description\n  - textbox \"Description\"\n  - group:\n    - radio \"Public\" [checked]\n    - text: Public\n    - radio \"Private\"\n    - text: Private\n  - button \"Create repository\"\n</page>\n[captura anexada: a página como ficou depois desta ação, em http://127.0.0.1:63905/new. Olhe a imagem e a lista de elementos e confirme que o passo deu certo antes do próximo; se não deu, mude a abordagem.]"
+    },
+    {
+      "call": "browser_tabs",
+      "ok": true,
+      "ms": 3,
+      "images": 0,
+      "text": "  tab_1 · octocat/OpenClod-Desktop · http://127.0.0.1:63905/octocat/OpenClod-Desktop\n* tab_2 · Novo repositório · http://127.0.0.1:63905/new"
+    },
+    {
+      "call": "browser_close_tab",
+      "ok": true,
+      "ms": 16,
+      "images": 0,
+      "text": "aba fechada. Restantes: 1\n* tab_1 · http://127.0.0.1:63905/octocat/OpenClod-Desktop"
+    },
+    {
+      "call": "browser_screenshot final",
+      "ok": true,
+      "ms": 50,
+      "images": 1,
+      "text": "screenshot 1440x900 · http://127.0.0.1:63905/octocat/OpenClod-Desktop"
+    }
+  ]
+}

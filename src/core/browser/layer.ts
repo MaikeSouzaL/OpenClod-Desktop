@@ -538,6 +538,9 @@ export class BrowserLayer {
     const matches = await locator.count().catch(() => 1)
     const before = this.activeTab
     await locator.first().click({ timeout: 15_000 })
+    // A click may navigate (a link or a form submit): wait for the new page to settle, the same parity the
+    // extension path has, so the snapshot after the click reads the resulting page and not the old one.
+    await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined)
     await page.waitForTimeout(250)
     // A link with target=_blank or window.open() creates a tab: follow it, as a person would.
     const opened = this.activeTab !== before ? this.activeTab : undefined
@@ -561,7 +564,9 @@ export class BrowserLayer {
     await locator.first().fill(value, { timeout: 15_000 })
     if (submit) {
       await page.keyboard.press('Enter')
-      await page.waitForTimeout(500)
+      // Enter in a form submits and navigates: wait for the new page like the click path.
+      await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined)
+      await page.waitForTimeout(400)
     }
     return {}
   }
