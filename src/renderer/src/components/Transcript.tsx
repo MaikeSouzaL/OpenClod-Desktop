@@ -217,6 +217,9 @@ export function Transcript({
   const [clock, setClock] = useState(Date.now())
   const streamingText = Object.values(streaming).join('')
   const reasoningText = Object.values(reasoning).join('')
+  // Quando o fluxo mudou pela última vez e quando o turno ficou ativo: é o que distingue "processando" de "travado".
+  const streamActivityRef = useRef(Date.now())
+  const busyStartRef = useRef(0)
 
   const results = useMemo(() => {
     const map = new Map<string, ToolResultPart>()
@@ -242,8 +245,12 @@ export function Transcript({
     (oldest, tool) => (!oldest || (tool.startedAt ?? 0) < (oldest.startedAt ?? 0) ? tool : oldest),
     null
   )
+  const busy = runState === 'thinking' || runState === 'streaming' || runState === 'tool' || runState === 'waiting_approval'
   const runningFor = oldestRunning?.startedAt ? clock - oldestRunning.startedAt : 0
   const silentFor = oldestRunning ? clock - (oldestRunning.updatedAt ?? oldestRunning.startedAt ?? clock) : 0
+  // Há quanto tempo o turno está ativo, e há quanto o stream não emite nada (modelo lento/estancado).
+  const busyFor = busyStartRef.current ? clock - busyStartRef.current : 0
+  const streamStalledFor = runState === 'streaming' ? clock - streamActivityRef.current : 0
   const workingLabel = runningNames.length
     ? `${summarizeCalls(runningNames, true)}${oldestRunning?.startedAt ? ` · ${formatDuration(runningFor)}` : ''}${
         silentFor > 5000 ? ` · sem saída há ${formatDuration(silentFor)}` : ''
@@ -253,15 +260,25 @@ export function Transcript({
       : runState === 'waiting_approval'
         ? 'Aguardando sua aprovação…'
         : runState === 'streaming'
-          ? 'Gerando resposta…'
-          : 'Pensando…'
+          ? `Gerando resposta…${streamStalledFor > 5000 ? ` · sem resposta há ${formatDuration(streamStalledFor)}` : ''}`
+          : `Pensando…${busyFor > 3000 ? ` · ${formatDuration(busyFor)}` : ''}`
 
+  // O relógio avança de 1 em 1 s enquanto o turno está ativo (não só durante ferramentas), para os tempos atualizarem.
   useEffect(() => {
-    if (!runningTools.length) return
+    if (!busy) {
+      busyStartRef.current = 0
+      return
+    }
+    if (!busyStartRef.current) busyStartRef.current = Date.now()
     setClock(Date.now())
     const timer = setInterval(() => setClock(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [runningTools.length])
+  }, [busy])
+
+  // Marca quando o fluxo (texto ou raciocínio) mudou pela última vez, para detectar quando ele estanca.
+  useEffect(() => {
+    streamActivityRef.current = Date.now()
+  }, [streamingText, reasoningText])
 
   useLayoutEffect(() => {
     if (!pinned.current) return
@@ -556,11 +573,10 @@ export function Transcript({
           </article>
         ) : null}
 
-        {/* Um indicador de "processando" enquanto o turno está ativo, em QUALQUER estado ocupado (pensando, gerando,
-            ferramenta, aguardando aprovação). Some quando há texto/raciocínio em stream, pois aí o próprio texto já é o sinal. */}
-        {(runState === 'thinking' || runState === 'streaming' || runState === 'tool' || runState === 'waiting_approval') &&
-        !streamingText &&
-        !reasoningText ? (
+        {/* Indicador de "processando" SEMPRE visível enquanto a LLM está ativa (pensando, gerando, ferramenta,
+            aguardando aprovação) — inclusive durante o stream. Mostra o tempo e avisa "sem resposta há Xs" se estancar,
+            para distinguir "processando" de "travado". */}
+        {busy ? (
           <div className="status-line">
             <span className="status-mark spin">
               <OpenclodMark size={14} />
