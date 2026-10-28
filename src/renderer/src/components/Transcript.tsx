@@ -260,8 +260,13 @@ export function Transcript({
       : runState === 'waiting_approval'
         ? 'Aguardando sua aprovação…'
         : runState === 'streaming'
-          ? `Gerando resposta…${streamStalledFor > 5000 ? ` · sem resposta há ${formatDuration(streamStalledFor)}` : ''}`
-          : `Pensando…${busyFor > 3000 ? ` · ${formatDuration(busyFor)}` : ''}`
+          ? `Gerando resposta…${
+              streamStalledFor > 5000
+                ? ` · sem resposta há ${formatDuration(streamStalledFor)}${streamStalledFor > 30000 ? ' — pode ter travado; use ⏹ Parar' : ''}`
+                : ''
+            }`
+          : // 'thinking' = o pedido foi enviado e esperamos a LLM; deixa explícito que a chamada está em curso.
+            `Aguardando a LLM…${busyFor > 1000 ? ` · ${formatDuration(busyFor)}` : ''}`
 
   // O relógio avança de 1 em 1 s enquanto o turno está ativo (não só durante ferramentas), para os tempos atualizarem.
   useEffect(() => {

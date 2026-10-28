@@ -13,8 +13,12 @@ import { isDeepSeekV4Model, openaiReasoningEffort } from './reasoning.js'
 import { estimateTokens } from '../util/ids.js'
 import { modelSeesImages } from './order.js'
 
-/** Silence allowed between stream chunks before the request is abandoned. */
-export const STREAM_IDLE_TIMEOUT_MS = 600_000
+/**
+ * Silêncio tolerado entre pedaços do stream antes de abandonar o pedido. 10 min era alto demais: um túnel do Colab
+ * que cai no meio ficava "aberto" por 10 min, indistinguível de um modelo lento. 3 min dão folga para o prefill de
+ * contextos grandes em GPU lenta, mas um stream morto dá erro bem mais rápido.
+ */
+export const STREAM_IDLE_TIMEOUT_MS = 180_000
 
 type OpenAIContent =
   | string
