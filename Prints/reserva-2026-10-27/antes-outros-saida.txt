@@ -1,0 +1,18 @@
+OK   configuração dos provedores de teste gravada
+FAIL 429: a conversa terminou com resposta de um LLM que funciona -> {"state":"streaming","failures":[],"seconds":152}
+FAIL 429: a conversa avisa a troca e o motivo -> []
+FAIL 429: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"fake-pro","provider":"Provedor A (falso)","notices":[]},"meta":{"providerId":"fake-a","model":"fake-pro"}}
+FAIL 429: sem esperar o Retry-After de 1 hora (turno em menos de 3 min, uma só chamada ao limitado) -> {"seconds":152,"hits":2}
+FAIL 401: a conversa terminou com resposta de um LLM que funciona -> {"state":"error","failures":["HTTP 401: {\"error\":{\"message\":\"Incorrect API key provided: sk-test-***\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}"],"seconds":5}
+FAIL 401: a conversa avisa a troca e o motivo -> []
+FAIL 401: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"fake-pro","provider":"Provedor A (falso)","notices":[]},"meta":{"providerId":"fake-a","model":"fake-pro"}}
+FAIL partial: a conversa terminou com resposta de um LLM que funciona -> {"state":"error","failures":["Rate limit exceeded: too many requests"],"seconds":5}
+FAIL partial: a conversa avisa a troca e o motivo -> []
+FAIL partial: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"fake-pro","provider":"Provedor A (falso)","notices":[]},"meta":{"providerId":"fake-a","model":"fake-pro"}}
+FAIL partial: a metade da resposta que já estava na tela foi mantida -> ["?:A capital da França é"]
+FAIL partial: o modelo novo continuou a resposta (texto depois da metade) -> A capital da França é
+FAIL overflow: a conversa terminou com resposta de um LLM que funciona -> {"state":"error","failures":["HTTP 400: {\"error\":{\"message\":\"This model's maximum context length is 8192 tokens. However, your messages resulted in 20000 tokens. Please reduce the length of "],"seconds":5}
+FAIL overflow: a conversa avisa a troca e o motivo -> []
+FAIL overflow: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"fake-pro","provider":"Provedor A (falso)","notices":[]},"meta":{"providerId":"fake-a","model":"fake-pro"}}
+
+1/16 verificações ok -> Prints\reserva-2026-10-27\antes-outros-reserva.json

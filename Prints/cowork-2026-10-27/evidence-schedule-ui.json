@@ -1,0 +1,33 @@
+{
+  "scenario": "schedule-ui",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T14:22:32.844Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork3-mvqryfrz",
+  "detail": {
+    "tasks": [
+      {
+        "name": "Resumo da pasta (formulário)",
+        "surface": "code"
+      },
+      {
+        "name": "Antiga sem tipo"
+      }
+    ]
+  },
+  "seconds": 6,
+  "checks": {
+    "tipo-de-sessao-comeca-em-Cowork": "ok",
+    "tipo-de-sessao-oferece-Cowork-e-Code": "ok",
+    "tarefa-nova-salva-como-Cowork": "ok",
+    "lista-mostra-o-tipo-Cowork": "ok",
+    "modelo-de-pasta-abre-como-Cowork": "ok",
+    "modelo-de-codigo-abre-como-Code": "ok",
+    "editar-mostra-o-tipo-salvo": "ok",
+    "editar-troca-o-tipo-para-Code": "ok",
+    "lista-mostra-Code-depois-de-editar": "ok",
+    "tarefa-sem-tipo-continua-sem-tipo": "ok"
+  },
+  "errors": [],
+  "ok": true
+}

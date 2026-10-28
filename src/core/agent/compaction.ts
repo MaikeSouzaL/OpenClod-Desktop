@@ -1,5 +1,6 @@
-import type { Message, Provider } from '../../shared/types.js'
+import type { Message, Provider, ToolSpec } from '../../shared/types.js'
 import { estimateTokens } from '../util/ids.js'
+import { isTurnContext } from './turn-context.js'
 
 export interface CompactionResult {
   messages: Message[]
@@ -18,8 +19,15 @@ function messageToText(message: Message, maxPerPart = 1200): string {
   return `${message.role.toUpperCase()}: ${chunks.join(' ')}`
 }
 
-export function estimateContextTokens(system: string, messages: Message[]): number {
+export function estimateContextTokens(
+  system: string,
+  messages: Message[],
+  tools?: ToolSpec[]
+): number {
   let total = estimateTokens(system)
+  // Tool schemas travel on every request and can dwarf the transcript (a
+  // single large MCP server can add >100k tokens), so they must count here.
+  if (tools?.length) total += estimateTokens(JSON.stringify(tools)) + 16
   for (const message of messages) total += estimateTokens(messageToText(message, 1e9)) + 4
   return total
 }
@@ -43,6 +51,27 @@ function findCut(messages: Message[], keep: number): number {
 const SUMMARY_HEADER = '[Contexto compactado'
 /** A previous summary is kept almost whole when it is summarised again (its tail holds Next Move and Relevant Files). */
 const PREVIOUS_SUMMARY_CHARS = 8000
+/** One summarisation request carries at most this much transcript. */
+const SUMMARY_CHUNK_CHARS = 50_000
+/** Upper bound of requests per compaction; the oldest chunks beyond it are the first to be left out. */
+const MAX_SUMMARY_CHUNKS = 8
+
+/** Groups message texts into chunks of bounded size; one oversized message keeps its head and tail. */
+export function chunkTexts(texts: string[]): string[] {
+  const chunks: string[] = []
+  let current = ''
+  for (const raw of texts) {
+    const half = SUMMARY_CHUNK_CHARS / 2
+    const text = raw.length > SUMMARY_CHUNK_CHARS ? `${raw.slice(0, half)}\n…[trecho longo cortado]…\n${raw.slice(-half)}` : raw
+    if (current && current.length + text.length + 2 > SUMMARY_CHUNK_CHARS) {
+      chunks.push(current)
+      current = ''
+    }
+    current += (current ? '\n\n' : '') + text
+  }
+  if (current) chunks.push(current)
+  return chunks
+}
 
 /**
  * Section names are stable English markers (the summary is read by a model,
@@ -139,6 +168,10 @@ export async function compactIfNeeded(options: {
   messages: Message[]
   provider: Provider
   contextWindow: number
+  /** Tool specs sent with the request; counted like the system prompt. */
+  tools?: ToolSpec[]
+  /** Actual prompt size reported by the provider on the previous call. */
+  usedTokens?: number
   keepRecent?: number
   signal?: AbortSignal
   /** Manual compaction ignores the budget check (the UI asks for it explicitly). */
@@ -147,7 +180,10 @@ export async function compactIfNeeded(options: {
 }): Promise<CompactionResult> {
   const { system, messages, provider, contextWindow } = options
   const budget = contextWindow * 0.75
-  const used = estimateContextTokens(system, messages)
+  const used = Math.max(
+    options.usedTokens ?? 0,
+    estimateContextTokens(system, messages, options.tools)
+  )
   if (!options.force && used < budget) return { messages, compacted: false }
 
   const keep = options.keepRecent ?? 8
@@ -157,11 +193,19 @@ export async function compactIfNeeded(options: {
   if (cut <= 0) return { messages, compacted: false }
 
   const older = messages.slice(0, cut)
-  const transcript = older
+  // The hidden per-turn contexts are derived data (memory pages, plan, suggestions): the next turn rebuilds them.
+  const texts = older
+    .filter((m) => !isTurnContext(m))
     .map((m) => messageToText(m, isCompactionSummary(m) ? PREVIOUS_SUMMARY_CHARS : undefined))
-    .join('\n\n')
-    .slice(0, 60_000)
-  const summary = await summarize(provider, { contextWindow }, transcript, options.signal)
+  // Progressive summary: each chunk of old messages updates the summary of the ones before it, so a long
+  // history is summarised whole instead of being cut at its first 60k characters (which dropped the most
+  // recent decisions among the messages that are then discarded).
+  let summary: string | null = null
+  for (const chunk of chunkTexts(texts).slice(-MAX_SUMMARY_CHUNKS)) {
+    const input: string = summary ? `${SUMMARY_HEADER} parcial]\n\n${summary}\n\n${chunk}` : chunk
+    summary = (await summarize(provider, { contextWindow }, input, options.signal)) ?? summary
+    if (options.signal?.aborted) break
+  }
 
   const header = summary
     ? `${SUMMARY_HEADER} automaticamente — resumo das ${older.length} mensagens anteriores]\n\n${summary}`

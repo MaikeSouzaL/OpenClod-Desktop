@@ -46,7 +46,7 @@ rl.on('line', (line) => {
       send({ jsonrpc: '2.0', method: 'notifications/message', params: { level: 'info' } })
       reply({
         protocolVersion: '2024-11-05',
-        capabilities: { tools: {} },
+        capabilities: { tools: {}, resources: {}, prompts: {} },
         serverInfo: { name: 'fake-mcp', version: '1.0.0' }
       })
       break
@@ -70,6 +70,46 @@ rl.on('line', (line) => {
       reply({ content: [{ type: 'text', text: 'echo:' + String(args.text) }] })
       break
     }
+    case 'resources/list':
+      if (!msg.params.cursor) {
+        reply({
+          resources: [
+            { uri: 'file:///projeto/README.md', name: 'README', description: 'Documento principal', mimeType: 'text/markdown' }
+          ],
+          nextCursor: 'page-2'
+        })
+      } else {
+        reply({ resources: [{ uri: 'db://tarefas', name: 'Tarefas' }] })
+      }
+      break
+    case 'resources/read':
+      reply({
+        contents: [
+          { uri: msg.params.uri, mimeType: 'text/plain', text: 'conteudo do recurso' },
+          { uri: msg.params.uri + '#imagem', mimeType: 'image/png', blob: 'aGVsbG8=' }
+        ]
+      })
+      break
+    case 'prompts/list':
+      reply({
+        prompts: [
+          {
+            name: 'revisar',
+            description: 'Revisa um arquivo',
+            arguments: [{ name: 'arquivo', description: 'Caminho', required: true }]
+          }
+        ]
+      })
+      break
+    case 'prompts/get':
+      reply({
+        description: 'Prompt de revisão',
+        messages: [
+          { role: 'user', content: { type: 'text', text: 'Revise ' + msg.params.arguments.arquivo } },
+          { role: 'assistant', content: { type: 'resource', resource: { uri: 'file:///guia.md', text: 'Guia' } } }
+        ]
+      })
+      break
     default:
       fail(-32601, 'method not found')
   }
@@ -105,9 +145,28 @@ describe('McpClient (JSON-RPC over stdio)', () => {
     expect(tools.map((t) => t.name)).toEqual(['echo', 'broken'])
     expect(tools[0].description).toBe('Echoes text back')
     expect(tools[0].inputSchema).toMatchObject({ type: 'object' })
+    expect(client.capabilitiesInfo).toEqual({ tools: true, resources: true, prompts: true })
+    expect(client.resourcesList()).toMatchObject([
+      { uri: 'file:///projeto/README.md', name: 'README', mimeType: 'text/markdown' },
+      { uri: 'db://tarefas', name: 'Tarefas' }
+    ])
+    expect(client.promptsList()).toMatchObject([
+      { name: 'revisar', arguments: [{ name: 'arquivo', required: true }] }
+    ])
 
     const result = await client.callTool('echo', { text: 'olá' }, 5_000)
     expect(result).toMatchObject({ ok: true, text: 'echo:olá', summary: 'fake/echo' })
+    expect(await client.readResource('file:///projeto/README.md')).toEqual([
+      { uri: 'file:///projeto/README.md', mimeType: 'text/plain', text: 'conteudo do recurso', blob: undefined },
+      { uri: 'file:///projeto/README.md#imagem', mimeType: 'image/png', text: undefined, blob: 'aGVsbG8=' }
+    ])
+    expect(await client.getPrompt('revisar', { arquivo: 'src/index.ts' })).toEqual({
+      description: 'Prompt de revisão',
+      messages: [
+        { role: 'user', content: 'Revise src/index.ts' },
+        { role: 'assistant', content: '[resource file:///guia.md]\nGuia' }
+      ]
+    })
 
     // toolsList returns a copy, not the internal array.
     const copy = client.toolsList()
@@ -123,6 +182,8 @@ describe('McpClient (JSON-RPC over stdio)', () => {
     await client.stop()
     expect(client.state).toBe('stopped')
     expect(client.toolsList()).toEqual([])
+    expect(client.resourcesList()).toEqual([])
+    expect(client.promptsList()).toEqual([])
   })
 
   it('rejects requests when the server was never started', async () => {
@@ -643,3 +704,5 @@ describe('REA detection and preset', () => {
     }
   })
 })
+
+

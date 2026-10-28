@@ -152,8 +152,26 @@ export function anthropicReasoning(model: string, effort: ReasoningEffort | unde
   }
 }
 
-/** `reasoning_effort` for OpenAI reasoning models (o-series, gpt-5); other values are clamped to `high`. */
-export function openaiReasoningEffort(effort: ReasoningEffort): 'low' | 'medium' | 'high' {
+/** DeepSeek V4 exposes low/high/max and rejects the OpenAI `medium` tier. */
+export function isDeepSeekV4Model(model: string): boolean {
+  const id = model.toLowerCase()
+  return /(^|[/])deepseek-(v4|flash)/.test(id) || /deepseek-v4\.\d/.test(id)
+}
+
+/**
+ * `reasoning_effort` for OpenAI reasoning models (o-series, gpt-5); other
+ * values are clamped to `high`. DeepSeek V4 maps its own three-tier API.
+ */
+export function openaiReasoningEffort(
+  effort: ReasoningEffort,
+  model = ''
+): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
+  if (isDeepSeekV4Model(model)) {
+    if (effort === 'low') return 'low'
+    if (effort === 'max') return 'max'
+    // DeepSeek maps medium/xhigh to high for compatibility.
+    return 'high'
+  }
   if (effort === 'low') return 'low'
   if (effort === 'medium') return 'medium'
   return 'high'
@@ -168,12 +186,19 @@ export function isOpenAIReasoningId(model: string): boolean {
  * Efforts worth offering for a provider/model pair; empty when the harness
  * cannot translate an effort into that API (the picker then says so).
  */
-export function effortLevelsFor(kind: 'openai' | 'anthropic' | 'mock', model: string, forced = false): readonly ReasoningEffort[] {
+export function effortLevelsFor(
+  kind: 'openai' | 'anthropic',
+  model: string,
+  forced = false,
+  explicit?: readonly ReasoningEffort[]
+): readonly ReasoningEffort[] {
+  if (explicit?.length) return explicit
   if (kind === 'anthropic') {
     const family = anthropicFamily(model)
     if (family.thinking === 'none') return []
     return family.efforts.length ? family.efforts : ALL_EFFORTS
   }
+  if (kind === 'openai' && isDeepSeekV4Model(model)) return ['low', 'high', 'max']
   if (kind === 'openai' && (forced || isOpenAIReasoningId(model))) return ['low', 'medium', 'high']
   return []
 }

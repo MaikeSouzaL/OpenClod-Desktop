@@ -3,9 +3,10 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { SessionRunner } from '../src/core/agent/runner'
-import { ScriptedProvider, type MockTurn } from '../src/core/providers/mock'
+import { ScriptedProvider, type MockTurn } from './support/scripted-provider'
 import { buildRegistry } from '../src/core/tools/registry'
 import { planTools } from '../src/core/tools/plan'
+import { lazyTools } from '../src/core/tools/lazy'
 import type { ToolDef } from '../src/core/tools/types'
 import { FileTracker } from '../src/core/session/tracker'
 import { WorkspaceGuard } from '../src/core/security/policy'
@@ -323,7 +324,7 @@ describe('built-in agents', () => {
     const expected = [
       'orchestrator', 'explorer', 'planner', 'coder', 'reviewer', 'tester', 'debugger', 'security-auditor',
       'researcher', 'docs-writer', 'computer-operator', 'go-specialist', 'rust-specialist', 'python-specialist',
-      'typescript-specialist', 'title', 'summary'
+      'typescript-specialist', 'svg-designer', 'svg-verifier', 'title', 'summary'
     ]
     for (const name of expected) expect(byName.has(name), name).toBe(true)
     expect(byName.size).toBe(BUILTIN_AGENTS.length)
@@ -336,6 +337,9 @@ describe('built-in agents', () => {
     }
     expect(byName.get('computer-operator')?.mode).toBe('computer')
     expect(byName.get('orchestrator')?.canCall).toBe('*')
+    expect(byName.get('svg-designer')?.tools).toEqual(expect.arrayContaining(['write_file', 'run_command', 'use_skill']))
+    expect(byName.get('svg-designer')?.canCall).toContain('svg-verifier')
+    expect(byName.get('svg-verifier')?.tools).toContain('run_command')
   })
 
   it('points every canCall at an agent that exists', () => {
@@ -343,7 +347,7 @@ describe('built-in agents', () => {
       if (!Array.isArray(agent.canCall)) continue
       for (const target of agent.canCall) expect(byName.has(target), `${agent.name} -> ${target}`).toBe(true)
     }
-    expect(byName.get('coder')?.canCall).toEqual(expect.arrayContaining(['explorer', 'tester', 'debugger', 'go-specialist', 'rust-specialist', 'python-specialist', 'typescript-specialist']))
+    expect(byName.get('coder')?.canCall).toEqual(expect.arrayContaining(['explorer', 'tester', 'debugger', 'svg-designer', 'go-specialist', 'rust-specialist', 'python-specialist', 'typescript-specialist']))
     expect(byName.get('reviewer')?.canCall).toEqual(expect.arrayContaining(['explorer', 'security-auditor']))
     expect(byName.get('debugger')?.canCall).toEqual(expect.arrayContaining(['explorer', 'tester']))
   })
@@ -365,7 +369,9 @@ describe('built-in agents', () => {
 
   it('hides the utilities and tells every visible agent to use the user\'s language', () => {
     const hidden = BUILTIN_AGENTS.filter((a) => a.hidden).map((a) => a.name).sort()
-    expect(hidden).toEqual(['summary', 'title', WORKER_AGENT].sort())
+    expect(hidden).toEqual(['improvement-analyst', 'summary', 'title', WORKER_AGENT].sort())
+    expect(byName.get('improvement-analyst')?.tools).toEqual([])
+    expect(byName.get('improvement-analyst')?.canCall).toBeUndefined()
     expect(byName.get('title')?.systemPrompt).toBe(TITLE_PROMPT)
     expect(byName.get('summary')?.systemPrompt).toBe(SUMMARY_PROMPT)
     expect(byName.get('title')?.tools).toEqual([])
@@ -533,12 +539,21 @@ describe('policy, model and limits for children', () => {
     const level1 = childLimits(DEFAULT_LIMITS, 1)
     const level2 = childLimits(level1, 2)
     const level3 = childLimits(level2, 3)
-    for (const key of ['maxIterations', 'maxToolCalls', 'maxWallClockMs', 'maxTokens', 'maxCostUsd'] as const) {
+    for (const key of ['maxIterations', 'maxToolCalls', 'maxWallClockMs', 'maxCostUsd'] as const) {
       expect(level1[key], key).toBeLessThan(DEFAULT_LIMITS[key])
       expect(level2[key], key).toBeLessThan(level1[key])
       expect(level3[key], key).toBeLessThan(level2[key])
     }
+    // 0 = automatic; children inherit the same formula instead of a fake cap.
+    expect(level1.maxTokens).toBe(0)
+    expect(level2.maxTokens).toBe(0)
+    expect(level3.maxTokens).toBe(0)
     expect(level1.maxParallelTools).toBe(DEFAULT_LIMITS.maxParallelTools)
+
+    const manual = childLimits({ ...DEFAULT_LIMITS, maxTokens: 4_000_000 }, 1)
+    expect(manual.maxTokens).toBe(2_000_000)
+    expect(childLimits(manual, 2).maxTokens).toBe(1_000_000)
+
     const tight = childLimits({ ...DEFAULT_LIMITS, maxIterations: 3 }, 1)
     expect(tight.maxIterations).toBe(3)
     expect(childLimits(DEFAULT_LIMITS, 1, { maxTurns: 7 }).maxIterations).toBe(7)
@@ -652,6 +667,8 @@ interface TreeOptions {
   approve?: (request: ApprovalRequest) => Promise<boolean>
   findProvider?: (id: string) => ProviderConfig | undefined
   withAgents?: boolean
+  /** Team mode (the "separate into agents" toggle): list_agents and task are sent in every request. */
+  team?: boolean
 }
 
 function makeTree(options: TreeOptions) {
@@ -687,7 +704,7 @@ function makeTree(options: TreeOptions) {
     mode: options.mode ?? 'code',
     provider,
     providerConfig: {
-      id: 'mock', kind: 'mock', label: 'Scripted', baseUrl: '', model: 'scripted',
+      id: 'test-double', kind: 'openai', label: 'Duplo de teste', baseUrl: 'http://localhost:0/v1', model: 'scripted',
       contextWindow: 128_000, supportsVision: false, supportsTools: true
     },
     registry,
@@ -700,6 +717,7 @@ function makeTree(options: TreeOptions) {
     emit: (event) => events.push(event),
     approve,
     ...(options.withAgents === false ? {} : { agents, runSubagent: (spec, caller) => spawnAgent(env, caller, spec) }),
+    autoAgents: options.team,
     retryBaseMs: 1,
     depth: 0
   })
@@ -736,15 +754,21 @@ describe('the agent tool', () => {
     expect(tree.runner.state).toBe('done')
   })
 
-  it('lists the callable agents with their descriptions in the tool description, never the hidden ones', async () => {
+  it('keeps the agent roster out of the prompt and leaves list_agents to tool_load', async () => {
     const tree = makeTree({ script: [{ text: 'oi' }] })
     await tree.runner.send('oi')
     const spec = tree.provider.requests[0].tools.find((t: ToolSpec) => t.name === 'agent')!
-    expect(spec.description).toContain('- explorer: Read-only codebase search')
-    expect(spec.description).toContain('- orchestrator:')
+    expect(spec.description).toContain('list_agents')
+    expect(spec.description).toContain('tool_load')
     expect(spec.description).toContain('nível 0 de 3')
+    // The roster can be huge; it must not ride along with every request.
+    expect(spec.description).not.toContain('- explorer:')
+    expect(spec.description).not.toContain('- orchestrator:')
     for (const hidden of ['title', 'summary', WORKER_AGENT]) expect(spec.description).not.toContain(`- ${hidden}:`)
-    expect(toolNames(tree.provider)).toContain('list_agents')
+    // The catalogue and the generic worker cost their schemas on every request, and almost no session uses them.
+    expect(toolNames(tree.provider)).toContain('agent')
+    expect(toolNames(tree.provider)).not.toContain('list_agents')
+    expect(toolNames(tree.provider)).not.toContain('task')
     const properties = (spec.parameters as { properties: Record<string, unknown> }).properties
     expect(Object.keys(properties)).toEqual(['agent', 'label', 'prompt', 'tools'])
     expect((spec.parameters as { required: string[] }).required).toEqual(['agent', 'prompt'])
@@ -1038,7 +1062,7 @@ describe('events of the agent tree', () => {
     expect(rest).toEqual([])
     expect(start).toMatchObject({
       type: 'subagent', sessionId: 'ses_root', label: 'explorer job', state: 'thinking', agent: 'explorer',
-      model: 'mock/scripted', depth: 1, prompt: 'Faça o trabalho de explorer com cuidado.'
+      model: 'test-double/scripted', depth: 1, prompt: 'Faça o trabalho de explorer com cuidado.'
     })
     expect(start.parentChildId).toBeUndefined()
     expect(start.startedAt).toBeTypeOf('number')
@@ -1156,7 +1180,7 @@ describe('what a child inherits', () => {
   })
 
   it('uses the model and effort of the definition', async () => {
-    const other = { id: 'other', kind: 'mock', label: 'Other', baseUrl: '', model: 'default', contextWindow: 1000, supportsVision: false, supportsTools: true } as ProviderConfig
+    const other = { id: 'other', kind: 'openai', label: 'Other', baseUrl: 'http://localhost:0/v1', model: 'default', contextWindow: 1000, supportsVision: false, supportsTools: true } as ProviderConfig
     const agents = new AgentRegistry([
       customAgent('cross', { model: 'other/gpt-x', effort: 'max' }),
       customAgent('same', { model: 'meta/llama-3' }),
@@ -1172,11 +1196,11 @@ describe('what a child inherits', () => {
     await tree.runner.send('modelos')
     const byAgent = new Map(tree.spawned.map((s) => [s.info.agent, s.config]))
     expect(byAgent.get('cross')).toMatchObject({ id: 'other', model: 'gpt-x' })
-    expect(byAgent.get('same')).toMatchObject({ id: 'mock', model: 'meta/llama-3' })
-    expect(byAgent.get('plain')).toMatchObject({ id: 'mock', model: 'scripted' })
+    expect(byAgent.get('same')).toMatchObject({ id: 'test-double', model: 'meta/llama-3' })
+    expect(byAgent.get('plain')).toMatchObject({ id: 'test-double', model: 'scripted' })
     expect(cross.requests[0].effort).toBe('max')
     const models = subagents(tree.events).filter((e) => e.state === 'thinking').map((e) => [e.agent, e.model])
-    expect(models).toEqual(expect.arrayContaining([['cross', 'other/gpt-x'], ['same', 'mock/meta/llama-3'], ['plain', 'mock/scripted']]))
+    expect(models).toEqual(expect.arrayContaining([['cross', 'other/gpt-x'], ['same', 'test-double/meta/llama-3'], ['plain', 'test-double/scripted']]))
   })
 
   it('inherits the caller\'s effort when the definition sets none, and caps iterations with maxTurns', async () => {
@@ -1202,7 +1226,8 @@ describe('the legacy task tool', () => {
         { toolCalls: [{ id: 't1', name: 'task', args: { label: 'pesquisa', prompt: 'Pesquise o formato do arquivo.' } }] },
         { text: 'fim' }
       ],
-      children: { [WORKER_AGENT]: [worker] }
+      children: { [WORKER_AGENT]: [worker] },
+      team: true
     })
     await tree.runner.send('delegue')
     const result = tree.runner.messages.find((m) => m.role === 'tool')!.parts[0] as { ok: boolean; text: string }
@@ -1221,7 +1246,8 @@ describe('the legacy task tool', () => {
         { toolCalls: [{ id: 't1', name: 'task', args: { label: 'escreve', prompt: 'Escreva o arquivo.', tools: ['write_file', 'task', 'external_agent'] } }] },
         { text: 'fim' }
       ],
-      children: { [WORKER_AGENT]: [worker] }
+      children: { [WORKER_AGENT]: [worker] },
+      team: true
     })
     await tree.runner.send('delegue')
     expect(toolNames(worker)).toEqual(['write_file'])
@@ -1233,7 +1259,8 @@ describe('the legacy task tool', () => {
         { toolCalls: [{ id: 't1', name: 'task', args: { label: 'escreve', prompt: 'Escreva o arquivo.', tools: ['write_file', 'read_file'] } }] },
         { text: 'fim' }
       ],
-      children: { [WORKER_AGENT]: [planWorker] }
+      children: { [WORKER_AGENT]: [planWorker] },
+      team: true
     })
     await plan.runner.send('delegue')
     expect(toolNames(planWorker)).toEqual(['read_file'])
@@ -1242,7 +1269,7 @@ describe('the legacy task tool', () => {
 
 describe('list_agents', () => {
   it('returns name, description and canCall of the agents the caller may call', async () => {
-    const tree = makeTree({ script: [{ toolCalls: [{ id: 'l1', name: 'list_agents', args: {} }] }, { text: 'fim' }] })
+    const tree = makeTree({ script: [{ toolCalls: [{ id: 'l1', name: 'list_agents', args: {} }] }, { text: 'fim' }], team: true })
     await tree.runner.send('quem?')
     const end = toolEnds(tree.events, 'list_agents')[0]
     expect(end.ok).toBe(true)
@@ -1268,5 +1295,134 @@ describe('list_agents', () => {
     expect(listed.text).toContain('- security-auditor:')
     expect(listed.text).not.toContain('- coder:')
     expect(listed.text).toContain('nível 1 de 3')
+  })
+})
+
+describe('the former essentials wait for tool_load', () => {
+  const resultsOf = (tree: ReturnType<typeof makeTree>) =>
+    tree.runner.messages
+      .flatMap((m) => m.parts)
+      .filter((p): p is Extract<typeof p, { type: 'tool_result' }> => p.type === 'tool_result')
+      .map((p) => ({ name: p.name, ok: p.ok, text: p.text }))
+
+  it('finds list_agents with tool_search, loads it with tool_load, then lists the roster', async () => {
+    const tree = makeTree({
+      tools: lazyTools,
+      script: [
+        { toolCalls: [{ id: 'a2', name: 'tool_search', args: { query: 'list_agents' } }] },
+        { toolCalls: [{ id: 'a3', name: 'tool_load', args: { tools: ['list_agents'] } }] },
+        { toolCalls: [{ id: 'a4', name: 'list_agents', args: {} }] },
+        { text: 'fim' }
+      ]
+    })
+    await tree.runner.send('quem?')
+    const results = resultsOf(tree)
+    expect(results.map((r) => [r.name, r.ok])).toEqual([['tool_search', true], ['tool_load', true], ['list_agents', true]])
+    expect(results[0].text).toContain('list_agents')
+    expect(results[2].text).toContain('- explorer:')
+    expect(toolNames(tree.provider, 0)).not.toContain('list_agents')
+    expect(toolNames(tree.provider, 2)).toContain('list_agents')
+  })
+
+  it('runs a direct call to list_agents by loading it, instead of spending a refused call', async () => {
+    const tree = makeTree({
+      tools: lazyTools,
+      script: [{ toolCalls: [{ id: 'a1', name: 'list_agents', args: {} }] }, { text: 'fim' }]
+    })
+    await tree.runner.send('quem?')
+    const results = resultsOf(tree)
+    expect(results.map((r) => [r.name, r.ok])).toEqual([['list_agents', true]])
+    expect(results[0].text).toContain('- explorer:')
+    // Not in the first request, in the next one (and so for the rest of the session).
+    expect(toolNames(tree.provider, 0)).not.toContain('list_agents')
+    expect(toolNames(tree.provider, 1)).toContain('list_agents')
+  })
+
+  it('loads and runs a deferred built-in tool of the mode that the model calls by name (no tool_search/tool_load round trip)', async () => {
+    const lazyOnly: ToolDef = {
+      name: 'browser_new_tab',
+      description: 'Abre uma aba.',
+      schema: z.object({ url: z.string() }),
+      risk: 'read',
+      parallelSafe: false,
+      describe: () => ({ title: 'Aba', detail: '' }),
+      async execute() {
+        return { ok: true, text: 'aberta' }
+      }
+    }
+    const tree = makeTree({
+      tools: [...lazyTools, lazyOnly],
+      script: [{ toolCalls: [{ id: 'b1', name: 'browser_new_tab', args: { url: 'https://x.test' } }] }, { text: 'fim' }]
+    })
+    await tree.runner.send('abra')
+    const [ran] = resultsOf(tree)
+    expect(ran.ok).toBe(true)
+    expect(ran.text).toContain('aberta')
+    expect(toolNames(tree.provider, 0)).not.toContain('browser_new_tab')
+  })
+
+  it('still refuses a direct call to a tool the mode does not have, and says so', async () => {
+    const outside: ToolDef = {
+      name: 'fora_do_modo',
+      description: 'Não pertence a nenhum modo.',
+      schema: z.object({}),
+      risk: 'write',
+      parallelSafe: false,
+      describe: () => ({ title: 'Fora', detail: '' }),
+      async execute() {
+        return { ok: true, text: 'não devia rodar' }
+      }
+    }
+    const tree = makeTree({
+      tools: [...lazyTools, outside],
+      script: [{ toolCalls: [{ id: 'f1', name: 'fora_do_modo', args: {} }] }, { text: 'fim' }]
+    })
+    await tree.runner.send('rode')
+    const [refused] = resultsOf(tree)
+    expect(refused.ok).toBe(false)
+    expect(refused.text).toContain('não está carregada')
+    expect(refused.text).toContain('não disponível no modo')
+  })
+
+  it('keeps a loaded former essential for the rest of the session, so the tool list does not change back every turn', async () => {
+    const tree = makeTree({
+      tools: lazyTools,
+      script: [{ toolCalls: [{ id: 'l1', name: 'tool_load', args: { tools: ['list_agents'] } }] }, { text: 'carregado' }, { text: 'de novo' }]
+    })
+    await tree.runner.send('carregue o catálogo')
+    await tree.runner.send('e agora?')
+    expect(toolNames(tree.provider, 0)).not.toContain('list_agents')
+    expect(toolNames(tree.provider, 1)).toContain('list_agents')
+    // The first request of the next turn already has it: the provider's cached prefix is the same one the last request used.
+    expect(toolNames(tree.provider, 2)).toContain('list_agents')
+  })
+
+  it('sends list_agents and task in every request in team mode', async () => {
+    const tree = makeTree({ team: true, script: [{ text: 'oi' }] })
+    await tree.runner.send('oi')
+    expect(toolNames(tree.provider)).toEqual(expect.arrayContaining(['agent', 'list_agents', 'task']))
+  })
+
+  it('leaves a specialist the essentials its definition names, for it to load by itself', async () => {
+    const agents = new AgentRegistry([customAgent('memo', { tools: ['memory_search', 'list_skills', 'read_file'] })])
+    const memo = new ScriptedProvider([
+      { toolCalls: [{ id: 'm1', name: 'tool_load', args: { tools: ['memory_search', 'list_skills'] } }] },
+      { text: 'carregou' }
+    ])
+    const tree = makeTree({
+      agents,
+      tools: lazyTools,
+      script: [{ toolCalls: agentCall('c1', 'memo') }, { text: 'fim' }],
+      children: { memo: [memo] }
+    })
+    await tree.runner.send('use o memo')
+    // Not sent up front: each costs its schema in every request...
+    expect(toolNames(memo)).toEqual(expect.arrayContaining(['read_file', 'tool_search', 'tool_load']))
+    expect(toolNames(memo)).not.toContain('memory_search')
+    // ...but they are in the specialist's pool, which they would not be if the caller's pool had lost them.
+    const loaded = memo.requests[1].messages.find((m: { role: string }) => m.role === 'tool')!.parts[0] as { ok: boolean; text: string }
+    expect(loaded.ok).toBe(true)
+    expect(loaded.text).toContain('habilitadas: memory_search, list_skills')
+    expect(toolNames(memo, 1)).toEqual(expect.arrayContaining(['memory_search', 'list_skills']))
   })
 })

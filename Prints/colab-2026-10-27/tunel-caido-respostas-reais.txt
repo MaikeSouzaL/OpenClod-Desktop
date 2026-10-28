@@ -1,0 +1,9 @@
+# O que o cliente recebe quando um quick tunnel cai (capturas reais, 2026-10-27)
+
+00-tunel-ok                        status=200 tipo=application/json  {"ok":true}
+01-origem-parada-get               status=502 tipo=text/html; charset=UTF-8  trycloudflare.com | 502: Bad gateway Bad gateway Error code 502 Visit cloudflare.com for more information. 2026-10-27 16:24:40 UTC You Browser Working
+01-origem-parada-post              status=502 tipo=text/html; charset=UTF-8  trycloudflare.com | 502: Bad gateway Bad gateway Error code 502 Visit cloudflare.com for more information. 2026-10-27 16:24:40 UTC You Browser Working
+02-tunel-encerrado-get             status=530 tipo=text/html; charset=utf-8  Cloudflare Tunnel error | miniature-tough-feb-comic.trycloudflare.com | Cloudflare Please enable cookies. Error 1033 Ray ID: a5130d8c29f6cdce-GRU &bul
+02-tunel-encerrado-post            status=530 tipo=text/html; charset=utf-8  Cloudflare Tunnel error | miniature-tough-feb-comic.trycloudflare.com | Cloudflare Please enable cookies. Error 1033 Ray ID: a5130d8d2e80a4f6-GRU &bul
+02b-tunel-encerrado-20s-depois     status=530 tipo=text/html; charset=utf-8  Cloudflare Tunnel error | miniature-tough-feb-comic.trycloudflare.com | Cloudflare Please enable cookies. Error 1033 Ray ID: a5130e0b1b2c1aa4-GRU &bul
+03-nome-inexistente                status=— tipo=—  ENOTFOUND fetch failed

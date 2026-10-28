@@ -1,0 +1,93 @@
+Saida do gerador (node scripts/colab-catalog.mjs): por familia, etiquetas medidas e puladas (e por que), em 2026-10-27:
+
+node : qwen3.8                                   2 etiquetas, 0 puladas
+No linha:15 caractere:1
++ node scripts/colab-catalog.mjs --cache "$s\cache" 2> "$s\gerador.err" ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (qwen3.8        ...etas, 0 puladas:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+qwen3.6                                   4 etiquetas, 0 puladas
+qwen3.5                                  13 etiquetas, 0 puladas
+qwen3                                    14 etiquetas, 2 puladas
+    pulada: qwen3:235b: 142 GB (acima de 90)
+    pulada: qwen3:235b-a22b-q8_0: 250 GB (acima de 90)
+qwen3-vl                                 10 etiquetas, 2 puladas
+    pulada: qwen3-vl:235b: 143 GB (acima de 90)
+    pulada: qwen3-vl:235b-a22b-instruct-q8_0: 251 GB (acima de 90)
+gemma4                                   10 etiquetas, 0 puladas
+gemma3                                    9 etiquetas, 0 puladas
+gpt-oss                                   2 etiquetas, 0 puladas
+nemotron-3-nano                           4 etiquetas, 0 puladas
+glm-4.7-flash                             0 etiquetas, 2 puladas
+    pulada: glm-4.7-flash:latest: memória do KV não modelada (glm4moelite)
+    pulada: glm-4.7-flash:q8_0: memória do KV não modelada (deepseek2)
+ministral-3                               6 etiquetas, 0 puladas
+mistral-small3.2                          2 etiquetas, 0 puladas
+mistral-nemo                              2 etiquetas, 0 puladas
+llama3.3                                  2 etiquetas, 0 puladas
+llama3.1                                  4 etiquetas, 2 puladas
+    pulada: llama3.1:405b: 243 GB (acima de 90)
+    pulada: llama3.1:405b-instruct-q8_0: 431 GB (acima de 90)
+llama3.2                                  3 etiquetas, 0 puladas
+llama3.2-vision                           3 etiquetas, 1 puladas
+    pulada: llama3.2-vision:90b-instruct-q8_0: 95 GB (acima de 90)
+phi4-mini                                 2 etiquetas, 0 puladas
+phi4                                      2 etiquetas, 0 puladas
+granite4                                  5 etiquetas, 0 puladas
+smollm2                                   5 etiquetas, 0 puladas
+cogito                                   10 etiquetas, 0 puladas
+hermes3                                   6 etiquetas, 2 puladas
+    pulada: hermes3:405b: 229 GB (acima de 90)
+    pulada: hermes3:405b-llama3.1-q8_0: 431 GB (acima de 90)
+olmo2                                     4 etiquetas, 0 puladas
+minicpm-v                                 2 etiquetas, 0 puladas
+qwen3-coder                               2 etiquetas, 2 puladas
+    pulada: qwen3-coder:480b: 290 GB (acima de 90)
+    pulada: qwen3-coder:480b-a35b-q8_0: 510 GB (acima de 90)
+qwen3-coder-next                          2 etiquetas, 0 puladas
+qwen2.5-coder                            12 etiquetas, 0 puladas
+devstral-small-2                          2 etiquetas, 0 puladas
+devstral                                  2 etiquetas, 0 puladas
+codestral                                 2 etiquetas, 0 puladas
+deepseek-r1                              12 etiquetas, 2 puladas
+    pulada: deepseek-r1:671b: 404 GB (acima de 90)
+    pulada: deepseek-r1:671b-q8_0: 713 GB (acima de 90)
+qwq                                       2 etiquetas, 0 puladas
+magistral                                 2 etiquetas, 0 puladas
+phi4-reasoning                            2 etiquetas, 0 puladas
+lfm2.5-thinking                           2 etiquetas, 0 puladas
+exaone-deep                               6 etiquetas, 0 puladas
+openthinker                               4 etiquetas, 0 puladas
+dolphin3                                  2 etiquetas, 0 puladas
+dolphin-llama3                            4 etiquetas, 0 puladas
+dolphin-mistral                           2 etiquetas, 0 puladas
+dolphin-mixtral                           3 etiquetas, 1 puladas
+    pulada: dolphin-mixtral:8x22b-v2.9-q8_0: 149 GB (acima de 90)
+dolphincoder                              4 etiquetas, 0 puladas
+llama2-uncensored                         4 etiquetas, 0 puladas
+wizard-vicuna-uncensored                  6 etiquetas, 0 puladas
+wizardlm-uncensored                       2 etiquetas, 0 puladas
+huihui_ai/Qwen3.8-abliterated             2 etiquetas, 0 puladas
+huihui_ai/Qwen3.6-abliterated             4 etiquetas, 0 puladas
+huihui_ai/qwen3.5-abliterated            12 etiquetas, 0 puladas
+huihui_ai/qwen3-abliterated              16 etiquetas, 1 puladas
+    pulada: huihui_ai/qwen3-abliterated:235b: 112 GB (acima de 90)
+huihui_ai/qwen3-vl-abliterated           10 etiquetas, 0 puladas
+huihui_ai/gemma-4-abliterated            11 etiquetas, 0 puladas
+huihui_ai/gemma3-abliterated              9 etiquetas, 0 puladas
+huihui_ai/gpt-oss-abliterated             3 etiquetas, 1 puladas
+    pulada: huihui_ai/gpt-oss-abliterated:120b-q8_0: 124 GB (acima de 90)
+huihui_ai/glm-4.7-flash-abliterated       0 etiquetas, 2 puladas
+    pulada: huihui_ai/glm-4.7-flash-abliterated:latest: memória do KV não modelada (glm4moelite)
+    pulada: huihui_ai/glm-4.7-flash-abliterated:q8_0: memória do KV não modelada (glm4moelite)
+huihui_ai/qwen2.5-coder-abliterate       12 etiquetas, 0 puladas
+huihui_ai/devstral-abliterated            2 etiquetas, 0 puladas
+huihui_ai/mistral-small-abliterated       2 etiquetas, 0 puladas
+huihui_ai/llama3.3-abliterated            2 etiquetas, 0 puladas
+huihui_ai/deepseek-r1-abliterated        12 etiquetas, 0 puladas
+huihui_ai/dolphin3-abliterated            2 etiquetas, 0 puladas
+huihui_ai/phi4-mini-abliterated           2 etiquetas, 0 puladas
+orcarouter/Qwen3.8-27B-Uncensored         2 etiquetas, 0 puladas
+
+306 entradas em 61 famílias (2026-10-27)

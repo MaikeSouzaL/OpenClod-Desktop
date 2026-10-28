@@ -7,9 +7,11 @@ import type {
   ToolCall
 } from '../../shared/types.js'
 import { classifyProviderError, isRetryableKind, postStream, readSse } from './http.js'
+import { normalizeToolCallSequence } from './messages.js'
 import { resolveCompat } from './compat.js'
-import { openaiReasoningEffort } from './reasoning.js'
+import { isDeepSeekV4Model, openaiReasoningEffort } from './reasoning.js'
 import { estimateTokens } from '../util/ids.js'
+import { modelSeesImages } from './order.js'
 
 /** Silence allowed between stream chunks before the request is abandoned. */
 export const STREAM_IDLE_TIMEOUT_MS = 600_000
@@ -38,15 +40,23 @@ interface OpenAIMessage {
  * `echoReasoning`, reasoning of assistant messages after the last real user
  * turn (the current tool loop) is sent back as `reasoning_content`.
  */
-export function toOpenAIMessages(system: string, messages: Message[], echoReasoning = false): OpenAIMessage[] {
+export function toOpenAIMessages(
+  system: string,
+  messages: Message[],
+  echoReasoning = false,
+  echoAllReasoning = false,
+  /** Whether the model accepts images; only then do tool-result images (screenshots) go out. */
+  vision = false
+): OpenAIMessage[] {
+  const normalized = normalizeToolCallSequence(messages)
   const out: OpenAIMessage[] = []
   if (system.trim()) out.push({ role: 'system', content: system })
   let lastUser = -1
-  messages.forEach((m, i) => {
+  normalized.forEach((m, i) => {
     if (m.role === 'user' && !m.hidden) lastUser = i
   })
 
-  for (const [index, message] of messages.entries()) {
+  for (const [index, message] of normalized.entries()) {
     if (message.role === 'system') continue
 
     if (message.role === 'user') {
@@ -75,10 +85,18 @@ export function toOpenAIMessages(system: string, messages: Message[], echoReason
     if (message.role === 'assistant') {
       const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
       const calls = message.parts.filter((p) => p.type === 'tool_call')
+      // OpenAI-compatible APIs reject an assistant message with content null and
+      // no tool_call (DeepSeek: "invalid message content type"). Empty turns
+      // happen when a model returns no text/calls; drop them from the replay.
+      if (!text.trim() && !calls.length) continue
       const msg: OpenAIMessage = { role: 'assistant', content: text || null }
-      if (echoReasoning && index > lastUser) {
+      if (echoReasoning) {
         const reasoning = message.parts.map((p) => (p.type === 'reasoning' ? p.text : '')).join('')
-        if (reasoning) msg.reasoning_content = reasoning
+        // DeepSeek V4 requires reasoning_content on every previous assistant
+        // turn when the request carries tools, even when it is empty. Other
+        // thinking providers only need the current tool loop.
+        if (echoAllReasoning) msg.reasoning_content = reasoning
+        else if (index > lastUser && reasoning) msg.reasoning_content = reasoning
       }
       if (calls.length) {
         msg.tool_calls = calls.map((c) => ({
@@ -95,12 +113,29 @@ export function toOpenAIMessages(system: string, messages: Message[], echoReason
     }
 
     // role === 'tool'
+    const toolImages: Array<{ tool: string; mediaType: string; data: string }> = []
     for (const part of message.parts) {
       if (part.type !== 'tool_result') continue
       out.push({
         role: 'tool',
         tool_call_id: part.toolCallId,
-        content: part.ok ? part.text : `ERRO: ${part.text}`
+        content: part.ok ? (part.text || '(sem saída)') : `ERRO: ${part.text || 'falhou'}`
+      })
+      if (vision) for (const image of part.images ?? []) toolImages.push({ tool: part.name, mediaType: image.mediaType, data: image.data })
+    }
+    // Chat Completions tool messages are text-only, so the pictures a tool returned
+    // (Computer Use / browser screenshots) follow as one user message after ALL of
+    // the tool messages, which must stay contiguous right after the assistant's calls.
+    if (toolImages.length) {
+      out.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: `[imagens retornadas pelas ferramentas acima: ${[...new Set(toolImages.map((image) => image.tool))].join(', ')}]` },
+          ...toolImages.map((image) => ({
+            type: 'image_url' as const,
+            image_url: { url: `data:${image.mediaType};base64,${image.data}`, detail: 'auto' as const }
+          }))
+        ] satisfies Exclude<OpenAIContent, string>
       })
     }
   }
@@ -122,7 +157,8 @@ export class OpenAICompatibleProvider implements Provider {
   ) {
     this.id = config.id
     this.label = config.label
-    this.supportsVision = config.supportsVision
+    // Per model when the server told which ones read images, the provider flag otherwise.
+    this.supportsVision = modelSeesImages(config)
     this.contextWindow = config.contextWindow
   }
 
@@ -146,7 +182,13 @@ export class OpenAICompatibleProvider implements Provider {
     const compat = resolveCompat(this.config)
     const body: Record<string, unknown> = {
       model: this.config.model,
-      messages: toOpenAIMessages(req.system, req.messages, compat.echoReasoning),
+      messages: toOpenAIMessages(
+        req.system,
+        req.messages,
+        compat.echoReasoning,
+        compat.echoReasoning && isDeepSeekV4Model(this.config.model),
+        this.supportsVision
+      ),
       stream: true,
       stream_options: { include_usage: true }
     }
@@ -161,10 +203,12 @@ export class OpenAICompatibleProvider implements Provider {
     }
     const maxTokens = req.maxTokens ?? this.config.maxOutputTokens
     if (maxTokens) body[compat.maxTokensField] = maxTokens
-    if (req.effort && compat.reasoningEffort) body.reasoning_effort = openaiReasoningEffort(req.effort)
+    if (req.effort && compat.reasoningEffort) {
+      body.reasoning_effort = openaiReasoningEffort(req.effort, this.config.model)
+    }
 
     const url = `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`
-    const response = await postStream({ url, headers, body, signal: req.signal })
+    const response = await postStream({ url, headers, body, signal: req.signal, fastFail: req.fastFail })
 
     if (!response.body) {
       yield { type: 'end', stopReason: 'error', toolCalls: [], error: 'resposta sem corpo', errorKind: 'server', retryable: true }
@@ -237,7 +281,10 @@ export class OpenAICompatibleProvider implements Provider {
           usage: {
             input: chunk.usage.prompt_tokens ?? 0,
             output: chunk.usage.completion_tokens ?? 0,
-            cachedInput: chunk.usage.prompt_tokens_details?.cached_tokens
+            // OpenAI-style details; DeepSeek reports cache hits at the top level.
+            cachedInput:
+              chunk.usage.prompt_tokens_details?.cached_tokens ??
+              (chunk.usage as { prompt_cache_hit_tokens?: number }).prompt_cache_hit_tokens
           }
         }
       }

@@ -1,0 +1,47 @@
+{
+  "model": "deepseek/deepseek-flash",
+  "seconds": 16,
+  "checks": {
+    "turno-terminou-sem-erro": "ok",
+    "modelo-chamou-image_inspect": "ok",
+    "image_inspect-resultado-ok": "ok",
+    "modelo-chamou-image_edit": "ok",
+    "image_edit-resultado-ok": "ok",
+    "modelo-chamou-image_generate": "ok",
+    "image_generate-resultado-ok": "ok",
+    "image_edit-argumentos": "ok",
+    "image_generate-argumentos": "ok",
+    "arquivos-de-saida-existem": "ok",
+    "edited.webp-e-webp-50x50": "ok",
+    "generated.png-e-png-64x64": "ok",
+    "endpoint-de-geracao-chamado-uma-vez": "ok",
+    "sem-erros-de-console-ou-pagina": "ok"
+  },
+  "usage": {
+    "input": 97245,
+    "output": 486,
+    "cachedInput": 77312,
+    "costUsd": 0.007026972
+  },
+  "errors": [],
+  "ok": true,
+  "edited": {
+    "format": "webp",
+    "width": 50,
+    "height": 50,
+    "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\images-2026-10-25\\edited.webp"
+  },
+  "generated": {
+    "format": "png",
+    "width": 64,
+    "height": 64,
+    "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\images-2026-10-25\\generated.png"
+  },
+  "imageRequests": [
+    {
+      "url": "/v1/images/generations",
+      "method": "POST"
+    }
+  ],
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\images-2026-10-25\\01-image-tools.png"
+}

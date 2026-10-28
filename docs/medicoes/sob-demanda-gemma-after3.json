@@ -1,0 +1,13 @@
+{
+  "label": "gemma-after3",
+  "nota": "Reconstruído da saída do console. O arquivo original foi sobrescrito por uma execução seguinte em que a nuvem do Ollama respondeu 'monthly usage limit' (nenhuma chamada), antes de o script passar a se recusar a gravar execuções sem resposta do modelo. Os campos abaixo são os que o console mostrou; o detalhe por chamada não foi preservado.",
+  "provider": "ollama/gemma4:31b-cloud",
+  "build": "build com o auto-carregamento por chamada direta, ainda sem os apelidos de busca e sem a frase 'Exceção' no prompt",
+  "scenarios": [
+    { "name": "mcp-state", "target": "mcp_servers", "sequence": ["mcp_servers"], "modelCalls": 2, "inputTokens": 12345, "targetOk": true },
+    { "name": "handoff", "target": "memory_handoff", "sequence": ["memory_page", "mcp_servers", "memory_page"], "modelCalls": 4, "inputTokens": 24846, "targetOk": false, "targetRan": false },
+    { "name": "skills", "target": "list_skills", "sequence": ["tool_search", "tool_list", "read_file", "tool_search", "tool_load", "list_skills"], "modelCalls": 7, "inputTokens": 69338, "targetOk": true },
+    { "name": "agents", "target": "list_agents", "sequence": ["list_agents"], "modelCalls": 2, "inputTokens": 15957, "targetOk": true }
+  ],
+  "totals": { "modelCalls": 15, "inputTokens": 122486, "allTargetsOk": false }
+}

@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { SessionRunner, type RunnerDeps } from '../src/core/agent/runner'
-import { ScriptedProvider } from '../src/core/providers/mock'
+import { ScriptedProvider } from './support/scripted-provider'
 import { buildRegistry } from '../src/core/tools/registry'
 import { FileTracker } from '../src/core/session/tracker'
 import { WorkspaceGuard } from '../src/core/security/policy'
@@ -23,6 +23,7 @@ import { computerClickTool, computerActivateTool } from '../src/core/tools/compu
 import { runCommandTool, readProcessOutputTool, killSessionProcesses } from '../src/core/tools/shell'
 import { DEFAULT_LIMITS, type HarnessEvent, type HooksConfig, type Message, type ProviderConfig } from '../src/shared/types'
 import type { ToolContext, ToolDef } from '../src/core/tools/types'
+import { isTurnContext } from '../src/core/agent/turn-context'
 import { makeTempDir, policy, removeTempDir } from './helpers'
 
 let cwd: string
@@ -79,9 +80,9 @@ function makeRunner(provider: ScriptedProvider, overrides: Partial<RunnerDeps> =
     provider,
     providerConfig: {
       id: 'mock',
-      kind: 'mock',
+      kind: 'openai',
       label: 'Scripted',
-      baseUrl: '',
+      baseUrl: 'http://localhost:0/v1',
       model: 'scripted',
       contextWindow: 128_000,
       supportsVision: false,
@@ -119,8 +120,8 @@ function hookScript(name: string, body: string): string {
 }
 
 describe('agent loop robustness', () => {
-  it('puts saved project memory in the system prompt', async () => {
-    const provider = new ScriptedProvider([{ text: 'ok' }])
+  it('puts saved project facts in the per-turn context, not in the cached system prompt', async () => {
+    const provider = new ScriptedProvider([{ text: 'ok' }, { text: 'ok de novo' }])
     const services = {
       browser: {},
       computer: {},
@@ -129,7 +130,14 @@ describe('agent loop robustness', () => {
     } as unknown as RunnerDeps['services']
     const { runner } = makeRunner(provider, { services })
     await runner.send('instale as dependências')
-    expect(provider.requests[0].system).toContain('este projeto usa pnpm, nunca npm')
+    // The system prompt is the cached prefix: facts live in the hidden message that follows the user's request.
+    expect(provider.requests[0].system).not.toContain('este projeto usa pnpm, nunca npm')
+    const context = provider.requests[0].messages.filter(isTurnContext).map(textOf).join('\n')
+    expect(context).toContain('## Fatos salvos com memory_write')
+    expect(context).toContain('este projeto usa pnpm, nunca npm')
+    // Unchanged facts are not repeated on the next turn.
+    await runner.send('e agora?')
+    expect(provider.requests[1].messages.filter(isTurnContext)).toHaveLength(1)
   })
 
   it('compacts and retries once when the provider reports a context overflow', async () => {

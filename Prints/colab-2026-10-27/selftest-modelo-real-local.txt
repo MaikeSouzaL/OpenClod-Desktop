@@ -1,0 +1,10 @@
+# Autoteste do notebook contra um modelo REAL (qwen3.5:4b do Ollama local), pelo servidor do notebook (proxy autenticado), 2026-10-27
+# python openclod_llm_server.py serve --engine-url http://127.0.0.1:11434 --model qwen3.5:4b ... ; python openclod_llm_server.py selftest --url http://127.0.0.1:<porta>/v1 ...
+
+   [ok] Lista de modelos com a chave: modelo qwen3.5:4b listado
+   [ok] Chave errada é recusada: HTTP 401
+   [ok] Texto: respondeu 'pong'
+   [ok] Streaming (SSE): 28 pedaços, o 1º em 2.0 s, total 7.2 s
+   [ok] Imagem (vermelho): respondeu 'Vermelho'
+   [ok] Imagem (verde): respondeu 'verde'
+   [ok] Chamada de ferramenta (stream): somar_numeros({"a":17,"b":25})

@@ -132,6 +132,15 @@ export function reduceActivity(state: ActivityState, event: HarnessEvent, now: n
         background: startsBackground(event.name, event.args, existing)
       })
     }
+    case 'tool_progress': {
+      if (AGENT_TOOLS.has(event.name)) return state
+      const existing = state.find((item) => item.id === event.toolCallId)
+      if (!existing) return state
+      return upsert(state, {
+        ...existing,
+        output: event.text ? event.text.slice(0, MAX_OUTPUT) : existing.output
+      })
+    }
     case 'tool_end': {
       if (AGENT_TOOLS.has(event.name)) return state
       const agentId = (event as { agentId?: string }).agentId

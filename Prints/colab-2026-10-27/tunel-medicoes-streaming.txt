@@ -1,0 +1,61 @@
+# Medições do quick tunnel da Cloudflare (cloudflared 2026.10.5, cliente fetch do Node), 2026-10-27
+# 1) primeira rodada (GET x POST)
+
+origem local: http://127.0.0.1:62728
+túnel: https://bibliography-optical-probe-settle.trycloudflare.com  (cloudflared --protocol auto)
+túnel respondendo: true
+
+[A  GET  text/event-stream] HTTP 200 {"content-type":"text/event-stream","server":"cloudflare","cf-ray":"a512e3fbaeec4b3f-GRU","content-encoding":null,"transfer-encoding":"chunked","cache-control":"no-cache"}
+  BUFFERIZADO (primeiro byte em 5077 ms, 1 pedaços, espalhados por 0 ms de 4800 ms esperados)
+  chegadas(ms): 5077
+
+[B  POST /v1/chat/completions (SSE)] HTTP 200 {"content-type":"text/event-stream","server":"cloudflare","cf-ray":"a512e41b5a1e1b29-GRU","content-encoding":null,"transfer-encoding":"chunked","cache-control":"no-cache"}
+  INCREMENTAL (primeiro byte em 187 ms, 13 pedaços, espalhados por 4871 ms de 4800 ms esperados)
+  chegadas(ms): 187, 594, 1016, 1409, 1819, 2220, 2626, 3030, 3438, 3845, 4252, 4658, 5058
+
+[C  GET  application/x-ndjson] HTTP 200 {"content-type":"application/x-ndjson","server":"cloudflare","cf-ray":"a512e43aee4ae03b-GRU","content-encoding":null,"transfer-encoding":"chunked","cache-control":null}
+  BUFFERIZADO (primeiro byte em 5068 ms, 1 pedaços, espalhados por 0 ms de 4800 ms esperados)
+  chegadas(ms): 5068
+
+[D  GET  text/plain chunked] HTTP 200 {"content-type":"text/plain; charset=utf-8","server":"cloudflare","cf-ray":"a512e45a9c0f119d-GRU","content-encoding":"gzip","transfer-encoding":"chunked","cache-control":null}
+  BUFFERIZADO (primeiro byte em 5065 ms, 1 pedaços, espalhados por 0 ms de 4800 ms esperados)
+  chegadas(ms): 5065
+
+[E  6 SSE simultâneos] status=200,200,200,200,200,200 primeiros bytes(ms)=4979,5059,5055,5054,5051,5051 total(ms)=4980,5059,5055,5054,5051,5052
+
+[F  POST 6 MB] HTTP 200 {"bytes":6291468}  (enviado 6291468 bytes)
+
+log do cloudflared (final):
+
+
+# 2) matriz: método x cabeçalhos x tipo de conteúdo, repetição, simultâneos, e testes longos
+
+túnel https://characteristic-ctrl-impressed-eligibility.trycloudflare.com
+GET  /sse (sem cabeçalhos)                             BUFFERIZADO  HTTP 200  1º byte 4266 ms  1 pedaços  espalhados por 0 ms  total 4267 ms  [text/event-stream]
+GET  /sse Accept: text/event-stream                    BUFFERIZADO  HTTP 200  1º byte 4355 ms  1 pedaços  espalhados por 0 ms  total 4356 ms  [text/event-stream]
+GET  /sse Accept: text/event-stream + Authorization    BUFFERIZADO  HTTP 200  1º byte 4249 ms  1 pedaços  espalhados por 0 ms  total 4249 ms  [text/event-stream]
+POST /sse corpo vazio                                  INCREMENTAL  HTTP 200  1º byte 184 ms  10 pedaços  espalhados por 3684 ms  total 4280 ms  [text/event-stream]
+POST /sse corpo JSON                                   INCREMENTAL  HTTP 200  1º byte 181 ms  10 pedaços  espalhados por 3692 ms  total 4281 ms  [text/event-stream]
+POST /sse corpo JSON + Authorization                   INCREMENTAL  HTTP 200  1º byte 160 ms  10 pedaços  espalhados por 3687 ms  total 4261 ms  [text/event-stream]
+POST /ndjson corpo JSON                                INCREMENTAL  HTTP 200  1º byte 182 ms  10 pedaços  espalhados por 3687 ms  total 4276 ms  [application/x-ndjson]
+POST /plain corpo JSON                                 INCREMENTAL  HTTP 200  1º byte 157 ms  10 pedaços  espalhados por 3684 ms  total 4251 ms  [text/plain; charset=utf-8]
+POST /sse corpo JSON, Accept: text/event-stream        INCREMENTAL  HTTP 200  1º byte 74 ms  10 pedaços  espalhados por 3695 ms  total 4178 ms  [text/event-stream]
+
+repetição do POST /sse com JSON (5 vezes seguidas):
+   INCREMENTAL  HTTP 200  1º byte 146 ms  10 pedaços  espalhados por 3685 ms  total 4235 ms
+   INCREMENTAL  HTTP 200  1º byte 177 ms  10 pedaços  espalhados por 3689 ms  total 4271 ms
+   INCREMENTAL  HTTP 200  1º byte 162 ms  10 pedaços  espalhados por 3687 ms  total 4251 ms
+   INCREMENTAL  HTTP 200  1º byte 157 ms  10 pedaços  espalhados por 3672 ms  total 4240 ms
+   INCREMENTAL  HTTP 200  1º byte 186 ms  10 pedaços  espalhados por 3676 ms  total 4266 ms
+
+6 POST /sse simultâneos:
+   INCREMENTAL  HTTP 200  1º byte 166 ms  10 pedaços  espalhados por 3679 ms  total 4258 ms
+   INCREMENTAL  HTTP 200  1º byte 162 ms  10 pedaços  espalhados por 3665 ms  total 4238 ms
+   INCREMENTAL  HTTP 200  1º byte 164 ms  10 pedaços  espalhados por 3663 ms  total 4239 ms
+   INCREMENTAL  HTTP 200  1º byte 181 ms  10 pedaços  espalhados por 3677 ms  total 4270 ms
+   INCREMENTAL  HTTP 200  1º byte 166 ms  10 pedaços  espalhados por 3678 ms  total 4259 ms
+   INCREMENTAL  HTTP 200  1º byte 156 ms  10 pedaços  espalhados por 3669 ms  total 4237 ms
+
+testes longos (POST, 115 s) em paralelo: com comentários ": ping" a cada 10 s  x  só cabeçalhos e silêncio
+  com pings : INCREMENTAL  HTTP 200  1º byte 92 ms  13 pedaços  espalhados por 120108 ms  total 120200 ms [100194,110202,120200]
+  silencioso: BUFFERIZADO  HTTP 200  1º byte 115150 ms  1 pedaços  espalhados por 0 ms  total 115150 ms [115150]

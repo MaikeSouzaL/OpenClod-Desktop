@@ -1,0 +1,58 @@
+OK   configuração dos provedores de teste gravada
+OK   402: o turno 1 é respondido pelo provedor A (ainda com saldo) -> ["fake-pro:ok, guardei."]
+OK   402: o turno terminou com resposta (não parou por falta de crédito) -> {"state":"done","failures":[]}
+OK   402: quem respondeu foi o LLM real da reserva -> ["fake-pro:ok, guardei.","qwen3.5:4b:CAJU"]
+OK   402: o contexto foi preservado (o modelo novo sabe a palavra-código) -> CAJU
+OK   402: o provedor esgotado foi chamado só uma vez no turno -> 1
+OK   402: a conversa avisa a troca (linha na conversa, com os dois nomes e o motivo) -> ["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   402: a linha de aviso aparece na tela -> ["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   402: a sessão passou a usar o modelo que funciona -> {"providerId":"ollama-real","model":"qwen3.5:4b"}
+OK   402: o seletor de modelo do compositor mostra o modelo novo -> {"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]}
+OK   402: o rodapé do compositor mostra o provedor novo -> {"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]}
+OK   402: o turno seguinte continua no modelo que funciona -> ["qwen3.5:4b:42"]
+OK   402: o provedor esgotado NÃO é tentado de novo a cada turno -> 1
+OK   402: uma conversa nova pedida no provedor esgotado já começa no que funciona -> {"providerId":"ollama-real","model":"qwen3.5:4b"}
+OK   402: depois de salvar as configurações a sessão continua no modelo que funciona -> {"meta":{"providerId":"ollama-real","model":"qwen3.5:4b"},"text":"CAJU"}
+OK   402: nem salvar as configurações fez o esgotado ser chamado de novo -> 1
+OK   402: depois de reabrir o app o seletor continua mostrando o modelo que funciona -> {"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]}
+OK   402: depois de reabrir o app a resposta vem do modelo que funciona, sem tocar no esgotado -> {"text":"CAJU","hits":1}
+OK   429: a conversa terminou com resposta de um LLM que funciona -> {"state":"done","lastModel":"qwen3.5:4b","failures":[],"seconds":7}
+OK   429: a conversa avisa a troca e o motivo -> ["Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   429: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]},"meta":{"providerId":"ollama-real","mod
+OK   429: sem esperar o Retry-After de 1 hora (turno em menos de 3 min, uma só chamada ao limitado) -> {"seconds":7,"hits":1}
+OK   401: a conversa terminou com resposta de um LLM que funciona -> {"state":"done","lastModel":"qwen3.5:4b","failures":[],"seconds":7}
+OK   401: a conversa avisa a troca e o motivo -> ["Provedor A (falso)/fake-pro falhou (auth: chave recusada); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   401: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (auth: chave recusada); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]},"meta":{"providerId":"ollama-real","model":"qwen3.5:4
+OK   partial: a conversa terminou com resposta de um LLM que funciona -> {"state":"done","lastModel":"qwen3.5:4b","failures":[],"seconds":7}
+OK   partial: a conversa avisa a troca e o motivo -> ["Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   partial: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]},"meta":{"providerId":"ollama-real","mod
+OK   partial: a metade da resposta que já estava na tela foi mantida -> ["fake-pro:A capital da França é","qwen3.5:4b:Paris."]
+OK   partial: o modelo novo continuou a resposta (texto depois da metade) -> Paris.
+OK   overflow: a conversa terminou com resposta de um LLM que funciona -> {"state":"done","lastModel":"qwen3.5:4b","failures":[],"seconds":7}
+OK   overflow: a conversa avisa a troca e o motivo -> ["Provedor A (falso)/fake-pro falhou (context_overflow: janela de contexto excedida); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   overflow: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (context_overflow: janela de contexto excedida); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]},"meta":{"providerId":"ollama
+OK   refused: a conversa terminou com resposta de um LLM que funciona -> {"state":"done","lastModel":"qwen3.5:4b","failures":[],"seconds":11}
+OK   refused: a conversa avisa a troca e o motivo -> ["Provedor A (falso)/fake-pro falhou (network: sem conexão); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   refused: o seletor do compositor mostra o modelo novo -> {"ui":{"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["Provedor A (falso)/fake-pro falhou (network: sem conexão); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]},"meta":{"providerId":"ollama-real","model":"qwen3.5:4
+OK   real-402: a sessão começou no DeepSeek (provedor padrão do usuário) -> {"id":"ses_7ae60aab-b3ea-4f9b-937a-097387f4f53b","title":"Reserva DeepSeek real","projectId":"prj_8676a277-55b4-42b2-b5cd-bf5721496434","cwd":"C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-reserva-kmq4CK\\projeto","mode":"code","surface":"code","providerId":"deepseek","model":"deepseek-fl
+OK   real-402: com o DeepSeek sem saldo de verdade, o LLM local real respondeu -> {"state":"done","lastModel":"qwen3.5:4b","failures":[]}
+OK   real-402: a conversa avisa "DeepSeek ... sem saldo" -> ["DeepSeek/deepseek-flash falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   real-402: o seletor mostra o modelo local -> {"model":"qwen3.5:4b","provider":"Ollama (modelo real)","notices":["DeepSeek/deepseek-flash falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]}
+SKIP openrouter: o OpenRouter não tem chave no cofre do perfil de origem (salve a chave em Configurações → Provedores e rode de novo)
+OK   modelos: o item do provedor ainda não mostra a lista de modelos (começa fechado)
+OK   modelos: ao abrir, lista os modelos do provedor com uma caixa por modelo -> 1 de 3 marcados
+OK   modelos: sem mexer, só o modelo principal está marcado -> 1 de 3 marcados
+OK   modelos: "Selecionar todos" marca todos -> 3 de 3 marcados
+OK   modelos: desmarcar um deixa os outros -> 2 de 3 marcados
+OK   modelos: a linha do provedor resume "2 modelos"
+OK   modelos: "Salvar alterações" grava só os modelos marcados -> {"fake-b":["fake-b-1","fake-b-2"]}
+OK   modelos: depois dos dois modelos marcados falharem, o LLM real respondeu -> {"state":"done","lastModel":"qwen3.5:4b","failures":[]}
+OK   modelos: foram tentados nesta ordem: o esgotado, o 1º marcado, o 2º marcado -> {"a":1,"b1":1,"b2":1,"b3":0}
+OK   modelos: o modelo que NÃO foi marcado nunca foi chamado -> {"a":1,"b1":1,"b2":1,"b3":0}
+OK   modelos: a conversa avisou as três trocas -> ["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Provedor B (falso)/fake-b-1. A conversa, o plano e a memória do projeto foram preservados.","Provedor B (falso)/fake-b-1 falhou (rate_limit: limite de uso atingido); continuando com Provedor B (falso)/fake-b-2. A conver
+OK   ordem: Configurações → Provedores mostra a lista "Ordem da reserva"
+OK   ordem: a lista segue a ordem escolhida e mostra o estado de cada provedor -> [{"id":"fake-a","status":"local"},{"id":"ollama-real","status":"local"},{"id":"anthropic","status":"sem chave"},{"id":"openai","status":"sem chave"}]
+OK   ordem: o botão "Subir" troca a ordem -> ["ollama-real","fake-a","anthropic"]
+OK   ordem: "Salvar alterações" grava a ordem e quem fica fora -> {"order":["ollama-real","fake-a","anthropic","openai","deepseek","kimi","qwen","openrouter","ollama","lmstudio","opencode-go","opencode","colab","fake-b"],"exclude":["anthropic","openai","kimi","qwen","openrouter","ollama","lmstudio","opencode-go","opencode","colab","fake-b","fake-a"]}
+
+55/55 verificações ok -> Prints\reserva-2026-10-27\depois-reserva.json

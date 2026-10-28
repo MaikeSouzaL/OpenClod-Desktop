@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ProviderHttpError, postStream, readSse } from '../src/core/providers/http'
 import { OpenAICompatibleProvider, parseArgs, toOpenAIMessages } from '../src/core/providers/openai'
-import { ScriptedProvider } from '../src/core/providers/mock'
+import { ScriptedProvider } from './support/scripted-provider'
 import type {
   Message,
   ModelRequest,
@@ -303,6 +303,112 @@ describe('OpenAI message conversion and arg parsing', () => {
     expect(out[3]).toEqual({ role: 'tool', tool_call_id: 'c1', content: 'ERRO: falhou' })
   })
 
+  it('echoes reasoning_content on every assistant turn for DeepSeek V4', () => {
+    const messages: Message[] = [
+      userMessage('primeiro'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        ts: 2,
+        parts: [
+          { type: 'reasoning', text: 'raciocínio antigo' },
+          { type: 'text', text: 'resposta 1' }
+        ]
+      },
+      userMessage('segundo'),
+      {
+        id: 'a2',
+        role: 'assistant',
+        ts: 4,
+        parts: [{ type: 'text', text: 'resposta 2' }]
+      }
+    ]
+
+    const out = toOpenAIMessages('', messages, true, true)
+    expect(out[1]).toMatchObject({ role: 'assistant', reasoning_content: 'raciocínio antigo' })
+    // DeepSeek rejects a missing reasoning_content even when the reasoning was empty.
+    expect(out[3]).toMatchObject({ role: 'assistant', reasoning_content: '' })
+
+    // Other thinking providers keep the tighter current-turn echo.
+    const loopOnly = toOpenAIMessages('', messages, true, false)
+    expect(loopOnly[1].reasoning_content).toBeUndefined()
+    expect(loopOnly[3].reasoning_content).toBeUndefined()
+  })
+
+  it('drops empty assistant turns and never sends nil tool content', () => {
+    // DeepSeek answers "Invalid message content type: <nil>" when a failed
+    // turn (no text, no tool calls) is replayed or a tool result is empty.
+    const messages: Message[] = [
+      userMessage('oi'),
+      { id: 'a1', role: 'assistant', ts: 2, parts: [{ type: 'reasoning', text: 'pensando' }] },
+      { id: 'a2', role: 'assistant', ts: 3, parts: [{ type: 'text', text: '   ' }], error: 'HTTP 400' },
+      {
+        id: 'a3',
+        role: 'assistant',
+        ts: 4,
+        parts: [{ type: 'tool_call', id: 'c1', name: 'read_file', args: { path: 'x' } }]
+      },
+      {
+        id: 't1',
+        role: 'tool',
+        ts: 5,
+        parts: [{ type: 'tool_result', toolCallId: 'c1', name: 'read_file', ok: true, text: '' }]
+      }
+    ]
+
+    const out = toOpenAIMessages('', messages)
+
+    expect(out.map((message) => message.role)).toEqual(['user', 'assistant', 'tool'])
+    expect(out[1]).toMatchObject({ role: 'assistant', content: null })
+    expect(out[1].tool_calls).toHaveLength(1)
+    expect(out[2]).toEqual({ role: 'tool', tool_call_id: 'c1', content: '(sem saída)' })
+  })
+
+  it('rebuilds tool results immediately after every assistant tool_calls', () => {
+    const messages: Message[] = [
+      userMessage('faça'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        ts: 2,
+        parts: [
+          { type: 'tool_call', id: 'c1', name: 'read_file', args: { path: 'a' } },
+          { type: 'tool_call', id: 'c2', name: 'read_file', args: { path: 'b' } }
+        ]
+      },
+      { id: 'u2', role: 'user', ts: 3, parts: [{ type: 'text', text: 'instrução no meio' }] },
+      {
+        id: 't1',
+        role: 'tool',
+        ts: 4,
+        parts: [
+          { type: 'tool_result', toolCallId: 'c1', name: 'read_file', ok: true, text: 'A' },
+          { type: 'tool_result', toolCallId: 'c2', name: 'read_file', ok: true, text: 'B' }
+        ]
+      }
+    ]
+    const out = toOpenAIMessages('', messages)
+    expect(out.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'tool', 'user'])
+    expect(out[2]).toMatchObject({ role: 'tool', tool_call_id: 'c1', content: 'A' })
+    expect(out[3]).toMatchObject({ role: 'tool', tool_call_id: 'c2', content: 'B' })
+  })
+
+  it('synthesizes a missing result instead of leaving an orphan tool_call', () => {
+    const messages: Message[] = [
+      userMessage('faça'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        ts: 2,
+        parts: [{ type: 'tool_call', id: 'c1', name: 'read_file', args: { path: 'a' } }]
+      }
+    ]
+    const out = toOpenAIMessages('', messages)
+    expect(out.map((message) => message.role)).toEqual(['user', 'assistant', 'tool'])
+    expect(out[2]).toMatchObject({ role: 'tool', tool_call_id: 'c1' })
+    expect(String(out[2].content)).toMatch(/Resultado ausente/i)
+  })
+
   it('parses JSON, repairs trailing commas and preserves raw payloads', () => {
     expect(parseArgs('{"a":1}')).toEqual({ a: 1 })
     expect(parseArgs('{"a":1,}')).toEqual({ a: 1 })
@@ -312,10 +418,10 @@ describe('OpenAI message conversion and arg parsing', () => {
 })
 
 describe('ScriptedProvider', () => {
-  it('exposes deterministic identity and labelled mock text', async () => {
+  it('exposes deterministic identity and says plainly it is a test double when out of script', async () => {
     const provider = new ScriptedProvider([])
-    expect(provider.id).toBe('mock')
-    expect(provider.label).toBe('Scripted (teste)')
+    expect(provider.id).toBe('test-double')
+    expect(provider.label).toBe('Duplo de teste')
     expect(provider.remaining).toBe(0)
 
     const events = await collect(provider, request())
@@ -323,7 +429,7 @@ describe('ScriptedProvider', () => {
       .filter((e) => e.type === 'text_delta')
       .map((e) => (e.type === 'text_delta' ? e.text : ''))
       .join('')
-    expect(text).toContain('não é um modelo real')
+    expect(text).toContain('duplo de teste')
     expect(events.at(-1)).toEqual({ type: 'end', stopReason: 'stop', toolCalls: [] })
   })
 

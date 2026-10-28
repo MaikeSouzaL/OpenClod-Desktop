@@ -1,0 +1,12 @@
+OK   o LLM de texto respondeu sobre a imagem -> {"state":"done","seconds":19}
+OK   a resposta usa o que a imagem mostra (BANANA-77), lido por um modelo com visão -> O texto escrito na imagem é: BANANA-77
+FAIL o LLM de texto NUNCA recebeu os bytes da imagem -> [true]
+FAIL o que o LLM de texto recebeu no lugar da imagem é a descrição escrita pelo modelo com visão (BANANA-77) -> [31353]
+FAIL o modelo com visão recebeu a imagem, uma única vez -> []
+FAIL a descrição ficou guardada junto da imagem na sessão -> [""]
+OK   uma segunda pergunta sobre a mesma imagem é respondida pela descrição guardada -> Vermelho
+FAIL a imagem não é descrita de novo (o modelo com visão não recebeu outra imagem) -> []
+OK   sem nenhum modelo com visão disponível o turno termina com resposta, sem erro -> {"state":"done"}
+FAIL e o LLM de texto continua sem receber a imagem -> [true]
+
+4/10 verificações ok -> Prints\reserva-2026-10-27\antes-visao.json

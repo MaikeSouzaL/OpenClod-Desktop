@@ -1,0 +1,74 @@
+{
+  "checks": {
+    "audio: turno terminou sem erro": "ok",
+    "audio: o harness processou o anexo ANTES do modelo (resumo oculto com o slug da memória)": "ok",
+    "audio: a resposta traz fatos que só estão no áudio (Marina)": "ok",
+    "audio: o modelo NÃO precisou transcrever por ferramenta": "ok",
+    "audio: o processamento apareceu como atividade em andamento e terminou bem": "ok",
+    "audio: página-índice e parte gravadas na memória do projeto": "ok",
+    "audio: a parte tem a transcrição (PostgreSQL, novembro, Marina) com tempos": "ok",
+    "audio: manifesto e transcrição em disco": "ok",
+    "memória: sessão nova responde sobre a gravação sem anexo": "ok",
+    "memória: achou pela memória (ferramenta de memória ou contexto do turno), sem reprocessar": "ok",
+    "vídeo: turno terminou sem erro": "ok",
+    "vídeo: resumo oculto com slugs, frames e folhas": "ok",
+    "vídeo: a resposta reflete a narração (anotar/transcrever/resumo)": "ok",
+    "vídeo: a memória tem a fala E o texto que o OCR leu nos frames": "ok",
+    "vídeo: os frames aparecem na linha do tempo com folha e célula": "ok",
+    "vídeo: frames e folhas de contato em disco (JPEG)": "ok",
+    "vídeo: as folhas só vão como imagem para modelo com visão (visão=true)": "ok",
+    "sem erros de página": "ok"
+  },
+  "sessions": {
+    "audio": {
+      "seconds": 12,
+      "calls": [
+        "memory_page"
+      ],
+      "answer": "**Resumo do áudio (reunião de planejamento do projeto Aurora, ~20s):**\n\n- **Banco de dados:** decidiram usar **PostgreSQL**.\n- **Lançamento:** versão **2 em novembro**.\n- **Orçamento aprovado:** **R$ 50 mil**.\n- **Relatório final:** responsável é a **Marina**.\n\n**Responsável pelo relatório final: Ma",
+      "digestTokens": 127,
+      "transcriptTokens": 286
+    },
+    "memory": {
+      "seconds": 10,
+      "calls": [
+        "memory_recall",
+        "memory_page",
+        "memory_page"
+      ],
+      "injected": true,
+      "answer": "Achei na memória, na transcrição do áudio `reuniao aurora.wav` (20 s, página [[audio-reuniao-aurora-7edf6a-parte-1]]):\n\n| Pergunta | Resposta | Trecho do áudio |\n|---|---|---|\n| Banco de dados | **PostgreSQL** | 0:04–0:11 |\n| Versão 2 | **novembro** (o áudio não informa o dia) | 0:04–0:11 |\n| Orçame"
+    },
+    "video": {
+      "seconds": 46,
+      "calls": [
+        "memory_page",
+        "memory_page",
+        "memory_page"
+      ],
+      "answer": "**O vídeo (0:34):** é um anúncio vertical estilo \"POV\" do app **HiNoter**. Começa com uma sala de aula (\"4 anos de faculdade e você agora vê... não tem que anotar tudo\"), mostra um celular dobrável rodando o app durante uma aula de biologia (inflamação, bactérias, células), depois o \"Transcrição ao vivo\" rodando com cronômetro sobre um notebook, e por fim o resultado: resumo organizado + mapa ment",
+      "digestTokens": 278,
+      "pages": 3,
+      "frames": 36,
+      "sheets": 4,
+      "ocrFrames": 36,
+      "transcriptSegments": 8,
+      "partTokens": 1334
+    }
+  },
+  "usage": {
+    "audio": {
+      "input": 22830,
+      "output": 240,
+      "cachedInput": 12032,
+      "costUsd": 0.0035995919999999995
+    },
+    "memory": {
+      "input": 39215,
+      "output": 556,
+      "cachedInput": 35840,
+      "costUsd": 0.00189474
+    }
+  },
+  "model": "deepseek/deepseek-flash"
+}

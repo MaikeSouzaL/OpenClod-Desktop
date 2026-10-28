@@ -1,38 +1,22 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react'
 import { Icon } from './Icons'
-
-interface Slide {
-  id: string
-  title: string
-  body: string
-  accent: string
-  background: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-interface SlideDocument {
-  version: 1
-  title: string
-  slides: Slide[]
-}
-
-function parseDocument(source: string): SlideDocument | null {
-  try {
-    const parsed = JSON.parse(source) as SlideDocument
-    if (parsed?.version !== 1 || !Array.isArray(parsed.slides)) return null
-    return parsed
-  } catch {
-    return null
-  }
-}
+import {
+  createSlideDocument,
+  duplicateSlide,
+  moveSlide,
+  newSlide,
+  parseSlideDocument,
+  removeSlide,
+  updateSlide,
+  type Slide,
+  type SlideDocument
+} from '../../../core/artifacts/slides'
 
 /** Visual editor for .openclod-slides.json. The raw JSON remains the source. */
 export function SlideStudio({ source, onChange }: { source: string; onChange(next: string): void }): ReactElement {
-  const parsed = useMemo(() => parseDocument(source), [source])
+  const parsed = useMemo(() => parseSlideDocument(source), [source])
   const [active, setActive] = useState(0)
+  const [presenting, setPresenting] = useState(false)
 
   if (!parsed) {
     return (
@@ -45,27 +29,7 @@ export function SlideStudio({ source, onChange }: { source: string; onChange(nex
           className="btn primary"
           onClick={() =>
             onChange(
-              JSON.stringify(
-                {
-                  version: 1,
-                  title: 'Nova apresentação',
-                  slides: [
-                    {
-                      id: 'slide-1',
-                      title: 'Novo slide',
-                      body: 'Clique e edite o conteúdo.',
-                      accent: '#d8b36e',
-                      background: '#17191e',
-                      x: 64,
-                      y: 92,
-                      width: 640,
-                      height: 300
-                    }
-                  ]
-                },
-                null,
-                2
-              )
+              JSON.stringify(createSlideDocument(), null, 2)
             )
           }
         >
@@ -78,49 +42,55 @@ export function SlideStudio({ source, onChange }: { source: string; onChange(nex
   const slide = parsed.slides[Math.max(0, Math.min(active, parsed.slides.length - 1))]
   if (!slide) return <div className="slide-editor-empty">Apresentação sem slides.</div>
 
-  const update = (patch: Partial<Slide>): void => {
-    const slides = parsed.slides.map((item, index) => (index === active ? { ...item, ...patch } : item))
-    onChange(JSON.stringify({ ...parsed, slides }, null, 2))
+  const commit = (document: SlideDocument, nextActive = active): void => {
+    onChange(JSON.stringify(document, null, 2))
+    setActive(Math.max(0, Math.min(nextActive, document.slides.length - 1)))
   }
+  const update = (patch: Partial<Slide>): void => commit(updateSlide(parsed, active, patch))
 
   return (
     <div className="slide-studio">
       <aside className="slide-rail">
+        <div className="slide-rail-heading">Slides</div>
         {parsed.slides.map((item, index) => (
           <button key={item.id} type="button" className={`slide-thumb ${index === active ? 'active' : ''}`} onClick={() => setActive(index)}>
             <span>{index + 1}</span>
             <strong>{item.title || 'Sem título'}</strong>
           </button>
         ))}
-        <button
-          type="button"
-          className="btn ghost small"
-          onClick={() => {
-            const next = {
-              ...parsed,
-              slides: [
-                ...parsed.slides,
-                {
-                  id: `slide-${Date.now().toString(36)}`,
-                  title: 'Novo slide',
-                  body: 'Edite este slide.',
-                  accent: slide.accent,
-                  background: slide.background,
-                  x: 64,
-                  y: 92,
-                  width: 640,
-                  height: 300
-                }
-              ]
-            }
-            onChange(JSON.stringify(next, null, 2))
-            setActive(next.slides.length - 1)
-          }}
-        >
-          <Icon name="plus" size={12} /> Slide
-        </button>
+        <div className="slide-rail-actions">
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={() => {
+              const added = { ...newSlide(parsed.slides.length + 1), accent: slide.accent, background: slide.background }
+              commit({ ...parsed, slides: [...parsed.slides, added] }, parsed.slides.length)
+            }}
+          ><Icon name="plus" size={12} /> Slide</button>
+          <button type="button" className="icon-btn small" title="Duplicar slide" onClick={() => {
+            const result = duplicateSlide(parsed, active)
+            commit(result.document, result.index)
+          }}><Icon name="copy" size={12} /></button>
+          <button type="button" className="icon-btn small" title="Mover para cima" disabled={active === 0} onClick={() => {
+            const result = moveSlide(parsed, active, -1)
+            commit(result.document, result.index)
+          }}><Icon name="arrowUp" size={12} /></button>
+          <button type="button" className="icon-btn small" title="Mover para baixo" disabled={active === parsed.slides.length - 1} onClick={() => {
+            const result = moveSlide(parsed, active, 1)
+            commit(result.document, result.index)
+          }}><Icon name="chevronDown" size={12} /></button>
+          <button type="button" className="icon-btn small danger" title="Excluir slide" disabled={parsed.slides.length <= 1} onClick={() => {
+            const result = removeSlide(parsed, active)
+            commit(result.document, result.index)
+          }}><Icon name="trash" size={12} /></button>
+        </div>
       </aside>
       <div className="slide-workspace">
+        <div className="slide-stage-head">
+          <input aria-label="Título da apresentação" value={parsed.title} onChange={(event) => commit({ ...parsed, title: event.target.value })} />
+          <span>{active + 1} / {parsed.slides.length}</span>
+          <button type="button" className="btn ghost small" onClick={() => setPresenting(true)}><Icon name="play" size={12} /> Apresentar</button>
+        </div>
         <div className="slide-canvas" style={{ background: slide.background }}>
           <div
             className="slide-object"
@@ -153,8 +123,47 @@ export function SlideStudio({ source, onChange }: { source: string; onChange(nex
             Y
             <input type="range" min={0} max={500} value={slide.y} onChange={(event) => update({ y: Number(event.target.value) })} />
           </label>
+          <label>
+            Largura
+            <input type="range" min={120} max={900} value={slide.width} onChange={(event) => update({ width: Number(event.target.value) })} />
+          </label>
+          <label>
+            Altura
+            <input type="range" min={100} max={520} value={slide.height} onChange={(event) => update({ height: Number(event.target.value) })} />
+          </label>
         </div>
       </div>
+      {presenting ? (
+        <div
+          className="slide-presentation"
+          role="dialog"
+          aria-modal="true"
+          aria-label={parsed.title}
+          tabIndex={0}
+          autoFocus
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setPresenting(false)
+            if (event.key === 'ArrowRight' || event.key === ' ') setActive((current) => Math.min(parsed.slides.length - 1, current + 1))
+            if (event.key === 'ArrowLeft') setActive((current) => Math.max(0, current - 1))
+          }}
+        >
+          <div className="slide-presentation-canvas" style={{ background: slide.background }}>
+            <div className="slide-presentation-object" style={{
+              left: `${(slide.x / 960) * 100}%`, top: `${(slide.y / 540) * 100}%`,
+              width: `${(slide.width / 960) * 100}%`, height: `${(slide.height / 540) * 100}%`,
+              ['--slide-accent' as string]: slide.accent
+            } as CSSProperties}>
+              <h1>{slide.title}</h1><p>{slide.body}</p>
+            </div>
+          </div>
+          <div className="slide-presentation-nav">
+            <button type="button" onClick={() => setActive((current) => Math.max(0, current - 1))}>←</button>
+            <span>{active + 1} / {parsed.slides.length}</span>
+            <button type="button" onClick={() => setActive((current) => Math.min(parsed.slides.length - 1, current + 1))}>→</button>
+            <button type="button" onClick={() => setPresenting(false)}>Fechar</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

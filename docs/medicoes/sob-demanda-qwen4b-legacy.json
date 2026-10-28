@@ -1,0 +1,193 @@
+{
+  "label": "qwen4b-legacy",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-legacy-mvqvacug",
+  "startedAt": "2026-10-27T16:00:04.110Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 17165,
+      "cachedTokens": 8546,
+      "uncachedTokens": 8619,
+      "perCall": [
+        {
+          "input": 8550,
+          "cached": 0,
+          "output": 59
+        },
+        {
+          "input": 8615,
+          "cached": 8546,
+          "output": 33
+        }
+      ],
+      "ms": 44306,
+      "final": "Atualmente há **0 servidores MCP** configurados no sistema.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqvi57k_q6fz criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 17625,
+      "cachedTokens": 16786,
+      "uncachedTokens": 839,
+      "perCall": [
+        {
+          "input": 8752,
+          "cached": 8038,
+          "output": 151
+        },
+        {
+          "input": 8873,
+          "cached": 8748,
+          "output": 104
+        }
+      ],
+      "ms": 84523,
+      "final": "Handoff registrado com sucesso:\n\n- **ID do handoff**: `ho_mvqvi57k_q6fz`\n- **Resumo**: piso de tokens medido\n- **Próximo passo**: rodar a suíte de testes\n\nQuem assumir esta sessão deve chamar `memory_handoff accept` e fornecer o ID para val",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 18716,
+      "cachedTokens": 17222,
+      "uncachedTokens": 1494,
+      "perCall": [
+        {
+          "input": 8986,
+          "cached": 8240,
+          "output": 57
+        },
+        {
+          "input": 9730,
+          "cached": 8982,
+          "output": 347
+        }
+      ],
+      "ms": 132860,
+      "final": "**Nenhum resultadocasa com o filtro \"pdf\".**\n\nA busca retornou 4 skills, mas nenhuma delas serve para arquivo PDF:\n\n| Skill | Descrição parcial | Por que NÃO casa com PDF |\n|-------|------------------|--------------------------|\n| **docx** ",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 30203,
+      "cachedTokens": 28010,
+      "uncachedTokens": 2193,
+      "perCall": [
+        {
+          "input": 9814,
+          "cached": 8240,
+          "output": 73
+        },
+        {
+          "input": 9964,
+          "cached": 9810,
+          "output": 77
+        },
+        {
+          "input": 10425,
+          "cached": 9960,
+          "output": 205
+        }
+      ],
+      "ms": 126830,
+      "final": "Para revisões de **segurança**, o agente recomendado é **`security-auditor`** - um auditor de segurança de aplicações (read-only) que revisa código e configuração para vulnerabilidades exploráveis como injeção, gaps de autenticação/autoriza",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/qwen3.5:4b",
+  "totals": {
+    "modelCalls": 9,
+    "inputTokens": 83709,
+    "uncachedTokens": 13145,
+    "allTargetsOk": true
+  }
+}

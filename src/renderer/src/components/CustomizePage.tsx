@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import type { AgentDefinition, AppSettings, CapabilityReport, HookEvent, McpServerSettings, SkillInfo } from '../../../shared/types'
-import type { McpCatalogInfo, McpPresetEntry, PluginCatalogEntry } from '../../../shared/api'
+import type { AgentDefinition, AppSettings, CapabilityReport, HookEvent, SkillInfo } from '../../../shared/types'
+import type { McpCatalogInfo, PluginCatalogEntry, PluginInfo } from '../../../shared/api'
 import { Icon } from './Icons'
+import { ConnectorsPanel, type ConnectorsSeed } from './ConnectorsPanel'
 import { errorMessage, unwrap } from '../lib/api'
 import type { SettingsTab } from './SettingsDialog'
 
-type CustomizeTab = 'skills' | 'connectors' | 'plugins' | 'agents' | 'hooks'
+export type CustomizeTab = 'skills' | 'connectors' | 'plugins' | 'agents' | 'hooks'
 
 const HOOK_LABELS: Partial<Record<HookEvent, string>> = {
   PreToolUse: 'Antes de cada ferramenta',
@@ -71,24 +72,24 @@ interface CustomizePageProps {
   capabilities: CapabilityReport | null
   onOpenSettings(tab: SettingsTab): void
   onRestartMcp(): Promise<void>
-  onSaveMcpServers(servers: McpServerSettings[]): Promise<void>
+  /** Opens this tab when it changes (e.g. "Abrir Conectores" in Configurações → MCP). */
+  openTab?: { tab: CustomizeTab; nonce: number } | null
 }
 
-export function CustomizePage({ settings, capabilities, onOpenSettings, onRestartMcp, onSaveMcpServers }: CustomizePageProps): ReactElement {
-  const [presets, setPresets] = useState<McpPresetEntry[]>([])
+export function CustomizePage({ settings, capabilities, onOpenSettings, onRestartMcp, openTab }: CustomizePageProps): ReactElement {
   const [catalog, setCatalog] = useState<McpCatalogInfo[]>([])
   const [agents, setAgents] = useState<AgentDefinition[]>([])
   const [plugins, setPlugins] = useState<PluginCatalogEntry[]>([])
-  const [tab, setTab] = useState<CustomizeTab>('skills')
+  const [installedPlugins, setInstalledPlugins] = useState<PluginInfo[]>([])
+  const [tab, setTab] = useState<CustomizeTab>(openTab?.tab ?? 'skills')
   const [view, setView] = useState<'mine' | 'discover'>('mine')
+  const [connectorSeed, setConnectorSeed] = useState<ConnectorsSeed | null>(null)
   const [skills, setSkills] = useState<SkillInfo[]>([])
   const [query, setQuery] = useState('')
   const [source, setSource] = useState<'all' | 'usuario' | 'projeto'>('all')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [restarting, setRestarting] = useState(false)
-  const [oauthBusy, setOauthBusy] = useState('')
 
   const loadSkills = useCallback(async (): Promise<void> => {
     try {
@@ -103,7 +104,13 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
   }, [loadSkills])
 
   useEffect(() => {
-    void window.forja.app.mcpPresets().then((result) => result.ok && setPresets(result.value))
+    if (openTab) setTab(openTab.tab)
+  }, [openTab])
+
+  /** Plugins and categories hand the Conectores tab a search to start from. */
+  const exploreConnectors = useCallback((query: string): void => {
+    setConnectorSeed({ query, nonce: Date.now() })
+    setTab('connectors')
   }, [])
 
   const loadCatalog = useCallback(async (): Promise<void> => {
@@ -111,9 +118,15 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
     if (result.ok) setCatalog(result.value)
   }, [])
 
+  const loadPlugins = useCallback(async (): Promise<void> => {
+    const result = await window.forja.app.plugins()
+    if (result.ok) setInstalledPlugins(result.value)
+  }, [])
+
   useEffect(() => {
     void loadCatalog()
-  }, [loadCatalog])
+    void loadPlugins()
+  }, [loadCatalog, loadPlugins])
 
   useEffect(() => {
     void window.forja.app.agents().then((result) => {
@@ -124,61 +137,6 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
     })
   }, [])
 
-  const installCatalog = async (entry: McpCatalogInfo): Promise<void> => {
-    if (entry.oauth) {
-      try {
-        const installed = await unwrap(window.forja.app.installMcp(entry.id))
-        if (!installed.ok) {
-          setError(installed.error ?? 'não foi possível preparar o conector OAuth')
-          return
-        }
-        setOauthBusy(entry.id)
-        const auth = await unwrap(window.forja.app.authorizeMcp(installed.name ?? entry.id))
-        setNotice(auth.detail)
-        await loadCatalog()
-        await onRestartMcp()
-      } catch (err) {
-        setError(errorMessage(err))
-      } finally {
-        setOauthBusy('')
-      }
-      return
-    }
-    const env: Record<string, string> = {}
-    const headers: Record<string, string> = {}
-    for (const key of entry.needs) {
-      const value = window.prompt(`${entry.name}: informe ${key}`)
-      if (value === null) return
-      if (!value.trim()) {
-        setError(`${key} é obrigatório.`)
-        return
-      }
-      if (/authorization|token|key/i.test(key) && /^authorization$/i.test(key)) headers[key] = value.trim()
-      else env[key] = value.trim()
-    }
-    try {
-      const result = await unwrap(window.forja.app.installMcp(entry.id, env, headers))
-      if (!result.ok) {
-        setError(result.error ?? `faltam: ${(result.missing ?? []).join(', ')}`)
-        return
-      }
-      setNotice(`"${entry.name}" instalado${result.state === 'ready' ? ` · ${result.tools?.length ?? 0} ferramentas` : ' · conexão falhou, confira as credenciais'}.`)
-      await loadCatalog()
-    } catch (err) {
-      setError(errorMessage(err))
-    }
-  }
-
-  const addPreset = async (preset: McpPresetEntry): Promise<void> => {
-    if (!preset.server) return
-    try {
-      await onSaveMcpServers([...(settings?.mcpServers ?? []).filter((server) => server.name !== preset.server!.name), preset.server])
-      setNotice(`"${preset.label}" adicionado. As ferramentas ficam disponíveis nas próximas mensagens (modos Código, Depurar, Autônomo, Web e Computador).`)
-    } catch (err) {
-      setError(errorMessage(err))
-    }
-  }
-
   const visibleSkills = useMemo(() => {
     const q = query.trim().toLowerCase()
     return skills
@@ -187,8 +145,6 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [skills, query, source])
 
-  const servers = settings?.mcpServers ?? []
-  const status = capabilities?.mcp ?? []
   const hooks = settings?.hooks ?? {}
   const hookEvents = Object.entries(hooks).filter(([, matchers]) => Array.isArray(matchers) && matchers.length) as Array<[HookEvent, NonNullable<AppSettings['hooks']>[HookEvent]]>
 
@@ -268,7 +224,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             <Icon name="hammer" size={14} /> Hooks
           </button>
         </div>
-        {tab !== 'hooks' ? (
+        {tab !== 'hooks' && tab !== 'connectors' ? (
           <div className="view-switch" role="group" aria-label="Origem">
             <button type="button" className={view === 'mine' ? 'active' : ''} onClick={() => setView('mine')}>
               Meus
@@ -339,144 +295,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
         </>
       ) : null}
 
-      {tab === 'connectors' ? (
-        view === 'discover' ? (
-          <>
-            <p className="page-lead">
-              Conectores MCP prontos para instalar. O agente também pode instalá-los sozinho quando a tarefa pedir
-              (Jira, GitHub, banco, navegador, documentos). Os que exigem login OAuth aparecem marcados.
-            </p>
-            <div className="page-tools">
-              <div className="page-search">
-                <Icon name="search" size={14} />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Procurar conectores (Jira, GitHub, banco...)"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-            <div className="connector-grid">
-              {catalog
-                .filter((entry) => {
-                  const q = query.trim().toLowerCase()
-                  return !q || `${entry.id} ${entry.name} ${entry.description} ${entry.category}`.toLowerCase().includes(q)
-                })
-                .map((entry) => (
-                  <article key={entry.id} className="connector-card">
-                    <div className="connector-head">
-                      <span className="connector-icon">
-                        <Icon name={entry.category === 'atlassian' ? 'briefcase' : entry.category === 'database' ? 'archive' : entry.category === 'browser' ? 'globe' : 'plug'} size={18} />
-                      </span>
-                      <div>
-                        <strong>{entry.name}</strong>
-                        <span className="connector-meta">
-                          {entry.transport}
-                          {entry.oauth ? ' · OAuth' : ''}
-                          {entry.installed ? ' · instalado' : ''}
-                        </span>
-                      </div>
-                    </div>
-                    <p>{entry.description}</p>
-                    <div className="connector-foot">
-                      <span className="connector-needs">
-                        {entry.needs.length ? `precisa: ${entry.needs.slice(0, 3).join(', ')}` : 'sem credenciais'}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={entry.installed || oauthBusy === entry.id}
-                        onClick={() => void installCatalog(entry)}
-                      >
-                        {entry.installed ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}
-                        {oauthBusy === entry.id ? 'Conectando…' : entry.installed ? 'Instalado' : 'Adicionar'}
-                      </button>
-                    </div>
-                  </article>
-                ))}
-            </div>
-            {!catalog.length ? <p className="muted">Carregando catálogo…</p> : null}
-          </>
-        ) : (
-        <>
-          <p className="page-lead">
-            Conectores são servidores MCP locais. Cada ferramenta que eles expõem passa pela mesma política de permissões das ferramentas nativas.
-          </p>
-          <div className="page-tools">
-            <span className="page-tools-spacer" />
-            <button
-              type="button"
-              className="btn subtle"
-              disabled={restarting}
-              onClick={() => {
-                setRestarting(true)
-                void onRestartMcp().finally(() => setRestarting(false))
-              }}
-            >
-              <Icon name="refresh" size={13} /> {restarting ? 'Reconectando…' : 'Reconectar todos'}
-            </button>
-            <button type="button" className="btn primary" onClick={() => onOpenSettings('mcp')}>
-              <Icon name="plus" size={13} /> Adicionar
-            </button>
-          </div>
-          <div className="card-grid">
-            <div className="info-card">
-              <div className="info-card-head">
-                <span className={`dot ${capabilities?.computer.available ? 'on' : 'off'}`} />
-                <strong>Computer Use</strong>
-                <span className="badge">nativo</span>
-              </div>
-              <p>{capabilities?.computer.available ? `Controle do Windows via ${capabilities.computer.backend}.` : 'Indisponível nesta máquina.'}</p>
-            </div>
-            <div className="info-card">
-              <div className="info-card-head">
-                <span className={`dot ${capabilities?.browser.available ? 'on' : 'off'}`} />
-                <strong>Navegador do agente</strong>
-                <span className="badge">nativo</span>
-              </div>
-              <p>{capabilities?.browser.available ? `Automação via ${capabilities.browser.engine ?? 'Playwright'}.` : 'Indisponível nesta máquina.'}</p>
-            </div>
-            {servers.map((server) => {
-              const live = status.find((item) => item.name === server.name)
-              return (
-                <div key={server.name} className="info-card">
-                  <div className="info-card-head">
-                    <span className={`dot ${live?.state === 'ready' ? 'on' : live?.state === 'error' ? 'off' : 'idle'}`} />
-                    <strong>{server.name}</strong>
-                    <span className="badge">{server.enabled ? live?.state ?? 'parado' : 'desativado'}</span>
-                  </div>
-                  <p>
-                    <code>{[server.command, ...server.args].join(' ').slice(0, 160)}</code>
-                  </p>
-                  <p className="muted">{live?.tools.length ? `${live.tools.length} ferramentas` : live?.error ?? 'sem ferramentas carregadas'}</p>
-                </div>
-              )
-            })}
-          </div>
-          {!servers.length ? <p className="muted">Nenhum servidor MCP configurado ainda.</p> : null}
-          {presets
-            .filter((preset) => !servers.some((server) => server.name === preset.server?.name))
-            .map((preset) => (
-              <div key={preset.id} className="info-card preset-card">
-                <div className="info-card-head">
-                  <Icon name="plug" size={14} />
-                  <strong>{preset.label}</strong>
-                  <span className="badge">preset</span>
-                </div>
-                <p>{preset.description}</p>
-                {preset.server ? (
-                  <button type="button" className="btn small primary" onClick={() => void addPreset(preset)}>
-                    <Icon name="plus" size={12} /> Adicionar
-                  </button>
-                ) : (
-                  <p className="muted">{preset.unavailableReason}</p>
-                )}
-              </div>
-            ))}
-        </>
-        )
-      ) : null}
+      {tab === 'connectors' ? <ConnectorsPanel capabilities={capabilities} seed={connectorSeed} /> : null}
 
       {tab === 'plugins' ? (
         <>
@@ -484,6 +303,77 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             Plugins empacotam skills, conectores e subagentes. O catálogo oficial da Anthropic tem 315 plugins; abaixo
             estão os mais usados. Conectores com MCP podem ser instalados direto daqui.
           </p>
+          <div className="installed-plugins-head">
+            <div>
+              <h2 className="section-title">Plugins locais instalados</h2>
+              <p className="field-help">Cada ferramenta é executada em um subprocesso Node isolado da UI e passa pela política normal do agente.</p>
+            </div>
+            <button
+              type="button"
+              className="btn primary small"
+              onClick={async () => {
+                setError('')
+                try {
+                  const installed = await unwrap(window.forja.app.installLocalPlugin())
+                  if (installed) {
+                    setNotice(`Plugin ${installed.name} ${installed.version} instalado. Ative-o para registrar as ferramentas.`)
+                    await loadPlugins()
+                  }
+                } catch (err) {
+                  setError(errorMessage(err))
+                }
+              }}
+            >
+              <Icon name="plus" size={13} /> Instalar pasta local
+            </button>
+          </div>
+          {installedPlugins.length ? (
+            <div className="installed-plugin-list">
+              {installedPlugins.map((plugin) => (
+                <article className="installed-plugin" key={plugin.id}>
+                  <div className="installed-plugin-main">
+                    <strong>{plugin.name} <span className="badge">v{plugin.version}</span></strong>
+                    <p>{plugin.description}</p>
+                    <span className="muted">API {plugin.apiVersion} · {plugin.tools.length} ferramenta(s){plugin.dependencies.length ? ` · requer ${plugin.dependencies.join(', ')}` : ''}</span>
+                    {plugin.tools.length ? <span className="plugin-tool-chips">{plugin.tools.map((tool) => <code key={tool.key}>{tool.key}:{tool.risk}</code>)}</span> : null}
+                    {plugin.errors.length ? <span className="field-note bad">{plugin.errors.join(' · ')}</span> : null}
+                  </div>
+                  <div className="installed-plugin-actions">
+                    <button
+                      type="button"
+                      className={`btn small ${plugin.enabled ? 'subtle' : 'primary'}`}
+                      onClick={async () => {
+                        try {
+                          await unwrap(window.forja.app.setPluginEnabled(plugin.id, !plugin.enabled))
+                          await loadPlugins()
+                        } catch (err) {
+                          setError(errorMessage(err))
+                        }
+                      }}
+                    >
+                      {plugin.enabled ? <Icon name="pause" size={12} /> : <Icon name="play" size={12} />} {plugin.enabled ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn small ghost"
+                      disabled={plugin.enabled}
+                      onClick={async () => {
+                        if (!window.confirm(`Remover ${plugin.name}? A pasta data do plugin será preservada.`)) return
+                        try {
+                          await unwrap(window.forja.app.removePlugin(plugin.id))
+                          await loadPlugins()
+                        } catch (err) {
+                          setError(errorMessage(err))
+                        }
+                      }}
+                    >
+                      <Icon name="trash" size={12} /> Remover
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : <div className="field-note">Nenhum plugin local instalado. Use “Instalar pasta local” e selecione a pasta que contém `plugin.json`.</div>}
           <div className="plugin-hero">
             <div>
               <span className="plugin-overline">From Anthropic</span>
@@ -492,11 +382,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
               <button
                 type="button"
                 className="btn small"
-                onClick={() => {
-                  setTab('connectors')
-                  setView('discover')
-                  setQuery('postgres')
-                }}
+                onClick={() => exploreConnectors('postgres')}
               >
                 Explorar conectores
               </button>
@@ -532,9 +418,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                     title={connector ? 'Adicionar conector' : 'Disponível pelo catálogo do Claude Code'}
                     onClick={() => {
                       if (connector) {
-                        setTab('connectors')
-                        setView('discover')
-                        setQuery(plugin.name)
+                        exploreConnectors(plugin.name)
                       } else {
                         setNotice('Este plugin é de skills e ainda não é importado automaticamente. Use o catálogo de conectores para a parte MCP.')
                       }
@@ -553,11 +437,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                 key={category}
                 type="button"
                 className="category-card"
-                onClick={() => {
-                  setTab('connectors')
-                  setView('discover')
-                  setQuery(category.split(' ')[0])
-                }}
+                onClick={() => exploreConnectors(category.split(' ')[0])}
               >
                 <Icon name="folder" size={14} /> {category}
               </button>

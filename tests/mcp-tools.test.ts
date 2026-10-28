@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mcpInstallTool, mcpServersTool, mcpSearchTool } from '../src/core/tools/mcp'
+import { mcpInstallTool, mcpPromptTool, mcpResourceTool, mcpServersTool, mcpSearchTool } from '../src/core/tools/mcp'
 import type { ToolContext } from '../src/core/tools/types'
 
 function context(service: unknown): ToolContext {
@@ -77,12 +77,66 @@ describe('MCP self-install tools', () => {
 
   it('lists configured servers and their state', async () => {
     const list = vi.fn(() => [
-      { name: 'jira', state: 'ready', transport: 'stdio', tools: ['a', 'b'] },
-      { name: 'atlassian', state: 'error', transport: 'http', tools: [], error: 'HTTP 401' }
+      {
+        name: 'jira',
+        state: 'ready',
+        transport: 'stdio',
+        tools: ['a', 'b'],
+        resources: [{ uri: 'jira://projeto/1', name: 'Projeto 1' }],
+        prompts: [{ name: 'resumir', arguments: [] }]
+      },
+      { name: 'atlassian', state: 'error', transport: 'http', tools: [], resources: [], prompts: [], error: 'HTTP 401' }
     ])
     const result = await mcpServersTool.execute({}, context({ list }))
     expect(result.text).toContain('● jira')
+    expect(result.text).toContain('1 recursos')
+    expect(result.text).toContain('1 prompts')
     expect(result.text).toContain('HTTP 401')
     expect(result.summary).toBe('2 MCPs')
+  })
+
+  it('lists and reads MCP resources, selecting the only available server', async () => {
+    const list = vi.fn(() => [
+      {
+        name: 'docs',
+        state: 'ready',
+        transport: 'stdio',
+        tools: [],
+        resources: [{ uri: 'file:///README.md', name: 'README', mimeType: 'text/markdown' }],
+        prompts: []
+      }
+    ])
+    const readResource = vi.fn(async () => [{ uri: 'file:///README.md', mimeType: 'text/markdown', text: '# Projeto' }])
+    const service = { list, readResource }
+    const listed = await mcpResourceTool.execute({ action: 'list' }, context(service))
+    expect(listed.text).toContain('file:///README.md')
+    const read = await mcpResourceTool.execute({ action: 'read', uri: 'file:///README.md' }, context(service))
+    expect(read).toMatchObject({ ok: true, text: '# Projeto', summary: 'docs · 1 conteúdo(s)' })
+    expect(readResource).toHaveBeenCalledWith('docs', 'file:///README.md')
+  })
+
+  it('fills and returns an MCP prompt', async () => {
+    const list = vi.fn(() => [
+      {
+        name: 'jira',
+        state: 'ready',
+        transport: 'stdio',
+        tools: [],
+        resources: [],
+        prompts: [{ name: 'revisar', arguments: [{ name: 'issue', required: true }] }]
+      }
+    ])
+    const getPrompt = vi.fn(async () => ({
+      description: 'Revisão do ticket',
+      messages: [{ role: 'user', content: 'Revise CNC-42' }]
+    }))
+    const service = { list, getPrompt }
+    const listed = await mcpPromptTool.execute({ action: 'list' }, context(service))
+    expect(listed.text).toContain('jira · revisar')
+    expect(listed.text).toContain('issue*')
+    const result = await mcpPromptTool.execute({ name: 'revisar', arguments: { issue: 'CNC-42' } }, context(service))
+    expect(result.text).toContain('Revisão do ticket')
+    expect(result.text).toContain('[user]\nRevise CNC-42')
+    expect(getPrompt).toHaveBeenCalledWith('jira', 'revisar', { issue: 'CNC-42' })
   })
 })

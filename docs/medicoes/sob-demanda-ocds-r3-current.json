@@ -1,0 +1,215 @@
+{
+  "label": "ocds-r3-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqwc8k5",
+  "startedAt": "2026-10-27T16:25:38.786Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "tool_load",
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 24244,
+      "cachedTokens": 768,
+      "uncachedTokens": 23476,
+      "perCall": [
+        {
+          "input": 7982,
+          "cached": 0,
+          "output": 217
+        },
+        {
+          "input": 8104,
+          "cached": 768,
+          "output": 25
+        },
+        {
+          "input": 8158,
+          "cached": 0,
+          "output": 31
+        }
+      ],
+      "ms": 10156,
+      "timedOut": false,
+      "final": "Nenhum: a ferramenta retornou \"nenhum MCP configurado\" — zero servidores MCP aparecem.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqwdcv8_nw3l criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 16843,
+      "cachedTokens": 768,
+      "uncachedTokens": 16075,
+      "perCall": [
+        {
+          "input": 8240,
+          "cached": 768,
+          "output": 143
+        },
+        {
+          "input": 8603,
+          "cached": 0,
+          "output": 68
+        }
+      ],
+      "ms": 8089,
+      "timedOut": false,
+      "final": "Handoff criado.\n\n- **Resumo:** piso de tokens medido\n- **Próximo passo:** rodar a suíte de testes\n- **Id:** `ho_mvqwdcv8_nw3l`\n\nQuem retomar deve chamar `memory_handoff accept` com esse id.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_load",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 26326,
+      "cachedTokens": 15872,
+      "uncachedTokens": 10454,
+      "perCall": [
+        {
+          "input": 8391,
+          "cached": 6144,
+          "output": 56
+        },
+        {
+          "input": 8554,
+          "cached": 4096,
+          "output": 75
+        },
+        {
+          "input": 9381,
+          "cached": 5632,
+          "output": 291
+        }
+      ],
+      "ms": 12162,
+      "timedOut": false,
+      "final": "Nenhuma skill de PDF instalada. A busca `pdf` retornou 4 skills, mas todas citam \"PDF\" apenas para dizer que **não** se aplicam a PDF:\n\n- **docx** — Word/.docx (exclui explicitamente PDF)\n- **pptx** — PowerPoint/.pptx (exclui PDF)\n- **qa-to",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "tool_load",
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 39791,
+      "cachedTokens": 21632,
+      "uncachedTokens": 18159,
+      "perCall": [
+        {
+          "input": 9299,
+          "cached": 0,
+          "output": 90
+        },
+        {
+          "input": 9487,
+          "cached": 6144,
+          "output": 59
+        },
+        {
+          "input": 9649,
+          "cached": 6016,
+          "output": 92
+        },
+        {
+          "input": 11356,
+          "cached": 9472,
+          "output": 356
+        }
+      ],
+      "ms": 14133,
+      "timedOut": false,
+      "final": "Busquei com `list_agents(query=\"segurança\")`.\n\n**Resultado literal da busca:** apenas 1 agente — `svg-verifier` (casa só porque cita \"segurança\" ao validar XML de SVG em modo somente leitura).\n\n**Porém**, a busca é sensível ao idioma: as de",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "totals": {
+    "modelCalls": 12,
+    "inputTokens": 107204,
+    "uncachedTokens": 68164,
+    "allTargetsOk": true
+  }
+}

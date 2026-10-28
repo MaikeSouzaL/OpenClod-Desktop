@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "rows": 4,
+  "types": [
+    "decision",
+    "decision",
+    "decision"
+  ],
+  "conflicts": [
+    "1 conflito(s)"
+  ],
+  "superseded": [
+    "superseded"
+  ],
+  "summary": "4 página(s) · 0 fixada(s) · 0 handoff(s) aberto(s) · 1 conflito(s) possível(is) · 1 substituída(s) · 0 invalidada(s)",
+  "bridge": "function",
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\memory-provenance-2026-10-25\\01-memory-provenance.png",
+  "errors": []
+}

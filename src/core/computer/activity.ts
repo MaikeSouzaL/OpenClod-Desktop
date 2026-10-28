@@ -10,6 +10,8 @@ import type { HarnessEvent } from '../../shared/types.js'
  */
 export class ComputerActivityTracker {
   private readonly calls = new Set<string>()
+  /** Turns that already touched Computer Use or the browser; stays until turn_end. */
+  private readonly overlayTurns = new Set<string>()
   private timer: ReturnType<typeof setTimeout> | null = null
   private visible = false
 
@@ -30,13 +32,17 @@ export class ComputerActivityTracker {
   handle(event: HarnessEvent): void {
     switch (event.type) {
       case 'tool_start':
-        if (!isComputerTool(event.name)) return
+        if (!isOverlayTool(event.name)) return
         this.calls.add(callKey(event))
+        // Computer Use and browser work span model iterations: one click,
+        // read, click again. Keep the border and the agent pointer up until
+        // the turn ends instead of hiding during the thinking gaps.
+        this.overlayTurns.add(turnKey(event))
         this.cancelTimer()
         this.setVisible(true)
         return
       case 'tool_end':
-        if (!isComputerTool(event.name)) return
+        if (!isOverlayTool(event.name)) return
         this.calls.delete(callKey(event))
         this.scheduleHide()
         return
@@ -45,6 +51,9 @@ export class ComputerActivityTracker {
         // pending calls so a stale entry never keeps the overlay forever.
         for (const key of [...this.calls]) {
           if (key.startsWith(`${event.sessionId}::`)) this.calls.delete(key)
+        }
+        for (const key of [...this.overlayTurns]) {
+          if (key.startsWith(`${event.sessionId}::`)) this.overlayTurns.delete(key)
         }
         this.scheduleHide()
         return
@@ -56,15 +65,16 @@ export class ComputerActivityTracker {
   dispose(): void {
     this.cancelTimer()
     this.calls.clear()
+    this.overlayTurns.clear()
     this.setVisible(false)
   }
 
   private scheduleHide(): void {
-    if (this.calls.size > 0) return
+    if (this.calls.size > 0 || this.overlayTurns.size > 0) return
     this.cancelTimer()
     this.timer = setTimeout(() => {
       this.timer = null
-      if (this.calls.size === 0) this.setVisible(false)
+      if (this.calls.size === 0 && this.overlayTurns.size === 0) this.setVisible(false)
     }, this.lingerMs)
     this.timer.unref?.()
   }
@@ -87,6 +97,22 @@ export function isComputerTool(name: string): boolean {
   return name.startsWith('computer_')
 }
 
+/**
+ * Tools that act on something the user can see: the real desktop or the
+ * user's Chrome. Both should show the same border/face/cursor overlay.
+ */
+export function isOverlayTool(name: string): boolean {
+  return name.startsWith('computer_') || name.startsWith('browser_')
+}
+
+export function isBrowserTool(name: string): boolean {
+  return name.startsWith('browser_')
+}
+
+function turnKey(event: Extract<HarnessEvent, { type: 'tool_start' | 'tool_end' }>): string {
+  return `${event.sessionId}::${event.agentId ?? 'root'}`
+}
+
 function callKey(event: Extract<HarnessEvent, { type: 'tool_start' | 'tool_end' }>): string {
-  return `${event.sessionId}::${event.agentId ?? 'root'}::${event.toolCallId}`
+  return `${turnKey(event)}::${event.toolCallId}`
 }

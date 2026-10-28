@@ -242,7 +242,7 @@ export const REA_APPROVAL_TOOLS: string[] = [
 
 /** Floor for tool calls: Ghidra's first import of a binary takes minutes. */
 const REA_MIN_CALL_TIMEOUT_MS = 300_000
-/** REA exposes ~185 tools; listing them takes longer than the 20 s default. */
+/** REA exposes ~185 tools; starting and listing them can take longer than the default start timeout. */
 const REA_START_TIMEOUT_MS = 60_000
 
 export interface ReaPresetOptions {

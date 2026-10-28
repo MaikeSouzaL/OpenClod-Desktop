@@ -1,0 +1,70 @@
+{
+  "label": "colab",
+  "startedAt": "2026-10-27T19:10:15.842Z",
+  "real": true,
+  "model": "colab/qwen3.5:9b-q8_0",
+  "shotHome": "Prints\\chat-computer-2026-10-27\\colab-01-inicio.png",
+  "sessionMode": "computer",
+  "command": {
+    "attempts": 1,
+    "seconds": 30,
+    "tools": [
+      "computer_open_path",
+      "computer_open_path",
+      "run_command",
+      "run_command",
+      "run_command",
+      "run_command"
+    ]
+  },
+  "shotCommand": "Prints\\chat-computer-2026-10-27\\colab-02-pasta-criada.png",
+  "target": {
+    "x": 818,
+    "y": 491,
+    "width": 300,
+    "height": 120
+  },
+  "mouse": {
+    "tries": 1,
+    "seconds": 51,
+    "click": {
+      "clicked": true,
+      "x": 949,
+      "y": 552,
+      "at": "2026-10-27T16:11:33.6162964-03:00"
+    },
+    "tools": [
+      "tool_search",
+      "tool_search",
+      "tool_load",
+      "tool_load",
+      "computer_list_windows",
+      "computer_list_windows",
+      "computer_screenshot",
+      "computer_screenshot",
+      "computer_click",
+      "computer_click"
+    ],
+    "clicks": [
+      {
+        "x": 495,
+        "y": 512
+      },
+      null
+    ]
+  },
+  "shotMouse": "Prints\\chat-computer-2026-10-27\\colab-03-clique-com-o-mouse.png",
+  "errors": [],
+  "checks": {
+    "o app abre no Início (Chat), com o campo \"Como posso ajudar você hoje?\"": "ok",
+    "a primeira mensagem do Início abriu uma conversa de Chat": "ok",
+    "a conversa do Chat abre em Computer Use (e não mais em \"Perguntar\", que só lê)": "ok",
+    "POR COMANDO: o modelo CRIOU a pasta no computador (não só explicou como fazer)": "ok",
+    "...usando ferramentas que o Chat antes não tinha (terminal ou Computer Use)": "ok",
+    "...e disse o que fez": "ok",
+    "a conversa terminou sem erro": "ok",
+    "PELO PONTEIRO: o modelo clicou no botão da janela-alvo com o mouse (o próprio botão registrou o clique)": "ok",
+    "...e o ponteiro estava DENTRO do botão": "ok",
+    "...usando a captura de tela e o clique por coordenada (sem teclado nem comando)": "ok"
+  }
+}

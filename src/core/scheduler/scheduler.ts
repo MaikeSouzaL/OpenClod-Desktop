@@ -3,25 +3,37 @@ import path from 'node:path'
 import { AGENT_MODES, type AgentMode } from '../../shared/types.js'
 import { id } from '../util/ids.js'
 import { SchedulerValidationError, nextRun, validateSchedule } from './schedule.js'
+import { SCHEDULED_SURFACES } from './session.js'
 import type {
   Schedule,
+  ScheduledSurface,
   ScheduledTask,
   ScheduledTaskInput,
   ScheduledTaskPatch,
   SchedulerOptions,
+  TaskAction,
+  TaskActionOptions,
   TaskRunHandler,
+  TaskPriority,
+  TaskRunRecord,
   TaskStatus
 } from './types.js'
 
 export { SchedulerValidationError, nextRun, validateSchedule } from './schedule.js'
+export { SCHEDULED_SURFACES, scheduledSession } from './session.js'
 export type {
   Schedule,
   ScheduleKind,
+  ScheduledSurface,
   ScheduledTask,
   ScheduledTaskInput,
   ScheduledTaskPatch,
   SchedulerOptions,
+  TaskAction,
+  TaskActionOptions,
   TaskRunHandler,
+  TaskPriority,
+  TaskRunRecord,
   TaskRunResult,
   TaskStatus
 } from './types.js'
@@ -67,10 +79,18 @@ interface TaskFields {
   projectId: string
   cwd: string
   mode?: AgentMode
+  surface?: ScheduledSurface
   providerId?: string
   model?: string
+  priority?: TaskPriority
+  maxRetries?: number
+  retryDelayMs?: number
+  action?: TaskAction
+  actionOptions?: TaskActionOptions
   schedule: Schedule
 }
+
+const ACTIONS: TaskAction[] = ['improvement-review']
 
 function text(
   value: unknown,
@@ -103,6 +123,10 @@ function normalizeFields(input: Record<string, unknown>): TaskFields {
   if (mode !== undefined && mode !== null && !AGENT_MODES.includes(mode as AgentMode)) {
     throw new SchedulerValidationError(`Modo inválido. Use um destes: ${AGENT_MODES.join(', ')}.`)
   }
+  const surface = input.surface
+  if (surface !== undefined && surface !== null && !SCHEDULED_SURFACES.includes(surface as ScheduledSurface)) {
+    throw new SchedulerValidationError(`Tipo de sessão inválido. Use um destes: ${SCHEDULED_SURFACES.join(', ')}.`)
+  }
   const fields: TaskFields = {
     name: text(input.name, 'O nome da tarefa', NAME_MAX, true)!,
     prompt: text(input.prompt, 'O prompt da tarefa', PROMPT_MAX, true)!,
@@ -111,10 +135,50 @@ function normalizeFields(input: Record<string, unknown>): TaskFields {
     schedule: validateSchedule(input.schedule)
   }
   if (mode) fields.mode = mode as AgentMode
+  if (surface) fields.surface = surface as ScheduledSurface
   const providerId = text(input.providerId, 'O provedor da tarefa', 200, false)
   if (providerId) fields.providerId = providerId
   const model = text(input.model, 'O modelo da tarefa', 200, false)
   if (model) fields.model = model
+  if (input.priority === 'low' || input.priority === 'high' || input.priority === 'normal') fields.priority = input.priority
+  if (input.maxRetries !== undefined) {
+    if (!Number.isInteger(input.maxRetries) || Number(input.maxRetries) < 0 || Number(input.maxRetries) > 5) {
+      throw new SchedulerValidationError('maxRetries deve ser um inteiro de 0 a 5.')
+    }
+    fields.maxRetries = Number(input.maxRetries)
+  }
+  if (input.retryDelayMs !== undefined) {
+    if (!Number.isFinite(input.retryDelayMs) || Number(input.retryDelayMs) < 0 || Number(input.retryDelayMs) > 300_000) {
+      throw new SchedulerValidationError('retryDelayMs deve estar entre 0 e 300000.')
+    }
+    fields.retryDelayMs = Math.round(Number(input.retryDelayMs))
+  }
+  const action = input.action
+  if (action !== undefined && action !== null) {
+    if (!ACTIONS.includes(action as TaskAction)) {
+      throw new SchedulerValidationError(`Ação inválida. Use uma destas: ${ACTIONS.join(', ')}.`)
+    }
+    fields.action = action as TaskAction
+    const options = input.actionOptions
+    if (options !== undefined && options !== null) {
+      if (typeof options !== 'object' || Array.isArray(options)) {
+        throw new SchedulerValidationError('As opções da ação devem ser um objeto.')
+      }
+      const { useAi, days } = options as Record<string, unknown>
+      const parsed: TaskActionOptions = {}
+      if (useAi !== undefined) {
+        if (typeof useAi !== 'boolean') throw new SchedulerValidationError('useAi deve ser verdadeiro ou falso.')
+        parsed.useAi = useAi
+      }
+      if (days !== undefined) {
+        if (!Number.isInteger(days) || Number(days) < 1 || Number(days) > 180) {
+          throw new SchedulerValidationError('days deve ser um inteiro de 1 a 180.')
+        }
+        parsed.days = Number(days)
+      }
+      fields.actionOptions = parsed
+    }
+  }
   return fields
 }
 
@@ -124,8 +188,14 @@ const EDITABLE: Array<keyof ScheduledTaskInput> = [
   'projectId',
   'cwd',
   'mode',
+  'surface',
   'providerId',
   'model',
+  'priority',
+  'maxRetries',
+  'retryDelayMs',
+  'action',
+  'actionOptions',
   'schedule'
 ]
 
@@ -136,8 +206,14 @@ function fieldsOf(task: ScheduledTask): Record<string, unknown> {
     projectId: task.projectId,
     cwd: task.cwd,
     mode: task.mode,
+    surface: task.surface,
     providerId: task.providerId,
     model: task.model,
+    priority: task.priority,
+    maxRetries: task.maxRetries,
+    retryDelayMs: task.retryDelayMs,
+    action: task.action,
+    actionOptions: task.actionOptions,
     schedule: task.schedule
   }
 }
@@ -153,6 +229,28 @@ function sameSchedule(a: Schedule, b: Schedule): boolean {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function priorityRank(priority: TaskPriority | undefined): number {
+  return priority === 'high' ? 2 : priority === 'low' ? 0 : 1
+}
+
+function normalizeRunRecord(value: unknown, index: number): TaskRunRecord[] {
+  if (!value || typeof value !== 'object') return []
+  const raw = value as Record<string, unknown>
+  if ((raw.status !== 'ok' && raw.status !== 'error') || !isFiniteNumber(raw.startedAt) || !isFiniteNumber(raw.finishedAt)) return []
+  return [{
+    id: typeof raw.id === 'string' ? raw.id.slice(0, 120) : `run-restored-${index}`,
+    trigger: raw.trigger === 'manual' ? 'manual' : 'schedule',
+    attempt: Math.max(1, Math.round(Number(raw.attempt) || 1)),
+    status: raw.status,
+    startedAt: raw.startedAt,
+    finishedAt: raw.finishedAt,
+    dueAt: isFiniteNumber(raw.dueAt) ? raw.dueAt : undefined,
+    late: raw.late === true,
+    sessionId: typeof raw.sessionId === 'string' ? raw.sessionId : undefined,
+    error: typeof raw.error === 'string' ? raw.error.slice(0, 2_000) : undefined
+  }]
 }
 
 function view(task: ScheduledTask): ScheduledTask {
@@ -184,6 +282,7 @@ export class Scheduler {
   private readonly now: () => Date
   private readonly tickMs: number
   private readonly catchUpMissed: boolean
+  private readonly maxConcurrent: number
 
   constructor(
     private readonly file: string,
@@ -192,6 +291,7 @@ export class Scheduler {
     this.now = options.now ?? (() => new Date())
     this.tickMs = options.tickMs && options.tickMs > 0 ? options.tickMs : DEFAULT_TICK_MS
     this.catchUpMissed = options.catchUpMissed !== false
+    this.maxConcurrent = Math.max(1, Math.min(16, Math.round(options.maxConcurrent ?? 4)))
   }
 
   /** A run starting later than this after its slot counts as late. */
@@ -276,6 +376,9 @@ export class Scheduler {
     if (typeof raw.lastSessionId === 'string') task.lastSessionId = raw.lastSessionId
     if (isFiniteNumber(raw.lastDueAt)) task.lastDueAt = raw.lastDueAt
     if (raw.lastRunLate === true) task.lastRunLate = true
+    if (Array.isArray(raw.runHistory)) {
+      task.runHistory = raw.runHistory.slice(-50).flatMap((entry, index) => normalizeRunRecord(entry, index))
+    }
     if (enabled) {
       // A stored time in the past is a missed slot and must survive: it is
       // what makes the first tick run the task.
@@ -367,8 +470,11 @@ export class Scheduler {
 
     const next: ScheduledTask = { ...current, ...fields, enabled, updatedAt: now.getTime() }
     if (!('mode' in fields)) delete next.mode
+    if (!('surface' in fields)) delete next.surface
     if (!('providerId' in fields)) delete next.providerId
     if (!('model' in fields)) delete next.model
+    if (!('action' in fields)) delete next.action
+    if (!('actionOptions' in fields)) delete next.actionOptions
 
     if (!enabled) {
       delete next.nextRunAt
@@ -447,17 +553,25 @@ export class Scheduler {
     if (!this.handler) return
     const nowMs = this.now().getTime()
     const lateGraceMs = this.lateGraceMs
-    const runs: Array<Promise<unknown>> = []
-    for (const task of [...this.tasks.values()]) {
+    const due: ScheduledTask[] = []
+    for (const task of this.tasks.values()) {
       if (!task.enabled || task.nextRunAt === undefined || task.nextRunAt > nowMs) continue
       if (this.running.has(task.id)) continue
-      if (!this.catchUpMissed && nowMs - task.nextRunAt > lateGraceMs) {
-        runs.push(this.skipMissed(task.id).catch(() => undefined))
-      } else {
-        runs.push(this.execute(task.id, 'schedule').catch(() => undefined))
-      }
+      due.push(task)
     }
-    await Promise.all(runs)
+    due.sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority) || (a.nextRunAt ?? 0) - (b.nextRunAt ?? 0))
+    let cursor = 0
+    const workers = Array.from({ length: Math.min(this.maxConcurrent, due.length) }, async () => {
+      while (cursor < due.length) {
+        const task = due[cursor++]
+        if (!this.catchUpMissed && nowMs - task.nextRunAt! > lateGraceMs) {
+          await this.skipMissed(task.id).catch(() => undefined)
+        } else {
+          await this.execute(task.id, 'schedule').catch(() => undefined)
+        }
+      }
+    })
+    await Promise.all(workers)
   }
 
   /** Runs a task right now, even if it is disabled. Resolves with the finished task. */
@@ -535,15 +649,48 @@ export class Scheduler {
       await this.persist().catch(() => undefined)
       this.emit()
 
-      let status: TaskStatus = 'ok'
+      let status: TaskStatus = 'error'
       let error: string | undefined
       let sessionId: string | undefined
-      try {
-        const result = await handler(view(started))
-        sessionId = result?.sessionId
-      } catch (err) {
-        status = 'error'
-        error = (err instanceof Error ? err.message : String(err)).slice(0, 2000) || 'Erro desconhecido.'
+      const history: TaskRunRecord[] = []
+      const attempts = 1 + Math.max(0, Math.min(5, task.maxRetries ?? 0))
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        const attemptStartedAt = this.now()
+        try {
+          const result = await handler(view(started))
+          sessionId = result?.sessionId
+          status = 'ok'
+          error = undefined
+          history.push({
+            id: id('run'),
+            trigger,
+            attempt,
+            status: 'ok',
+            startedAt: attemptStartedAt.getTime(),
+            finishedAt: this.now().getTime(),
+            dueAt,
+            late,
+            sessionId
+          })
+          break
+        } catch (err) {
+          status = 'error'
+          error = (err instanceof Error ? err.message : String(err)).slice(0, 2000) || 'Erro desconhecido.'
+          history.push({
+            id: id('run'),
+            trigger,
+            attempt,
+            status: 'error',
+            startedAt: attemptStartedAt.getTime(),
+            finishedAt: this.now().getTime(),
+            dueAt,
+            late,
+            error
+          })
+          if (attempt < attempts && (task.retryDelayMs ?? 0) > 0) {
+            await new Promise((resolve) => setTimeout(resolve, Math.min(300_000, task.retryDelayMs!)))
+          }
+        }
       }
 
       // The task may have been edited or removed while it ran: apply the
@@ -552,6 +699,7 @@ export class Scheduler {
       if (!current) return view(started)
       const finishedAt = this.now()
       const finished: ScheduledTask = { ...current, lastStatus: status, updatedAt: finishedAt.getTime() }
+      finished.runHistory = [...(current.runHistory ?? []), ...history].slice(-50)
       delete finished.lastError
       delete finished.lastSessionId
       if (error !== undefined) finished.lastError = error

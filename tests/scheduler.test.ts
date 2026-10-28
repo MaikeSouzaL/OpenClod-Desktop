@@ -285,7 +285,7 @@ describe('Scheduler', () => {
 
   const now = (): Date => new Date(clock.getTime())
 
-  function make(options: { tickMs?: number; catchUpMissed?: boolean } = {}, target = file): Scheduler {
+  function make(options: { tickMs?: number; catchUpMissed?: boolean; maxConcurrent?: number } = {}, target = file): Scheduler {
     const scheduler = new Scheduler(target, { now, ...options })
     created.push(scheduler)
     return scheduler
@@ -826,6 +826,37 @@ describe('Scheduler', () => {
       expect(done.sort()).toEqual(['A', 'B'])
       expect(s.get(a.id)!.lastStatus).toBe('ok')
       expect(s.get(b.id)!.lastStatus).toBe('ok')
+    })
+
+    it('orders due tasks by priority when the concurrency limit is one', async () => {
+      const s = make({ maxConcurrent: 1 })
+      await s.create(input({ name: 'baixa', priority: 'low', schedule: { kind: 'hourly', minute: 30 } }))
+      await s.create(input({ name: 'alta', priority: 'high', schedule: { kind: 'hourly', minute: 30 } }))
+      await s.create(input({ name: 'normal', priority: 'normal', schedule: { kind: 'hourly', minute: 30 } }))
+      const order: string[] = []
+      await s.start(async (task) => { order.push(task.name) })
+      clock = d(2025, 1, 6, 9, 31)
+      await s.tick()
+      expect(order).toEqual(['alta', 'normal', 'baixa'])
+    })
+
+    it('retries failed attempts and persists a bounded run history', async () => {
+      const s = make()
+      const task = await s.create(input({ maxRetries: 2, retryDelayMs: 0 }))
+      let attempts = 0
+      await s.start(async () => {
+        attempts++
+        if (attempts < 3) throw new Error(`falha ${attempts}`)
+        return { sessionId: 'ses_retry' }
+      })
+      clock = d(2025, 1, 6, 9, 0, 10)
+      await s.tick()
+      const result = s.get(task.id)!
+      expect(attempts).toBe(3)
+      expect(result.lastStatus).toBe('ok')
+      expect(result.lastSessionId).toBe('ses_retry')
+      expect(result.runHistory?.map((run) => run.status)).toEqual(['error', 'error', 'ok'])
+      expect(result.runHistory?.map((run) => run.attempt)).toEqual([1, 2, 3])
     })
 
     it('never runs the same task twice at once, and skips slots that pass during a run', async () => {

@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "api": {
+    "export": "function",
+    "inspect": "function",
+    "restore": "function",
+    "exportConfiguration": "function",
+    "importConfiguration": "function"
+  },
+  "actions": [
+    "Criar backup",
+    "Inspecionar",
+    "Restaurar",
+    "Exportar configuração",
+    "Importar configuração"
+  ],
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\backup-2026-10-25\\01-settings-backup.png",
+  "errors": []
+}

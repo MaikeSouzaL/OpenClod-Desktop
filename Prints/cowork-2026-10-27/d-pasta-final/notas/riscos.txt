@@ -1,0 +1,3 @@
+Risco 1: atraso do fornecedor de pagamentos (probabilidade alta).
+Risco 2: baixa adesão no primeiro mês (probabilidade média).
+Risco 3: falha de segurança no login (probabilidade baixa, impacto alto).

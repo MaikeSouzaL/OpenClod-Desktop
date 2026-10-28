@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Openclod Desktop</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img class="logo" src="icons/48.png" alt="" width="36" height="36">
+    <div class="title">
+      <strong>Openclod Desktop</strong>
+      <span id="version" class="muted">extensão</span>
+    </div>
+  </header>
+
+  <section id="status" class="card status" data-state="connecting" aria-live="polite">
+    <span class="dot" aria-hidden="true"></span>
+    <div>
+      <div id="status-title" class="status-title">Procurando o Openclod…</div>
+      <div id="status-detail" class="muted">Verificando a conexão com o aplicativo.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Abas em uso pelo agente</h2>
+    <ul id="tabs" class="tabs"></ul>
+    <p id="tabs-empty" class="muted empty">Nenhuma aba em uso agora.</p>
+  </section>
+
+  <div class="actions">
+    <button id="stop" type="button" class="danger" disabled>
+      <span class="square" aria-hidden="true"></span> Parar o agente
+    </button>
+    <button id="reconnect" type="button">Reconectar</button>
+  </div>
+
+  <p id="hint" class="hint" hidden></p>
+  <p id="files" class="hint" hidden>
+    Para o agente abrir arquivos locais (<code>file://</code>), ative
+    <em>Permitir acesso a URLs de arquivo</em> nos detalhes da extensão.
+    <button id="details" type="button" class="link">Abrir detalhes</button>
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

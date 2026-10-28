@@ -1,0 +1,261 @@
+{
+  "label": "baseline",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp/openclod-snap-baseline-mvqlf2u2",
+  "startedAt": "2026-10-27T12:05:28.900Z",
+  "turns": [
+    {
+      "ms": 32302,
+      "count": 28,
+      "tools": [
+        "list_dir",
+        "glob",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file",
+        "read_file"
+      ],
+      "run": "done",
+      "final": "Li os 8 arquivos de `src` (store.ts, project.ts, graph.ts, tools.ts, context.ts, compaction.ts, lazy.ts, library.ts).\n\n**O projeto é o núcleo de memória e conte"
+    },
+    {
+      "ms": 28231,
+      "count": 36,
+      "tools": [
+        "update_plan",
+        "run_command",
+        "run_command",
+        "update_plan"
+      ],
+      "run": "done",
+      "final": "Os três passos foram executados e marcados como concluídos.\n\n**1) Contagem de linhas (arquivos reais, com linhas em branco incluídas)**\n\n| Linhas | Arquivo |\n|-"
+    },
+    {
+      "ms": 4039,
+      "count": 38,
+      "tools": [],
+      "run": "done",
+      "final": "`src/core/memory/project.ts`, com 1360 linhas — o maior dos 8 arquivos de `src`."
+    }
+  ],
+  "baseInputTokens": 9959,
+  "baseCalls": 1,
+  "calls": [
+    {
+      "turn": 0,
+      "position": "first",
+      "input": 10621,
+      "cached": 2560,
+      "output": 60
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 10725,
+      "cached": 10496,
+      "output": 71
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 10876,
+      "cached": 10624,
+      "output": 199
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 11921,
+      "cached": 11008,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 17151,
+      "cached": 11904,
+      "output": 108
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 24875,
+      "cached": 17152,
+      "output": 76
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 32030,
+      "cached": 24832,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 33822,
+      "cached": 32000,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 40309,
+      "cached": 33792,
+      "output": 60
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 40429,
+      "cached": 40192,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 49147,
+      "cached": 40448,
+      "output": 45
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 52564,
+      "cached": 49152,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 54651,
+      "cached": 52608,
+      "output": 44
+    },
+    {
+      "turn": 0,
+      "position": "other",
+      "input": 56452,
+      "cached": 54656,
+      "output": 478
+    },
+    {
+      "turn": 1,
+      "position": "first",
+      "input": 57724,
+      "cached": 2560,
+      "output": 530
+    },
+    {
+      "turn": 1,
+      "position": "afterPlan",
+      "input": 60571,
+      "cached": 896,
+      "output": 979
+    },
+    {
+      "turn": 1,
+      "position": "other",
+      "input": 61796,
+      "cached": 61440,
+      "output": 524
+    },
+    {
+      "turn": 1,
+      "position": "afterPlan",
+      "input": 62343,
+      "cached": 896,
+      "output": 410
+    },
+    {
+      "turn": 2,
+      "position": "first",
+      "input": 63349,
+      "cached": 2816,
+      "output": 28
+    }
+  ],
+  "byPosition": {
+    "first": {
+      "calls": 3,
+      "meanInput": 43898,
+      "meanUncached": 41253,
+      "cachedShare": 6,
+      "uncachedTotal": 123758
+    },
+    "afterPlan": {
+      "calls": 2,
+      "meanInput": 61457,
+      "meanUncached": 60561,
+      "cachedShare": 1,
+      "uncachedTotal": 121122
+    },
+    "other": {
+      "calls": 14,
+      "meanInput": 35482,
+      "meanUncached": 3317,
+      "cachedShare": 91,
+      "uncachedTotal": 46444
+    }
+  },
+  "total": {
+    "calls": 19,
+    "meanInput": 39545,
+    "meanUncached": 15333,
+    "cachedShare": 61,
+    "uncachedTotal": 291324
+  },
+  "byTurn": [
+    {
+      "turn": 1,
+      "calls": 14,
+      "meanInput": 31827,
+      "meanUncached": 3868,
+      "cachedShare": 88,
+      "uncachedTotal": 54149
+    },
+    {
+      "turn": 2,
+      "calls": 4,
+      "meanInput": 60609,
+      "meanUncached": 44161,
+      "cachedShare": 27,
+      "uncachedTotal": 176642
+    },
+    {
+      "turn": 3,
+      "calls": 1,
+      "meanInput": 63349,
+      "meanUncached": 60533,
+      "cachedShare": 4,
+      "uncachedTotal": 60533
+    }
+  ],
+  "firstCallOfTurn": [
+    {
+      "turn": 1,
+      "input": 10621,
+      "cached": 2560,
+      "cachedShare": 24
+    },
+    {
+      "turn": 2,
+      "input": 57724,
+      "cached": 2560,
+      "cachedShare": 4
+    },
+    {
+      "turn": 3,
+      "input": 63349,
+      "cached": 2816,
+      "cachedShare": 4
+    }
+  ],
+  "errors": []
+}

@@ -3,6 +3,8 @@ import type { ToolResultPart } from '../../../shared/types'
 import { Icon } from './Icons'
 import { previewEdit } from '../lib/groups'
 import { basename } from '../lib/format'
+import { DrawingBlock } from './DrawingBlock'
+import { isDrawableHtml, looksLikeSvg } from '../lib/drawings'
 import type { LiveTool } from '../lib/types'
 
 interface EditCardProps {
@@ -20,6 +22,16 @@ export function EditCard({ name, args, result, live }: EditCardProps): ReactElem
   const [open, setOpen] = useState(true)
   const errorText = failed ? (live?.text ?? result?.text ?? '') : ''
   const path = preview?.path ?? ''
+  // A drawing the agent saved as a file (an .svg or a small .html page) is shown, not only listed as a diff.
+  const written = name === 'write_file' && args && typeof args === 'object' ? (args as { content?: unknown }).content : undefined
+  const drawing =
+    !failed && typeof written === 'string' && written.length < 400_000
+      ? /\.svg$/i.test(path) && looksLikeSvg(written)
+        ? { kind: 'svg' as const, source: written }
+        : /\.html?$/i.test(path) && isDrawableHtml(written)
+          ? { kind: 'html' as const, source: written }
+          : null
+      : null
 
   return (
     <div className={`edit-card ${failed ? 'failed' : ''} ${running ? 'running' : ''}`}>
@@ -50,6 +62,7 @@ export function EditCard({ name, args, result, live }: EditCardProps): ReactElem
           {preview.truncated ? <div className="edit-line gap"><span className="edit-sign" /><span className="edit-text">… diff truncado</span></div> : null}
         </div>
       ) : null}
+      {drawing && !running ? <DrawingBlock kind={drawing.kind} source={drawing.source} title={basename(path)} /> : null}
     </div>
   )
 }

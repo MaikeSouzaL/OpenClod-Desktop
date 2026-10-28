@@ -24,10 +24,86 @@ const STATUS_CLASS: Record<GitFileEntry['status'], string> = {
   typechange: 'modified'
 }
 
-function DiffView({ diff }: { diff: string }): ReactElement {
+interface ReviewComment {
+  id: string
+  line: number
+  source: string
+  text: string
+  createdAt: number
+}
+
+const REVIEW_STORAGE = 'forja.diff.review-comments'
+
+function readComments(): Record<string, ReviewComment[]> {
+  try {
+    const value = JSON.parse(localStorage.getItem(REVIEW_STORAGE) ?? '{}') as unknown
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, ReviewComment[]> : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeComments(all: Record<string, ReviewComment[]>): void {
+  try {
+    localStorage.setItem(REVIEW_STORAGE, JSON.stringify(all))
+  } catch {
+    /* review notes are best effort when storage is unavailable */
+  }
+}
+
+function DiffView({ diff, storageKey }: { diff: string; storageKey: string }): ReactElement {
+  const [comments, setComments] = useState<ReviewComment[]>(() => readComments()[storageKey] ?? [])
+  const [openLine, setOpenLine] = useState<number | null>(null)
+  const [draft, setDraft] = useState('')
+  useEffect(() => {
+    setComments(readComments()[storageKey] ?? [])
+    setOpenLine(null)
+    setDraft('')
+  }, [storageKey])
+  let oldLine = 0
+  let newLine = 0
+  const lines = diff.split('\n').map((line, index) => {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunk) {
+      oldLine = Number(hunk[1]) - 1
+      newLine = Number(hunk[2]) - 1
+    }
+    const isMeta = line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++') || line.startsWith('@@')
+    if (!isMeta && !line.startsWith('+')) oldLine++
+    if (!isMeta && !line.startsWith('-')) newLine++
+    return {
+      index,
+      line,
+      number: isMeta ? 0 : line.startsWith('-') ? oldLine : newLine,
+      commentable: !isMeta && line.length > 0
+    }
+  })
+  const save = (): void => {
+    if (openLine === null || !draft.trim()) return
+    const item = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, line: openLine, source: lines[openLine]?.line ?? '', text: draft.trim(), createdAt: Date.now() }
+    const next = [...comments, item]
+    setComments(next)
+    const all = readComments()
+    all[storageKey] = next
+    writeComments(all)
+    setOpenLine(null)
+    setDraft('')
+  }
+  const remove = (id: string): void => {
+    const next = comments.filter((comment) => comment.id !== id)
+    setComments(next)
+    const all = readComments()
+    if (next.length) all[storageKey] = next
+    else delete all[storageKey]
+    writeComments(all)
+  }
+  const copy = (): void => {
+    const text = comments.map((comment) => `${storageKey}:${comment.line}\n${comment.text}`).join('\n\n')
+    void navigator.clipboard?.writeText(text).catch(() => undefined)
+  }
   return (
-    <pre>
-      {diff.split('\n').map((line, index) => {
+    <div className="diff-code">
+      {lines.map(({ index, line, number, commentable }) => {
         const cls =
           line.startsWith('+') && !line.startsWith('+++')
             ? 'add'
@@ -37,13 +113,37 @@ function DiffView({ diff }: { diff: string }): ReactElement {
                 ? 'hunk'
                 : ''
         return (
-          <span key={index} className={cls}>
-            {line}
-            {'\n'}
-          </span>
+          <div key={index} className={`diff-code-line ${cls}`}>
+            <span className="diff-line-number">{number || ''}</span>
+            <code>{line || ' '}</code>
+            {commentable ? <button type="button" className="diff-comment-trigger" title="Comentar esta linha" onClick={() => { setOpenLine(index); setDraft('') }}>+</button> : null}
+            {openLine === index ? (
+              <div className="diff-comment-editor">
+                <textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="O que precisa mudar nesta linha?" rows={2} />
+                <span>
+                  <button type="button" className="btn tiny primary" onClick={save} disabled={!draft.trim()}>Comentar</button>
+                  <button type="button" className="btn tiny ghost" onClick={() => setOpenLine(null)}>Cancelar</button>
+                </span>
+              </div>
+            ) : null}
+            {comments.filter((comment) => comment.line === index).map((comment) => (
+              <div key={comment.id} className="diff-comment">
+                <span>{comment.text}</span>
+                <button type="button" className="icon-btn small" title="Excluir comentário" onClick={() => remove(comment.id)}>
+                  <Icon name="x" size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
         )
       })}
-    </pre>
+      {comments.length ? (
+        <div className="diff-review-summary">
+          <strong>{comments.length} comentário(s)</strong>
+          <button type="button" className="btn tiny ghost" onClick={copy}><Icon name="copy" size={11} /> Copiar para o agente</button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -62,7 +162,7 @@ function groupByDir(files: GitFileEntry[]): TreeEntry[] {
 }
 
 /** Session changes recorded by the harness, used when the folder is not a Git repository. */
-function TrackerChanges({ changes, onReveal }: { changes: FileChange[]; onReveal(path: string): void }): ReactElement {
+function TrackerChanges({ sessionId, changes, onReveal }: { sessionId: string; changes: FileChange[]; onReveal(path: string): void }): ReactElement {
   const [selected, setSelected] = useState<string | null>(null)
   const change = changes.find((item) => item.path === selected) ?? changes[0]
   return (
@@ -89,7 +189,7 @@ function TrackerChanges({ changes, onReveal }: { changes: FileChange[]; onReveal
               </button>
             </span>
           </div>
-          <DiffView diff={change.diff} />
+          <DiffView diff={change.diff} storageKey={`${sessionId}:${change.path}`} />
         </div>
       ) : null}
     </>
@@ -97,12 +197,13 @@ function TrackerChanges({ changes, onReveal }: { changes: FileChange[]; onReveal
 }
 
 interface ChangesPaneProps {
+  sessionId: string
   root: string
   changes: FileChange[]
   onReveal(path: string): void
 }
 
-export function ChangesPane({ root, changes, onReveal }: ChangesPaneProps): ReactElement {
+export function ChangesPane({ sessionId, root, changes, onReveal }: ChangesPaneProps): ReactElement {
   const [status, setStatus] = useState<GitStatusInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -239,7 +340,7 @@ export function ChangesPane({ root, changes, onReveal }: ChangesPaneProps): Reac
         changes.length ? (
           <>
             <div className="panel-note">Esta pasta não é um repositório Git. Mostrando as alterações feitas pelo agente nesta sessão.</div>
-            <TrackerChanges changes={changes} onReveal={onReveal} />
+            <TrackerChanges sessionId={sessionId} changes={changes} onReveal={onReveal} />
           </>
         ) : (
           <div className="panel-empty">
@@ -286,7 +387,7 @@ export function ChangesPane({ root, changes, onReveal }: ChangesPaneProps): Reac
                 </span>
               </div>
               {diffError ? <div className="inline-error">{diffError}</div> : null}
-              {diff ? <DiffView diff={diff.text || '(sem diferenças de texto)'} /> : null}
+              {diff ? <DiffView diff={diff.text || '(sem diferenças de texto)'} storageKey={`${sessionId}:${root}:${current.path}:${current.staged ? 'staged' : 'worktree'}`} /> : null}
               {diff?.truncated ? <div className="panel-note">Diff truncado por tamanho.</div> : null}
             </div>
           ) : null}

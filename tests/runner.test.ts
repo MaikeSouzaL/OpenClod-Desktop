@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
 import { z } from 'zod'
 import { SessionRunner, repairOrphanToolCalls, trimInlineImages, type RunnerDeps } from '../src/core/agent/runner'
-import { ScriptedProvider } from '../src/core/providers/mock'
+import { ScriptedProvider } from './support/scripted-provider'
 import { buildRegistry } from '../src/core/tools/registry'
+import { mcpCallTool, mcpCatalogTool } from '../src/core/tools/mcp'
+import { lazyTools } from '../src/core/tools/lazy'
 import { FileTracker } from '../src/core/session/tracker'
 import { WorkspaceGuard } from '../src/core/security/policy'
 import { DEFAULT_LIMITS, type HarnessEvent, type ToolSpec } from '../src/shared/types'
@@ -58,9 +62,9 @@ function makeRunner(
     provider,
     providerConfig: {
       id: 'mock',
-      kind: 'mock',
+      kind: 'openai',
       label: 'Scripted',
-      baseUrl: '',
+      baseUrl: 'http://localhost:0/v1',
       model: 'scripted',
       contextWindow: 128_000,
       supportsVision: false,
@@ -86,6 +90,48 @@ function makeRunner(
 }
 
 describe('SessionRunner end-to-end turn', () => {
+  it('does not stop with open plan items: sends the agent back until done or blocked', async () => {
+    const updatePlan: ToolDef = {
+      name: 'update_plan',
+      description: 'fake plan tool',
+      schema: z.object({
+        items: z.array(z.object({ text: z.string(), status: z.enum(['pending', 'active', 'done', 'blocked']) }))
+      }),
+      risk: 'read',
+      parallelSafe: false,
+      describe: () => ({ title: 'Atualizar plano', detail: 'fake' }),
+      async execute(raw, ctx) {
+        const args = raw as { items: Array<{ text: string; status: 'pending' | 'active' | 'done' | 'blocked' }> }
+        ctx.setPlan(args.items.map((item, index) => ({ id: `plan_${index}`, ...item })))
+        return { ok: true, text: 'plano atualizado', summary: 'plano' }
+      }
+    }
+    const openItems = [
+      { text: 'passo 1', status: 'done' as const },
+      { text: 'passo 2', status: 'pending' as const }
+    ]
+    const doneItems = openItems.map((item) => ({ ...item, status: 'done' as const }))
+    const provider = new ScriptedProvider([
+      { toolCalls: [{ id: 'plan_1', name: 'update_plan', args: { items: openItems } }] },
+      { text: 'Vou parar aqui.' },
+      { toolCalls: [{ id: 'plan_2', name: 'update_plan', args: { items: doneItems } }] },
+      { text: 'Concluído.' }
+    ])
+    const { runner } = makeRunner(provider, {
+      registry: buildRegistry(updatePlan),
+      limits: { ...DEFAULT_LIMITS, maxIterations: 6 }
+    })
+
+    await runner.send('faça dois passos')
+
+    expect(provider.requests).toHaveLength(4)
+    expect(runner.plan.every((item) => item.status === 'done')).toBe(true)
+    const guard = provider.requests[2].messages.find(
+      (message) => message.role === 'user' && message.parts.some((part) => part.type === 'text' && part.text.includes('<plan-guard>'))
+    )
+    expect(guard).toBeTruthy()
+  })
+
   it('streams a tool call, executes it and finishes after the follow-up message', async () => {
     const provider = new ScriptedProvider([
       { toolCalls: [{ id: 'call_1', name: 'read_file', args: { path: 'a.txt' } }] },
@@ -134,6 +180,32 @@ describe('SessionRunner end-to-end turn', () => {
     expect(runner.busy).toBe(false)
     expect(runner.state).toBe('done')
     expect(runner.usage.input).toBeGreaterThan(0)
+  })
+
+  it('emits UI-only tool_progress without adding it to the transcript', async () => {
+    const progressTool: ToolDef = {
+      name: 'run_command',
+      description: 'fake command with progress',
+      schema: z.object({ command: z.string() }),
+      risk: 'exec',
+      parallelSafe: false,
+      describe: () => ({ title: 'Executar comando', detail: 'fake' }),
+      async execute(_raw, ctx) {
+        ctx.progress?.('linha ao vivo', { outputAt: Date.now() })
+        return { ok: true, text: 'fim', summary: 'ok' }
+      }
+    }
+    const provider = new ScriptedProvider([
+      { toolCalls: [{ id: 'cmd_1', name: 'run_command', args: { command: 'npm test' } }] },
+      { text: 'terminou' }
+    ])
+    const { runner, events } = makeRunner(provider, { registry: buildRegistry(progressTool) })
+
+    await runner.send('rode os testes')
+
+    const progress = events.find((event): event is Extract<HarnessEvent, { type: 'tool_progress' }> => event.type === 'tool_progress')
+    expect(progress).toMatchObject({ toolCallId: 'cmd_1', text: 'linha ao vivo' })
+    expect(JSON.stringify(runner.messages.map((message) => message.parts))).not.toContain('linha ao vivo')
   })
 
   it('asks for approval, executes when approved and reports denial as a tool error', async () => {
@@ -193,6 +265,64 @@ describe('SessionRunner end-to-end turn', () => {
     expect(events.some((e) => e.type === 'status' && e.state === 'cancelled')).toBe(true)
     expect(runner.busy).toBe(false)
     expect(runner.state).toBe('cancelled')
+    // Stopping a turn is flagged so the activity feed, metrics and notifications do not call it a failure.
+    expect(turnEnd).toMatchObject({ cancelled: true })
+  })
+
+  it('warns once that a paid provider has no tariff (cost shows as 0 and the cost limit cannot protect), but not for local or priced ones', async () => {
+    const paid = { id: 'p', kind: 'openai' as const, label: 'Pago', baseUrl: 'https://api.example.com/v1', model: 'm', contextWindow: 128_000, supportsVision: false, supportsTools: true }
+    const turns = [{ text: 'a', usage: { input: 100, output: 10 } }, { text: 'b', usage: { input: 100, output: 10 } }]
+    const noticesOf = async (providerConfig: typeof paid & { inputCostPerMTok?: number }) => {
+      const { runner, events } = makeRunner(new ScriptedProvider([turns[0]]), { providerConfig })
+      await runner.send('um')
+      await runner.send('dois')
+      return events.filter((e) => e.type === 'notice' && /sem tarifa|não tem tarifa/.test(e.text))
+    }
+    expect(await noticesOf(paid)).toHaveLength(1)
+    expect(await noticesOf({ ...paid, inputCostPerMTok: 3 })).toHaveLength(0)
+    expect(await noticesOf({ ...paid, baseUrl: 'http://localhost:11434/v1' })).toHaveLength(0)
+  })
+
+  it('does not flag a genuine failure as cancelled', async () => {
+    const failure = { error: 'modelo indisponível', retryable: true }
+    const { runner, events } = makeRunner(new ScriptedProvider([failure, failure, failure]), { retryBaseMs: 1 })
+    await runner.send('oi')
+    expect(events.at(-1)).not.toHaveProperty('cancelled')
+  })
+
+  it('stops the rest of a tool batch once the user aborted: later calls never run', async () => {
+    const ran: string[] = []
+    const slow: ToolDef = {
+      name: 'write_file', // a core tool, so the runner offers it in code mode
+      description: 'slow write',
+      schema: z.object({ id: z.string() }),
+      risk: 'write',
+      parallelSafe: false,
+      describe: (raw) => ({ title: 'Escrever', detail: String((raw as { id: string }).id) }),
+      async execute(raw) {
+        const { id } = raw as { id: string }
+        ran.push(id)
+        await new Promise((resolve) => setTimeout(resolve, 60))
+        return { ok: true, text: `feito ${id}` }
+      }
+    }
+    const provider = new ScriptedProvider([
+      {
+        toolCalls: [
+          { id: 'b1', name: 'write_file', args: { id: 'um' } },
+          { id: 'b2', name: 'write_file', args: { id: 'dois' } },
+          { id: 'b3', name: 'write_file', args: { id: 'tres' } }
+        ]
+      },
+      { text: 'fim' }
+    ])
+    const { runner, events } = makeRunner(provider, { registry: buildRegistry(slow) })
+    const running = runner.send('faça três escritas')
+    setTimeout(() => runner.abort(), 20)
+    await running
+    expect(ran).toEqual(['um'])
+    const ends = events.filter((e) => e.type === 'tool_end') as Array<{ toolCallId: string; summary?: string }>
+    expect(ends.filter((e) => e.summary === 'cancelada').map((e) => e.toolCallId)).toEqual(['b2', 'b3'])
   })
 
   it('reports a provider error as a turn error and a notice after the transient retries', async () => {
@@ -222,11 +352,126 @@ describe('SessionRunner end-to-end turn', () => {
   })
 })
 
+describe('turn budget', () => {
+  it('ends with a final summary and a budget event instead of a bare error', async () => {
+    const provider = new ScriptedProvider([
+      {
+        toolCalls: [{ id: 'c1', name: 'read_file', args: { path: 'a.txt' } }],
+        usage: { input: 5_000_000, output: 1_000 }
+      },
+      { text: 'Resumo: li a.txt; falta o resto.', usage: { input: 10_000, output: 100 } }
+    ])
+    const { runner, events } = makeRunner(provider, {
+      limits: { ...DEFAULT_LIMITS, maxTokens: 1_000 },
+      initial: { plan: [{ id: 'p1', text: 'Ler a.txt', status: 'active' }] }
+    })
+
+    await runner.send('tarefa longa')
+
+    const budget = events.find((event) => event.type === 'budget')
+    expect(budget).toMatchObject({ type: 'budget', info: { kind: 'tokens', limit: 1_000 } })
+    // The final call keeps the tools but forbids calls, so the turn can close.
+    expect(provider.requests[1].toolChoice).toBe('none')
+    expect(runner.messages.at(-1)?.parts[0]).toMatchObject({
+      type: 'text',
+      text: 'Resumo: li a.txt; falta o resto.'
+    })
+    expect(events.at(-1)).toMatchObject({ type: 'turn_end', stopReason: 'stop' })
+    expect(runner.state).toBe('done')
+    // The plan survives the budget stop for the "continue" action.
+    expect(runner.plan[0].status).toBe('active')
+    expect(events.some((event) => event.type === 'notice' && event.level === 'error')).toBe(false)
+  })
+
+  it('uses the automatic budget for a large context window', async () => {
+    const provider = new ScriptedProvider([
+      { text: 'ok', usage: { input: 5_000_000, output: 10 } }
+    ])
+    const { runner, events } = makeRunner(provider, {
+      limits: { ...DEFAULT_LIMITS, maxTokens: 0 }
+    })
+    await runner.send('oi')
+    const usage = events.find((event) => event.type === 'usage')
+    expect(usage).toMatchObject({ type: 'usage', limit: 6_000_000 })
+    expect(events.some((event) => event.type === 'budget')).toBe(false)
+  })
+})
+
+describe('tool output spill', () => {
+  it('spills a 20k non-read_file result and keeps a short preview', async () => {
+    const outDir = await makeTempDir('forja-spill-')
+    try {
+      const bigTool: ToolDef = {
+        name: 'run_command',
+        description: 'fake big command',
+        schema: z.object({ command: z.string() }),
+        risk: 'exec',
+        parallelSafe: true,
+        describe: () => ({ title: 'Rodar', detail: 'big' }),
+        async execute() {
+          return { ok: true, text: `${'x'.repeat(20_000)}FIM`, summary: 'ok' }
+        }
+      }
+      const provider = new ScriptedProvider([
+        { toolCalls: [{ id: 'c_big', name: 'run_command', args: { command: 'big' } }] },
+        { text: 'ok' }
+      ])
+      const { runner } = makeRunner(provider, {
+        registry: buildRegistry(bigTool),
+        toolOutputDir: outDir
+      })
+
+      await runner.send('rode o comando grande')
+
+      const toolMessage = runner.messages.find((message) => message.role === 'tool')!
+      const text = toolMessage.parts
+        .filter((part) => part.type === 'tool_result')
+        .map((part) => (part.type === 'tool_result' ? part.text : ''))
+        .join('')
+      expect(text.length).toBeLessThan(16_000)
+      expect(text).toContain('salva em arquivo')
+      expect(text).toContain('FIM')
+      expect(fs.readdirSync(path.join(outDir, 'ses_test'))).toHaveLength(1)
+    } finally {
+      await removeTempDir(outDir)
+    }
+  })
+
+  it('truncates a huge read_file instead of spilling it', async () => {
+    const bigRead: ToolDef = {
+      name: 'read_file',
+      description: 'fake huge read',
+      schema: z.object({ path: z.string() }),
+      risk: 'read',
+      parallelSafe: true,
+      describe: () => ({ title: 'Ler', detail: 'big' }),
+      async execute() {
+        return { ok: true, text: `${'a'.repeat(70_000)}FIM`, summary: 'lido' }
+      }
+    }
+    const provider = new ScriptedProvider([
+      { toolCalls: [{ id: 'c_read', name: 'read_file', args: { path: 'big.txt' } }] },
+      { text: 'ok' }
+    ])
+    const { runner } = makeRunner(provider, { registry: buildRegistry(bigRead) })
+
+    await runner.send('leia o arquivo grande')
+
+    const toolMessage = runner.messages.find((message) => message.role === 'tool')!
+    const text = toolMessage.parts
+      .filter((part) => part.type === 'tool_result')
+      .map((part) => (part.type === 'tool_result' ? part.text : ''))
+      .join('')
+    expect(text.length).toBeLessThanOrEqual(60_000)
+    expect(text).not.toContain('salva em arquivo')
+  })
+})
+
 describe('MCP tools and effort reach the model', () => {
   const mcpTool: ToolDef = {
     name: 'mcp__srv__lookup',
     description: '[MCP srv] lookup',
-    schema: z.record(z.unknown()),
+    schema: z.record(z.string(), z.unknown()),
     jsonSchema: { type: 'object' },
     risk: 'exec',
     parallelSafe: false,
@@ -236,21 +481,61 @@ describe('MCP tools and effort reach the model', () => {
     }
   }
 
+  const mcpService = {
+    search: async () => ({ catalog: [], registry: [], installed: [] }),
+    install: async () => ({ ok: true }),
+    list: () => [],
+    catalog: () => [],
+    schema: () => undefined,
+    call: async () => ({ ok: true, text: '', summary: '' }),
+    readResource: async () => [],
+    getPrompt: async () => ({ messages: [] })
+  }
+
   function withMcp(provider: ScriptedProvider, mode: RunnerDeps['mode'], extra: Partial<RunnerDeps> = {}): SessionRunner {
-    const { runner } = makeRunner(provider, { mode, registry: buildRegistry(readTool, writeTool, mcpTool), ...extra })
+    const { runner } = makeRunner(provider, {
+      mode,
+      registry: buildRegistry(readTool, writeTool, mcpTool, mcpCatalogTool, mcpCallTool, ...lazyTools),
+      services: {
+        browser: {},
+        computer: {},
+        skills: { list: () => [] },
+        memory: { all: async () => [] },
+        mcp: mcpService
+      } as unknown as RunnerDeps['services'],
+      ...extra
+    })
     return runner
   }
 
-  it('offers registered MCP tools in working modes only', async () => {
-    const names = async (mode: RunnerDeps['mode']): Promise<string[]> => {
-      const provider = new ScriptedProvider([{ text: 'ok' }])
-      await withMcp(provider, mode).send('oi')
-      return provider.requests[0].tools.map((tool: ToolSpec) => tool.name)
+  it('leaves the MCP catalogue/call to tool_load in working modes only, never every server schema', async () => {
+    const outcome = async (mode: RunnerDeps['mode']): Promise<{ sent: string[]; later: string[]; loaded: boolean }> => {
+      const provider = new ScriptedProvider([
+        { toolCalls: [{ id: 'l1', name: 'tool_load', args: { tools: ['mcp_catalog', 'mcp_call'] } }] },
+        { text: 'ok' }
+      ])
+      const runner = withMcp(provider, mode)
+      await runner.send('oi')
+      const load = runner.messages.flatMap((message) => message.parts).find((part) => part.type === 'tool_result' && part.name === 'tool_load')
+      return {
+        sent: provider.requests[0].tools.map((tool: ToolSpec) => tool.name),
+        later: provider.requests[1].tools.map((tool: ToolSpec) => tool.name),
+        loaded: Boolean(load && load.type === 'tool_result' && load.ok)
+      }
     }
-    expect(await names('code')).toContain('mcp__srv__lookup')
-    expect(await names('autonomous')).toContain('mcp__srv__lookup')
-    expect(await names('ask')).toContain('mcp__srv__lookup')
-    expect(await names('review')).not.toContain('mcp__srv__lookup')
+    // The fallback path costs its schemas in every request, and first-class `mcp__server__tool` is the way in.
+    const code = await outcome('code')
+    expect(code.sent).not.toContain('mcp_catalog')
+    expect(code.sent).not.toContain('mcp_call')
+    expect(code.loaded).toBe(true)
+    expect(code.later).toEqual(expect.arrayContaining(['mcp_catalog', 'mcp_call']))
+    expect((await outcome('autonomous')).loaded).toBe(true)
+    expect((await outcome('ask')).loaded).toBe(true)
+    const review = await outcome('review')
+    expect(review.loaded).toBe(false)
+    expect(review.later).not.toContain('mcp_catalog')
+    // Per-server schemas are never sent directly any more.
+    expect(code.sent).not.toContain('mcp__srv__lookup')
   })
 
   it('passes the session effort to the provider on every request of a turn', async () => {
@@ -276,11 +561,86 @@ describe('MCP tools and effort reach the model', () => {
   })
 })
 
-describe('model fallback', () => {  const backupConfig = {
+describe('loop guard', () => {
+  it('stops a repeated reasoning stream and stores a limitation card', async () => {
+    const block = 'Preciso verificar a hipótese com cuidado antes de responder ao usuário. '
+    const provider = new ScriptedProvider([{ reasoning: block.repeat(8) }])
+    const { runner, events } = makeRunner(provider, { effort: 'low' })
+
+    await runner.send('continue')
+
+    expect(events.some((event) => event.type === 'notice' && /Loop detectado/.test(event.text))).toBe(true)
+    const end = events.find((event) => event.type === 'turn_end')
+    expect(end).toMatchObject({ stopReason: 'error' })
+    expect(end?.type === 'turn_end' ? end.error : '').toMatch(/Loop detectado/)
+    const limitation = runner.messages
+      .flatMap((message) => message.parts)
+      .find((part): part is Extract<typeof part, { type: 'limitation' }> => part.type === 'limitation')
+    expect(limitation?.report.title).toBe('Loop detectado e interrompido')
+    expect(runner.state).toBe('error')
+  })
+
+  it('stops after four identical tool calls instead of nudging forever', async () => {
+    const call = { id: 'same', name: 'read_file', args: { path: 'a.txt' } }
+    const provider = new ScriptedProvider([
+      { toolCalls: [call] },
+      { toolCalls: [call] },
+      { toolCalls: [call] },
+      { toolCalls: [call] },
+      { text: 'não deveria chegar aqui' }
+    ])
+    const { runner, events } = makeRunner(provider)
+
+    await runner.send('leia de novo')
+
+    const end = events.find((event) => event.type === 'turn_end')
+    expect(end).toMatchObject({ stopReason: 'error' })
+    expect(events.some((event) => event.type === 'notice' && /Loop detectado na ferramenta/.test(event.text))).toBe(true)
+    expect(provider.remaining).toBe(1)
+    expect(runner.state).toBe('error')
+  })
+})
+
+describe('tool images', () => {
+  it('keeps screenshots in the transcript even when the model has no vision', async () => {
+    const imageRead: ToolDef = {
+      ...readTool,
+      async execute() {
+        return {
+          ok: true,
+          text: 'captura de tela',
+          summary: 'tela 800x600',
+          images: [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AAAA', label: 'print.png' }]
+        }
+      }
+    }
+    const provider = new ScriptedProvider([
+      { toolCalls: [{ id: 'shot_1', name: 'read_file', args: { path: 'print.png' } }] },
+      { text: 'vi a captura' }
+    ])
+    // The mock reports vision=true by default; force the vision-less path.
+    Object.defineProperty(provider, 'supportsVision', { value: false })
+    const { runner } = makeRunner(provider, { registry: buildRegistry(imageRead) })
+
+    await runner.send('tire um print')
+
+    const part = runner.messages
+      .flatMap((message) => message.parts)
+      .find((candidate): candidate is Extract<typeof candidate, { type: 'tool_result' }> => candidate.type === 'tool_result')
+    expect(part?.images).toHaveLength(1)
+    expect(part?.text).toContain('não suporta visão')
+    // The note tells the model it did NOT get the picture and where to read the screen as text instead.
+    expect(part?.text).toContain('NÃO recebeu a imagem')
+    expect(part?.text).toContain('computer_snapshot')
+  })
+})
+
+describe('model fallback', () => {
+  const backupConfig = {
     id: 'mock-backup',
-    kind: 'mock' as const,
+    kind: 'openai' as const,
     label: 'Backup',
-    baseUrl: '',
+    baseUrl: 'http://localhost:0/v1',
     model: 'backup-model',
     contextWindow: 32_000,
     supportsVision: false,
@@ -332,20 +692,25 @@ describe('model fallback', () => {  const backupConfig = {
     expect(backup.requests).toHaveLength(1)
   })
 
-  it('does not hide a partial answer by switching models mid-stream', async () => {
+  it('keeps a partial answer on screen and lets the next model continue it, instead of ending the turn', async () => {
     const primary = new ScriptedProvider([
       { text: 'resposta parcial', error: '402 payment required', errorKind: 'quota' }
     ])
-    const backup = new ScriptedProvider([{ text: 'não deveria ser chamado' }])
-    const { runner, events } = withFallback(primary, backup)
+    const backup = new ScriptedProvider([{ text: ' e o resto da resposta' }])
+    const { runner } = withFallback(primary, backup)
 
     await runner.send('oi')
 
-    expect(runner.state).toBe('error')
-    expect(backup.requests).toHaveLength(0)
-    const failed = runner.messages.find((m) => m.role === 'assistant' && m.error)
-    expect(failed?.parts[0]).toMatchObject({ type: 'text', text: 'resposta parcial' })
-    expect(events.some((e) => e.type === 'notice' && e.level === 'error')).toBe(true)
+    expect(runner.state).toBe('done')
+    // What reached the screen stays in the history, without an error mark; the next model is asked to pick it up.
+    const partial = runner.messages.find((m) => m.role === 'assistant' && m.parts[0]?.type === 'text' && m.parts[0].text === 'resposta parcial')
+    expect(partial).toBeTruthy()
+    expect(partial?.error).toBeUndefined()
+    expect(backup.requests).toHaveLength(1)
+    const seen = backup.requests[0].messages
+    expect(seen.some((m) => m.role === 'assistant' && JSON.stringify(m.parts).includes('resposta parcial'))).toBe(true)
+    expect(seen.some((m) => m.hidden && JSON.stringify(m.parts).includes('resposta-interrompida'))).toBe(true)
+    expect(runner.messages.at(-1)?.parts[0]).toMatchObject({ type: 'text', text: ' e o resto da resposta' })
   })
 
   it('reports a real error when every model in the fallback chain fails', async () => {
@@ -356,11 +721,60 @@ describe('model fallback', () => {  const backupConfig = {
     await runner.send('oi')
 
     expect(runner.state).toBe('error')
-    expect(runner.messages.at(-1)?.error).toContain('401')
+    const failed = runner.messages.find((message) => message.role === 'assistant' && message.error)
+    expect(failed?.error).toContain('401')
+    const limitation = runner.messages.flatMap((message) => message.parts).find((part) => part.type === 'limitation')
+    expect(limitation).toBeTruthy()
   })
 })
 
-describe('crash recovery', () => {  it('repairs tool calls left without a result after a forced quit', () => {
+describe('self-analysis on failure', () => {
+  it('adds a limitation card with the exact error and a suggested fix', async () => {
+    const provider = new ScriptedProvider([
+      { error: '400 {"error":{"message":"Invalid message content type: <nil>"}}', errorKind: 'bad_request' }
+    ])
+    const { runner, events } = makeRunner(provider)
+
+    await runner.send('conserte o bug do login')
+
+    expect(runner.state).toBe('error')
+    const limitation = runner.messages
+      .flatMap((message) => message.parts)
+      .find((part): part is Extract<typeof part, { type: 'limitation' }> => part.type === 'limitation')
+    expect(limitation?.report).toMatchObject({ goal: 'conserte o bug do login', automatic: true })
+    expect(limitation?.report.error).toContain('Invalid message content type')
+    expect(limitation?.report.suggestion).toMatch(/formato da requisição/i)
+    expect(events.some((event) => event.type === 'limitation')).toBe(true)
+    expect(events.at(-1)).toMatchObject({ type: 'turn_end', stopReason: 'error' })
+  })
+
+  it('does not add a second card when the agent reported the limitation itself', async () => {
+    const reportTool: ToolDef = {
+      name: 'report_limitation',
+      description: 'fake limitation report',
+      schema: z.object({ title: z.string() }),
+      risk: 'read',
+      parallelSafe: false,
+      describe: () => ({ title: 'Limitação', detail: 'fake' }),
+      async execute() {
+        return { ok: true, text: 'registrado', summary: 'registrado' }
+      }
+    }
+    const provider = new ScriptedProvider([
+      { toolCalls: [{ id: 'lim_1', name: 'report_limitation', args: { title: 'sem acesso' } }] },
+      { error: '429 rate limit', errorKind: 'rate_limit' }
+    ])
+    const { runner } = makeRunner(provider, { registry: buildRegistry(reportTool) })
+
+    await runner.send('tente acessar')
+
+    const cards = runner.messages.flatMap((message) => message.parts).filter((part) => part.type === 'limitation')
+    expect(cards).toHaveLength(0)
+  })
+})
+
+describe('crash recovery', () => {
+  it('repairs tool calls left without a result after a forced quit', () => {
     const assistant = {
       id: 'msg_a',
       role: 'assistant' as const,

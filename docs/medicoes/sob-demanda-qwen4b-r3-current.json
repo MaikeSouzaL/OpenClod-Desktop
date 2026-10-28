@@ -1,0 +1,198 @@
+{
+  "label": "qwen4b-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqwc8k5",
+  "startedAt": "2026-10-27T16:25:27.437Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 15047,
+      "cachedTokens": 0,
+      "uncachedTokens": 15047,
+      "perCall": [
+        {
+          "input": 7471,
+          "cached": 0,
+          "output": 43
+        },
+        {
+          "input": 7576,
+          "cached": 0,
+          "output": 58
+        }
+      ],
+      "ms": 54372,
+      "timedOut": false,
+      "final": "0 servidores MCP aparecem, pois nenhum MCP está atualmente configurado ou instalado na máquina.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "mcp__memoryhandoff__register"
+      ],
+      "targetRan": false,
+      "targetOk": false,
+      "targetText": "",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 1,
+      "inputTokens": 7700,
+      "cachedTokens": 6959,
+      "uncachedTokens": 741,
+      "perCall": [
+        {
+          "input": 7700,
+          "cached": 6959,
+          "output": 659
+        }
+      ],
+      "ms": 304852,
+      "timedOut": true,
+      "final": "Vou registrar o handoff de memória para a próxima sessão.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "use_skill"
+      ],
+      "targetRan": false,
+      "targetOk": false,
+      "targetText": "",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 15718,
+      "cachedTokens": 14992,
+      "uncachedTokens": 726,
+      "perCall": [
+        {
+          "input": 7808,
+          "cached": 7188,
+          "output": 92
+        },
+        {
+          "input": 7910,
+          "cached": 7804,
+          "output": 250
+        }
+      ],
+      "ms": 102609,
+      "timedOut": false,
+      "final": "As habilidades instaladas no projeto são:\n\n- **animation-master** - Criação e revisão de animações para a web\n- **depuracao-sistematica** - Método para reproduzir, isolar e corrigir falhas sem chutar\n- **docx** - Documentos Word (.docx) no ",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "tool_load",
+        "tool_list",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 42999,
+      "cachedTokens": 28690,
+      "uncachedTokens": 14309,
+      "perCall": [
+        {
+          "input": 8735,
+          "cached": 7188,
+          "output": 89
+        },
+        {
+          "input": 8906,
+          "cached": 0,
+          "output": 56
+        },
+        {
+          "input": 12604,
+          "cached": 8902,
+          "output": 53
+        },
+        {
+          "input": 12754,
+          "cached": 12600,
+          "output": 318
+        }
+      ],
+      "ms": 219395,
+      "timedOut": false,
+      "final": "Com base na busca por \"segurança\", encontrei **apenas um agente**:\n\n## svg-verifier\n\n**Descrição:** Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/25",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/qwen3.5:4b",
+  "totals": {
+    "modelCalls": 9,
+    "inputTokens": 81464,
+    "uncachedTokens": 30823,
+    "allTargetsOk": false
+  }
+}

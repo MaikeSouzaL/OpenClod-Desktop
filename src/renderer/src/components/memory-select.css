@@ -1,0 +1,137 @@
+/* Tela de Memória: marcar páginas e apagar em massa. Só o que é novo; os cards em si seguem em styles.css. */
+
+.memory-card {
+  position: relative;
+}
+
+/* O card deixou de ser um botão único (não cabe um botão dentro de outro): o conteúdo abre a página, a caixa marca. */
+.memory-card-open {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.memory-card-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 6px;
+  border-radius: 6px;
+}
+
+.memory-card .memory-card-head {
+  padding-right: 30px;
+}
+
+.memory-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.memory-check input,
+.memory-bulk-master input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.memory-check-box {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid color-mix(in srgb, var(--text) 30%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  color: transparent;
+  pointer-events: none;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.memory-check:hover .memory-check-box,
+.memory-bulk-master:hover .memory-check-box {
+  border-color: color-mix(in srgb, var(--text) 55%, transparent);
+}
+
+.memory-check input:checked + .memory-check-box,
+.memory-bulk-master input:checked + .memory-check-box,
+.memory-bulk-master .memory-check-box[data-state='some'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.memory-check input:focus-visible + .memory-check-box,
+.memory-bulk-master input:focus-visible + .memory-check-box {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.memory-grid .memory-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--elevated));
+}
+
+/* A barra acima da grade: marcar todas e, com seleção, limpar ou apagar */
+.memory-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 46px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.memory-bulk.has-selection {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--text);
+}
+
+.memory-bulk-master {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.memory-bulk-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-bulk-spacer {
+  flex: 1 1 auto;
+}
+
+.memory-bulk .muted {
+  font-size: 12px;
+}

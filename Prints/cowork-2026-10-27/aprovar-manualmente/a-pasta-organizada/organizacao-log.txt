@@ -1,0 +1,42 @@
+LOG DE ORGANIZAÇÃO — 2026-10-27
+Nenhum arquivo foi apagado. Para reverter, mova cada destino de volta ao nome de origem
+(comandos de reversão no fim deste arquivo).
+
+ORIGEM (raiz) -> DESTINO (novo nome)   | Critério da data
+------------------------------------------------------------------------------
+NF_maio_final_v2.txt -> notas-fiscais/2026-05-09-nf-1067-oficina-beta.txt | data de emissão no texto
+nota fiscal marco 2026 (1).txt -> notas-fiscais/2026-03-10-nf-1021-padaria-sol.txt | data de emissão no texto
+nota-fiscal-abril.txt -> notas-fiscais/2026-04-14-nf-1044-mercado-central.txt | data de emissão no texto
+
+contrato_clienteA_assinado.txt -> contratos/2026-01-15-contrato-cliente-a-assinado.txt | início de vigência no texto
+contrato clienteB rascunho.txt -> contratos/2026-02-20-contrato-cliente-b-rascunho.txt | vigência prevista no texto
+
+ata reuniao 12-03.txt -> atas/2026-03-12-ata-metas-trimestre.txt | data no texto
+ata_reuniao_19_03.md -> atas/2026-03-19-ata-revisao-precos.md | data no texto
+
+vendas_q1.csv -> vendas/2026-03-31-vendas-q1.csv | último dia do trimestre (2026-01..03)
+vendas q1 (copia).csv -> APAGADO (duplicata idêntica de vendas_q1.csv, confirmada com fc /b; remoção autorizada pelo usuário em 2026-10-27)
+vendas q2 FINAL.csv -> vendas/2026-06-30-vendas-q2.csv | último dia do trimestre (2026-04..06)
+
+foto_equipe.png -> imagens/2026-05-19-foto-equipe.png | SEM data interna (PNG 1x1 vazio); usada data de modificação do arquivo
+logo antigo.png -> imagens/2025-11-01-logo-antigo.png | SEM data interna (PNG 1x1 vazio); usada data de modificação do arquivo
+
+lista de tarefas.txt -> outros/2026-06-04-lista-de-tarefas.txt | SEM data interna; usada data de modificação do arquivo
+
+MANTIDO NA RAIZ: CLAUDE.md (arquivo de instruções do projeto, não é documento)
+
+------------------------------------------------------------------------------
+REVERSÃO (executar a partir desta pasta):
+move "notas-fiscais\2026-05-09-nf-1067-oficina-beta.txt" "NF_maio_final_v2.txt"
+move "notas-fiscais\2026-03-10-nf-1021-padaria-sol.txt" "nota fiscal marco 2026 (1).txt"
+move "notas-fiscais\2026-04-14-nf-1044-mercado-central.txt" "nota-fiscal-abril.txt"
+move "contratos\2026-01-15-contrato-cliente-a-assinado.txt" "contrato_clienteA_assinado.txt"
+move "contratos\2026-02-20-contrato-cliente-b-rascunho.txt" "contrato clienteB rascunho.txt"
+move "atas\2026-03-12-ata-metas-trimestre.txt" "ata reuniao 12-03.txt"
+move "atas\2026-03-19-ata-revisao-precos.md" "ata_reuniao_19_03.md"
+move "vendas\2026-03-31-vendas-q1.csv" "vendas_q1.csv"
+REM reversão NÃO disponível para a cópia: vendas q1 (copia).csv foi apagado
+move "vendas\2026-06-30-vendas-q2.csv" "vendas q2 FINAL.csv"
+move "imagens\2026-05-19-foto-equipe.png" "foto_equipe.png"
+move "imagens\2025-11-01-logo-antigo.png" "logo antigo.png"
+move "outros\2026-06-04-lista-de-tarefas.txt" "lista de tarefas.txt"

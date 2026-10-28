@@ -14,13 +14,13 @@ describe('MCP catalog', () => {
     expect(catalogEntry('atlassian')?.transport).toBe('http')
   })
 
-  it('builds the official Atlassian server with Basic auth from email + API token', () => {
-    const built = buildCatalogServer(catalogEntry('atlassian')!, {
+  it('builds the API-token Atlassian variant with Basic auth', () => {
+    const built = buildCatalogServer(catalogEntry('atlassian-token')!, {
       env: { ATLASSIAN_EMAIL: 'dev@example.com', ATLASSIAN_API_TOKEN: 'secret-token' }
     })
     expect(built.missing).toEqual([])
     expect(built.server).toMatchObject({
-      name: 'atlassian',
+      name: 'atlassian-token',
       type: 'http',
       url: 'https://mcp.atlassian.com/v2/mcp',
       enabled: true
@@ -32,8 +32,23 @@ describe('MCP catalog', () => {
     expect(JSON.stringify(built.server?.args)).not.toContain('secret-token')
   })
 
+  it('makes the official Atlassian connector OAuth-first', () => {
+    const entry = catalogEntry('atlassian')!
+    expect(entry.oauth).toBe(true)
+    const built = buildCatalogServer(entry)
+    expect(built.missing).toEqual([])
+    expect(built.needsOAuth).toBe(true)
+    expect(built.server).toMatchObject({
+      name: 'atlassian',
+      type: 'http',
+      url: 'https://mcp.atlassian.com/v2/mcp',
+      enabled: true
+    })
+    expect(built.server?.headers).toBeUndefined()
+  })
+
   it('reports every missing required credential instead of saving a broken server', () => {
-    const built = buildCatalogServer(catalogEntry('atlassian')!)
+    const built = buildCatalogServer(catalogEntry('atlassian-token')!)
     expect(built.server).toBeNull()
     expect(built.missing).toEqual(['ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'])
   })
@@ -43,6 +58,18 @@ describe('MCP catalog', () => {
       env: { ALLOWED_PATH: 'C:\\Users\\me\\Desktop' }
     })
     expect(built.server?.args).toEqual(['-y', '@modelcontextprotocol/server-filesystem', 'C:\\Users\\me\\Desktop'])
+  })
+
+  it('keeps the SQLite server on the mcp 1.x line (mcp 2.x broke mcp-server-sqlite) without characters cmd.exe reads as operators', () => {
+    const sqlite = catalogEntry('sqlite')!
+    expect(sqlite.command).toBe('uvx')
+    expect((sqlite.args ?? []).slice(0, 3)).toEqual(['--with', 'mcp~=1.6', 'mcp-server-sqlite'])
+    const built = buildCatalogServer(sqlite, { env: { DB_PATH: 'C:\\dados\\app.db' } })
+    expect(built.server?.args).toEqual(['--with', 'mcp~=1.6', 'mcp-server-sqlite', '--db-path', 'C:\\dados\\app.db'])
+    // On Windows npx/uvx run through `cmd.exe /c`: `<`, `>`, `|` and `&` in an argument would be redirects or pipes.
+    for (const entry of [catalogEntry('sqlite')!, catalogEntry('git')!, catalogEntry('time')!, catalogEntry('fetch')!].filter(Boolean)) {
+      expect((entry.args ?? []).some((arg) => /[<>|&^]/.test(arg))).toBe(false)
+    }
   })
 
   it('installs OAuth-only connectors and flags that the first call opens a login', () => {

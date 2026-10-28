@@ -10,6 +10,12 @@ export interface LiveTool {
   files?: string[]
   data?: Record<string, unknown>
   running: boolean
+  /** When execution started; drives the live elapsed timer. */
+  startedAt?: number
+  /** Last live chunk while a long tool is still running. */
+  progress?: string
+  /** When the last live chunk arrived. */
+  updatedAt?: number
 }
 
 export interface LogEntry {

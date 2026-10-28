@@ -1,4 +1,4 @@
-import type { AgentMode, AuditLevel, RunState, Usage } from '../../../shared/types'
+import type { AgentMode, AuditLevel, RunState, SessionState, Usage } from '../../../shared/types'
 
 export const MODE_LABELS: Record<AgentMode, string> = {
   ask: 'Perguntar',
@@ -141,6 +141,19 @@ export function formatUsage(usage: Usage): string {
   const total = usage.input + usage.output
   const cost = usage.costUsd ? ` · US$ ${usage.costUsd.toFixed(3)}` : ''
   return `${formatTokens(total)} tokens${cost}`
+}
+
+/**
+ * Prompt size of the most recent model call. `session.usage` is cumulative and
+ * must not be shown as the current context gauge.
+ */
+export function lastRequestTokens(session: SessionState | null): number {
+  if (!session) return 0
+  for (let index = session.messages.length - 1; index >= 0; index--) {
+    const usage = session.messages[index].usage
+    if (usage) return usage.input + usage.output
+  }
+  return 0
 }
 
 export function levelLabel(level: AuditLevel | 'error'): string {

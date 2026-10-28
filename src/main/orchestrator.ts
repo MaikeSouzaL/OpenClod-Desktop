@@ -8,6 +8,7 @@ import type {
   ApprovalDecision,
   ApprovalRequest,
   CapabilityReport,
+  ContextBreakdown,
   FileChange,
   HarnessEvent,
   ImagePart,
@@ -15,6 +16,9 @@ import type {
   McpServerSettings,
   Project,
   ProviderConfig,
+  ProviderErrorKind,
+  QuestionAnswer,
+  QuestionRequest,
   RunState,
   SessionMeta,
   SessionState,
@@ -24,13 +28,14 @@ import { DEFAULT_LIMITS } from '../shared/types.js'
 import { SessionStore } from '../core/session/store.js'
 import { FileTracker } from '../core/session/tracker.js'
 import { SettingsStore } from './settings.js'
+import { ColabService, type ColabHost } from './colab.js'
 import { SkillLibrary } from '../core/skills/library.js'
 import { MemoryStore } from '../core/memory/store.js'
 import { ProjectMemory } from '../core/memory/project.js'
 import { BrowserLayer } from '../core/browser/layer.js'
 import { ComputerLayer } from '../core/computer/layer.js'
 import { ToolRegistry } from '../core/tools/registry.js'
-import type { ToolDef } from '../core/tools/types.js'
+import { lazyTools } from '../core/tools/lazy.js'
 import { createAgentRegistry, type AgentRegistry } from '../core/agents/registry.js'
 import { writeAgentFile } from '../core/agents/loader.js'
 import { agentForgeTools } from '../core/agents/tools.js'
@@ -43,19 +48,30 @@ import { webTools } from '../core/tools/web.js'
 import { browserTools } from '../core/tools/browser.js'
 import { computerTools } from '../core/tools/computer.js'
 import { planTools } from '../core/tools/plan.js'
+import { limitationTools } from '../core/tools/limitations.js'
+import { askTools } from '../core/tools/ask.js'
 import { projectMemoryTools } from '../core/memory/tools.js'
 import { SessionRunner } from '../core/agent/runner.js'
-import type { RunnerSnapshot } from '../core/agent/runner.js'
+import type { RunnerSnapshot, SendOptions } from '../core/agent/runner.js'
 import { createProvider, hasCredentials, resolveApiKey } from '../core/providers/index.js'
+import { errorKindOf } from '../core/providers/http.js'
+import { describeFailure, isAccountLevelKind } from '../core/providers/health.js'
+import { ProviderReserve } from './reserve.js'
 import { WorkspaceGuard } from '../core/security/policy.js'
 import { mergeRules, ruleForApproval } from '../core/security/rules.js'
 import { HookRunner } from '../core/hooks/runner.js'
 import { ApprovalStore, loadProjectSettings, mergeHooks } from '../core/config/project.js'
-import { McpClient, mcpQualifiedName, normalizeMcpServerSettings, type McpServerConfig } from '../core/mcp/client.js'
+import { McpClient, normalizeMcpServerSettings, type McpServerConfig } from '../core/mcp/client.js'
 import { buildCatalogServer, catalogEntry, searchMcpCatalog, MCP_CATALOG } from '../core/mcp/catalog.js'
 import { installFromRegistry, searchMcpRegistry } from '../core/mcp/registry.js'
-import type { McpToolService } from '../core/tools/types.js'
-import { mcpTools } from '../core/tools/mcp.js'
+import type { McpReloadReport, McpToolService, ToolDef } from '../core/tools/types.js'
+import { createMcpTools } from '../core/tools/mcp.js'
+import { buildMcpToolDefs, type McpSkippedTool } from '../core/mcp/tools.js'
+import { hintForMcpError } from '../core/mcp/hints.js'
+import { DEFAULT_START_TIMEOUT_MS, MIN_LISTING_TIMEOUT_MS } from '../core/mcp/limits.js'
+import type { ResolvedToolPolicy } from '../core/mcp/policy.js'
+import { rewindMessages } from '../core/session/rewind.js'
+import { captureGitFileCheckpoint, restoreGitFileCheckpoint } from '../core/session/checkpoint.js'
 import { describeToolchains, toolchains } from '../core/util/toolchains.js'
 import { ensureProjectInstructions } from '../core/agent/context.js'
 import { resourcePath } from '../core/util/resources.js'
@@ -64,12 +80,28 @@ import { discoverForProvider, type DiscoveryResult } from '../core/providers/dis
 import { importClaudeCatalog, type ClaudeImportReport } from './claude-import.js'
 import { AiMemoryService } from './ai-memory.js'
 import { InboxStore } from './inbox.js'
-import { McpOAuthManager } from './mcp-oauth.js'
+import { McpOAuthManager, OAuthSetupError } from './mcp-oauth.js'
+import { ConnectorService, MAX_MCP_SERVERS } from './connector-service.js'
 import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/external-agent.js'
+import { codeIntelligenceTools } from '../core/tools/code-intelligence.js'
+import { documentTools } from '../core/tools/documents.js'
+import { mediaTools } from '../core/tools/media.js'
+import { findMediaPaths } from '../core/media/paths.js'
+import { ingestToMemory, loadSheetImages } from '../core/media/memory.js'
+import { imageTools } from '../core/tools/images.js'
+import { PluginManager } from '../core/plugins/manager.js'
 import { id } from '../core/util/ids.js'
 import { ChromeBridge } from './chrome/bridge.js'
 import { buildNativeMemoryGraph } from '../core/memory/graph.js'
 import type { AgentDefinition, AgentsListing, PolicyConfig, ReasoningEffort } from '../shared/types.js'
+import type {
+  ConnectInput,
+  ConnectorDirectory,
+  ConnectorState,
+  ConnectorTool,
+  ConnectResult,
+  ToolPolicy
+} from '../shared/mcp-connectors.js'
 
 interface PendingApproval {
   resolve: (decision: ApprovalDecision) => void
@@ -79,12 +111,25 @@ interface PendingApproval {
   request: ApprovalRequest
 }
 
+interface PendingQuestion {
+  resolve: (answers: QuestionAnswer[] | null) => void
+  timer: NodeJS.Timeout
+  sessionId: string
+}
+
 export interface OrchestratorOptions {
   userData: string
   broadcast: (event: HarnessEvent) => void
   /** Optional log sink (the main process writes to %APPDATA%\Openclod\logs\main.log). */
   log?: (message: string) => void
+  /** Wait before the automatic second attempt at a server that ran out of start time (3 s; tests shorten it). */
+  mcpStartRetryDelayMs?: number
+  /** What the Google Colab feature needs from Electron (open the browser, show a file, copy text). Tests omit it: nothing is opened. */
+  colabHost?: ColabHost
 }
+
+/** The ways a server's start can run out of time (the client's own timeouts and the orchestrator's last-resort guard). */
+const MCP_START_TIMEOUT = /timeout de MCP|não terminou de iniciar/
 
 export class Orchestrator {
   readonly store: SessionStore
@@ -93,11 +138,19 @@ export class Orchestrator {
   readonly skills: SkillLibrary
   readonly aiMemory: AiMemoryService
   readonly inbox: InboxStore
+  readonly plugins: PluginManager
   private readonly oauth: McpOAuthManager
+  /** Connector directory, states and connect/disconnect (Personalização → Conectores). */
+  readonly connectors: ConnectorService
+  /** Last 401 challenge per server, reused when the user starts OAuth manually. */
+  private mcpChallenges = new Map<string, string>()
+  /** Credentials a server needed that the vault did not have at the last start (never the values). */
+  private mcpSecretIssues = new Map<string, string[]>()
   private baseRegistry: ToolRegistry
   private mcpClients = new Map<string, McpClient>()
-  private mcpTools: ToolDef[] = []
   private mcpReloadAt = new Map<string, number>()
+  /** Pending automatic second attempts at starting a server that ran out of time (cleared on shutdown). */
+  private mcpStartRetries = new Map<string, NodeJS.Timeout>()
   private runners = new Map<string, SessionRunner>()
   private trackers = new Map<string, FileTracker>()
   private browsers = new Map<string, BrowserLayer>()
@@ -109,26 +162,70 @@ export class Orchestrator {
   private memorySyncs = new Map<string, Promise<void>>()
   private persistTimers = new Map<string, NodeJS.Timeout>()
   private pending = new Map<string, PendingApproval>()
+  private pendingQuestions = new Map<string, PendingQuestion>()
   private sessionAllow = new Map<string, Set<string>>()
   private sessionPolicies = new Map<string, PolicyConfig>()
   private sessionHooks = new Map<string, HookRunner>()
+  private pluginSkillRoots = new Set<string>()
   /** Live subagents per user session, so aborting the session can also stop their processes. */
   private agentChildren = new Map<string, Set<string>>()
   private readonly approvals: ApprovalStore
   private eventQueue: Promise<void> = Promise.resolve()
   private readonly probeBrowser = new BrowserLayer()
   readonly chromeBridge: ChromeBridge
+  /** Which provider takes over when the one in use cannot answer, and what is known about which ones work. */
+  readonly reserve: ProviderReserve
+  /** Settings → Provedores → Google Colab (GPU): notebook, connection code, link health. */
+  readonly colab: ColabService
 
   constructor(private readonly options: OrchestratorOptions) {
     this.store = new SessionStore(userDataPath(options.userData, 'data'))
     this.settings = new SettingsStore(userDataPath(options.userData, 'config'))
+    this.reserve = new ProviderReserve({ settings: () => this.settings.get(), resolver: () => this.settings.resolver() })
+    this.colab = new ColabService({
+      settings: this.settings,
+      health: this.reserve.health,
+      host: options.colabHost ?? {
+        notebookDir: path.join(options.userData, 'colab'),
+        openUrl: () => undefined,
+        revealFile: () => undefined,
+        copyText: () => undefined
+      },
+      // Idle sessions are rebuilt with the new provider list; the interface reloads the settings (and the model picker).
+      emitChanged: () => {
+        this.settingsChanged()
+        this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'general' })
+      },
+      log: (message) => this.options.log?.(message)
+    })
     this.approvals = new ApprovalStore(path.join(userDataPath(options.userData, 'data'), 'permissions'))
     this.computer = new ComputerLayer()
     this.skills = new SkillLibrary([])
     this.aiMemory = new AiMemoryService(path.join(userDataPath(options.userData, 'data'), 'ai-memory'))
     this.inbox = new InboxStore(path.join(userDataPath(options.userData, 'data'), 'inbox'))
-    this.oauth = new McpOAuthManager(path.join(userDataPath(options.userData, 'data'), 'oauth'))
+    this.plugins = new PluginManager(path.join(options.userData, 'plugins'))
+    this.oauth = new McpOAuthManager(
+      path.join(userDataPath(options.userData, 'data'), 'oauth'),
+      this.settings.secretCrypto
+    )
+    this.connectors = new ConnectorService({
+      settings: this.settings,
+      oauth: this.oauth,
+      clients: () => this.mcpClients,
+      // One connector changes (connect, login done, disconnect): only its server restarts, the others keep running.
+      restart: (serverName) => (serverName ? this.startMcpServers(serverName) : this.restartMcp()),
+      refreshTools: () => this.rebuildRegistry(),
+      emitChanged: () => this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'mcp' }),
+      secretIssues: () => this.mcpSecretIssues,
+      challenge: (serverName) => this.mcpChallenges.get(serverName),
+      log: (message) => this.options.log?.(message)
+    })
     this.chromeBridge = new ChromeBridge(options.userData)
+    // The Stop button of the Chrome extension ends the turn like the Stop button of the app does.
+    this.chromeBridge.onStop((sessionId) => {
+      this.options.log?.(`Parar pelo Chrome: sessão ${sessionId}`)
+      void this.abort(sessionId).catch(() => undefined)
+    })
     this.baseRegistry = buildBaseRegistry()
   }
 
@@ -157,6 +254,7 @@ export class Orchestrator {
 
   async init(): Promise<void> {
     await this.settings.init()
+    await this.plugins.init()
     await this.store.init()
     await this.chromeBridge.start().catch((err) => this.options.log?.(`ponte Chrome: ${(err as Error).message}`))
 
@@ -171,6 +269,7 @@ export class Orchestrator {
     await ensureStarterSkills(userSkills)
     this.skills.addRoot(userSkills, 'usuario')
     await this.skills.reload()
+    await this.refreshPluginSkills()
 
     // First start after the rename: bring the Claude Desktop/Code catalog in
     // (skills, agents and MCP servers). The flag makes it a one-time import;
@@ -186,7 +285,11 @@ export class Orchestrator {
       }
     }
 
-    await this.startMcpServers()
+    // MCP servers connect in the background (in parallel, each with its own start timeout):
+    // a slow `npx` download or an unreachable remote server must never delay the window.
+    // The panel shows each one as "starting" until it answers.
+    void this.startMcpServers().catch((err) => this.options.log?.(`MCP: ${(err as Error).message}`))
+    this.rebuildRegistry()
     // The AI-Memory sidecar indexes every project's wiki. Start it in the
     // background: a missing binary or a slow model must never delay the UI.
     void this.aiMemory.start().catch((err) => this.options.log?.(`ai-memory: ${(err as Error).message}`))
@@ -196,63 +299,242 @@ export class Orchestrator {
   /* ------------------------------- registry ------------------------------ */
 
   private rebuildRegistry(): void {
-    const next = buildBaseRegistry()
-    for (const tool of this.mcpTools) {
-      // Names are capped at 60 chars, so two long tool names can collide; keep the first.
-      if (!next.get(tool.name)) next.register(tool)
-    }
+    const next = buildBaseRegistry((server, tool) => this.mcpClients.get(server)?.policyFor(tool))
+    for (const tool of this.plugins.toolDefs()) if (!next.get(tool.name)) next.register(tool)
+    // Every tool of every connected MCP server is a tool of its own (mcp__server__tool).
+    for (const tool of this.mcpDirectTools()) if (!next.get(tool.name)) next.register(tool)
     // Mutate the existing registry instead of replacing it: an active runner
     // keeps its reference, so tools installed mid-turn become visible on the
     // very next model iteration.
     this.baseRegistry.replaceAll(next.list())
   }
 
-  private async startMcpServers(): Promise<void> {
-    for (const client of this.mcpClients.values()) await client.stop()
-    this.mcpClients.clear()
-    this.mcpTools = []
+  /** Tools skipped at the last rebuild because the server's schema cannot be offered to a model API. */
+  private mcpSkipped: McpSkippedTool[] = []
+  private mcpRefreshTimer: NodeJS.Timeout | null = null
 
-    for (const config of this.settings.get().mcpServers ?? []) {
-      if (!config.enabled) continue
-      const client = new McpClient({
-        ...(config as McpServerConfig),
-        onUnauthorized: async (challenge) => {
-          if (!config.url) return null
-          this.onEvent({
-            type: 'notice',
-            sessionId: '',
-            level: 'info',
-            text: `MCP ${config.name}: abrindo login OAuth no navegador`
-          })
-          return this.oauth.authorize(config.name, config.url, challenge).catch((err) => {
-            this.options.log?.(`OAuth de MCP ${config.name} falhou: ${(err as Error).message}`)
-            return null
-          })
-        },
-        onToolsChanged: () => {
-          const now = Date.now()
-          if (now - (this.mcpReloadAt.get(config.name) ?? 0) < 5_000) return
-          this.mcpReloadAt.set(config.name, now)
-          this.options.log?.(`MCP ${config.name}: tools/list_changed; recarregando servidores`)
-          void this.restartMcp()
+  /**
+   * First-class tools for the connected servers. The saved settings are the source of truth for the per-tool
+   * policy (include/exclude/approval/toolPolicy): every rebuild copies them to the live clients, so changing a
+   * policy never needs a reconnection.
+   */
+  private mcpDirectTools(): ToolDef[] {
+    const stored = this.settings.get().mcpServers ?? []
+    for (const [name, client] of this.mcpClients) {
+      const settings = stored.find((item) => item.name === name)
+      if (!settings) continue
+      client.setPolicy({
+        includeTools: settings.includeTools,
+        excludeTools: settings.excludeTools,
+        approvalTools: settings.approvalTools,
+        toolPolicy: settings.toolPolicy
+      })
+    }
+    const build = buildMcpToolDefs({
+      hosts: [...this.mcpClients.values()],
+      settings: (name) => stored.find((item) => item.name === name),
+      getHost: (name) => this.mcpClients.get(name)
+    })
+    this.mcpSkipped = build.skipped
+    return build.tools
+  }
+
+  /** Coalesces the bursts of state changes (start, reconnect, list_changed) into one rebuild and one UI refresh. */
+  private scheduleMcpRefresh(): void {
+    if (this.mcpRefreshTimer) return
+    this.mcpRefreshTimer = setTimeout(() => {
+      this.mcpRefreshTimer = null
+      try {
+        this.rebuildRegistry()
+        this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'mcp' })
+      } catch (err) {
+        this.options.log?.(`MCP: ${(err as Error).message}`)
+      }
+    }, 120)
+    this.mcpRefreshTimer.unref?.()
+  }
+
+  async installPlugin(sourceDir: string) {
+    const plugin = await this.plugins.installDirectory(sourceDir)
+    this.rebuildRegistry()
+    await this.refreshPluginSkills()
+    return plugin
+  }
+
+  async setPluginEnabled(pluginId: string, enabled: boolean) {
+    const plugin = await this.plugins.setEnabled(pluginId, enabled)
+    this.rebuildRegistry()
+    await this.refreshPluginSkills()
+    return plugin
+  }
+
+  async removePlugin(pluginId: string) {
+    const removed = await this.plugins.remove(pluginId)
+    this.rebuildRegistry()
+    await this.refreshPluginSkills()
+    return removed
+  }
+
+  private async refreshPluginSkills(): Promise<void> {
+    for (const root of this.pluginSkillRoots) this.skills.removeRoot(root)
+    this.pluginSkillRoots.clear()
+    for (const root of this.plugins.skillRoots()) {
+      this.skills.addRoot(root, 'usuario')
+      this.pluginSkillRoots.add(root)
+    }
+    await this.skills.reload()
+  }
+
+  /** Serialized: a restart waits for the previous start/stop to settle instead of racing it. */
+  private mcpStart: Promise<void> = Promise.resolve()
+
+  private startMcpServers(only?: string, attempt = 0): Promise<void> {
+    const run = this.mcpStart.then(() => this.doStartMcpServers(only, attempt))
+    this.mcpStart = run.catch(() => undefined)
+    return run
+  }
+
+  /**
+   * Stops and starts the servers from the saved settings: all of them, or only `only`. Each server starts on its own
+   * with its own deadline (`startTimeoutMs`), so one that hangs neither blocks the others nor the serialized chain of
+   * restarts: it ends as `error` with the cause. The registry is rebuilt as servers settle, so the tools of the fast
+   * ones are usable while a slow one is still starting.
+   */
+  private async doStartMcpServers(only?: string, attempt = 0): Promise<void> {
+    const doomed = only
+      ? [this.mcpClients.get(only)].filter((client): client is McpClient => Boolean(client))
+      : [...this.mcpClients.values()]
+    await Promise.all(doomed.map((client) => client.stop().catch(() => undefined)))
+    if (only) this.mcpClients.delete(only)
+    else this.mcpClients.clear()
+
+    const enabled = (this.settings.get().mcpServers ?? []).filter((config) => config.enabled)
+    const servers = only ? enabled.filter((config) => config.name === only) : enabled
+    if (only) this.mcpSecretIssues.delete(only)
+    else this.mcpSecretIssues.clear()
+    await Promise.allSettled(servers.map((stored) => this.startMcpServer(stored, attempt)))
+    this.rebuildRegistry()
+  }
+
+  private async startMcpServer(stored: McpServerSettings, attempt = 0): Promise<void> {
+    // settings.json only holds `${secret:...}` references; the client gets the real values (never logged).
+    const { server: config, missing } = this.settings.resolveMcpServer(stored)
+    const oauthToken = await this.oauth.token(config.name).catch(() => null)
+    const client = new McpClient({
+      ...(config as McpServerConfig),
+      ...(oauthToken ? { oauthToken } : {}),
+      // Connection lost mid-session (HTTP/SSE stopped answering, stdio process died): retry with exponential
+      // backoff (1 s, 2 s, 4 s, 8 s, 16 s) and show it in the connector state.
+      reconnect: {},
+      onUnauthorized: async (challenge) => {
+        if (!config.url) return null
+        if (challenge) this.mcpChallenges.set(config.name, challenge)
+        // Refresh a stored token silently. Opening a consent screen is an
+        // explicit action (authorizeMcp), so app startup never blocks on it.
+        return this.oauth.token(config.name).catch(() => null)
+      },
+      // The client already reloaded its own lists (debounced): only this server's tools change, nothing restarts.
+      onToolsChanged: (kind) => {
+        this.options.log?.(`MCP ${config.name}: ${kind ?? 'ferramentas'} atualizadas (list_changed)`)
+        this.scheduleMcpRefresh()
+      },
+      onStateChange: () => this.scheduleMcpRefresh()
+    })
+    // Registered before it answers so the panel can show it as "starting".
+    this.mcpClients.set(config.name, client)
+    if (missing.length) {
+      // A credential the vault no longer has: never start the server with half of its credentials.
+      const names = missing.map((inner) => {
+        const key = inner.slice(inner.indexOf('.') + 1)
+        try {
+          return decodeURIComponent(key)
+        } catch {
+          return key
         }
       })
-      try {
-        await client.start()
-        this.mcpClients.set(config.name, client)
-        for (const tool of client.toolsList()) {
-          this.mcpTools.push(mcpToolDef(client, tool.name, tool.description, tool.inputSchema))
-        }
-      } catch (err) {
-        client.lastError = (err as Error).message
-        this.mcpClients.set(config.name, client)
-      }
+      this.mcpSecretIssues.set(config.name, names)
+      client.state = 'error'
+      client.lastError = `credencial ausente do cofre: ${names.join(', ')}`
+      return
     }
-    this.rebuildRegistry()
+    const startMs = typeof config.startTimeoutMs === 'number' && config.startTimeoutMs > 0 ? config.startTimeoutMs : DEFAULT_START_TIMEOUT_MS
+    const startedAt = Date.now()
+    let guard: NodeJS.Timeout | undefined
+    try {
+      // The client bounds its own start (the handshake, then at least MIN_LISTING_TIMEOUT_MS per listing); this is
+      // the last line of defence against a start that never returns, so it must outlast that.
+      await Promise.race([
+        client.start(startMs),
+        new Promise<never>((_, reject) => {
+          guard = setTimeout(
+            () => reject(new Error(`o servidor MCP ${config.name} não terminou de iniciar em ${Math.round(startMs / 1000)} s`)),
+            startMs + MIN_LISTING_TIMEOUT_MS + 5_000
+          )
+        })
+      ])
+      // How long each server really takes to come up is what tells a slow machine from a broken server.
+      this.options.log?.(`MCP ${config.name}: pronto em ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${client.exposedToolsList().length} ferramenta(s))`)
+    } catch (err) {
+      const message = (err as Error).message
+      if (client.state === 'starting') {
+        await client.stop().catch(() => undefined)
+        client.state = 'error'
+      }
+      client.lastError = message
+      this.options.log?.(`MCP ${config.name}: ${message.slice(0, 300)}`)
+      if (attempt === 0 && MCP_START_TIMEOUT.test(message)) this.retryMcpStartOnce(config.name, client)
+    } finally {
+      if (guard) clearTimeout(guard)
+    }
+    this.scheduleMcpRefresh()
+  }
+
+  /**
+   * A server that ran out of time on its first start gets one more attempt, in the background. The machine is at its
+   * busiest right after the app opens (a dozen servers, the voice engine, the memory service) and the first attempt
+   * already warmed what `uvx`/`npx` download on first use, so the second one usually fits: `jira` took 18 s cold and 8 s
+   * warm. Auth failures, a crash or a missing command are not retried. If the user reconnects, reloads or disables the
+   * server meanwhile, its client was replaced and nothing happens.
+   */
+  private retryMcpStartOnce(name: string, failed: McpClient): void {
+    const previous = this.mcpStartRetries.get(name)
+    if (previous) clearTimeout(previous)
+    const timer = setTimeout(() => {
+      this.mcpStartRetries.delete(name)
+      if (this.mcpClients.get(name) !== failed || failed.state !== 'error') return
+      this.options.log?.(`MCP ${name}: nova tentativa de partida (a primeira esgotou o prazo)`)
+      void this.startMcpServers(name, 1).catch((err) => this.options.log?.(`MCP ${name}: ${(err as Error).message}`))
+    }, this.options.mcpStartRetryDelayMs ?? 3_000)
+    timer.unref?.()
+    this.mcpStartRetries.set(name, timer)
   }
 
   async restartMcp(): Promise<void> {
     await this.startMcpServers()
+  }
+
+  /**
+   * Restarts the servers from the saved settings (all, or only `server`) and rebuilds their tools. This is what
+   * `mcp_reload` runs. Unlike `restartMcp`, it reports what each server ended up as.
+   */
+  async reloadMcpServers(server?: string): Promise<McpReloadReport> {
+    const configured = this.settings.get().mcpServers ?? []
+    if (server && !configured.some((config) => config.name === server)) return { servers: [] }
+    await this.startMcpServers(server)
+    const names = server ? [server] : configured.filter((config) => config.enabled).map((config) => config.name)
+    return {
+      servers: names.map((name) => {
+        const client = this.mcpClients.get(name)
+        const enabled = configured.find((config) => config.name === name)?.enabled !== false
+        return {
+          name,
+          state: enabled ? (client?.state ?? 'stopped') : 'disabled',
+          tools: client?.exposedToolsList().length ?? 0,
+          error: client?.lastError ?? undefined,
+          hint: client?.describe().hint
+        }
+      })
+    }
   }
 
   /* ------------------------------- sessions ------------------------------ */
@@ -266,14 +548,37 @@ export class Orchestrator {
     model: string
     title?: string
   }): Promise<SessionMeta> {
+    // A new conversation does not start on a provider the harness already knows cannot answer (no balance, refused key)
+    // while another one works: asking it would only cost a failed request before the switch.
+    const wanted = this.settings.providerConfig(input.providerId)
+    if (wanted) {
+      const start = this.reserve.startingPoint({ ...wanted, model: input.model || wanted.model })
+      if (start.movedFrom) {
+        this.options.log?.(
+          `nova conversa: ${start.movedFrom.config.label} ${start.movedFrom.missingKey ? 'não tem chave configurada' : `está indisponível (${describeFailure(start.movedFrom.kind)})`}; começa em ${start.config.label}/${start.config.model}`
+        )
+        input = { ...input, providerId: start.config.id, model: start.config.model }
+      }
+    }
     return this.store.createSession(input)
+  }
+
+  /** Logs any step of starting a turn that takes more than a second: a slow start must leave a trace. */
+  private async slowStep<T>(label: string, work: Promise<T>): Promise<T> {
+    const started = Date.now()
+    try {
+      return await work
+    } finally {
+      const ms = Date.now() - started
+      if (ms > 1_000) this.options.log?.(`iniciar turno: "${label}" levou ${(ms / 1000).toFixed(1)} s`)
+    }
   }
 
   async ensureRunner(sessionId: string): Promise<SessionRunner> {
     const existing = this.runners.get(sessionId)
     if (existing) return existing
 
-    const state = await this.store.loadSession(sessionId)
+    const state = await this.slowStep('carregar a sessão', this.store.loadSession(sessionId))
     if (!state) throw new Error(`sessão não encontrada: ${sessionId}`)
     ensureProjectInstructions(state.meta.cwd)
     const settings = this.settings.get()
@@ -282,15 +587,18 @@ export class Orchestrator {
       settings.providers.find((p) => p.id === settings.defaultProviderId) ??
       settings.providers[0]
     if (!providerConfig) throw new Error('nenhum provedor configurado')
-    if (!hasCredentials(providerConfig, this.settings.resolver())) {
+    // The session's own provider, unless it has no key or the harness already knows it cannot answer (no balance, refused
+    // key...) and another one works: then the session starts there, and the conversation says so.
+    const start = this.reserve.startingPoint({ ...providerConfig, model: state.meta.model || providerConfig.model })
+    const activeConfig = start.config
+    if (!hasCredentials(activeConfig, this.settings.resolver())) {
       throw new Error(
-        `o provedor "${providerConfig.label}" não tem credencial configurada. Abra Configurações → Provedores.`
+        `o provedor "${activeConfig.label}" não tem credencial configurada. Abra Configurações → Provedores.`
       )
     }
-
-    const activeConfig = { ...providerConfig, model: state.meta.model || providerConfig.model }
+    if (start.movedFrom) this.announceStartMove(sessionId, state, start.movedFrom, activeConfig)
     const provider = createProvider(activeConfig, this.settings.resolver())
-    const fallback = settings.useAllModels ? this.buildFallback(settings, activeConfig) : undefined
+    const fallback = this.reserve.chainFor(activeConfig)
     const tracker = this.trackers.get(sessionId) ?? new FileTracker(state.meta.cwd)
     if (state.changes?.length) tracker.restore(state.changes)
     this.trackers.set(sessionId, tracker)
@@ -300,7 +608,8 @@ export class Orchestrator {
       sessionId,
       chrome: this.chromeBridge,
       mode: browserSettings.mode,
-      groupBySession: browserSettings.groupBySession
+      groupBySession: browserSettings.groupBySession,
+      fallbackToManaged: browserSettings.fallbackToManaged
     })
     this.browsers.set(sessionId, browser)
 
@@ -315,7 +624,13 @@ export class Orchestrator {
       this.projectMemories.get(state.meta.projectId) ??
       new ProjectMemory(path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', state.meta.projectId))
     this.projectMemories.set(state.meta.projectId, projectMemory)
-    await this.syncNativeToAi(state.meta.projectId)
+    // Split legacy session logs and build the per-subject index before the
+    // runner reads the briefing.
+    await this.slowStep('memória do projeto (init)', projectMemory.init())
+    // Copying every wiki page into AI-Memory is two HTTP calls per page: minutes on a project with dozens of pages.
+    // It used to run HERE, so the first message after every app start sat in the composer until it finished.
+    // It runs in the background now; recall still works from what AI-Memory already has.
+    this.syncNativeToAiInBackground(state.meta.projectId)
 
     const effectiveFullAccess = settings.policy.fullAccess === true || settings.policy.mode === 'unrestricted'
     const effectivePolicy: PolicyConfig = {
@@ -329,7 +644,7 @@ export class Orchestrator {
       effectiveFullAccess
     )
     const project = this.store.listProjects().find((p) => p.id === state.meta.projectId)
-    const branch = await gitBranch(state.meta.cwd)
+    const branch = await this.slowStep('ramo do git', gitBranch(state.meta.cwd))
     const { policy: sessionPolicy, hooks } = this.sessionConfig(state)
     const policy: PolicyConfig = settings.policy.mode === 'unrestricted'
       ? { ...sessionPolicy, ...effectivePolicy }
@@ -338,7 +653,8 @@ export class Orchestrator {
     this.sessionHooks.set(sessionId, hooks)
 
     const agents = this.agentRegistryFor(state.meta.cwd)
-    const agentEnv = this.agentEnv(agents, describeToolchains(await toolchains()))
+    const toolchainText = describeToolchains(await this.slowStep('detectar ferramentas instaladas', toolchains()))
+    const agentEnv = this.agentEnv(agents, toolchainText)
     const runner = new SessionRunner({
       sessionId,
       cwd: state.meta.cwd,
@@ -346,6 +662,8 @@ export class Orchestrator {
       provider,
       providerConfig: activeConfig,
       fallback,
+      health: this.reserve.health,
+      vision: { candidates: () => this.reserve.visionCandidates() },
       effort: state.meta.effort,
       registry: this.baseRegistry,
       policy,
@@ -370,9 +688,10 @@ export class Orchestrator {
       },
       hooks,
       toolOutputDir: this.toolOutputDir(),
-      systemExtra: describeToolchains(await toolchains()),
+      systemExtra: toolchainText,
       emit: (event) => this.onEvent(event),
       approve: (request) => this.approve(request),
+      ask: (request) => this.askQuestions(request),
       agents,
       autoAgents: Boolean(settings.autoAgents),
       surface: state.meta.surface ?? 'code',
@@ -391,6 +710,19 @@ export class Orchestrator {
     const runner = this.runners.get(sessionId)
     runner?.abort()
     this.runners.delete(sessionId)
+  }
+
+  /** Sessions whose runner must be rebuilt once the turn that is running now ends. */
+  private pendingDrops = new Set<string>()
+
+  /**
+   * Model, mode, effort and environment changes must not kill a turn in progress: the new value is
+   * saved at once and the runner is rebuilt (so it is picked up) as soon as the turn ends.
+   */
+  private dropRunnerWhenIdle(sessionId: string): void {
+    const runner = this.runners.get(sessionId)
+    if (runner?.busy) this.pendingDrops.add(sessionId)
+    else this.dropRunner(sessionId)
   }
 
   /* -------------------------------- agents -------------------------------- */
@@ -460,36 +792,39 @@ export class Orchestrator {
   }
 
   /**
-   * When `useAllModels` is on, every configured provider/model with credentials
-   * becomes a fallback, in order. The active model is excluded; the runner
-   * switches only after a quota/rate-limit/auth/transport failure and keeps the
-   * same conversation + project memory.
+   * A session that starts on another provider than the one it was saved with (the saved one is known to be down): saves
+   * the new provider on the session, tells the composer, and, when the session already has a history, leaves a line in the
+   * conversation. An empty session only gets the new provider (a first message is what names it and starts its history).
    */
-  private buildFallback(
-    settings: AppSettings,
-    current: ProviderConfig
-  ): Array<{ provider: ReturnType<typeof createProvider>; config: ProviderConfig }> {
-    const out: Array<{ provider: ReturnType<typeof createProvider>; config: ProviderConfig }> = []
-    const seen = new Set<string>([`${current.id}::${current.model}`])
-    const resolver = this.settings.resolver()
-    for (const provider of settings.providers) {
-      if (provider.kind === 'mock') continue
-      if (!hasCredentials(provider, resolver)) continue
-      const models = provider.models?.length ? provider.models : [provider.model]
-      for (const model of models) {
-        const key = `${provider.id}::${model}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        const config = { ...provider, model }
-        try {
-          out.push({ provider: createProvider(config, resolver), config })
-        } catch {
-          /* one invalid provider must not stop the fallback chain */
-        }
-        if (out.length >= 100) return out
-      }
+  private announceStartMove(
+    sessionId: string,
+    state: SessionState,
+    from: { config: ProviderConfig; kind: ProviderErrorKind; missingKey?: boolean },
+    to: ProviderConfig
+  ): void {
+    const why = from.missingKey ? 'não tem chave configurada' : `está indisponível (${from.kind}: ${describeFailure(from.kind)})`
+    const text =
+      `${from.config.label}/${from.config.model} ${why}; ` +
+      `esta conversa continua com ${to.label}/${to.model}. A conversa, o plano e a memória do projeto foram preservados.`
+    // onEvent saves the new provider/model on the session for every model_switch.
+    this.onEvent({
+      type: 'model_switch',
+      sessionId,
+      from: { providerId: from.config.id, label: from.config.label, model: from.config.model },
+      to: { providerId: to.id, label: to.label, model: to.model },
+      reason: from.kind
+    })
+    if (!state.messages.length) return
+    const message: Message = {
+      id: id('msg'),
+      role: 'system',
+      ts: Date.now(),
+      parts: [{ type: 'text', text }],
+      notice: { kind: 'model_switch', level: 'warn' }
     }
-    return out
+    state.messages.push(message)
+    this.onEvent({ type: 'message', sessionId, message })
+    this.onEvent({ type: 'notice', sessionId, level: 'warn', desktop: false, text })
   }
 
   /** What the agent runtime needs from the app: providers, the tool registry, events and approvals. */
@@ -507,7 +842,7 @@ export class Orchestrator {
       lmstudio: 7
     }
     const providers = settings.providers
-      .filter((provider) => provider.kind !== 'mock' && hasCredentials(provider, resolver))
+      .filter((provider) => hasCredentials(provider, resolver))
       .sort((a, b) => (priority[a.id] ?? 20) - (priority[b.id] ?? 20))
     const provider = providers[0]
     if (!provider) return undefined
@@ -558,12 +893,19 @@ export class Orchestrator {
           sessionId: `agent-${id('child')}`,
           chrome: this.chromeBridge,
           mode: browser.mode,
-          groupBySession: browser.groupBySession
+          groupBySession: browser.groupBySession,
+          fallbackToManaged: browser.fallbackToManaged
         })
       },
       emit: (event) => this.onEvent(event),
       approve: (request) => this.approve(request),
       toolOutputDir: this.toolOutputDir(),
+      // A specialist agent whose provider runs out of credit moves to the next one that works, like the session itself.
+      reserve: {
+        chainFor: (config) => this.reserve.chainFor(config),
+        health: this.reserve.health,
+        visionCandidates: () => this.reserve.visionCandidates()
+      },
       onChildStart: (rootSessionId, childId) => {
         const set = this.agentChildren.get(rootSessionId) ?? new Set<string>()
         set.add(childId)
@@ -592,7 +934,9 @@ export class Orchestrator {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
       await this.store.patchMeta(sessionId, { title })
     }
-    await runner.send(text, { images })
+    const messageId = id('msg')
+    await this.captureFileCheckpoint(sessionId, messageId)
+    await runner.send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest' })
     await this.captureTurnMemory(sessionId, runner, text)
   }
 
@@ -622,8 +966,10 @@ export class Orchestrator {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
       await this.store.patchMeta(sessionId, { title })
     }
+    const messageId = id('msg')
+    await this.captureFileCheckpoint(sessionId, messageId)
     void runner
-      .send(text, { images })
+      .send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest' })
       .then(async () => {
         await this.captureTurnMemory(sessionId, runner, text)
         await this.drainInbox(sessionId)
@@ -647,7 +993,9 @@ export class Orchestrator {
       if (!next) return
       this.inbox.remove(sessionId, next.id)
       try {
-        await runner.send(next.text, { images: next.images })
+        const messageId = id('msg')
+        await this.captureFileCheckpoint(sessionId, messageId)
+        await runner.send(next.text, { images: next.images, messageId, prepare: this.mediaPrepare(sessionId, next.text), prepareLabel: 'media_ingest' })
         await this.captureTurnMemory(sessionId, runner, next.text)
       } catch (err) {
         this.onEvent({
@@ -658,6 +1006,62 @@ export class Orchestrator {
         })
         return
       }
+    }
+  }
+
+  /**
+   * Audio and video the USER attached or named in the message are processed before the first model call: transcript,
+   * frames, contact sheets and the text on the frames go into the project's memory (src/core/media), and the model gets a
+   * short digest with the slugs of the pages to open. No interface: the file goes in, the knowledge stays. Only paths in
+   * the user's own text count, never in tool output. Returns nothing for a message without media.
+   */
+  private mediaPrepare(sessionId: string, text: string): SendOptions['prepare'] | undefined {
+    const files = findMediaPaths(text).filter((file) => {
+      try {
+        return fs.statSync(file).isFile()
+      } catch {
+        return false
+      }
+    })
+    if (!files.length) return undefined
+    const projectId = this.store.getSession(sessionId)?.meta.projectId
+    if (!projectId) return undefined
+    return async ({ signal, progress }) => {
+      const memory = this.memoryForProject(projectId)
+      const digests: string[] = []
+      const images: ImagePart[] = []
+      // A few notices, not a flood: one per phase, and at most one every few seconds within a phase.
+      let lastAt = 0
+      let lastPhase = ''
+      const note = (message: string): void => {
+        const phase = message.split(':')[0]
+        if (phase === lastPhase && Date.now() - lastAt < 6_000) return
+        lastPhase = phase
+        lastAt = Date.now()
+        progress(message)
+      }
+      for (const [index, file] of files.entries()) {
+        progress(`Processando ${path.basename(file)}${files.length > 1 ? ` (${index + 1} de ${files.length})` : ''}: transcrição, frames e memória…`)
+        try {
+          const result = await ingestToMemory({
+            file,
+            memory,
+            mirror: async (draft) => {
+              await this.aiMemory.writePage(projectId, { path: `pages/${draft.slug}.md`, title: draft.title, body: draft.body, tags: draft.tags, tier: 'semantic' })
+            },
+            signal,
+            onProgress: note
+          })
+          digests.push(result.digest)
+          images.push(...loadSheetImages(result.dir, result.manifest, 2))
+          progress(`${path.basename(file)} processado: ${result.manifest.frames.length} frames, ${result.manifest.transcript.segments.length} trechos de fala, ${result.plan.parts.length} parte(s) na memória.`)
+        } catch (error) {
+          if (signal.aborted) throw error
+          digests.push(`Não consegui processar ${path.basename(file)}: ${(error as Error).message}`)
+          progress(`Não consegui processar ${path.basename(file)}: ${(error as Error).message}`)
+        }
+      }
+      return { text: `<midia-processada>\n${digests.join('\n\n')}\n</midia-processada>`, images: images.slice(0, 3) }
     }
   }
 
@@ -675,6 +1079,26 @@ export class Orchestrator {
 
   inboxClear(sessionId: string): void {
     this.inbox.clear(sessionId)
+  }
+
+  private checkpointRoot(): string {
+    return path.join(userDataPath(this.options.userData, 'data'), 'checkpoints')
+  }
+
+  private async captureFileCheckpoint(sessionId: string, messageId: string): Promise<void> {
+    try {
+      const cwd = this.store.getSession(sessionId)?.meta.cwd
+      if (!cwd) return
+      const checkpoint = await captureGitFileCheckpoint(cwd, path.join(this.checkpointRoot(), sessionId, messageId))
+      if (!checkpoint) return
+    } catch (error) {
+      this.onEvent({
+        type: 'notice',
+        sessionId,
+        level: 'warn',
+        text: `checkpoint de arquivos indisponível: ${(error as Error).message}`
+      })
+    }
   }
 
   /**
@@ -696,60 +1120,79 @@ export class Orchestrator {
         .pop() ?? ''
       const tools = [...new Set(after.flatMap((message) => message.parts).filter((part) => part.type === 'tool_call').map((part) => part.name))]
       const files = (this.trackers.get(sessionId)?.changes() ?? []).map((change) => change.path).slice(-12)
-      await this.memoryForProject(state.meta.projectId).rememberTurn({
+      const memory = this.memoryForProject(state.meta.projectId)
+      const captured = await memory.rememberTurn({
         sessionTitle: state.meta.title,
         sessionId,
+        turnId: lastUser?.id,
         userText,
         assistantText,
         tools,
         files
       })
+      if (!captured) return
 
-      // Full turn in AI-Memory: request, answer, tool calls and their real
-      // output. One page per turn keeps writes idempotent and avoids a
-      // read-modify-write race between concurrent sessions.
-      const turnId = lastUser?.id ?? `turn_${Date.now()}`
-      const stamp = new Date().toISOString()
-      const transcript = renderTurnTranscript(after)
-      const body: string[] = [
-        `## Turno — ${new Date().toLocaleString('pt-BR')}`,
-        '',
-        `- **Turno:** ${turnId}`,
-        `- **Data:** ${stamp}`,
-        `- **Modelo:** ${state.meta.providerId}/${state.meta.model}`,
-        '',
-        '### Pedido',
-        '',
-        userText.trim().slice(0, 12_000) || '(sem texto)',
-        '',
-        '### Resposta',
-        '',
-        assistantText.trim().slice(0, 20_000) || '(sem resposta textual)',
-        '',
-        '### Execução',
-        '',
-        transcript || '(nenhuma ferramenta usada)',
-        '',
-        '### Arquivos alterados',
-        '',
-        files.length ? files.map((file) => `- ${file}`).join('\n') : '(nenhum)'
-      ]
-      const pagePath = `s/${shortHash(sessionId)}.md`
-      const related = await this.aiMemory
-        .relatedMarkdown(state.meta.projectId, `${userText}\n${assistantText}`, pagePath, 4)
-        .catch(() => '')
-      if (related) body.push('', '### Relacionados', '', related)
-      const existing = await this.aiMemory.readPage(state.meta.projectId, pagePath).catch(() => null)
-      const fullBody = existing
-        ? `${existing.body.trim()}\n\n---\n\n${body.join('\n')}`
-        : [`# ${state.meta.title || 'Sessão'}`, '', body.join('\n')].join('\n')
-      await this.aiMemory.writePage(state.meta.projectId, {
-        path: pagePath,
-        title: `Sessão ${state.meta.title || sessionId}`,
-        body: fullBody,
-        tags: ['sessao', 'automatico', 'turno'],
-        tier: 'episodic'
-      })
+      // One small AI-Memory page per turn plus a session index page. The old
+      // `s/<hash>.md` transcript is intentionally not written anymore: search
+      // must return the relevant turn, not a giant session dump.
+      for (const summary of [captured.turn, captured.session]) {
+        const page = await memory.readPage(summary.slug)
+        if (!page) continue
+        const pagePath = `pages/${summary.slug}.md`
+        const related = page.body.includes('## Relacionados')
+          ? ''
+          : await this.aiMemory
+              .relatedMarkdown(state.meta.projectId, `${page.title}\n${page.body}`, pagePath, 4)
+              .catch(() => '')
+        await this.aiMemory.writePage(state.meta.projectId, {
+          path: pagePath,
+          title: page.title,
+          body: related ? `${page.body}\n\n## Relacionados\n\n${related}` : page.body,
+          tags: page.tags,
+          pinned: page.pinned,
+          tier: summary.kind === 'turn' ? 'episodic' : 'semantic'
+        })
+      }
+      // Remove the previous monolithic session transcript from the index once
+      // the atomic pages exist. It is redundant and would dominate recall.
+      if (lastUser) {
+        const legacyPath = `s/${shortHash(sessionId)}.md`
+        await this.aiMemory.deletePage(state.meta.projectId, legacyPath).catch(() => false)
+      }
+
+      // The continuity capsule: one page per session saying where the work stands (objective, plan, next step, files),
+      // so another model in another session can "continue de onde paramos" without being told anything again.
+      try {
+        const text = (message: Message | undefined): string => message?.parts.find((part) => part.type === 'text')?.text ?? ''
+        const firstUser = messages.find((message) => message.role === 'user' && !message.hidden)
+        const summary = messages.find((message) => message.role === 'user' && message.hidden && text(message).startsWith('[Contexto compactado'))
+        const capsule = await memory.recordState({
+          sessionTitle: state.meta.title,
+          sessionId,
+          provider: this.settings.providerConfig(state.meta.providerId)?.label ?? state.meta.providerId,
+          model: state.meta.model,
+          runState: runner.state,
+          firstRequest: text(firstUser) || userText,
+          lastRequest: userText,
+          result: assistantText,
+          plan: runner.plan,
+          files,
+          summary: summary ? text(summary) : undefined
+        })
+        const page = await memory.readPage(capsule.summary.slug)
+        if (page) {
+          await this.aiMemory.writePage(state.meta.projectId, {
+            path: `pages/${capsule.summary.slug}.md`,
+            title: page.title,
+            body: page.body,
+            tags: page.tags,
+            pinned: page.pinned,
+            tier: 'semantic'
+          })
+        }
+      } catch (err) {
+        this.options.log?.(`cápsula de continuidade da sessão ${sessionId} falhou: ${(err as Error).message}`)
+      }
     } catch (err) {
       this.options.log?.(`memória automática da sessão ${sessionId} falhou: ${(err as Error).message}`)
     }
@@ -768,16 +1211,23 @@ export class Orchestrator {
       this.onEvent({ type: 'approval_resolved', sessionId, id: approvalId, approved: false })
       pending.resolve({ approved: false, reason: 'turno cancelado' })
     }
+    for (const [questionId, pending] of [...this.pendingQuestions.entries()]) {
+      if (pending.sessionId !== sessionId) continue
+      clearTimeout(pending.timer)
+      this.pendingQuestions.delete(questionId)
+      this.onEvent({ type: 'question_resolved', sessionId, id: questionId, answers: [] })
+      pending.resolve(null)
+    }
     this.onEvent({ type: 'status', sessionId, state: 'cancelled' })
   }
 
   async setMode(sessionId: string, mode: SessionMeta['mode']): Promise<void> {
-    this.dropRunner(sessionId)
+    this.dropRunnerWhenIdle(sessionId)
     await this.store.patchMeta(sessionId, { mode })
   }
 
   async setEffort(sessionId: string, effort: ReasoningEffort | null): Promise<void> {
-    this.dropRunner(sessionId)
+    this.dropRunnerWhenIdle(sessionId)
     await this.store.patchMeta(sessionId, { effort: effort ?? undefined })
   }
 
@@ -795,12 +1245,12 @@ export class Orchestrator {
     const profiles = this.settings.get().environments ?? []
     const profile = profiles.find((item) => item.id === environmentId)
     if (!profile) throw new Error('ambiente não encontrado')
-    this.dropRunner(sessionId)
+    this.dropRunnerWhenIdle(sessionId)
     await this.store.patchMeta(sessionId, { environment: profile.id })
   }
 
   async setModel(sessionId: string, providerId: string, model: string): Promise<void> {
-    this.dropRunner(sessionId)
+    this.dropRunnerWhenIdle(sessionId)
     await this.store.patchMeta(sessionId, { providerId, model })
   }
 
@@ -821,6 +1271,7 @@ export class Orchestrator {
     await this.store.deleteSession(sessionId)
     // Full outputs of large tool results were spilled here (see SessionRunner).
     await fs.promises.rm(path.join(this.toolOutputDir(), sessionId), { recursive: true, force: true }).catch(() => undefined)
+    await fs.promises.rm(path.join(this.checkpointRoot(), sessionId), { recursive: true, force: true }).catch(() => undefined)
   }
 
   /** Where oversized tool outputs are written so the model can page through them. */
@@ -853,6 +1304,15 @@ export class Orchestrator {
     return this.store.getSession(sessionId)
   }
 
+  /**
+   * Measured size of what the next request of a session carries. Only a session that already has a runner (it had a turn
+   * since the app opened) can say: building one just to look would create files in the project and start the browser
+   * layer, so a panel that is only being read gets `null` and shows its own estimate.
+   */
+  contextBreakdown(sessionId: string): ContextBreakdown | null {
+    return this.runners.get(sessionId)?.contextBreakdown() ?? null
+  }
+
   async compactSession(sessionId: string): Promise<SessionState | null> {
     const state = this.store.getSession(sessionId)
     if (!state) return null
@@ -860,6 +1320,78 @@ export class Orchestrator {
     if (!runner) throw new Error('a sessão ainda não tem um executor ativo; envie uma mensagem primeiro')
     await runner.compactNow()
     return this.store.getSession(sessionId)
+  }
+
+  /** Conversation rewind. File edits stay on disk by design and remain visible in Alterações. */
+  async rewindSession(sessionId: string, messageId: string, restoreFiles = false): Promise<SessionState | null> {
+    const state = await this.store.loadSession(sessionId)
+    if (!state) return null
+    const runner = this.runners.get(sessionId)
+    if (runner?.busy) throw new Error('pare o turno atual antes de voltar a uma mensagem')
+    const messages = rewindMessages(state.messages, messageId)
+    if (restoreFiles) {
+      const source = [...messages].reverse().find((message) => {
+        if (message.role !== 'user' || message.hidden) return false
+        return fs.existsSync(path.join(this.checkpointRoot(), sessionId, message.id, 'checkpoint.json'))
+      })
+      if (!source) throw new Error('este ponto não possui checkpoint de arquivos Git')
+      const checkpointDir = path.join(this.checkpointRoot(), sessionId, source.id)
+      const restored = await restoreGitFileCheckpoint(state.meta.cwd, checkpointDir)
+      this.onEvent({
+        type: 'notice',
+        sessionId,
+        level: 'warn',
+        text: `Arquivos restaurados ao checkpoint. O estado anterior à restauração foi preservado em ${restored.recoveryDir}`
+      })
+    }
+    const next: SessionState = {
+      ...state,
+      messages,
+      plan: [],
+      approvals: [],
+      state: 'idle'
+    }
+    if (runner) {
+      runner.messages = messages
+      runner.plan = []
+      runner.state = 'idle'
+    }
+    await this.store.saveSession(next)
+    return this.store.getSession(sessionId)
+  }
+
+  /** Branches a conversation into a new session without mutating the original. */
+  async forkSession(sessionId: string, messageId: string): Promise<SessionState | null> {
+    const state = await this.store.loadSession(sessionId)
+    if (!state) return null
+    const runner = this.runners.get(sessionId)
+    if (runner?.busy) throw new Error('pare o turno atual antes de criar um chat lateral')
+    const messages = rewindMessages(state.messages, messageId)
+    const created = await this.store.createSession({
+      projectId: state.meta.projectId,
+      cwd: state.meta.cwd,
+      mode: state.meta.mode,
+      surface: state.meta.surface,
+      providerId: state.meta.providerId,
+      model: state.meta.model,
+      title: `${state.meta.title.slice(0, 104)} · lateral`
+    })
+    const next: SessionState = {
+      ...state,
+      meta: {
+        ...created,
+        environment: state.meta.environment,
+        effort: state.meta.effort
+      },
+      messages,
+      plan: [],
+      changes: [],
+      approvals: [],
+      usage: { input: 0, output: 0 },
+      state: 'idle'
+    }
+    await this.store.saveSession(next)
+    return this.store.getSession(created.id)
   }
 
   async dispose(sessionId: string, reason = 'other'): Promise<void> {
@@ -873,12 +1405,21 @@ export class Orchestrator {
   }
 
   async shutdown(): Promise<void> {
+    // Everything stops in parallel and each part gets a deadline. It used to be one after the other with no limit:
+    // with a dozen MCP servers (each one has to exit) closing the window took a minute or never finished.
+    const within = (work: Promise<unknown>, ms: number): Promise<unknown> =>
+      Promise.race([work.catch(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, ms))])
+    for (const timer of this.mcpStartRetries.values()) clearTimeout(timer)
+    this.mcpStartRetries.clear()
     // Sessions whose runner was dropped by a settings change still get SessionEnd.
-    for (const sessionId of new Set([...this.runners.keys(), ...this.sessionHooks.keys()])) await this.dispose(sessionId, 'app_quit')
-    for (const client of this.mcpClients.values()) await client.stop()
-    await this.aiMemory.stop()
-    await this.computer.close()
-    await this.chromeBridge.stop()
+    const sessions = [...new Set([...this.runners.keys(), ...this.sessionHooks.keys()])]
+    await within(Promise.all(sessions.map((sessionId) => this.dispose(sessionId, 'app_quit'))), 4_000)
+    await Promise.all([
+      ...[...this.mcpClients.values()].map((client) => within(client.stop(), 4_000)),
+      within(this.aiMemory.stop(), 4_000),
+      within(this.computer.close(), 4_000),
+      within(this.chromeBridge.stop(), 2_000)
+    ])
   }
 
   /* ------------------------------- approvals ----------------------------- */
@@ -905,6 +1446,20 @@ export class Orchestrator {
       }, 5 * 60 * 1000)
       this.pending.set(request.id, { resolve, timer, sessionId: request.sessionId, signature, request })
     })
+  }
+
+  /** Approvals still waiting for the user in this session (survive switching to another session and back). */
+  pendingApprovals(sessionId: string): ApprovalRequest[] {
+    return [...this.pending.values()].filter((item) => item.sessionId === sessionId).map((item) => item.request)
+  }
+
+  /**
+   * What the session's runner holds right now (messages, plan, usage, run state). The stored copy is written
+   * a fraction of a second after each change, so a reader that asks right after an event would see an older one.
+   */
+  liveSnapshot(sessionId: string): RunnerSnapshot | undefined {
+    const runner = this.runners.get(sessionId)
+    return runner ? runner.snapshot() : undefined
   }
 
   resolveApproval(approvalId: string, approved: boolean, always = false, reason = ''): void {
@@ -949,17 +1504,68 @@ export class Orchestrator {
     pending.resolve(feedback ? { approved, reason: feedback } : { approved })
   }
 
+  /* ------------------------------- questions ----------------------------- */
+
+  /** Shows the questions above the composer and waits for the user (10 min). */
+  async askQuestions(request: QuestionRequest): Promise<QuestionAnswer[] | null> {
+    this.onEvent({ type: 'question_request', sessionId: request.sessionId, request })
+    void this.sessionHooks
+      .get(request.sessionId)
+      ?.run('Notification', {
+        message: `O Openclod precisa de uma resposta: ${request.questions.map((question) => question.header).join(', ')}`.slice(0, 500)
+      })
+      .catch(() => undefined)
+    return new Promise<QuestionAnswer[] | null>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingQuestions.delete(request.id)
+        this.onEvent({ type: 'question_resolved', sessionId: request.sessionId, id: request.id, answers: [] })
+        resolve(null)
+      }, 9 * 60 * 1000)
+      this.pendingQuestions.set(request.id, { resolve, timer, sessionId: request.sessionId })
+    })
+  }
+
+  /** Called by the renderer; false means the question expired or belongs to another session. */
+  resolveQuestions(questionId: string, answers: QuestionAnswer[]): boolean {
+    const pending = this.pendingQuestions.get(questionId)
+    if (!pending) return false
+    clearTimeout(pending.timer)
+    this.pendingQuestions.delete(questionId)
+    this.onEvent({ type: 'question_resolved', sessionId: pending.sessionId, id: questionId, answers })
+    pending.resolve(answers)
+    return true
+  }
+
   /* ------------------------------- events -------------------------------- */
 
   private onEvent(event: HarnessEvent): void {
     this.options.broadcast(event)
-    this.eventQueue = this.eventQueue
-      .then(() => this.store.appendEvent(event.sessionId, event))
-      .catch(() => undefined)
+    // Live output can fire every 600 ms; it is useful in the UI, not in the
+    // durable event journal (which would grow without bound).
+    if (event.type !== 'tool_progress') {
+      this.eventQueue = this.eventQueue
+        .then(() => this.store.appendEvent(event.sessionId, event))
+        .catch(() => undefined)
+    }
 
     if (event.type === 'status') {
       const existing = this.store.getSession(event.sessionId)
       if (existing) existing.state = event.state
+    }
+    if (event.type === 'model_switch') {
+      // The session lives on the new model from now on: the runner that is rebuilt after a settings save or a restart
+      // starts there instead of asking the exhausted provider again, and the composer shows it.
+      this.options.log?.(
+        `sessão ${event.sessionId}: ${event.from.label}/${event.from.model} → ${event.to.label}/${event.to.model} (${event.reason})`
+      )
+      void this.store.patchMeta(event.sessionId, { providerId: event.to.providerId, model: event.to.model }).catch(() => undefined)
+    }
+    if (event.type === 'turn_end' && this.pendingDrops.delete(event.sessionId)) {
+      // The turn is over: rebuild the runner so the model/mode chosen meanwhile takes effect.
+      setTimeout(() => {
+        const runner = this.runners.get(event.sessionId)
+        if (runner && !runner.busy) this.dropRunner(event.sessionId)
+      }, 0)
     }
   }
 
@@ -968,7 +1574,9 @@ export class Orchestrator {
     if (existingTimer) clearTimeout(existingTimer)
     const timer = setTimeout(() => {
       this.persistTimers.delete(sessionId)
-      void this.flush(sessionId, snapshot)
+      void this.flush(sessionId, snapshot).catch((err) =>
+        this.options.log?.(`não consegui salvar a sessão ${sessionId}: ${(err as Error).message}`)
+      )
     }, 350)
     this.persistTimers.set(sessionId, timer)
   }
@@ -1015,13 +1623,16 @@ export class Orchestrator {
           command: config?.url ? `${config.type ?? 'http'} ${config.url}` : (config?.command ?? ''),
           state: client.state,
           tools: client.toolsList().map((t) => t.name),
+          resources: client.resourcesList(),
+          prompts: client.promptsList(),
           error: client.lastError ?? undefined
         }
       }),
       providers: settings.providers.map((provider) => ({
         id: provider.id,
         label: provider.label,
-        configured: hasCredentials(provider, this.settings.resolver())
+        configured: hasCredentials(provider, this.settings.resolver()),
+        unavailable: this.reserve.statusOf(provider.id)
       })),
       toolchains: await toolchains(),
       node: process.versions.node,
@@ -1030,10 +1641,11 @@ export class Orchestrator {
   }
 
   /** Lists the models a saved provider serves (Ollama, LM Studio, OpenAI-compatible, Anthropic). */
-  async discoverModels(providerId: string): Promise<DiscoveryResult> {
-    const config = this.settings.providerConfig(providerId)
-    if (!config) throw new Error('provedor não encontrado')
-    if (config.kind === 'mock') return { models: [], source: 'openai', error: 'o provedor de teste não tem modelos' }
+  async discoverModels(providerId: string, draft?: Partial<Pick<ProviderConfig, 'baseUrl' | 'kind' | 'model'>>): Promise<DiscoveryResult> {
+    const saved = this.settings.providerConfig(providerId)
+    if (!saved) throw new Error('provedor não encontrado')
+    // The form may hold an address that is not saved yet: ask THAT server (the key is the one in the vault).
+    const config = { ...saved, ...draft }
     return discoverForProvider(config, resolveApiKey(config, this.settings.resolver()))
   }
 
@@ -1064,10 +1676,26 @@ export class Orchestrator {
   async authorizeMcp(serverName: string): Promise<{ connected: boolean; detail: string }> {
     const config = (this.settings.get().mcpServers ?? []).find((server) => server.name === serverName)
     if (!config?.url) throw new Error('o conector selecionado não é remoto')
-    const token = await this.oauth.authorize(serverName, config.url)
+    const challenge = this.mcpChallenges.get(serverName)
+    let token: string | null
+    try {
+      // The directory may bring a public client id / scopes for servers without dynamic registration.
+      token = await this.oauth.reauthorize(serverName, config.url, challenge, this.connectors.oauthOptions(serverName))
+    } catch (err) {
+      // Setup failures carry a fix the user can act on (no dynamic registration, no OAuth metadata...).
+      if (err instanceof OAuthSetupError && err.hint) throw new Error(`${err.message}. ${err.hint}`)
+      throw err
+    }
     if (!token) return { connected: false, detail: 'O provedor não concluiu o login OAuth.' }
-    await this.restartMcp()
-    return { connected: true, detail: 'Login OAuth concluído; conector reiniciado.' }
+    this.connectors.loginFinished(serverName)
+    await this.startMcpServers(serverName)
+    const client = this.mcpClients.get(serverName)
+    return client?.state === 'ready'
+      ? { connected: true, detail: 'Login OAuth concluído; conector reiniciado.' }
+      : {
+          connected: false,
+          detail: `Login OAuth concluído, mas o conector não ficou pronto: ${client?.lastError ?? 'sem detalhes'}`
+        }
   }
 
   /** Full connector catalog for Personalização → Conectores → Descobrir. */
@@ -1087,6 +1715,41 @@ export class Orchestrator {
       docs: entry.docs,
       installed: installed.has(entry.id)
     }))
+  }
+
+  /* ----------------- connectors (Personalização → Conectores) ---------------- */
+
+  connectorDirectory(): ConnectorDirectory {
+    return this.connectors.directory()
+  }
+
+  connectorStates(): ConnectorState[] {
+    return this.connectors.states()
+  }
+
+  connectConnector(id: string, input?: ConnectInput): Promise<ConnectResult> {
+    return this.connectors.connect(id, input)
+  }
+
+  disconnectConnector(id: string): Promise<ConnectorState> {
+    return this.connectors.disconnect(id)
+  }
+
+  connectorTools(serverName: string): ConnectorTool[] {
+    return this.connectors.tools(serverName)
+  }
+
+  setToolPolicy(serverName: string, tool: string, policy: ToolPolicy): Promise<ConnectorTool[]> {
+    return this.connectors.setToolPolicy(serverName, tool, policy)
+  }
+
+  reloadMcp(): Promise<ConnectorState[]> {
+    return this.connectors.reload()
+  }
+
+  /** `mcpServers` with every credential masked, for the JSON editor in Configurações → MCP. */
+  maskedMcpSettings(): McpServerSettings[] {
+    return this.connectors.maskedSettings()
   }
 
   /** Installs an MCP from the catalog/registry on behalf of the UI or the agent. */
@@ -1110,7 +1773,7 @@ export class Orchestrator {
       merged.push(server)
       added++
     }
-    await this.settings.update({ mcpServers: merged.slice(0, 40), claudeCatalogImported: true })
+    await this.settings.update({ mcpServers: merged.slice(0, MAX_MCP_SERVERS), claudeCatalogImported: true })
     await this.skills.reload()
     if (restart) await this.restartMcp()
     return { ...report, imported: added }
@@ -1164,11 +1827,37 @@ export class Orchestrator {
           warning
         }
       },
-      install: async (input) => {
+      install: async (request) => {
+        let input = request
         let server: McpServerSettings | null = null
         let missing: string[] = []
         let needsOAuth = false
         let error: string | undefined
+        // `reuse_credentials_from`: another server lends its credentials inside the app; the values never reach the model.
+        let reused: string[] = []
+        if (input.reuseCredentialsFrom) {
+          try {
+            const entry = !input.url && !input.command ? catalogEntry(input.id) : null
+            const blank = (record: Record<string, string> | undefined): string[] =>
+              Object.entries(record ?? {}).filter(([, value]) => !value?.trim()).map(([key]) => key)
+            const filled = (record: Record<string, string> | undefined): Record<string, string> =>
+              Object.fromEntries(Object.entries(record ?? {}).filter(([, value]) => value?.trim()))
+            const lent = this.connectors.reuseCredentials(
+              input.reuseCredentialsFrom,
+              entry
+                ? {
+                    // Only what the server requires: optional extras (a second product's token) stay the user's choice.
+                    env: (entry.env ?? []).filter((item) => item.required).map((item) => item.key),
+                    headers: (entry.headers ?? []).filter((item) => item.required).map((item) => item.key)
+                  }
+                : { env: blank(input.env), headers: blank(input.headers) }
+            )
+            input = { ...input, env: { ...lent.env, ...filled(input.env) }, headers: { ...lent.headers, ...filled(input.headers) } }
+            reused = lent.keys
+          } catch (err) {
+            return { ok: false, error: (err as Error).message }
+          }
+        }
 
         if (input.url || input.command) {
           try {
@@ -1204,48 +1893,113 @@ export class Orchestrator {
           }
         }
 
-        if (!server) return { ok: false, missing, needsOAuth, error: error ?? 'servidor não encontrado no catálogo nem no registro' }
+        const reusedKeys = reused.length ? reused : undefined
+        if (!server) return { ok: false, missing, needsOAuth, error: error ?? 'servidor não encontrado no catálogo nem no registro', reused: reusedKeys }
 
         const current = this.settings.get().mcpServers ?? []
-        const next = [...current.filter((item) => item.name !== server!.name), server].slice(-20)
+        const next = [...current.filter((item) => item.name !== server!.name), server].slice(-MAX_MCP_SERVERS)
         await this.settings.update({ mcpServers: next })
         this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'mcp' })
-        await this.restartMcp()
+        // Only the new/changed server restarts: the other servers keep running (and a hung one cannot delay this).
+        await this.startMcpServers(server.name)
         const client = this.mcpClients.get(server.name)
+        // An OAuth connector gets its login screen right away (in the background), like connecting it in Conectores.
+        if (needsOAuth && server.url && client?.state !== 'ready') {
+          void this.connectors.beginLogin(server.name).catch((err) => this.options.log?.(`login OAuth de ${server!.name}: ${(err as Error).message}`))
+        }
         return {
           ok: Boolean(client?.state === 'ready') || Boolean(needsOAuth),
           name: server.name,
           state: client?.state ?? 'stopped',
-          tools: client?.toolsList().map((tool) => tool.name) ?? [],
+          tools: client?.exposedToolsList().map((tool) => tool.name) ?? [],
           needsOAuth,
-          error: client?.lastError ?? undefined
+          error: client?.lastError ?? undefined,
+          reused: reusedKeys
         }
       },
       list: () => {
         const configs = this.settings.get().mcpServers ?? []
         return configs.map((config) => {
           const client = this.mcpClients.get(config.name)
+          const exposed = this.baseRegistry.list().filter((tool) => tool.mcp?.server === config.name)
           return {
             name: config.name,
             state: config.enabled ? (client?.state ?? 'stopped') : 'disabled',
-            transport: config.type ?? 'stdio',
-            tools: client?.toolsList().map((tool) => tool.name) ?? [],
-            error: client?.lastError ?? undefined
+            transport: client?.transport ?? config.type ?? 'stdio',
+            tools: client?.exposedToolsList().map((tool) => tool.name) ?? [],
+            resources: client?.resourcesList() ?? [],
+            prompts: client?.promptsList() ?? [],
+            resourceTemplates: client?.resourceTemplatesList() ?? [],
+            error: client?.lastError ?? undefined,
+            hint: client?.describe().hint,
+            hidden: client?.hiddenToolCount || undefined,
+            deferred: exposed.filter((tool) => tool.mcp?.deferred).length || undefined,
+            skipped: this.mcpSkipped.filter((item) => item.server === config.name).map((item) => ({ tool: item.tool, reason: item.reason })),
+            reconnect: client?.reconnectAttempt
+              ? `reconectando (tentativa ${client.reconnectAttempt}${client.state === 'error' ? ', aguardando' : ''})`
+              : undefined
           }
         })
+      },
+      policy: (server, tool) => this.mcpClients.get(server)?.policyFor(tool),
+      hint: (server, message) => {
+        const config = (this.settings.get().mcpServers ?? []).find((item) => item.name === server)
+        return hintForMcpError(server, config, message)
+      },
+      reload: (server) => this.reloadMcpServers(server),
+      catalog: () => {
+        const configs = this.settings.get().mcpServers ?? []
+        return [...this.mcpClients.entries()].map(([name, client]) => {
+          const config = configs.find((item) => item.name === name)
+          return {
+            name,
+            state: client.state,
+            transport: config?.type ?? (config?.url ? 'http' : 'stdio'),
+            tools: client.exposedToolsList().map((tool) => ({
+              name: tool.name,
+              description: tool.description
+            })),
+            error: client.lastError ?? undefined
+          }
+        })
+      },
+      schema: (server, tool) => {
+        const client = this.mcpClients.get(server)
+        const hit = client?.exposedToolsList().find((item) => item.name === tool)
+        return hit
+          ? { name: hit.name, description: hit.description, inputSchema: hit.inputSchema }
+          : undefined
+      },
+      call: async (server, tool, args, signal, options) => {
+        const client = this.mcpClients.get(server)
+        if (!client) throw new Error(`servidor MCP "${server}" não está disponível`)
+        return client.callTool(tool, args, undefined, signal, options)
+      },
+      readResource: async (server, uri) => {
+        const client = this.mcpClients.get(server)
+        if (!client) throw new Error(`servidor MCP "${server}" não está disponível`)
+        return client.readResource(uri)
+      },
+      getPrompt: async (server, name, args = {}) => {
+        const client = this.mcpClients.get(server)
+        if (!client) throw new Error(`servidor MCP "${server}" não está disponível`)
+        return client.getPrompt(name, args)
       }
     }
   }
 
-  async testProvider(providerId: string): Promise<{ ok: boolean; detail: string }> {
-    const config = this.settings.providerConfig(providerId)
-    if (!config) return { ok: false, detail: 'provedor não encontrado' }
+  async testProvider(providerId: string, draft?: Partial<Pick<ProviderConfig, 'baseUrl' | 'kind' | 'model'>>): Promise<{ ok: boolean; detail: string }> {
+    const saved = this.settings.providerConfig(providerId)
+    if (!saved) return { ok: false, detail: 'provedor não encontrado' }
+    // The form may hold an address or a model that is not saved yet: test what the user is looking at.
+    const config = { ...saved, ...draft }
     if (!hasCredentials(config, this.settings.resolver())) {
       return { ok: false, detail: 'sem credencial configurada' }
     }
     const provider = createProvider(config, this.settings.resolver())
     let text = ''
     let error: string | undefined
+    let kind: ProviderErrorKind | undefined
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 30_000)
@@ -1259,15 +2013,24 @@ export class Orchestrator {
         signal: controller.signal
       })) {
         if (event.type === 'text_delta') text += event.text
-        if (event.type === 'end' && event.stopReason === 'error') error = event.error
+        if (event.type === 'end' && event.stopReason === 'error') {
+          error = event.error
+          kind = event.errorKind
+        }
       }
       clearTimeout(timer)
     } catch (err) {
       error = (err as Error).message
+      kind = errorKindOf(err)
     }
-    if (error) return { ok: false, detail: error }
+    if (error) {
+      // What the test found is what the sessions would find: remember it, so Settings shows it and the reserve skips it.
+      if (kind && isAccountLevelKind(kind)) this.reserve.health.mark(config, kind)
+      return { ok: false, detail: error }
+    }
     const answer = text.trim()
     if (!answer) return { ok: false, detail: 'o provedor respondeu sem texto; aumente o limite ou verifique o modelo' }
+    this.reserve.health.clear(providerId)
     return { ok: true, detail: answer.slice(0, 120) }
   }
 
@@ -1282,8 +2045,8 @@ export class Orchestrator {
     const settings = this.settings.get()
     const config =
       this.settings.providerConfig(settings.defaultProviderId) ??
-      settings.providers.find((provider) => provider.kind !== 'mock')
-    if (!config || config.kind === 'mock' || !hasCredentials(config, this.settings.resolver())) return raw
+      settings.providers.find((provider) => hasCredentials(provider, this.settings.resolver()))
+    if (!config || !hasCredentials(config, this.settings.resolver())) return raw
 
     const provider = createProvider(config, this.settings.resolver())
     const controller = new AbortController()
@@ -1308,6 +2071,115 @@ export class Orchestrator {
       clearTimeout(timer)
     }
     return out.trim() || raw
+  }
+
+  /* ------------------------- improvement review -------------------------- */
+
+  /** Default provider with a credential; real models only, since a mock would write a fake analysis. */
+  private analysisProviderConfig(): ProviderConfig | undefined {
+    const settings = this.settings.get()
+    const config =
+      this.settings.providerConfig(settings.defaultProviderId) ??
+      settings.providers.find((provider) => hasCredentials(provider, this.settings.resolver()))
+    if (!config || !hasCredentials(config, this.settings.resolver())) return undefined
+    return config
+  }
+
+  /** What an AI analysis would use (the evidence leaves the machine for this provider). */
+  improvementProvider(): { id: string; label: string; model: string } | undefined {
+    const config = this.analysisProviderConfig()
+    return config ? { id: config.id, label: config.label, model: config.model } : undefined
+  }
+
+  /**
+   * One tool-less call: the analyst can neither read nor change anything, it
+   * only turns the evidence it is given into text.
+   */
+  async improvementAnalyze(system: string, prompt: string, signal: AbortSignal): Promise<string> {
+    const config = this.analysisProviderConfig()
+    if (!config) throw new Error('nenhum provedor com credencial configurada')
+    const provider = createProvider(config, this.settings.resolver())
+    const controller = new AbortController()
+    const abort = (): void => controller.abort()
+    if (signal.aborted) abort()
+    signal.addEventListener('abort', abort, { once: true })
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 120_000)
+    let out = ''
+    let error: string | undefined
+    try {
+      for await (const event of provider.stream({
+        system,
+        messages: [{ id: id('msg'), role: 'user', ts: Date.now(), parts: [{ type: 'text', text: prompt }] }],
+        tools: [],
+        maxTokens: 3_000,
+        temperature: 0.2,
+        signal: controller.signal
+      })) {
+        if (event.type === 'text_delta') out += event.text
+        if (event.type === 'end' && event.stopReason === 'error') error = event.error
+      }
+    } catch (err) {
+      if (timedOut) throw new Error('o modelo não respondeu em 120 s')
+      throw err
+    } finally {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+    }
+    if (timedOut) throw new Error('o modelo não respondeu em 120 s')
+    if (error) throw new Error(error)
+    return out
+  }
+
+  /** System prompt of the `improvement-analyst` agent; a user file with that name overrides the built-in. */
+  improvementAnalystPrompt(fallback: string): string {
+    return this.agentRegistryFor().get('improvement-analyst')?.systemPrompt || fallback
+  }
+
+  /** Everything the review reads about one project, in the shape `collectEvidence` expects. */
+  async improvementSessions(projectId: string): Promise<Array<{ id: string; title: string; updatedAt: number; providerId: string; model: string }>> {
+    this.requireProject(projectId)
+    return (await this.store.listSessions())
+      .filter((summary) => summary.meta.projectId === projectId)
+      .map((summary) => ({ id: summary.meta.id, title: summary.meta.title, updatedAt: summary.meta.updatedAt, providerId: summary.meta.providerId, model: summary.meta.model }))
+  }
+
+  /** Writes the report as a wiki page (source of truth) and mirrors it into AI-Memory like `memory_page` does. */
+  async improvementSavePage(
+    projectId: string,
+    review: { slug: string; title: string; body: string; tags: string[]; summary: string },
+    usedAi: boolean
+  ): Promise<void> {
+    this.requireProject(projectId)
+    const memory = this.memoryForProject(projectId)
+    await memory.init()
+    const page = await memory.writePage({
+      slug: review.slug,
+      title: review.title,
+      body: review.body,
+      tags: review.tags,
+      source: 'improvement-review',
+      memoryType: 'fact',
+      confidence: usedAi ? 'inferred' : 'observed',
+      context: 'Revisão de melhorias: sugestões a partir dos logs do projeto. Nada foi aplicado.'
+    })
+    if (!this.aiMemory.available) return
+    const related = await this.aiMemory
+      .relatedMarkdown(projectId, `${page.title}\n${review.body}`, `pages/${page.slug}.md`, 4)
+      .catch(() => '')
+    await this.aiMemory
+      .writePage(projectId, {
+        path: `pages/${page.slug}.md`,
+        title: page.title,
+        body: `${review.body}${related ? `\n\n## Relacionados\n\n${related}` : ''}`,
+        tags: page.tags,
+        pinned: page.pinned,
+        tier: 'semantic'
+      })
+      .catch(() => undefined)
   }
 
   /* ------------------------------- files --------------------------------- */
@@ -1356,7 +2228,7 @@ export class Orchestrator {
   }
 
   async screenshot(): Promise<{ image: string; width: number; height: number }> {
-    const shot = await this.computer.captureScreen(1400)
+    const shot = await this.computer.captureScreen(1400, { monitor: 0 })
     return { image: shot.image.data, width: shot.width, height: shot.height }
   }
 
@@ -1369,6 +2241,15 @@ export class Orchestrator {
     const project = await this.store.addProject(folder, name)
     ensureProjectInstructions(project.path, project.name)
     return project
+  }
+
+  /** Changes the default model of one project; other projects are untouched. */
+  async setProjectModel(projectId: string, providerId: string, model: string): Promise<Project> {
+    this.requireProject(projectId)
+    if (!this.settings.providerConfig(providerId)) throw new Error('provedor não encontrado')
+    const updated = await this.store.setProjectModel(projectId, providerId, model)
+    if (!updated) throw new Error('projeto não encontrado')
+    return updated
   }
 
   /* ------------------------------- memory --------------------------------- */
@@ -1394,6 +2275,13 @@ export class Orchestrator {
    * imported outside it) into the project's index. Runs once per project per
    * app run; new pages are mirrored at write time.
    */
+  /** Fire and forget: failures are logged, nothing waits for it. */
+  private syncNativeToAiInBackground(projectId: string): void {
+    void this.syncNativeToAi(projectId).catch((err) =>
+      this.options.log?.(`sincronização da memória nativa com AI-Memory falhou: ${(err as Error).message}`)
+    )
+  }
+
   private async syncNativeToAi(projectId: string): Promise<void> {
     if (this.syncedMemories.has(projectId) || !this.aiMemory.available) return
     const running = this.memorySyncs.get(projectId)
@@ -1407,37 +2295,78 @@ export class Orchestrator {
   }
 
   private async doSyncNativeToAi(projectId: string): Promise<void> {
+    const startedAt = Date.now()
+    // Pages already copied (by content fingerprint) are skipped, so only the first sync is long.
+    const cacheFile = path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', projectId, 'ai-sync.json')
+    let copied: Record<string, string> = {}
+    try {
+      copied = JSON.parse(await fs.promises.readFile(cacheFile, 'utf8')) as Record<string, string>
+    } catch {
+      /* first run */
+    }
+    const saveCache = async (): Promise<void> => {
+      await fs.promises.writeFile(cacheFile, JSON.stringify(copied), 'utf8').catch(() => undefined)
+    }
     try {
       const native = await this.memoryForProject(projectId).listPages()
       if (!native.length) return
       const indexed = await this.aiMemory.recent(projectId, 100)
-      const known = new Set(indexed.map((hit) => hit.path))
+      // If AI-Memory lost its index (fresh data folder) the cache would hide that: start over.
+      if (!indexed.length) copied = {}
+      // The old monolithic `s/<hash>.md` transcripts are replaced by per-turn
+      // pages. Delete them so recall does not keep loading a giant file.
+      for (const hit of indexed) {
+        if (hit.path.startsWith('s/')) {
+          await this.aiMemory.deletePage(projectId, hit.path).catch(() => false)
+        }
+      }
+      let done = 0
       for (const summary of native) {
+        // A long first sync is spread over several runs instead of hammering the sidecar for minutes.
+        if (Date.now() - startedAt > 60_000) {
+          this.options.log?.(`sincronização com AI-Memory: pausada após ${done} páginas; continua na próxima vez`)
+          break
+        }
         const path = `pages/${summary.slug}.md`
         const page = await this.memoryForProject(projectId).readPage(summary.slug)
         if (!page) continue
-        // Session pages already have a richer AI-Memory transcript at
-        // `s/<hash>.md`; mirroring the native summary would create a duplicate
-        // node for the same conversation in the graph.
+        // Legacy session transcript pages are replaced by the atomic turn
+        // notes; any remaining one is not a useful graph node.
         if (summary.tags.includes('sessao') && summary.tags.includes('automatico')) {
           await this.aiMemory.deletePage(projectId, path).catch(() => false)
           continue
         }
-        if (known.has(path)) continue
-        const related = await this.aiMemory
-          .relatedMarkdown(projectId, `${page.title}\n${page.body}`, path, 4)
-          .catch(() => '')
-        await this.aiMemory
+        const fingerprint = crypto.createHash('sha1').update(JSON.stringify([page.title, page.body, page.tags, page.pinned, summary.tags])).digest('hex')
+        if (copied[path] === fingerprint) continue
+        const related = page.body.includes('## Relacionados')
+          ? ''
+          : await this.aiMemory
+              .relatedMarkdown(projectId, `${page.title}\n${page.body}`, path, 4)
+              .catch(() => '')
+        const written = await this.aiMemory
           .writePage(projectId, {
             path,
             title: page.title,
             body: related ? `${page.body}\n\n## Relacionados\n\n${related}` : page.body,
             tags: page.tags,
             pinned: page.pinned,
-            tier: 'semantic'
+            tier: summary.tags.includes('turno') ? 'episodic' : 'semantic'
           })
-          .catch(() => undefined)
+          .then(() => true, () => false)
+        if (written) {
+          copied[path] = fingerprint
+          done++
+          if (done % 10 === 0) await saveCache()
+        }
       }
+      // A page that left the wiki (archived hub, deleted page) must not stay searchable in the index.
+      const live = new Set(native.map((summary) => `pages/${summary.slug}.md`))
+      for (const mirrored of Object.keys(copied)) {
+        if (live.has(mirrored)) continue
+        await this.aiMemory.deletePage(projectId, mirrored).catch(() => false)
+        delete copied[mirrored]
+      }
+      await saveCache()
     } catch (err) {
       this.options.log?.(`sincronização da memória nativa com AI-Memory falhou: ${(err as Error).message}`)
     }
@@ -1447,7 +2376,7 @@ export class Orchestrator {
     projectId: string
   ): Promise<Awaited<ReturnType<ProjectMemory['stats']>> & { indexed?: number; aiRunning?: boolean }> {
     this.requireProject(projectId)
-    await this.syncNativeToAi(projectId)
+    this.syncNativeToAiInBackground(projectId)
     const stats = await this.memoryForProject(projectId).stats()
     const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
     return { ...stats, indexed: indexed.length, aiRunning: this.aiMemory.status().running }
@@ -1461,7 +2390,7 @@ export class Orchestrator {
    */
   async memoryList(projectId: string): Promise<Awaited<ReturnType<ProjectMemory['listPages']>>> {
     this.requireProject(projectId)
-    await this.syncNativeToAi(projectId)
+    this.syncNativeToAiInBackground(projectId)
     const native = await this.memoryForProject(projectId).listPages()
     const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
     const known = new Set(native.map((page) => page.title.trim().toLowerCase()))
@@ -1502,7 +2431,9 @@ export class Orchestrator {
         source: 'ai-memory'
       }
     }
-    return this.memoryForProject(projectId).readPage(slug)
+    const memory = this.memoryForProject(projectId)
+    await memory.init()
+    return memory.readPage(slug)
   }
 
   async memoryDelete(projectId: string, slug: string): Promise<boolean> {
@@ -1514,6 +2445,12 @@ export class Orchestrator {
     // Curated pages are mirrored into AI-Memory; remove both copies.
     await this.aiMemory.deletePage(projectId, `pages/${slug}.md`).catch(() => false)
     return deleted
+  }
+
+  async memoryInvalidate(projectId: string, slug: string, reason = '') {
+    this.requireProject(projectId)
+    if (slug.startsWith(AI_PAGE_PREFIX)) throw new Error('páginas importadas do AI-Memory não possuem metadados editáveis; use Excluir')
+    return this.memoryForProject(projectId).invalidatePage(slug, reason)
   }
 
   /** A bounded, ranked view of the project's long-term memory for the agent. */
@@ -1529,7 +2466,7 @@ export class Orchestrator {
    */
   async memoryGraph(projectId: string): Promise<import('./ai-memory.js').AiMemoryGraph> {
     this.requireProject(projectId)
-    await this.syncNativeToAi(projectId)
+    this.syncNativeToAiInBackground(projectId)
     const summaries = await this.memoryForProject(projectId).listPages()
     const native = await Promise.all(summaries.map((summary) => this.memoryForProject(projectId).readPage(summary.slug)))
     const sidecar = await this.aiMemory.graph(projectId).catch(() => null)
@@ -1654,6 +2591,7 @@ export class Orchestrator {
   async memoryImportMarkdown(projectId: string, files: Array<{ name: string; content: string }>): Promise<number> {
     this.requireProject(projectId)
     const memory = this.memoryForProject(projectId)
+    await memory.init()
     let imported = 0
     for (const file of files) {
       const raw = file.content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
@@ -1698,28 +2636,11 @@ function graphKeywords(text: string, limit = 10): string[] {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([word]) => word)
 }
 
-/** Human-readable execution log of one turn, used in the AI-Memory page. */
-function renderTurnTranscript(messages: Message[]): string {
-  const lines: string[] = []
-  for (const message of messages) {
-    for (const part of message.parts) {
-      if (part.type === 'tool_call') {
-        const args = JSON.stringify(part.args ?? {}).replace(/\s+/g, ' ').slice(0, 900)
-        lines.push(`### Ferramenta: ${part.name}`, '', '```json', args, '```', '')
-      } else if (part.type === 'tool_result') {
-        const text = (part.text ?? '').replace(/```/g, '``\u200b`').slice(0, 4_000)
-        lines.push(`**Resultado de ${part.name}:** ${part.ok ? 'ok' : 'falhou'}`, '', text || '(vazio)', '')
-      }
-    }
-  }
-  return lines.join('\n').trim()
-}
-
 function userDataPath(base: string, child: string): string {
   return path.join(base, child)
 }
 
-function buildBaseRegistry(): ToolRegistry {
+function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => ResolvedToolPolicy | undefined): ToolRegistry {
   return new ToolRegistry()
     .register(...fsTools)
     .register(...searchTools)
@@ -1728,40 +2649,18 @@ function buildBaseRegistry(): ToolRegistry {
     .register(...webTools)
     .register(...browserTools)
     .register(...computerTools)
-    .register(...mcpTools)
+    .register(...createMcpTools(mcpPolicy))
+    .register(...lazyTools)
     .register(...planTools)
+    .register(...limitationTools)
+    .register(...askTools)
     .register(...projectMemoryTools)
     .register(...agentForgeTools)
     .register(...externalAgentTools)
-}
-
-function mcpToolDef(
-  client: McpClient,
-  toolName: string,
-  description: string,
-  inputSchema: Record<string, unknown>
-): ToolDef {
-  const name = mcpQualifiedName(client.name, toolName)
-  return {
-    name,
-    description: `[MCP ${client.name}] ${description || toolName}`,
-    schema: z.record(z.unknown()),
-    jsonSchema: inputSchema,
-    // approvalTools of the server map to `destructive`, which still asks in auto mode.
-    risk: client.toolRisk(toolName),
-    parallelSafe: false,
-    requires: undefined,
-    describe(args) {
-      return {
-        title: `MCP ${client.name}/${toolName}`,
-        detail: JSON.stringify(args).slice(0, 600),
-        preview: `${client.name}/${toolName}`
-      }
-    },
-    async execute(args, ctx): Promise<ToolResult> {
-      return client.callTool(toolName, args, undefined, ctx.signal)
-    }
-  }
+    .register(...codeIntelligenceTools)
+    .register(...documentTools)
+    .register(...mediaTools)
+    .register(...imageTools)
 }
 
 /**

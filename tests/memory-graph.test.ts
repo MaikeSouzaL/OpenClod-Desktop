@@ -49,4 +49,12 @@ describe('native memory graph', () => {
     expect(graph.edges).toHaveLength(1)
     expect(graph.edges[0]).toMatchObject({ kind: 'link', weight: 12 })
   })
+
+  it('caps semantic degree for large groups while preserving explicit links', () => {
+    const pages = Array.from({ length: 120 }, (_, index) => page(`p${index}`, `Página ${index}`, index === 0 ? '[[p119]]' : 'memória grafo conexão', ['grupo']))
+    const graph = buildNativeMemoryGraph(pages)
+    expect(graph.edges.length).toBeLessThanOrEqual(721)
+    expect(graph.nodes.every((node) => node.degree <= 13)).toBe(true)
+    expect(graph.edges).toEqual(expect.arrayContaining([expect.objectContaining({ source: 'p0', target: 'p119', kind: 'link' })]))
+  })
 })

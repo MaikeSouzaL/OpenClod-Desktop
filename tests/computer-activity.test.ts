@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ComputerActivityTracker, isComputerTool } from '../src/core/computer/activity'
+import { ComputerActivityTracker, isComputerTool, isOverlayTool } from '../src/core/computer/activity'
 import type { HarnessEvent } from '../src/shared/types'
 
 const start = (toolCallId: string, name = 'computer_click', sessionId = 'ses_1', agentId?: string): HarnessEvent => ({
@@ -37,11 +37,15 @@ describe('ComputerActivityTracker', () => {
     vi.useRealTimers()
   })
 
-  it('recognises every computer tool and ignores the rest', () => {
+  it('recognises every desktop and browser tool and ignores the rest', () => {
     expect(isComputerTool('computer_click')).toBe(true)
     expect(isComputerTool('computer_screenshot')).toBe(true)
     expect(isComputerTool('browser_open')).toBe(false)
     expect(isComputerTool('read_file')).toBe(false)
+    expect(isOverlayTool('computer_click')).toBe(true)
+    expect(isOverlayTool('browser_open')).toBe(true)
+    expect(isOverlayTool('browser_click')).toBe(true)
+    expect(isOverlayTool('read_file')).toBe(false)
 
     const onChange = vi.fn()
     const tracker = new ComputerActivityTracker(onChange)
@@ -50,7 +54,7 @@ describe('ComputerActivityTracker', () => {
     expect(tracker.active).toBe(false)
   })
 
-  it('shows on the first computer call and hides only after the linger', () => {
+  it('keeps the overlay during the whole computer turn, then hides after the linger', () => {
     const onChange = vi.fn()
     const tracker = new ComputerActivityTracker(onChange, 2500)
 
@@ -59,12 +63,33 @@ describe('ComputerActivityTracker', () => {
     expect(tracker.active).toBe(true)
 
     tracker.handle(end('c1'))
+    vi.advanceTimersByTime(30_000)
     expect(tracker.active).toBe(true)
+
+    tracker.handle(turnEnd())
     vi.advanceTimersByTime(2499)
     expect(tracker.active).toBe(true)
     vi.advanceTimersByTime(1)
     expect(tracker.active).toBe(false)
     expect(onChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('keeps the overlay up across the thinking gap between browser tools', () => {
+    const onChange = vi.fn()
+    const tracker = new ComputerActivityTracker(onChange, 1000)
+
+    tracker.handle(start('b1', 'browser_click'))
+    tracker.handle(end('b1', 'browser_click'))
+    vi.advanceTimersByTime(10_000)
+    expect(tracker.active).toBe(true)
+
+    tracker.handle(start('b2', 'browser_snapshot'))
+    tracker.handle(end('b2', 'browser_snapshot'))
+    expect(tracker.active).toBe(true)
+
+    tracker.handle(turnEnd())
+    vi.advanceTimersByTime(1000)
+    expect(tracker.active).toBe(false)
   })
 
   it('does not flicker between consecutive computer calls', () => {
@@ -80,6 +105,7 @@ describe('ComputerActivityTracker', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
 
     tracker.handle(end('c2'))
+    tracker.handle(turnEnd())
     vi.advanceTimersByTime(1000)
     expect(tracker.active).toBe(false)
   })
@@ -95,6 +121,7 @@ describe('ComputerActivityTracker', () => {
     expect(tracker.active).toBe(true)
 
     tracker.handle(end('child', 'computer_screenshot', 'ses_1', 'agent_7'))
+    tracker.handle(turnEnd())
     vi.advanceTimersByTime(500)
     expect(tracker.active).toBe(false)
   })

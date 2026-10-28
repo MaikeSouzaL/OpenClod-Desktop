@@ -401,7 +401,7 @@ interface AgentSpec {
   binEnv: string
   binNames: string[]
   installHint: string
-  args(mode: PermissionMode): string[]
+  args(mode: PermissionMode, model?: string): string[]
   envFor?(mode: PermissionMode): Record<string, string>
   parser(): StreamParser
 }
@@ -449,8 +449,15 @@ const SPECS: Record<ExternalAgentName, AgentSpec> = {
     label: 'OpenCode',
     binEnv: 'FORJA_OPENCODE_BIN',
     binNames: ['opencode'],
-    installHint: 'Instale com "npm i -g opencode-ai@1.2.10" e reabra o Openclod, ou aponte FORJA_OPENCODE_BIN para o executável.',
-    args: () => ['run', '--format', 'json', '--'],
+    installHint: 'Instale com "npm i -g opencode-ai@latest" e reabra o Openclod, ou aponte FORJA_OPENCODE_BIN para o executável.',
+    args: (mode, model) => [
+      'run',
+      '--format',
+      'json',
+      ...(model ? ['-m', model] : []),
+      ...(mode === 'unrestricted' ? ['--auto'] : []),
+      '--'
+    ],
     envFor: (mode) => {
       const env: Record<string, string> = {}
       if (mode === 'unrestricted') env.OPENCODE_PERMISSION = '"allow"'
@@ -569,6 +576,7 @@ function runAgent(params: {
   spec: AgentSpec
   bin: string
   mode: PermissionMode
+  model?: string
   prompt: string
   cwd: string
   env: NodeJS.ProcessEnv
@@ -583,7 +591,7 @@ function runAgent(params: {
   return new Promise((resolve) => {
     let child: ChildProcess
     try {
-      child = launch(params.bin, spec.args(params.mode), params.cwd, params.env)
+      child = launch(params.bin, spec.args(params.mode, params.model), params.cwd, params.env)
     } catch (err) {
       resolve({
         code: null,
@@ -698,6 +706,7 @@ function runAgent(params: {
 const schema = z.object({
   agent: z.enum(['claude', 'codex', 'opencode']).describe('Qual CLI usar: "claude" (Claude Code), "codex" (OpenAI Codex) ou "opencode" (OpenCode)'),
   prompt: z.string().min(1).max(100_000).describe('Tarefa completa e autocontida para o agente externo'),
+  model: z.string().min(1).max(200).optional().describe('Modelo provider/modelo do OpenCode; exemplos: opencode/beam-free ou deepseek/deepseek-flash'),
   cwd: z.string().optional().describe('Diretório de trabalho (dentro do projeto); padrão: o da sessão'),
   timeout_ms: z.number().int().min(1000).max(MAX_TIMEOUT_MS).optional().describe('Tempo máximo em ms (padrão 600000)')
 })
@@ -766,13 +775,22 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
       const timeoutMs = args.timeout_ms ?? DEFAULT_TIMEOUT_MS
       const progress = emitProgress(ctx, spec.label)
       ctx.log('info', `external_agent: ${spec.label} (${lookup.path}) em ${cwd}`)
-      progress(`iniciando (permissões: ${args.agent === 'claude' ? claudePermissionMode(mode) : `sandbox ${codexSandbox(mode)}`})`)
+      const permissionLabel =
+        args.agent === 'claude'
+          ? claudePermissionMode(mode)
+          : args.agent === 'codex'
+            ? `sandbox ${codexSandbox(mode)}`
+            : mode === 'unrestricted'
+              ? 'auto'
+              : mode
+      progress(`iniciando (permissões: ${permissionLabel})`)
 
       const started = Date.now()
       const run = await runAgent({
         spec,
         bin: lookup.path,
         mode,
+        model: args.model,
         prompt: args.prompt,
         cwd,
         env: { ...sanitizedEnv(), ...options.env, ...spec.envFor?.(mode), NO_COLOR: '1', FORCE_COLOR: '0' },
@@ -820,7 +838,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
       }
       if (outcome.denials.length) {
         parts.push(
-          `Ações negadas pelo modo de permissão do agente (${claudePermissionMode(mode)}): ${outcome.denials.join(', ')}. Mude o modo do Openclod para "aceitar edições" ou "automático" se elas forem necessárias.`
+          `Ações negadas pelo modo de permissão do agente (${permissionLabel}): ${outcome.denials.join(', ')}. Mude o modo do Openclod para "aceitar edições" ou "automático" se elas forem necessárias.`
         )
       }
       parts.push(`[${meta.join(' · ')}]`)

@@ -33,6 +33,18 @@ type ResultRecord = {
   images?: number
 }
 
+function saveImages(label: string, images: unknown[] | undefined): void {
+  const list = images as unknown as { length?: number; [index: number]: unknown } | undefined
+  const count = typeof list?.length === 'number' ? list.length : 0
+  for (let index = 0; index < count; index++) {
+    const raw = list?.[index]
+    const image = raw && typeof raw === 'object' ? raw as { data?: unknown; mediaType?: unknown } : null
+    if (typeof image?.data !== 'string') continue
+    const ext = image.mediaType === 'image/jpeg' ? 'jpg' : image.mediaType === 'image/webp' ? 'webp' : 'png'
+    fs.writeFileSync(path.join(outputDir, `${label}${index ? `-${index + 1}` : ''}.${ext}`), Buffer.from(image.data, 'base64'))
+  }
+}
+
 const root = process.cwd()
 const outputDir = path.join(root, 'Prints', 'computer-use-2026-10-24')
 fs.mkdirSync(outputDir, { recursive: true })
@@ -57,6 +69,7 @@ const context = {
 async function invoke(call: string, action: () => Promise<ToolResultLike>, expectedFailure = false): Promise<ResultRecord> {
   try {
     const result = await action()
+    saveImages(call.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase(), result.images)
     const record: ResultRecord = {
       call,
       ok: result.ok,
@@ -96,8 +109,8 @@ try {
   const snapshot = await invoke('computer_snapshot screenshot', () =>
     computerSnapshotTool.execute({ window: target.id, include_screenshot: true }, context)
   )
-  const snapshotData = snapshot.evidence as { screenshot_id?: string } | undefined
-  if (!snapshotData?.screenshot_id) throw new Error('snapshot não retornou screenshot_id')
+  const snapshotData = snapshot.evidence as { snapshot_id?: string; screenshot_id?: string } | undefined
+  if (!snapshot.ok || !snapshotData?.snapshot_id) throw new Error('snapshot não retornou uma árvore válida')
 
   await invoke('computer_set_value', () =>
     computerSetValueTool.execute({
@@ -158,10 +171,11 @@ try {
   await invoke('computer_snapshot after right click', () =>
     computerSnapshotTool.execute({ window: target.id, include_screenshot: false }, context)
   )
-  await invoke('computer_scroll global after reobserve (known backend limitation)', async () => {
+  await invoke('computer_scroll global after reobserve', async () => {
     await computerSnapshotTool.execute({ window: target.id, include_screenshot: true }, context)
+    await computerWaitTool.execute({ seconds: 0.25 }, context)
     return computerScrollTool.execute({ window: target.id, x: 400, y: 220, scroll_y: 240, input_method: 'global' }, context)
-  }, true)
+  })
   await invoke('computer_snapshot after global scroll', () =>
     computerSnapshotTool.execute({ window: target.id, include_screenshot: true }, context)
   )
@@ -204,6 +218,13 @@ try {
   await invoke('stale window rejected', () =>
     computerSnapshotTool.execute({ window: 1 }, context), true
   )
+  const inspected = new Set(['notepad'])
+  for (const window of list) {
+    if (!window.title || inspected.has(window.app)) continue
+    inspected.add(window.app)
+    await invoke(`computer_get_window ${window.app}`, () => computerGetWindowTool.execute({ window: window.id, app: window.app }, context))
+    await invoke(`computer_snapshot ${window.app}`, () => computerSnapshotTool.execute({ window: window.id, include_screenshot: true }, context))
+  }
 } finally {
   const summary = {
     generatedAt: new Date().toISOString(),

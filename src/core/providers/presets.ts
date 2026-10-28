@@ -9,10 +9,17 @@ export interface ProviderPreset {
   supportsVision: boolean
   inputCostPerMTok?: number
   outputCostPerMTok?: number
+  cachedInputCostPerMTok?: number
   apiKeyEnv?: string
   local?: boolean
   docs?: string
   models?: string[]
+  /** Models of `models` that read images, when the provider serves both kinds (see ProviderConfig.visionModels). */
+  visionModels?: string[]
+  /** Reasoning depth levels the API accepts; omitted = auto-detect. */
+  effortLevels?: ProviderConfig['effortLevels']
+  /** Default for new sessions; omitted = keep the user's automatic choice. */
+  defaultEffort?: ProviderConfig['defaultEffort']
 }
 
 /**
@@ -46,10 +53,17 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     kind: 'openai',
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
-    contextWindow: 128_000,
+    model: 'deepseek-flash',
+    contextWindow: 1_048_576,
     supportsVision: false,
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    // deepseek-flash peak rates (USD / 1M tokens); cache hits are ~50x cheaper.
+    inputCostPerMTok: 0.3,
+    outputCostPerMTok: 1.2,
+    cachedInputCostPerMTok: 0.006,
+    models: ['deepseek-flash', 'deepseek-v4-pro'],
+    // V4.1 Flash / V4 Pro expose three API thinking levels; `max` is the
+    // vendor's top tier, not a UI-only alias.
+    effortLevels: ['low', 'high', 'max'],
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     docs: 'https://api-docs.deepseek.com/'
   },
@@ -83,6 +97,8 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     contextWindow: 128_000,
     supportsVision: true,
     models: ['deepseek/deepseek-chat', 'anthropic/claude-sonnet-4.5', 'openai/gpt-4.1', 'google/gemini-2.5-pro'],
+    // deepseek/deepseek-chat (the default) reads text only; the other three read images.
+    visionModels: ['anthropic/claude-sonnet-4.5', 'openai/gpt-4.1', 'google/gemini-2.5-pro'],
     apiKeyEnv: 'OPENROUTER_API_KEY',
     docs: 'https://openrouter.ai/docs'
   },
@@ -141,16 +157,6 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     models: ['local-model'],
     local: true,
     docs: 'https://lmstudio.ai/docs/api/openai-api'
-  },
-  mock: {
-    kind: 'mock',
-    label: 'Scripted (autoteste)',
-    baseUrl: 'mock://local',
-    model: 'scripted',
-    contextWindow: 128_000,
-    supportsVision: true,
-    models: ['scripted'],
-    local: true
   }
 }
 
@@ -168,7 +174,11 @@ export function presetToConfig(key: string): ProviderConfig {
     supportsVision: preset.supportsVision,
     supportsTools: true,
     models: preset.models ? [...preset.models] : [preset.model],
+    visionModels: preset.visionModels ? [...preset.visionModels] : undefined,
     inputCostPerMTok: preset.inputCostPerMTok,
-    outputCostPerMTok: preset.outputCostPerMTok
+    outputCostPerMTok: preset.outputCostPerMTok,
+    cachedInputCostPerMTok: preset.cachedInputCostPerMTok,
+    effortLevels: preset.effortLevels ? [...preset.effortLevels] : undefined,
+    defaultEffort: preset.defaultEffort
   }
 }

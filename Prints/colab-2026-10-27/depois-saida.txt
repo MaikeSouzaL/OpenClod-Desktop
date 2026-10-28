@@ -1,0 +1,51 @@
+OK   o cartão "Google Colab (GPU)" está na aba Provedores, com o botão e a área do código
+OK   o cartão diz, na tela e sem precisar abrir nada, que o Google pode encerrar a sessão sem aviso
+OK   o cartão traz os limites e termos do Colab, com a alternativa e os links oficiais
+OK   o botão gravou o notebook numa pasta visível (.ipynb nbformat 4) que pede GPU -> Documentos\Openclod\Colab\openclod-servidor-llm.ipynb
+OK   o notebook leva, legível, o mesmo servidor que o dublê executa (o arquivo dos recursos do app)
+OK   toda célula de código do notebook gerado pelo app compila em Python -> ok
+OK   o app copiou o caminho, mostrou o arquivo e abriu SÓ o Colab (nada foi aberto de verdade; nada publicado) -> [{"kind":"copy","target":"C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-colab-Kxfg0G\\Documentos\\Openclod\\Colab\\openclod-servidor-llm.ipynb"},{"kind":"reveal","target":"C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-colab-Kxfg0G\\Documentos\\Openclod\\Colab\\openclod-servidor-llm.ipynb
+OK   mostra os 5 passos, em português, da primeira execução -> ["No Colab que abriu: Arquivo → Fazer uplo","Ambiente de execução → Executar tudo (Ct","Espere: na primeira vez leva de 5 a 15 m","No fim aparece o CÓDIGO DE CONEXÃO. Cliq","Cole o código aqui no Openclod, confira "]
+OK   código cortado no final: "incompleto, faltou o final", sem botão de conectar
+OK   um caractere trocado: "foi alterado (a verificação não confere)"
+OK   texto qualquer: "não parece um código de conexão"
+OK   o código do dublê (feito pelo módulo do notebook, quebrado em linhas) é aceito
+OK   a confirmação mostra servidor, modelo, GPU, visão, ferramentas, contexto e versão do notebook -> Confira antes de conectarServidor127.0.0.1:57063 este computador (teste)Modeloqwen3.5:4bGPURTX 2060 (6 GB) · dublê local do ColabImagenssim, o modelo lê imagensFerramentassimContexto32.768 tokensNoteb
+OK   o endereço é este computador (modo de teste): a confirmação avisa -> 127.0.0.1:57063
+OK   o notebook do dublê é reconhecido como o original desta versão do Openclod
+OK   a confirmação avisa que a conversa e os arquivos passam por esse servidor
+OK   a chave não aparece em lugar nenhum da tela
+OK   a caixa do código fica mascarada por padrão (o código contém a chave) -> disc
+OK   conferir não grava nada: o settings.json segue sem o provedor do Colab
+OK   conectado: o provedor "colab" existe, com visão, ferramentas e a janela de contexto que o SERVIDOR informou -> {"vision":true,"ctx":32768}
+OK   a chave foi para o cofre: o settings.json guarda só "secret:colab" -> secret:colab
+OK   a chave não está em NENHUM arquivo do perfil (configurações, logs, dados), nem em UTF-8 nem em UTF-16 -> []
+OK   o código de conexão inteiro também não está em nenhum arquivo do perfil
+OK   o cartão passa a mostrar o servidor, o modelo, a GPU, "lê imagens" e o contexto -> 127.0.0.1:57063qwen3.5:4b · RTX 2060 (6 GB) · dublê local do Colab · lê imagens · 32.768 tokensnotebook original v1.0.0 · conectado agora há pouco · resposta em 33 ms Testar agoraAjustes do provedorColar código novo Desc
+OK   depois de conectar a caixa do código some (não sobra a chave na tela)
+OK   as capacidades do app já contam o Colab como provedor com credencial -> {"id":"colab","label":"Google Colab (GPU)","configured":true}
+OK   o cartão do provedor Colab: endereço travado, sem campo de chave, sem "remover" (a remoção é o Desconectar)
+OK   ...mas o botão Testar continua lá
+OK   o seletor de modelo do compositor lista "Google Colab (GPU)" com o modelo, sem reiniciar o app -> ["Anthropic","OpenAI","DeepSeek","Kimi / Moonshot","Qwen (DashScope)","OpenRouter","OpenCode Go","OpenCode Zen","Ollama (local)","LM Studio (local)","Google Colab (GPU)"]
+OK   o compositor mostra o modelo do Colab na sessão
+OK   sessão real pelo Colab: o modelo VIU a imagem (a cor certa foi escrita no arquivo) -> {"color":"verde","attempts":1,"final":"Criei o arquivo `cor.txt` contendo apenas a palavra \"verde\" (em português e minúsculas), conforme o comando solicitado. "}
+OK   ...e CHAMOU a ferramenta write_file (chamada de ferramenta em stream pelo servidor) -> {"calls":["write_file"],"attempts":1}
+OK   o servidor do Colab recebeu os pedidos, ao menos uma imagem, e contou tokens (e não registrou erro) -> {"requests":2,"images":2,"prompt":24945,"completion":85,"errors":0}
+OK   a sessão terminou no Colab (a reserva não precisou entrar) -> {"providerId":"colab"}
+OK   a falha chegou no meio do turno e a reserva assumiu sozinha: a sessão agora está no Ollama -> {"providerId":"ollama"}
+OK   a conversa avisa a troca, citando o Colab e o motivo "sem conexão" -> ["Google Colab (GPU)/qwen3.5:4b falhou (network: sem conexão); continuando com Ollama (local)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."]
+OK   o histórico seguiu: o modelo da reserva respondeu sobre o arquivo criado antes -> O arquivo criado é **cor.txt** e ele contém apenas: **verde**
+OK   o túnel caído foi chamado poucas vezes (sem 5 tentativas com espera) -> 2
+OK   Colab caiu (página 530 do túnel): o cartão passa a "caiu" e diz o que fazer, sem HTML ->  O túnel do Google Colab não respondeu: a sessão do Colab provavelmente terminou (ou o notebook parou). Rode o notebook de novo e cole o novo código de conexão.
+OK   uma conversa NOVA pedida no Colab caído já nasce na reserva: a sessão fica gravada no modelo que funciona e responde -> {"providerId":"ollama","model":"qwen3.5:4b","answer":"ok.","run":"done"}
+OK   colar um código novo mostra que ele substitui o endereço e a chave do Colab já conectado
+OK   reconectado em um passo: novo endereço no mesmo provedor (um só provedor Colab), chave nova no cofre -> {"baseUrl":"http://127.0.0.1:57266/v1"}
+OK   o estado do link volta a "conectado" com a chave nova -> conectado
+OK   depois de fechar e abrir o app: o Colab continua conectado (provedor e chave do cofre)
+OK   Desconectar pede uma segunda confirmação (um clique só não apaga)
+OK   desconectado: o provedor sai das configurações e da reserva
+OK   desconectado: a chave foi apagada do cofre (o app não encontra mais credencial)
+OK   desconectado: o ladrilho do Colab some da lista
+
+48/48 verificações ok -> Prints\colab-2026-10-27\depois-ui-colab.json
+EXIT=0

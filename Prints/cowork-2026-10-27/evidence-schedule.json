@@ -1,0 +1,103 @@
+{
+  "scenario": "schedule",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:21:23.102Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "once": {
+      "id": "tsk_a188320c-649b-43fd-85b2-d2efe578d485",
+      "name": "Resumo diário (automático)",
+      "prompt": "Leia dados.txt e grave em resumo-agendado.md uma frase com o total de pedidos de hoje e de ontem.",
+      "projectId": "prj_54eebc15-17e8-4e56-bc80-d98c0f368037",
+      "cwd": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-cowork-schedule-HljKHg\\Relatorios agendados",
+      "schedule": {
+        "kind": "once",
+        "at": "2026-10-27T13:22:17.377Z"
+      },
+      "mode": "autonomous",
+      "enabled": false,
+      "createdAt": 1793107287382,
+      "updatedAt": 1793107350153,
+      "lastRunAt": 1793107341816,
+      "lastStatus": "ok",
+      "lastDueAt": 1793107337377,
+      "runHistory": [
+        {
+          "id": "run_cca095fd-2c9b-4c51-be67-af1d6e644b2a",
+          "trigger": "schedule",
+          "attempt": 1,
+          "status": "ok",
+          "startedAt": 1793107341819,
+          "finishedAt": 1793107350153,
+          "dueAt": 1793107337377,
+          "late": false,
+          "sessionId": "ses_f782f688-28b7-4f57-baf5-754c95200e33"
+        }
+      ],
+      "lastSessionId": "ses_f782f688-28b7-4f57-baf5-754c95200e33"
+    },
+    "manual": {
+      "id": "tsk_57e03a21-99ae-4649-b95d-0bd636672b73",
+      "name": "Resumo sob demanda",
+      "prompt": "Leia dados.txt e grave em resumo-manual.md uma frase com o valor de hoje em reais.",
+      "projectId": "prj_54eebc15-17e8-4e56-bc80-d98c0f368037",
+      "cwd": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-cowork-schedule-HljKHg\\Relatorios agendados",
+      "schedule": {
+        "kind": "daily",
+        "time": "03:00"
+      },
+      "mode": "autonomous",
+      "enabled": true,
+      "createdAt": 1793107287387,
+      "updatedAt": 1793107303544,
+      "nextRunAt": 1793167200000,
+      "lastRunAt": 1793107288861,
+      "lastStatus": "ok",
+      "runHistory": [
+        {
+          "id": "run_8abeb353-406b-4b05-917b-f59857bdba04",
+          "trigger": "manual",
+          "attempt": 1,
+          "status": "ok",
+          "startedAt": 1793107288864,
+          "finishedAt": 1793107303544,
+          "late": false,
+          "sessionId": "ses_9b8d11b5-4b5b-44ff-83a8-e894f0eb85b7"
+        }
+      ],
+      "lastSessionId": "ses_9b8d11b5-4b5b-44ff-83a8-e894f0eb85b7"
+    },
+    "sessions": [
+      {
+        "title": "Agendada: Resumo diário (automático)",
+        "surface": "code",
+        "mode": "autonomous"
+      },
+      {
+        "title": "Agendada: Resumo sob demanda",
+        "surface": "code",
+        "mode": "autonomous"
+      }
+    ],
+    "files": [
+      "CLAUDE.md",
+      "dados.txt",
+      "resumo-agendado.md",
+      "resumo-manual.md"
+    ]
+  },
+  "seconds": 71,
+  "checks": {
+    "agendamentos-criados": "ok",
+    "tela-Agendados-lista-as-duas-tarefas": "ok",
+    "executar-agora-aceito": "ok",
+    "tarefa-automatica-rodou-sozinha-no-horario": "ok",
+    "executar-agora-rodou": "ok",
+    "arquivo-da-tarefa-automatica": "ok",
+    "arquivo-da-tarefa-manual": "ok",
+    "sessao-agendada-aparece-no-Cowork": "FALHOU: [{\"title\":\"Agendada: Resumo diário (automático)\",\"surface\":\"code\",\"mode\":\"autonomous\"},{\"title\":\"Agendada: Resumo sob demanda\",\"surface\":\"code\",\"mode\":\"autonomous\"}]"
+  },
+  "errors": [],
+  "ok": false
+}

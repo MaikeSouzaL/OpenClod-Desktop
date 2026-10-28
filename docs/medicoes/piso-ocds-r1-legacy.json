@@ -1,0 +1,133 @@
+{
+  "label": "ocds-legacy",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-legacy-mvqtqqig",
+  "startedAt": "2026-10-27T15:17:56.849Z",
+  "samples": [
+    {
+      "firstInput": 9402,
+      "firstCached": 0,
+      "calls": 3,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2954
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 391
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 450
+          },
+          {
+            "id": "results",
+            "label": "Resultados de ferramentas",
+            "tokens": 80
+          },
+          {
+            "id": "calls",
+            "label": "Chamadas de ferramentas",
+            "tokens": 2
+          }
+        ],
+        "total": 10507,
+        "window": 32768,
+        "lastRequest": 9794
+      }
+    },
+    {
+      "firstInput": 9749,
+      "firstCached": 9344,
+      "calls": 2,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2954
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 391
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "memory",
+            "label": "Memória e contexto do turno",
+            "tokens": 331
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 235
+          },
+          {
+            "id": "results",
+            "label": "Resultados de ferramentas",
+            "tokens": 15
+          },
+          {
+            "id": "calls",
+            "label": "Chamadas de ferramentas",
+            "tokens": 7
+          }
+        ],
+        "total": 10563,
+        "window": 32768,
+        "lastRequest": 9998
+      }
+    }
+  ],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "firstInput": [
+    9402,
+    9749
+  ],
+  "breakdown": {
+    "system": 2954,
+    "instructions": 554,
+    "skills": 391,
+    "tools": 6075,
+    "mcp": 1,
+    "memory": 331,
+    "messages": 235,
+    "results": 15,
+    "calls": 7
+  },
+  "errors": []
+}

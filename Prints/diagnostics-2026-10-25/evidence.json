@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "bridge": {
+    "observability": "function",
+    "exportDiagnostics": "function"
+  },
+  "metrics": 6,
+  "health": 6,
+  "eventRows": 3,
+  "healthStatus": "warn",
+  "snapshot": {
+    "startedAt": 1793078315759,
+    "updatedAt": 1793078317300,
+    "uptimeMs": 3416,
+    "eventCount": 3,
+    "sessionCount": 0,
+    "turnCount": 0,
+    "failedTurns": 0,
+    "toolCalls": 0,
+    "failedToolCalls": 0,
+    "approvalRequests": 0,
+    "blockedAudits": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cachedTokens": 0,
+    "costUsd": 0,
+    "activeTurns": 0,
+    "activeTools": 0,
+    "tools": []
+  },
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\diagnostics-2026-10-25\\01-diagnostics-overview.png",
+  "errors": []
+}

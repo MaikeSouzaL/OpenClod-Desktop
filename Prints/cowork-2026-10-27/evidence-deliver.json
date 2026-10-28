@@ -1,0 +1,168 @@
+{
+  "scenario": "deliver",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:27:31.812Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "tools": {
+      "write_file": 1,
+      "run_command": 1
+    },
+    "plan": [
+      "active: Ler e entender os arquivos de dados da pasta",
+      "pending: Extrair números consolidados (receita por região, meta, mensal)",
+      "pending: Gerar relatorio-vendas.docx",
+      "pending: Gerar analise-vendas.xlsx com aba Resumo com fórmulas reais",
+      "pending: Gerar apresentacao-vendas.pptx com 5 slides",
+      "pending: Abrir e conferir cada arquivo gerado"
+    ],
+    "approvals": [],
+    "questions": [],
+    "finalText": "70 verificações passaram. Vou reforçar com uma checagem de colisão de texto no PDF renderizado (detecta sobreposição/estouro que a checagem de página não pega):",
+    "docx": {
+      "bytes": 41181,
+      "paragraphs": 110,
+      "headings": [],
+      "tables": 4,
+      "rows": 16,
+      "firstLines": [
+        "EQUIPE ALFA  ·  RELATÓRIO DE DESEMPENHO COMERCIAL",
+        "Relatório de Vendas",
+        "1º semestre de 2026 — janeiro a junho",
+        "Documento para a Diretoria   |   Base: vendas_2026.csv (36 registros) e metas.txt   |   Emissão: 27/10/2026   ",
+        "1. Resumo executivo",
+        "No primeiro semestre de 2026 a operação registrou receita de R$ 639.377, com 1.823 unidades vendidas e ticket "
+      ]
+    },
+    "docxRender": {
+      "ok": true,
+      "pages": 3
+    },
+    "xlsx": {
+      "bytes": 10051,
+      "sheets": [
+        {
+          "name": "Resumo",
+          "cells": 114,
+          "formulas": 67
+        },
+        {
+          "name": "Dados",
+          "cells": 188,
+          "formulas": 2
+        }
+      ],
+      "formulas": 69,
+      "sample": [
+        "Resumo!B6 =SUMIF(Dados!$B$2:$B$37,$A6,Dados!$E$2:$E$37)",
+        "Resumo!C6 =SUMIF(Dados!$B$2:$B$37,$A6,Dados!$D$2:$D$37)",
+        "Resumo!D6 =IFERROR(B6/SUMPRODUCT((Dados!$B$2:$B$37=$A6)/COUNTIFS(Dados!$A$2:$A$37,Dados!$A$2:$A$37,Dados!$B$2:$B$37,Dados!$B$2:$B$37)),\"\")",
+        "Resumo!F6 =IFERROR(B6/E6,\"\")",
+        "Resumo!G6 =IF(F6=\"\",\"\",IF(F6>=1,\"Meta atingida\",\"Abaixo da meta\"))",
+        "Resumo!B7 =SUMIF(Dados!$B$2:$B$37,$A7,Dados!$E$2:$E$37)",
+        "Resumo!C7 =SUMIF(Dados!$B$2:$B$37,$A7,Dados!$D$2:$D$37)",
+        "Resumo!D7 =IFERROR(B7/SUMPRODUCT((Dados!$B$2:$B$37=$A7)/COUNTIFS(Dados!$A$2:$A$37,Dados!$A$2:$A$37,Dados!$B$2:$B$37,Dados!$B$2:$B$37)),\"\")"
+      ]
+    },
+    "xlsxRecalculated": [
+      "Resumo!B6 = 212195",
+      "Resumo!C6 = 605",
+      "Resumo!D6 = 35365.8333333333",
+      "Resumo!F6 = 1.41463333333333",
+      "Resumo!G6 = Meta atingida",
+      "Resumo!B7 = 207000",
+      "Resumo!C7 = 600",
+      "Resumo!D7 = 34500",
+      "Resumo!F7 = 1.035",
+      "Resumo!G7 = Meta atingida",
+      "Resumo!B8 = 220182",
+      "Resumo!C8 = 618"
+    ],
+    "pptx": {
+      "bytes": 57637,
+      "slides": 5,
+      "titles": [
+        "EQUIPE ALFA  ·  DIRETORIA",
+        "O QUE A DIRETORIA PRECISA SABER",
+        "TOTAL, MÉDIA MENSAL E ATINGIMENTO DA META",
+        "COMO A RECEITA SE DISTRIBUIU NO SEMESTRE",
+        "O QUE FAZER COM ESSES NÚMEROS"
+      ],
+      "tables": 1
+    },
+    "pptxRender": {
+      "ok": true,
+      "pages": 5
+    },
+    "expected": {
+      "total": 639377,
+      "byRegion": {
+        "Sul": 212195,
+        "Sudeste": 207000,
+        "Nordeste": 220182
+      },
+      "byProduct": {
+        "Plano Basico": 179299,
+        "Plano Pro": 460078
+      }
+    },
+    "folderAfter": [
+      "_build/analisa.py",
+      "_build/build_docx.py",
+      "_build/build_pptx.py",
+      "_build/build_xlsx.py",
+      "_build/check_layout.py",
+      "_build/pdf/apresentacao-vendas.pdf",
+      "_build/pdf/relatorio-vendas.pdf",
+      "_build/recalc/analise-vendas-Dados.csv",
+      "_build/recalc/analise-vendas-Resumo.csv",
+      "_build/verify.py",
+      "analise-vendas.xlsx",
+      "apresentacao-vendas.pptx",
+      "CLAUDE.md",
+      "metas.txt",
+      "relatorio-vendas.docx",
+      "reuniao-diretoria.md",
+      "vendas_2026.csv"
+    ],
+    "usage": {
+      "input": 1605649,
+      "output": 37217,
+      "cachedInput": 1579520,
+      "costUsd": 0.06197621999999999
+    }
+  },
+  "seconds": 301,
+  "checks": {
+    "sessao-cowork": "ok",
+    "turno-terminou-sem-erro": "FALHOU: error",
+    "tres-arquivos-entregues": "ok",
+    "docx-e-um-docx-valido": "ok",
+    "docx-tem-resumo-executivo": "ok",
+    "docx-tem-tabela": "ok",
+    "docx-traz-a-receita-total-certa": "ok",
+    "docx-cita-as-3-regioes-com-valores": "ok",
+    "docx-segue-a-instrucao-da-pasta": "ok",
+    "docx-abre-no-LibreOffice": "ok",
+    "xlsx-e-um-xlsx-valido-com-2-abas-ou-mais": "ok",
+    "xlsx-tem-formulas-de-verdade": "ok",
+    "xlsx-tem-aba-Resumo": "ok",
+    "xlsx-tem-os-dados-das-36-linhas": "ok",
+    "xlsx-segue-a-instrucao-da-pasta": "ok",
+    "xlsx-formulas-calculam-sem-erro": "ok",
+    "xlsx-alguma-formula-da-a-receita-total": "ok",
+    "xlsx-formula-da-receita-Sul": "ok",
+    "xlsx-formula-da-receita-Sudeste": "ok",
+    "xlsx-formula-da-receita-Nordeste": "ok",
+    "xlsx-abre-no-LibreOffice": "ok",
+    "pptx-e-um-pptx-valido": "ok",
+    "pptx-tem-5-slides": "ok",
+    "pptx-todos-os-slides-tem-texto": "ok",
+    "pptx-traz-numeros-reais-dos-dados": "ok",
+    "pptx-segue-a-instrucao-da-pasta": "ok",
+    "pptx-abre-no-LibreOffice-com-5-paginas": "ok"
+  },
+  "errors": [],
+  "ok": false
+}

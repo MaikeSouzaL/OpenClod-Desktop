@@ -1,0 +1,14 @@
+OK   configuração dos provedores de teste gravada
+OK   modelos: o item do provedor ainda não mostra a lista de modelos (começa fechado)
+OK   modelos: ao abrir, lista os modelos do provedor com uma caixa por modelo -> 1 de 3 marcados
+OK   modelos: sem mexer, só o modelo principal está marcado -> 1 de 3 marcados
+OK   modelos: "Selecionar todos" marca todos -> 3 de 3 marcados
+OK   modelos: desmarcar um deixa os outros -> 2 de 3 marcados
+OK   modelos: a linha do provedor resume "2 modelos"
+OK   modelos: "Salvar alterações" grava só os modelos marcados -> {"fake-b":["fake-b-1","fake-b-2"]}
+OK   modelos: depois dos dois modelos marcados falharem, o LLM real respondeu -> {"state":"done","lastModel":"qwen3.5:4b","failures":[]}
+OK   modelos: foram tentados nesta ordem: o esgotado, o 1º marcado, o 2º marcado -> {"a":1,"b1":1,"b2":1,"b3":0}
+OK   modelos: o modelo que NÃO foi marcado nunca foi chamado -> {"a":1,"b1":1,"b2":1,"b3":0}
+OK   modelos: a conversa avisou as três trocas -> ["Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Provedor B (falso)/fake-b-1. A conversa, o plano e a memória do projeto foram preservados.","Provedor B (falso)/fake-b-1 falhou (rate_limit: limite de uso atingido); continuando com Provedor B (falso)/fake-b-2. A conver
+
+12/12 verificações ok -> Prints\reserva-2026-10-27\modelos-reserva.json

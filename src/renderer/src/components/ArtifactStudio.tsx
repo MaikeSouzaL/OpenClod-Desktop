@@ -10,6 +10,7 @@ import { css } from '@codemirror/lang-css'
 import { html } from '@codemirror/lang-html'
 import { python } from '@codemirror/lang-python'
 import { errorMessage, unwrap } from '../lib/api'
+import { parseSlideDocument, slidesToHtml } from '../../../core/artifacts/slides'
 import { Icon } from './Icons'
 import { Markdown } from './Markdown'
 import { SlideStudio } from './SlideStudio'
@@ -60,6 +61,8 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
   const [saved, setSaved] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [tab, setTab] = useState<'split' | 'editor' | 'preview'>('split')
   const [dark, setDark] = useState(() => document.documentElement.dataset.theme !== 'light')
@@ -139,6 +142,27 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
     }
   }
 
+  const exportSlides = async (): Promise<void> => {
+    const document = parseSlideDocument(draft)
+    if (!document) {
+      setError('O documento de slides não é válido.')
+      return
+    }
+    setExporting(true)
+    setError('')
+    setNotice('')
+    try {
+      const target = file.path.replace(/\.openclod-slides\.json$/i, '.slides.html')
+      await unwrap(window.forja.files.write(root, target, slidesToHtml(document)))
+      setNotice(`Apresentação exportada para ${target}`)
+      onSaved?.()
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const preview = useMemo(() => {
     if (file.path.toLowerCase().endsWith('.openclod-slides.json')) {
       return <SlideStudio source={draft} onChange={setDraft} />
@@ -200,6 +224,11 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
           <button type="button" className="btn ghost small" onClick={() => void window.forja.files.reveal(`${root}\\${file.path}`)}>
             <Icon name="external" size={12} /> Explorer
           </button>
+          {file.path.toLowerCase().endsWith('.openclod-slides.json') ? (
+            <button type="button" className="btn ghost small" onClick={() => void exportSlides()} disabled={exporting}>
+              <Icon name="download" size={12} /> {exporting ? 'Exportando…' : 'Exportar HTML'}
+            </button>
+          ) : null}
           <button type="button" className="btn primary small" onClick={() => void save()} disabled={!dirty || saving}>
             <Icon name="check" size={12} /> {saving ? 'Salvando…' : 'Salvar'}
           </button>
@@ -209,6 +238,7 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
         </div>
       </header>
       {error ? <div className="inline-error">{error}</div> : null}
+      {notice ? <div className="artifact-success">{notice}</div> : null}
       {loading ? <div className="page-empty compact">Abrindo artefato…</div> : null}
       <div className={`artifact-studio-body ${tab}`}>
         {tab !== 'preview' ? <div className="artifact-editor" ref={hostRef} /> : null}

@@ -4,18 +4,15 @@ import { Icon } from './Icons'
 import { OpenclodMark, MenuPopover, type MenuItem } from './Chrome'
 import { relativeTime } from '../lib/format'
 
-function normalize(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-}
-
 export type SidebarMode = SessionSurface
-export type SidebarPage = 'projects' | 'memory' | 'artifacts' | 'scheduled' | 'dispatch' | 'design' | 'customize' | 'more'
+export type SidebarPage = 'projects' | 'memory' | 'artifacts' | 'scheduled' | 'activity' | 'dispatch' | 'design' | 'customize' | 'more'
 
-const PAGES: Array<{ id: SidebarPage; label: string; icon: 'folder' | 'archive' | 'image' | 'clock' | 'terminal' | 'sparkles' | 'sliders' | 'more' }> = [
+const PAGES: Array<{ id: SidebarPage; label: string; icon: 'folder' | 'archive' | 'image' | 'clock' | 'bell' | 'terminal' | 'sparkles' | 'sliders' | 'more' }> = [
   { id: 'projects', label: 'Projetos', icon: 'folder' },
   { id: 'memory', label: 'Memória', icon: 'archive' },
   { id: 'artifacts', label: 'Artefatos', icon: 'image' },
   { id: 'scheduled', label: 'Agendados', icon: 'clock' },
+  { id: 'activity', label: 'Atividades', icon: 'bell' },
   { id: 'dispatch', label: 'Dispatch', icon: 'terminal' },
   { id: 'design', label: 'Design', icon: 'sparkles' },
   { id: 'customize', label: 'Personalização', icon: 'sliders' },
@@ -41,6 +38,7 @@ interface SidebarProps {
   onRemoveProject(project: Project): void
   onDeleteProject(project: Project): void
   onOpenGraph(project: Project): void
+  onWorktrees(project: Project): void
   onDeleteSession(sessionId: string): void
   onRenameSession(sessionId: string, title: string): void
   onArchiveSession(sessionId: string, archived: boolean): void
@@ -73,6 +71,7 @@ export function Sidebar({
   onRemoveProject,
   onDeleteProject,
   onOpenGraph,
+  onWorktrees,
   onDeleteSession,
   onRenameSession,
   onArchiveSession,
@@ -85,7 +84,6 @@ export function Sidebar({
   const [draft, setDraft] = useState('')
   const [searching, setSearching] = useState(false)
   const [query, setQuery] = useState('')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [showArchived, setShowArchived] = useState(false)
   const [oldestFirst, setOldestFirst] = useState(false)
@@ -105,6 +103,7 @@ export function Sidebar({
           (item) =>
             item.id === 'artifacts' ||
             item.id === 'scheduled' ||
+            item.id === 'activity' ||
             item.id === 'customize' ||
             item.id === 'more' ||
             // Claude Code shows the project memory only when a project exists.
@@ -124,7 +123,7 @@ export function Sidebar({
 
   const sessionsFor = (project: Project): SessionSummary[] =>
     visibleSessions
-      .filter((session) => normalize(session.meta.cwd) === normalize(project.path))
+      .filter((session) => session.meta.projectId === project.id)
       .sort((a, b) => b.meta.updatedAt - a.meta.updatedAt)
 
   const recent = useMemo(
@@ -188,6 +187,12 @@ export function Sidebar({
           label: 'Nova sessão',
           icon: 'plus',
           onSelect: () => onNewSession(projectSession)
+        },
+        {
+          id: 'worktrees',
+          label: 'Worktrees e sessão isolada',
+          icon: 'gitBranch',
+          onSelect: () => onWorktrees(projectSession)
         },
         {
           id: 'graph',
@@ -286,7 +291,9 @@ export function Sidebar({
   const projectRow = (project: Project): ReactElement => {
     const list = sessionsFor(project)
     const isActive = project.id === activeProjectId
-    const isOpen = isActive ? collapsed[project.id] !== true : expanded[project.id] === true
+    // The project in use always shows its sessions; otherwise the user would
+    // have to remember an old collapse state to switch sessions.
+    const isOpen = isActive || expanded[project.id] === true
     return (
       <section key={project.id} className={`side-project ${isActive ? 'is-active' : ''}`}>
         <div
@@ -307,8 +314,7 @@ export function Sidebar({
             }}
             onClick={() => {
               onSelectProject(project)
-              if (isActive) setCollapsed((current) => ({ ...current, [project.id]: isOpen }))
-              else setExpanded((current) => ({ ...current, [project.id]: true }))
+              if (!isActive) setExpanded((current) => ({ ...current, [project.id]: true }))
             }}
             title={project.path}
           >

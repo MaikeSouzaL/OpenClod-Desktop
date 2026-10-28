@@ -1,0 +1,15 @@
+{
+  "scenario": "preview",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:41:45.832Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork2-mvqq546i",
+  "crash": "locator.count: Target page, context or browser has been closed\n    at preview (C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\scripts\\ui-cowork.cjs:773:184)\n    at async main (C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\scripts\\ui-cowork.cjs:799:21)",
+  "seconds": 85,
+  "checks": {
+    "arquivos-de-exemplo-copiados": "ok",
+    "cenario-rodou-ate-o-fim": "FALHOU: locator.count: Target page, context or browser has been closed"
+  },
+  "errors": [],
+  "ok": false
+}

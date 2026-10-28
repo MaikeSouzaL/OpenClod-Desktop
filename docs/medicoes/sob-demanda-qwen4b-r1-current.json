@@ -1,0 +1,209 @@
+{
+  "label": "qwen4b-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqvaek5",
+  "startedAt": "2026-10-27T16:12:13.373Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 15053,
+      "cachedTokens": 0,
+      "uncachedTokens": 15053,
+      "perCall": [
+        {
+          "input": 7474,
+          "cached": 0,
+          "output": 54
+        },
+        {
+          "input": 7579,
+          "cached": 0,
+          "output": 68
+        }
+      ],
+      "ms": 58342,
+      "timedOut": false,
+      "final": "**0 servidores MCP configurados.** Atual mensagem indica que nenhum MCP foi encontrado no projeto; use `mcp_search` e `mcp_install` para adicionar algum se necessário.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff",
+        "memory_handoff",
+        "memory_recall"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqvz9oj_d6mx criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 32087,
+      "cachedTokens": 23129,
+      "uncachedTokens": 8958,
+      "perCall": [
+        {
+          "input": 7671,
+          "cached": 6962,
+          "output": 118
+        },
+        {
+          "input": 7993,
+          "cached": 0,
+          "output": 199
+        },
+        {
+          "input": 8182,
+          "cached": 7989,
+          "output": 51
+        },
+        {
+          "input": 8241,
+          "cached": 8178,
+          "output": 199
+        }
+      ],
+      "ms": 187242,
+      "timedOut": false,
+      "final": "Handoff criado com sucesso:\n\n**ID do handoff**: `ho_mvqvz9oj_d6mx`\n\n**Resumo registrado**: \"piso de tokens medido\" - análise realizada com 0 servidores MCP configurados (atualização da sessão anterior, concluída há 1 min, que encontrou **0 ",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_list"
+      ],
+      "targetRan": false,
+      "targetOk": false,
+      "targetText": "",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 19527,
+      "cachedTokens": 15071,
+      "uncachedTokens": 4456,
+      "perCall": [
+        {
+          "input": 7916,
+          "cached": 7159,
+          "output": 65
+        },
+        {
+          "input": 11611,
+          "cached": 7912,
+          "output": 197
+        }
+      ],
+      "ms": 106749,
+      "timedOut": false,
+      "final": "Baseado na lista completa das skills instaladas, **nenhum** caso com nome contendo \"pdf\". A ferramenta mais relevante para lidar com documentos é:\n\n- **`document_extract`** — Extrai texto local de PDF, DOCX, XLSX, PPTX, HTML, CSV, JSON, Mar",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "tool_search",
+        "tool_list"
+      ],
+      "targetRan": false,
+      "targetOk": false,
+      "targetText": "",
+      "usedToolLoad": false,
+      "usedToolSearch": true,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 30354,
+      "cachedTokens": 24895,
+      "uncachedTokens": 5459,
+      "perCall": [
+        {
+          "input": 8829,
+          "cached": 7159,
+          "output": 143
+        },
+        {
+          "input": 8915,
+          "cached": 8825,
+          "output": 68
+        },
+        {
+          "input": 12610,
+          "cached": 8911,
+          "output": 224
+        }
+      ],
+      "ms": 167049,
+      "timedOut": false,
+      "final": "Vou verificar a ferramentas `list_agents` já está carregada e mostrar os resultados:\n\n**Não encontrei agente específico para \"segurança\" no catálogo.** A ferramenta `list_agents` que está disponível é uma ferramenta genérica de agentes, mas",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "qwen3.5:4b"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/qwen3.5:4b",
+  "totals": {
+    "modelCalls": 11,
+    "inputTokens": 97021,
+    "uncachedTokens": 33926,
+    "allTargetsOk": false
+  }
+}

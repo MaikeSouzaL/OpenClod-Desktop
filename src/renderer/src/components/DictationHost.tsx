@@ -2,17 +2,19 @@ import { useEffect, useRef } from 'react'
 import type { AppSettings } from '../../../shared/types'
 import { Dictation, micErrorMessage, startMic, type MicCapture } from '../lib/voice'
 import {
+  dictationSnapshot,
   registerDictationHandlers,
   updateDictation,
   type DictationPhase
 } from '../lib/dictation-store'
 
 /**
- * One global dictation engine for the window. The main process owns the global
- * shortcut and the floating pill; this component owns the microphone and the
- * Whisper bridge. The microphone button in the composer talks to this engine
- * through the dictation store, so both entry points behave exactly the same:
- * live partial text in the pill, and insertion into the focused field on stop.
+ * One global dictation engine for the window. The main process owns the
+ * optional global shortcut and the floating pill; this component owns the
+ * microphone and the Whisper bridge. The microphone button in the composer
+ * talks to this engine through the dictation store, so both entry points
+ * behave exactly the same: live partial text in the pill, and insertion into
+ * the focused field on stop.
  */
 export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null {
   const voiceRef = useRef(voice)
@@ -66,6 +68,9 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       const text = (engine?.text ?? latest).trim()
       teardown()
       phase = 'idle'
+      // Clear the live preview before the final insertion, so the text is not
+      // shown twice (preview + inserted text).
+      updateDictation({ phase: 'idle', level: 0, text: '', error: '' })
       if (text) {
         try {
           await window.forja.dictation.insert(text)
@@ -139,16 +144,26 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
         updateDictation({ phase: 'listening', level: 0, text: latest, error: '' })
         send({ phase: 'listening', text: latest })
       } catch (err) {
+        const cancelled = phase !== 'loading'
         teardown()
         phase = 'idle'
         await window.forja.stt.stop().catch(() => undefined)
-        fail(micErrorMessage(err))
+        if (!cancelled) fail(micErrorMessage(err))
       }
     }
 
     const toggle = (): void => {
       if (phase === 'idle') void start()
       else if (phase === 'listening' || phase === 'loading') void stop()
+    }
+
+    /** Stops without inserting text: the user changed session/project. */
+    const cancel = (): void => {
+      if (phase === 'idle') return
+      phase = 'idle'
+      teardown()
+      void window.forja.stt.stop().catch(() => undefined)
+      reset()
     }
 
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -159,7 +174,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
     }
     window.addEventListener('keydown', onKeyDown)
 
-    const unregister = registerDictationHandlers({ toggle, stop })
+    const unregister = registerDictationHandlers({ toggle, stop, cancel })
     removeToggle = window.forja.dictation.onToggle(toggle)
 
     return () => {
@@ -175,6 +190,17 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       reset()
     }
   }, [])
+
+  // Keep the Whisper model warm: the first mic click should not wait for the
+  // 1 GB model to load. Runs in the background, never interrupts a dictation.
+  useEffect(() => {
+    if (!voice) return
+    const timer = setTimeout(() => {
+      if (dictationSnapshot().phase !== 'idle') return
+      void window.forja.stt.preload({ model: voice.model, language: voice.language })
+    }, 1200)
+    return () => clearTimeout(timer)
+  }, [voice?.model, voice?.language])
 
   return null
 }

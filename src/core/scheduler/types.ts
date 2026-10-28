@@ -1,4 +1,7 @@
-import type { AgentMode } from '../../shared/types.js'
+import type { AgentMode, SessionSurface } from '../../shared/types.js'
+
+/** Where the session of a run lives: Cowork (work in a folder, shown on Início) or Code. Chat is not scheduled. */
+export type ScheduledSurface = Extract<SessionSurface, 'cowork' | 'code'>
 
 /**
  * When a task runs. All times are the user's LOCAL wall-clock time.
@@ -27,6 +30,33 @@ export type ScheduleKind = Schedule['kind']
  *             is reported as ok/error plus `lastRunLate`.
  */
 export type TaskStatus = 'ok' | 'error' | 'missed' | 'running'
+export type TaskPriority = 'low' | 'normal' | 'high'
+
+/**
+ * Built-in jobs a task may run instead of starting a prompt session. The
+ * handler decides what each one does; the scheduler only stores and validates.
+ */
+export type TaskAction = 'improvement-review'
+
+export interface TaskActionOptions {
+  /** Let the configured model write the analysis (default true when a provider exists). */
+  useAi?: boolean
+  /** Look-back window in days (1-180). */
+  days?: number
+}
+
+export interface TaskRunRecord {
+  id: string
+  trigger: 'schedule' | 'manual'
+  attempt: number
+  status: 'ok' | 'error'
+  startedAt: number
+  finishedAt: number
+  dueAt?: number
+  late?: boolean
+  sessionId?: string
+  error?: string
+}
 
 export interface ScheduledTask {
   id: string
@@ -35,10 +65,21 @@ export interface ScheduledTask {
   projectId: string
   cwd: string
   mode?: AgentMode
+  /** Surface of the session each run opens. Missing means `code`, what every task did before this field existed. */
+  surface?: ScheduledSurface
   providerId?: string
   model?: string
   schedule: Schedule
   enabled: boolean
+  priority?: TaskPriority
+  /** Automatic retries after a failed handler call. 0..5. */
+  maxRetries?: number
+  retryDelayMs?: number
+  /** Built-in job to run instead of the prompt; `prompt` then only describes it. */
+  action?: TaskAction
+  actionOptions?: TaskActionOptions
+  /** Most recent attempts, oldest first. */
+  runHistory?: TaskRunRecord[]
   /** Epoch milliseconds. */
   createdAt: number
   updatedAt: number
@@ -62,16 +103,23 @@ export interface ScheduledTaskInput {
   projectId: string
   cwd: string
   mode?: AgentMode
+  surface?: ScheduledSurface
   providerId?: string
   model?: string
   schedule: Schedule
   /** Defaults to true. */
   enabled?: boolean
+  priority?: TaskPriority
+  maxRetries?: number
+  retryDelayMs?: number
+  action?: TaskAction
+  actionOptions?: TaskActionOptions
 }
 
-/** Fields a caller may change. `null`/undefined clears mode, providerId and model. */
-export type ScheduledTaskPatch = Partial<Omit<ScheduledTaskInput, 'mode' | 'providerId' | 'model'>> & {
+/** Fields a caller may change. `null`/undefined clears mode, surface, providerId and model. */
+export type ScheduledTaskPatch = Partial<Omit<ScheduledTaskInput, 'mode' | 'surface' | 'providerId' | 'model'>> & {
   mode?: AgentMode | null
+  surface?: ScheduledSurface | null
   providerId?: string | null
   model?: string | null
 }
@@ -98,4 +146,6 @@ export interface SchedulerOptions {
    * Default true. When false the run is skipped and recorded as 'missed'.
    */
   catchUpMissed?: boolean
+  /** Maximum number of different tasks started in one scheduling pass. */
+  maxConcurrent?: number
 }

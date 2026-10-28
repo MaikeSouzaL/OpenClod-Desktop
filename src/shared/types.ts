@@ -24,6 +24,14 @@ export const AGENT_MODES: AgentMode[] = [
   'autonomous'
 ]
 
+/**
+ * The mode a new session opens in on each surface. Chat opens in Computer Use: a request like "crie uma pasta na minha área de
+ * trabalho" has to be done, not explained (the read-only "ask" mode is still one click away in the composer).
+ */
+export function defaultAgentMode(surface: 'chat' | 'cowork' | 'code'): AgentMode {
+  return surface === 'chat' ? 'computer' : surface === 'cowork' ? 'autonomous' : 'code'
+}
+
 export type PermissionMode = 'readonly' | 'ask' | 'accept-edits' | 'auto' | 'unrestricted'
 
 export interface TextPart {
@@ -37,6 +45,13 @@ export interface ImagePart {
   /** base64, no data: prefix */
   data: string
   label?: string
+  /**
+   * What a model that CAN read images saw in this picture, written for models that cannot (the vision relay, see
+   * core/vision). It travels with the image, so the picture is described once and every later request reuses it.
+   */
+  description?: string
+  /** `provider/model` that wrote `description`. */
+  describedBy?: string
 }
 
 export interface ToolCallPart {
@@ -54,6 +69,11 @@ export interface ToolResultPart {
   text: string
   images?: ImagePart[]
   detail?: string
+  /**
+   * Descriptions of `images` written by the vision relay. The pictures themselves are not stored with the session;
+   * the descriptions are, so a model that cannot read images still knows what each screenshot showed.
+   */
+  imageDescriptions?: string[]
 }
 
 /**
@@ -65,7 +85,27 @@ export interface ReasoningPart {
   text: string
 }
 
-export type ContentPart = TextPart | ImagePart | ToolCallPart | ToolResultPart | ReasoningPart
+/** Structured self-analysis shown as a card in the transcript. */
+export interface LimitationReport {
+  title: string
+  goal: string
+  error: string
+  difficulty: string
+  suggestion: string
+  workaround?: string
+  /** Actions the agent tried before stopping, with a short outcome. */
+  attempts?: string[]
+  severity?: 'blocked' | 'degraded'
+  /** True when the harness produced the report (not the model's report_limitation call). */
+  automatic?: boolean
+}
+
+export interface LimitationPart {
+  type: 'limitation'
+  report: LimitationReport
+}
+
+export type ContentPart = TextPart | ImagePart | ToolCallPart | ToolResultPart | ReasoningPart | LimitationPart
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
 
@@ -96,6 +136,11 @@ export interface Message {
   model?: string
   usage?: Usage
   error?: string
+  /**
+   * A line the harness wrote for the USER, shown in the conversation (a model switch, for instance). Such a message has
+   * role 'system': providers skip it, so no model ever reads it.
+   */
+  notice?: { kind: 'model_switch'; level: 'info' | 'warn' }
 }
 
 export interface Usage {
@@ -152,6 +197,11 @@ export interface ModelRequest {
   /** Per-session reasoning depth; providers map it to what their API supports. */
   effort?: ReasoningEffort
   signal?: AbortSignal
+  /**
+   * The caller has another model to move to when this one fails: do not wait out a long rate-limit pause and retry at
+   * most once, so the switch happens in seconds instead of minutes.
+   */
+  fastFail?: boolean
 }
 
 export interface ToolSpec {
@@ -226,6 +276,75 @@ export interface ApprovalResponse {
   /** When true the same tool+preview is allowed for the rest of the session. */
   always?: boolean
   reason?: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Questions to the user (ask_user)                                    */
+/* ------------------------------------------------------------------ */
+
+export interface QuestionOption {
+  label: string
+  description?: string
+}
+
+export interface QuestionSpec {
+  /** Short label shown above the question ("Backend", "Prazo"). */
+  header: string
+  question: string
+  /** Concrete choices. Without options the user gets a free-text field. */
+  options?: QuestionOption[]
+  /** Allow checking more than one option. */
+  multi?: boolean
+  /** Offer a free-text answer in addition to the options (default true). */
+  allowOther?: boolean
+}
+
+export interface QuestionAttachment {
+  name: string
+  /** Absolute path the agent can read with its file/shell tools. */
+  path: string
+  kind: 'file' | 'folder'
+}
+
+export interface QuestionAnswer {
+  header: string
+  answers: string[]
+  attachments?: QuestionAttachment[]
+}
+
+export interface QuestionRequest {
+  id: string
+  sessionId: string
+  questions: QuestionSpec[]
+}
+
+/**
+ * What the next request of a session would carry, measured from the real system prompt, tool schemas and history (not
+ * guessed): the context meter shows it, and it tells where the tokens go.
+ */
+export interface ContextBreakdown {
+  items: Array<{ id: string; label: string; tokens: number }>
+  /** Sum of the items. */
+  total: number
+  /** Context window of the session's model. */
+  window: number
+  /** Size the provider reported for the last real request (0 before the first one). */
+  lastRequest: number
+}
+
+/** Why a turn stopped at its budget, with enough detail for the UI and logs. */
+export interface BudgetInfo {
+  /** `iterations`: the turn used up its iteration cap (`used` and `limit` count iterations). */
+  kind: 'tokens' | 'cost' | 'iterations'
+  used: number
+  limit: number
+  input: number
+  output: number
+  cachedInput: number
+  iterations: number
+  toolCalls: number
+  contextTokens: number
+  contextWindow: number
 }
 
 export interface PolicyConfig {
@@ -306,6 +425,13 @@ export type HooksConfig = Partial<Record<HookEvent, HookMatcher[]>>
 /* Events emitted by the harness                                       */
 /* ------------------------------------------------------------------ */
 
+/** A provider and the model of it a session talks to. */
+export interface ModelRef {
+  providerId: string
+  label: string
+  model: string
+}
+
 export type HarnessEvent =
   | { type: 'session_start'; sessionId: string }
   | { type: 'turn_start'; sessionId: string; messageId: string }
@@ -319,6 +445,16 @@ export type HarnessEvent =
       name: string
       args: unknown
       /** Set on events forwarded from a subagent: its `childId`. Absent for the session's own tools. */
+      agentId?: string
+    }
+  | {
+      type: 'tool_progress'
+      sessionId: string
+      toolCallId: string
+      name: string
+      /** Last chunk of live output. UI-only; never added to the model context. */
+      text?: string
+      data?: Record<string, unknown>
       agentId?: string
     }
   | {
@@ -336,8 +472,12 @@ export type HarnessEvent =
     }
   | { type: 'approval_request'; sessionId: string; request: ApprovalRequest }
   | { type: 'approval_resolved'; sessionId: string; id: string; approved: boolean }
+  | { type: 'question_request'; sessionId: string; request: QuestionRequest }
+  | { type: 'question_resolved'; sessionId: string; id: string; answers: QuestionAnswer[] }
+  | { type: 'budget'; sessionId: string; info: BudgetInfo }
+  | { type: 'limitation'; sessionId: string; report: LimitationReport }
   | { type: 'plan'; sessionId: string; items: PlanItem[] }
-  | { type: 'usage'; sessionId: string; usage: Usage; total: Usage }
+  | { type: 'usage'; sessionId: string; usage: Usage; total: Usage; turn?: Usage; limit?: number; providerId?: string; providerLabel?: string; model?: string; costUsd?: number }
   | { type: 'status'; sessionId: string; state: RunState; detail?: string }
   | { type: 'audit'; sessionId: string; level: AuditLevel; message: string }
   | { type: 'diff'; sessionId: string; files: FileChange[] }
@@ -367,8 +507,19 @@ export type HarnessEvent =
       /** First 400 characters of the child's answer (or of its error), on the end event. */
       summary?: string
     }
-  | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: StopReason; error?: string }
-  | { type: 'notice'; sessionId: string; level: 'info' | 'warn' | 'error'; text: string }
+  | { type: 'turn_end'; sessionId: string; messageId: string; stopReason: StopReason; error?: string; /** The user stopped the turn: not a failure. */ cancelled?: boolean }
+  | { type: 'notice'; sessionId: string; level: 'info' | 'warn' | 'error'; text: string; desktop?: boolean }
+  | {
+      /**
+       * The session moved to another model because the one it was on could not answer. The main process saves the new
+       * provider/model on the session, and the composer shows it.
+       */
+      type: 'model_switch'
+      sessionId: string
+      from: ModelRef
+      to: ModelRef
+      reason: ProviderErrorKind
+    }
   | { type: 'settings_changed'; sessionId: string; scope: 'mcp' | 'browser' | 'general' }
 
 export type RunState =
@@ -383,10 +534,31 @@ export type RunState =
 
 export type AuditLevel = 'info' | 'warn' | 'blocked'
 
+export interface PlanStepActivity {
+  id: string
+  name: string
+  kind: 'command' | 'tool' | 'agent'
+  title: string
+  status: 'done' | 'failed'
+  startedAt: number
+  endedAt: number
+  detail?: string
+  /** Tail of the tool output, capped; persisted with the session. */
+  output?: string
+  exitCode?: number
+}
+
 export interface PlanItem {
   id: string
   text: string
   status: 'pending' | 'active' | 'done' | 'blocked'
+  /** Stamped by the runner when the item starts/finishes; used by the plan UI. */
+  startedAt?: number
+  endedAt?: number
+  /** The app closed while this item was active; the next turn must resume it. */
+  interrupted?: boolean
+  /** What the agent did while this item was active, persisted with the plan. */
+  activity?: PlanStepActivity[]
 }
 
 export interface FileChange {
@@ -403,7 +575,7 @@ export interface FileChange {
 
 export interface ProviderConfig {
   id: string
-  kind: 'openai' | 'anthropic' | 'mock'
+  kind: 'openai' | 'anthropic'
   label: string
   baseUrl: string
   model: string
@@ -413,13 +585,38 @@ export interface ProviderConfig {
   supportsTools: boolean
   /** Models offered by the model picker; the active `model` is always first. */
   models?: string[]
+  /**
+   * Models of `models` known to read images (filled by "Detectar modelos" when the server says so). When present it
+   * decides per model; `supportsVision` stays the answer for providers that do not tell.
+   */
+  visionModels?: string[]
   inputCostPerMTok?: number
   outputCostPerMTok?: number
+  /** Cost of cache-hit input tokens; falls back to the normal input rate. */
+  cachedInputCostPerMTok?: number
   temperature?: number
   /** Output token cap sent with each request (provider default when unset). */
   maxOutputTokens?: number
   /** Per-model wire quirks; unset fields are auto-detected from the model id. */
   compat?: ModelCompat
+  /** Explicit effort levels this provider/model accepts; empty = auto-detect. */
+  effortLevels?: ReasoningEffort[]
+  /** Effort applied to new sessions of this provider; unset = automatic. */
+  defaultEffort?: ReasoningEffort
+  /** Set on the provider made by Settings → Provedores → Google Colab (GPU): where the model runs and which notebook made it. */
+  colab?: ColabLinkInfo
+}
+
+/** What the app remembers about the Colab server a provider points to. Never holds the key (that is in the vault). */
+export interface ColabLinkInfo {
+  host: string
+  gpu: string
+  vramMiB?: number
+  notebookVersion: string
+  engine?: string
+  connectedAt: number
+  /** The notebook's server module is the one this build ships. Informative only: a server can claim anything. */
+  verified?: boolean
 }
 
 export interface ModelCompat {
@@ -483,6 +680,8 @@ export interface Project {
   path: string
   createdAt: number
   lastOpenedAt: number
+  /** Default LLM for sessions in this project; other projects keep their own. */
+  model?: { providerId: string; model: string }
 }
 
 export interface SessionState {
@@ -505,6 +704,7 @@ export interface HarnessLimits {
   maxIterations: number
   maxToolCalls: number
   maxWallClockMs: number
+  /** Cumulative turn cap. 0 = automatic: max(6M, 10 × contextWindow). */
   maxTokens: number
   maxCostUsd: number
   maxParallelTools: number
@@ -516,7 +716,7 @@ export const DEFAULT_LIMITS: HarnessLimits = {
   maxIterations: 60,
   maxToolCalls: 400,
   maxWallClockMs: 45 * 60 * 1000,
-  maxTokens: 3_000_000,
+  maxTokens: 0,
   maxCostUsd: 10,
   maxParallelTools: 4
 }
@@ -572,6 +772,15 @@ export interface AgentsListing {
 /* Settings                                                            */
 /* ------------------------------------------------------------------ */
 
+export interface HarnessSelfRepairSettings {
+  /** Allow the agent to open a repair session and modify/build the harness itself. */
+  enabled: boolean
+  /** Source checkout of Openclod Desktop. Empty disables the feature. */
+  repoPath: string
+  /** Relaunch Openclod after a repair session ends with HARNESS_OK. */
+  restartAfterRepair: boolean
+}
+
 export interface AppSettings {
   providers: ProviderConfig[]
   defaultProviderId: string
@@ -585,10 +794,29 @@ export interface AppSettings {
   autoAgents?: boolean
   /** Execution environments shown in the composer. */
   environments?: EnvironmentProfile[]
-  /** Try the next model/provider when one runs out of quota or is unavailable. */
+  /**
+   * Move the conversation to the next working model/provider when the one in use runs out of balance, hits a rate
+   * limit, refuses the key or goes down. On by default.
+   */
   useAllModels?: boolean
+  /** Providers in the order the reserve tries them (ids). Providers not listed follow, in the order they are listed. */
+  fallbackOrder?: string[]
+  /** Providers that must never be used as a reserve. */
+  fallbackExclude?: string[]
+  /**
+   * Which models of each provider take part in the reserve (the boxes ticked in Settings → Ordem da reserva), by provider id.
+   * No entry: only the provider's own model. An empty list: none of its models (the provider is out of the line).
+   */
+  fallbackModels?: Record<string, string[]>
+  /**
+   * Model that describes images for models that cannot read them (the vision relay). Unset = the first reserve
+   * provider with a credential and a model known to read images.
+   */
+  visionModel?: { providerId: string; model: string }
   /** Last provider/model picked by the user; survives restarts. */
   lastModel?: { providerId: string; model: string }
+  /** Opt-in self-evolution: repair the harness when it detects a limitation. */
+  selfRepair?: HarnessSelfRepairSettings
   /** The Claude Desktop/Code catalog (skills, agents, MCPs) was imported once. */
   claudeCatalogImported?: boolean
   mcpServers: McpServerSettings[]
@@ -599,6 +827,8 @@ export interface AppSettings {
     mode: 'auto' | 'chrome-existing' | 'playwright'
     /** Give each Openclod session its own named Chrome tab group. */
     groupBySession?: boolean
+    /** "Chrome existente" without the extension: open an isolated Chromium instead of failing. Default true. */
+    fallbackToManaged?: boolean
   }
   /**
    * Also read `.claude/settings.json` / `.claude/settings.local.json` of the
@@ -610,17 +840,42 @@ export interface AppSettings {
   voice?: {
     model: string
     language: string
-    /** Electron accelerator; default Control+Alt+Space. */
+    /** Electron accelerator. Empty/absent = no global shortcut; the mic button still works. */
     shortcut?: string
+    /** Show the floating Wispr-Flow-style pill. Off by default: text goes straight to the field. */
+    overlay?: boolean
     /** toggle = press to start, press again to insert; hold is reserved for a native key hook. */
     mode?: 'toggle' | 'hold'
     /** Send the final text through the current model to fix punctuation/filler (costs tokens). */
     polish?: boolean
     /** Where the final text goes when Openclod is not focused. */
     insert?: 'composer' | 'focused'
+    /** Read assistant responses with the native Windows speech synthesizer. */
+    ttsProvider?: 'windows' | 'edge'
+    ttsVoice?: string
+    /** System.Speech rate, -10..10. */
+    ttsRate?: number
+    /** System.Speech volume, 0..100. */
+    ttsVolume?: number
+  }
+  /** Desktop notification filters. Internal activity is always recorded. */
+  notifications?: NotificationPreferences
+  updates?: {
+    feedUrl?: string
+    autoCheck?: boolean
   }
   /** Settings schema version, used for one-time migrations. */
   settingsVersion?: number
+}
+
+export interface NotificationPreferences {
+  desktop: boolean
+  turnFinished: boolean
+  failures: boolean
+  approvals: boolean
+  minimumSeverity: 'info' | 'success' | 'warning' | 'error'
+  quietStart?: string
+  quietEnd?: string
 }
 
 export interface McpServerSettings {
@@ -650,6 +905,19 @@ export interface McpServerSettings {
   excludeTools?: string[]
   /** Tools (same patterns) that must always ask for approval, even in auto mode. */
   approvalTools?: string[]
+  /**
+   * Per-tool permission over the server's own tool names (exact name or glob; `'*'` is the server default).
+   * 'deny' hides and blocks the tool, 'ask' always asks (even in unrestricted mode), 'allow' skips the
+   * prompt when the app policy allows it. An exact name beats a glob; both beat `approvalTools`.
+   */
+  toolPolicy?: Record<string, 'allow' | 'ask' | 'deny'>
+  /** Largest tool result handed to the model, in tokens (default 25 000; `MAX_MCP_OUTPUT_TOKENS` overrides it). */
+  maxOutputTokens?: number
+  /**
+   * true: this server's tools are always sent to the model; false: always found with tool_search;
+   * unset: sent when the total number of MCP tools is small, deferred otherwise (like Claude Code's `alwaysLoad`).
+   */
+  alwaysLoad?: boolean
 }
 
 export interface ComputerStatus {
@@ -668,6 +936,8 @@ export interface BrowserStatus {
   /** True when the companion Chrome extension is attached to the native host. */
   attached?: boolean
   browser?: string
+  /** Version reported by the extension in its hello message. */
+  extensionVersion?: string
 }
 
 export interface MCPStatus {
@@ -675,6 +945,12 @@ export interface MCPStatus {
   command: string
   state: 'stopped' | 'starting' | 'ready' | 'error'
   tools: string[]
+  resources: Array<{ uri: string; name: string; description?: string; mimeType?: string }>
+  prompts: Array<{
+    name: string
+    description?: string
+    arguments: Array<{ name: string; description?: string; required?: boolean }>
+  }>
   error?: string
 }
 
@@ -682,7 +958,14 @@ export interface CapabilityReport {
   computer: ComputerStatus
   browser: BrowserStatus
   mcp: MCPStatus[]
-  providers: { id: string; label: string; configured: boolean; reachable?: boolean }[]
+  providers: {
+    id: string
+    label: string
+    configured: boolean
+    reachable?: boolean
+    /** The failure the harness is working around right now (no balance, refused key...), until `until`. */
+    unavailable?: { kind: ProviderErrorKind; since: number; until: number; cloud?: boolean }
+  }[]
   /** Language toolchains found on this machine (Go, Rust, Python, Node…). */
   toolchains?: Array<{ id: string; label: string; version: string; command: string }>
   node: string

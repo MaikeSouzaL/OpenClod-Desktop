@@ -1,0 +1,68 @@
+Etapas 1 e 2 do notebook rodadas DE VERDADE nesta maquina (nvidia-smi real: RTX 2060; conferencia real no registry.ollama.ai; somente_listar_modelos = True: nada foi baixado):
+
+Openclod: servidor de LLM no Google Colab, notebook 1.1.0
+GPU encontrada: NVIDIA GeForce RTX 2060 | memória 6 GB (livre 4,2 GB) | driver 610.88 | compute 7.5
+[!] GPU com menos de 8 GB: só cabe um modelo pequeno (4B). Para um agente de verdade, escolha uma GPU maior.
+
+Modelos abertos que cabem nesta GPU (4,2 GB livres): 26 de 161 do catálogo, de todo tipo, inclusive sem censura.
+
+Agentes com visão e ferramentas (o que o Openclod usa melhor): 1 modelo
+    1. Qwen3.5 0.8B                         Q8_0       1,0 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+
+Agentes só texto (com ferramentas): 7 modelos
+    2. Granite 4 1B                         Q8_0       1,6 GB  ctx 64k   ferramentas | Apache-2.0
+    3. Granite 4 350M                       BF16       0,7 GB  ctx 32k   ferramentas | Apache-2.0
+    4. Qwen3 1.7B                           Q4_K_M     1,4 GB  ctx 8k    ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+    5. Llama 3.2 1B                         Q8_0       1,3 GB  ctx 16k   ferramentas | Licença Llama  contexto curto: só conversa
+    6. Qwen3 0.6B                           Q8_0       0,8 GB  ctx 8k    ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+    7. SmolLM2 360M                         F16        0,7 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+    8. SmolLM2 135M                         F16        0,3 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+
+Código: 3 modelos
+    9. Qwen2.5-Coder 1.5B                   Q4_K_M     1,0 GB  ctx 32k   ferramentas | Apache-2.0
+   10. Qwen2.5-Coder 0.5B                   Q8_0       0,5 GB  ctx 32k   ferramentas | Apache-2.0
+   11. Qwen2.5-Coder 3B                     Q4_K_M     1,9 GB  ctx 8k    ferramentas | Licença Qwen  contexto curto: só conversa
+
+Raciocínio: 3 modelos
+   12. LFM2.5 Thinking 1.2B                 Q8_0       1,2 GB  ctx 64k   ferramentas, pensamento | licença: ver a página
+   13. DeepSeek-R1 (destilados) 1.5B        Q4_K_M     1,1 GB  ctx 32k   ferramentas, pensamento | MIT
+   14. EXAONE Deep 2.4B                     Q4_K_M     1,6 GB  ctx 8k    só texto | licença: ver a página  contexto curto: só conversa
+
+Só conversa (sem ferramentas nem visão): 2 modelos
+   15. Gemma 3 1B                           Q8_0       1,1 GB  ctx 32k   só texto | Termos do Gemma
+   16. Gemma 3 270M                         Q8_0       0,3 GB  ctx 32k   só texto | Termos do Gemma
+
+Sem censura (uncensored / abliterated): 10 modelos
+      Menos recusas do que os modelos originais; a qualidade e o uso de ferramentas variam, e o uso é por sua conta.
+   17. DeepSeek-R1 abliterated 1.5B         Q4_K_M     1,1 GB  ctx 32k   só texto, pensamento | MIT
+   18. Qwen2.5-Coder abliterated 1.5B       Q4_K_M     1,1 GB  ctx 32k   ferramentas | Apache-2.0
+   19. Gemma 3 abliterated 1B               Q8_0       1,1 GB  ctx 32k   só texto | Termos do Gemma
+   20. Qwen3.5 abliterated 0.8B             Q8_0       1,0 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+   21. Gemma 3 abliterated 270M             F16        0,5 GB  ctx 32k   só texto | Termos do Gemma
+   22. Qwen2.5-Coder abliterated 0.5B       Q8_0       0,5 GB  ctx 32k   ferramentas | Apache-2.0
+   23. Qwen3.5 abliterated 2B               Q4_K_M     1,9 GB  ctx 16k   visão, ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+   24. Qwen2.5-Coder abliterated 3B         Q4_K_M     1,9 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+   25. Qwen3 abliterated 1.7B               Q4_K_M     1,1 GB  ctx 8k    ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+   26. Qwen3 abliterated 0.6B               Q4_K_M     0,4 GB  ctx 16k   ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+
+Não cabem nesta GPU (4,2 GB livres); os mais próximos:
+       Granite 4 3B                         Q4_K_M     2,1 GB  precisaria de ~4,6 GB com ctx 8k
+       Qwen3.5 2B                           Q8_0       2,7 GB  precisaria de ~4,6 GB com ctx 8k
+       Qwen3-VL 2B                          Q4_K_M     1,9 GB  precisaria de ~4,6 GB com ctx 8k
+       Qwen3-VL abliterated 2B              Q4_K_M     1,9 GB  precisaria de ~4,6 GB com ctx 8k
+       Llama 3.2 3B                         Q4_K_M     2,0 GB  precisaria de ~4,8 GB com ctx 8k
+       Hermes 3 3B                          Q4_K_M     2,0 GB  precisaria de ~4,8 GB com ctx 8k
+
+Conferi no registro do Ollama: 26 etiquetas existem, 0 não.
+O tamanho em GB é o do arquivo; o contexto é o maior que cabe em 100% na GPU (estimativa conservadora: o notebook confere de verdade ao carregar).
+
+Rodando nesta execução (GPU pequena (menos de 8 GB)):
+  Qwen3.5-4B em Q4_K_M (3,3 GB): é o limite do que o Openclod consegue usar como agente.
+  -> qwen3.5:4b-q4_K_M | contexto 32768 tokens | cache KV f16 | pensamento desligado
+     qwen3.5:2b-q8_0 | contexto 32768 tokens | cache KV f16 | pensamento desligado
+  (as opções seguintes só entram se a anterior não couber 100% na GPU)
+  Fonte: https://ollama.com/library/qwen3.5  https://huggingface.co/Qwen/Qwen3.5-9B
+
+Para rodar outro: em Opções, preencha numero_da_lista com o número da lista acima, ou tipo_de_modelo, ou digite uma etiqueta do Ollama em modelo_manual, e rode tudo de novo.
+Você marcou somente_listar_modelos: parei aqui, antes de baixar qualquer coisa. Escolha em Opções, desmarque essa caixa e use Executar tudo.
+[parou como pedido: Parei depois da lista, como você pediu.]

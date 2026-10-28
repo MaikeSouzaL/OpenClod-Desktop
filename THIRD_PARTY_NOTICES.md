@@ -19,8 +19,9 @@ Estas bibliotecas fazem parte do aplicativo distribuído.
 | [`dompurify`](https://github.com/cure53/DOMPurify) | 3.4.17 | **MPL-2.0 OR Apache-2.0** (esta distribuição usa Apache-2.0) | Sanitização do HTML produzido a partir de markdown antes de renderizar. |
 | [`marked`](https://marked.js.org) | 15.0.12 | **MIT** | Conversão de markdown em HTML no renderer. |
 | [`playwright`](https://playwright.dev) | 1.64.1 | **Apache-2.0** | Automação do navegador (Chrome/Edge/Chromium). Inclui `playwright-core`, também Apache-2.0. |
-| [`zod`](https://zod.dev) | 3.25.76 | **MIT** | Validação de entrada das ferramentas. |
-| [`zod-to-json-schema`](https://github.com/StefanTerdell/zod-to-json-schema) | 3.25.2 | **ISC** | Conversão dos schemas Zod em JSON Schema enviado ao modelo. |
+| [`zod`](https://zod.dev) | 4.6.7 | **MIT** | Validação de entrada das ferramentas e conversão nativa para JSON Schema. |
+| [`fflate`](https://github.com/101arrowz/fflate) | 0.8.3 | **MIT** | Leitura ZIP local de DOCX/XLSX/PPTX. |
+| [`sharp`](https://sharp.pixelplumbing.com) | 0.35.5 | **Apache-2.0** | Inspeção, edição e conversão local de imagens. |
 | [`react`](https://react.dev) | 19.3.1 | **MIT** | Interface (renderer). |
 | [`react-dom`](https://react.dev) | 19.3.1 | **MIT** | Renderização da interface no DOM. |
 
@@ -63,8 +64,16 @@ artefato final (exceto o resultado do build):
 | `vite` | 6.4.5 | MIT |
 | `@vitejs/plugin-react` | 4.x | MIT |
 | `typescript` | 5.9.3 | Apache-2.0 |
-| `vitest` | 3.2.7 | MIT |
+| `vitest` | 5.0.5 | MIT |
+| [`simple-icons`](https://simpleicons.org) | 16.36.0 | **CC0-1.0** (coleção; cada marca segue o próprio dono, ver seção 5) |
 | `@types/node`, `@types/react`, `@types/react-dom`, `@types/diff` | 22.x / 19.x / 5.x | MIT (DefinitelyTyped) |
+
+> `simple-icons` é `devDependency` e **não vai no instalador**: só o coletor de logos
+> (`scripts/connector-icons.mjs`, `npm run connector-icons`) o lê, em desenvolvimento, para
+> escrever os ladrilhos SVG das marcas que ele cobre (o caminho do glifo e a cor oficial; o
+> coletor escreve o SVG, nenhum arquivo do pacote é copiado). O app só carrega os arquivos já
+> gerados em `src/renderer/public/connector-icons/`. Origem de cada imagem:
+> `docs/mcp/icones-conectores.json`.
 
 ## 4. Fontes incluídas
 
@@ -80,19 +89,36 @@ usadas apenas na interface do Openclod Desktop e não foram modificadas.
 
 ## 4.1 Runtime de voz embarcado (`resources/`)
 
-Distribuído para o ditado local (Whisper) e ferramentas nativas. Versões,
+Distribuído para o ditado local (Whisper), a criação de documentos do Office e
+ferramentas nativas. Versões,
 tamanhos e hashes estão em `resources/MANIFEST.json`.
 
 | Componente | Licença | Uso |
 |---|---|---|
 | Python 3.10 embutido | **PSF-2.0** | Runtime do sidecar de reconhecimento de voz. |
+| edge-tts 7.3.1 | **LGPL-3.0** | Vozes neurais gratuitas da Microsoft Edge. Licença em `resources/licenses/python/edge-tts/LICENSE.txt`. |
+| aiohttp, aiohappyeyeballs, aiosignal, async-timeout, attrs, frozenlist, multidict, propcache, tabulate e yarl | Apache-2.0/MIT/BSD conforme os metadados dos pacotes | Dependências do cliente HTTP `edge-tts`. |
 | faster-whisper 1.2.1 | **MIT** | Inferência Whisper em CTranslate2. |
 | CTranslate2 4.7.1 | **MIT** | Backend de inferência. |
+| NVIDIA CUDA 12 / cuBLAS / cuDNN 9 runtime DLLs | **NVIDIA CUDA Toolkit EULA / cuDNN SLA** | Aceleração opcional do Whisper em GPU NVIDIA. As DLLs são carregadas localmente; nenhum áudio sai do computador. |
 | Silero VAD (ONNX, via faster-whisper) | **MIT** | Detecção de fala no streaming. |
 | Modelos `tiny`, `base`, `small` (Systran/faster-whisper-*) | **MIT** | Pesos locais; nenhum áudio é enviado a terceiros. |
 | PyAV, onnxruntime, tokenizers, huggingface-hub, numpy e demais dependências | Licenças declaradas no `MANIFEST.json` (MIT/Apache/BSD) | Dependências do sidecar. |
+| python-docx 1.2.0, openpyxl 3.1.5, python-pptx 1.0.2 e et-xmlfile 2.0.0 | **MIT** | Criação e leitura de .docx, .xlsx e .pptx pelo Cowork, no mesmo Python embutido (`scripts/embed-office.mjs`, rodas fixadas por versão e sha256). Licenças em `resources/licenses/office/`. |
+| XlsxWriter 3.3.0 | **BSD-2-Clause** | Planilhas com fórmulas reais, formatos e gráficos nativos. |
+| lxml 6.1.1 | **BSD-3-Clause** | XML das bibliotecas de documentos (a roda traz libxml2, libxslt e zlib; ver `resources/licenses/office/lxml`). |
+| Pillow 12.3.0 | **MIT-CMU** | Imagens e gráficos em PNG dos documentos. A roda inclui FreeType (FreeType License), HarfBuzz, LittleCMS, libjpeg-turbo, libavif, brotli e outros; o aviso completo está em `resources/licenses/office/pillow/LICENSE`. |
+| typing-extensions 4.15.0 | **PSF-2.0** | Já embarcado como dependência do huggingface-hub; também exigido por python-docx e python-pptx. |
+| `openclod_office` (construtores de documentos) | **MIT** (código do projeto) | `resources/office/pylib`: relatório Word, planilha e apresentação sobre as bibliotecas acima, mais os comandos `openclod-python` e `openclod-office`. |
+| claude-real-video 0.7.19 (lógica portada) | **MIT** — Copyright (c) 2026 LeoAido. Texto em `resources/licenses/claude-real-video/MIT.txt` | Seleção de frames por mudança de cena com piso de densidade, deduplicação em três canais, folhas de contato e linha do tempo do ingestor de áudio/vídeo (`resources/media/forja_media.py`), reescritos sobre PyAV e numpy (sem ffmpeg nem Pillow). https://github.com/HUANGCHIHHUNGLeo/claude-real-video |
 | open-computer-use 1.3.0 | **MIT** | Backend de Computer Use (Go). |
 | ripgrep 14.1.1 | **MIT OR Unlicense** | Busca de arquivos. |
+
+O `edge-tts` acessa o serviço de leitura em voz alta do Microsoft Edge, sem chave
+de API. O recurso exige internet, pode mudar ou ficar indisponível por decisão da
+Microsoft e não é uma API oficial com SLA. Por isso, o Openclod mantém
+`System.Speech` do Windows como fallback offline. O Openclod Desktop não é
+afiliado nem endossado pela Microsoft.
 
 ## 4.2 Projetos estudados sem código incorporado
 
@@ -101,6 +127,7 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
 | [ai-memory](https://github.com/akitaonrails/ai-memory) | **MIT** | Motor de memória de longo prazo executado como sidecar (`resources/bin/ai-memory.exe`, licença em `resources/licenses/ai-memory/MIT.txt`). O grafo consome a API oficial `/api/v1/graph` e complementa com conexões semânticas próprias. O layout circular inicial em `src/renderer/src/lib/graph-layout.ts` é uma adaptação do `circular_layout` de `crates/ai-memory-web/src/routes/graph.rs`. |
 | [Wispr Flow](https://wisprflow.ai) | **Proprietário** | Análise de comportamento com REA (instalador, `app.asar`, helper .NET). Nenhum código, ícone, fonte, prompt ou artefato foi copiado; o ditado do Openclod Desktop é uma implementação independente. |
 | [opencode](https://github.com/anomalyco/opencode) | MIT | Referência de padrões; trechos adaptados estão identificados no código. |
+| [munim-computer-use](https://github.com/munimtechnologies/munim-computer-use) | **Apache-2.0** | Algoritmo de settle adaptado em `src/core/computer/settle.ts`; backend MCP em avaliação. Procedência em `docs/research/CODE_PROVENANCE.md`. |
 | [openharness](https://github.com/pokkai/openharness) | MIT | Referência de hooks, permissões e compactação; sem código copiado. |
 | [cdesktop](https://github.com/cdesktop-ai/cdesktop) | Apache-2.0 | Referência de UX e executores; sem código copiado. |
 | [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) | MIT | Referência de plugins/eventos; sem código copiado. |
@@ -118,6 +145,33 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
   Anthropic ou de qualquer outro fornecedor de modelos.
 - A interface usa identidade visual própria (tipografia Inter + Source Serif 4,
   ambas OFL). Nenhum recurso visual proprietário do Claude Desktop é reproduzido.
+- **Logos dos conectores (Personalização → Conectores).** A tela mostra o logo de cada
+  serviço (GitHub, Notion, Slack, Atlassian etc.) em `src/renderer/public/connector-icons/`
+  (~890 imagens). São **marcas registradas dos respectivos donos**, usadas **somente para
+  identificar o serviço** a que o conector se refere (uso nominativo); não indicam parceria,
+  patrocínio nem endosso, e continuam sob os termos de cada marca (veja as diretrizes de
+  marca de cada fornecedor antes de reutilizá-las fora do Openclod). Foram coletadas em
+  desenvolvimento, de quatro fontes: o `iconUrl` do próprio diretório de conectores, o site do
+  fornecedor (apple-touch-icon / ícone declarado na página), o pacote `simple-icons` (CC0, só os
+  glifos) e, como último recurso, serviços públicos de favicons (Google, DuckDuckGo). O
+  **manifesto `docs/mcp/icones-conectores.json`** registra, para cada imagem, o arquivo, a
+  fonte, o endereço de origem, o domínio e o tamanho original. O app **nunca baixa logos em
+  tempo de execução**. Por esta seção, os logos da Anthropic/Claude **não** são incluídos (os
+  conectores da Anthropic ficam com as iniciais). Se um titular de marca pedir a remoção de um
+  logo, basta marcá-lo com `skip` em `scripts/data/connector-icons-overrides.json` e rodar o
+  coletor de novo.
+- **Marcas dos provedores (Configurações → Provedores).** A grade e os cartões de provedor
+  mostram a marca de DeepSeek, Google Colab, Kimi/Moonshot, LM Studio, Ollama, OpenAI,
+  OpenCode, OpenRouter e Qwen. São **marcas registradas dos respectivos donos**, usadas
+  **somente para identificar o provedor** (uso nominativo), sem parceria nem endosso. Cada
+  desenho é um caminho SVG embutido em `src/renderer/src/lib/provider-logos.ts`, **gerado** por
+  `scripts/provider-logos.mjs` a partir do pacote `simple-icons` (CC0, só o glifo e a cor
+  oficial) e, para a OpenAI (que o `simple-icons` deixou de distribuir), do arquivo
+  `docs/images/provider-icons/openai.svg` do repositório
+  [mem0ai/mem0](https://github.com/mem0ai/mem0) (Apache-2.0), cuja origem fica anotada em cada
+  entrada do arquivo gerado. O app **nunca baixa logos em tempo de execução**. A
+  **Anthropic/Claude não tem marca** nessa grade (§5, primeiro item): o provedor mostra a
+  inicial. Provedores criados pelo usuário também mostram as iniciais.
 
 ## 6. Obrigações práticas de distribuição
 
@@ -237,6 +291,13 @@ Apache-2.0. O texto integral está em:
 O Apache-2.0 exige manter avisos de copyright, fornecer o texto da licença,
 indicar alterações em arquivos modificados e incluir `NOTICE` quando existir.
 Nenhum desses pacotes foi modificado neste repositório.
+
+### Munim Computer Use (Apache-2.0)
+
+O ponteiro do agente em `src/main/cursor-arrow.ts` usa `cursor_arrow_112.png` do
+projeto Munim Computer Use
+(<https://github.com/munimtechnologies/munim-computer-use>), licenciado sob
+Apache-2.0. O texto integral está em `licenses/munim-computer-use-LICENSE`.
 
 ### SIL Open Font License 1.1
 

@@ -9,16 +9,42 @@ export interface SkillMeta {
   body: string
 }
 
-function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string } {
-  if (!raw.startsWith('---')) return { meta: {}, body: raw }
-  const end = raw.indexOf('\n---', 3)
-  if (end < 0) return { meta: {}, body: raw }
-  const header = raw.slice(3, end).trim()
-  const body = raw.slice(end + 4).replace(/^\r?\n/, '')
+/**
+ * Reads the `---` header of a SKILL.md. Besides `key: value` it understands what real skills use for long
+ * descriptions: folded and literal block scalars (`>`, `>-`, `|`), quoted strings, plain values continued on
+ * indented lines, a byte-order mark and CRLF line endings. (The old one-line reader turned a folded
+ * `description: >` into the single character ">", so such skills never described themselves.)
+ */
+export function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string } {
+  const text = raw.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+  if (!text.startsWith('---')) return { meta: {}, body: text }
+  const end = text.indexOf('\n---', 3)
+  if (end < 0) return { meta: {}, body: text }
+  const lines = text.slice(3, end).split('\n')
+  const body = text.slice(end + 4).replace(/^\n/, '')
   const meta: Record<string, string> = {}
-  for (const line of header.split(/\r?\n/)) {
-    const match = /^([a-zA-Z0-9_-]+):\s*(.*)$/.exec(line.trim())
-    if (match) meta[match[1]] = match[2].replace(/^["']|["']$/g, '')
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^([A-Za-z0-9_-]+):[ \t]*(.*)$/.exec(lines[i])
+    if (!match) continue
+    const key = match[1]
+    let value = match[2].trim()
+    // Indented lines that follow belong to this key.
+    const block: string[] = []
+    while (i + 1 < lines.length && (lines[i + 1].trim() === '' || /^[ \t]/.test(lines[i + 1]))) block.push(lines[++i])
+    while (block.length && block[block.length - 1].trim() === '') block.pop()
+    const indent = Math.min(...block.filter((l) => l.trim()).map((l) => l.match(/^[ \t]*/)![0].length), Infinity)
+    const dedented = block.map((l) => (Number.isFinite(indent) ? l.slice(indent) : l))
+    const scalar = /^([>|])([+-]?)$/.exec(value)
+    if (scalar) {
+      value = scalar[1] === '>' ? dedented.map((l) => l.trim()).filter(Boolean).join(' ') : dedented.join('\n')
+    } else if (dedented.length) {
+      const continuation = dedented.map((l) => l.trim()).filter(Boolean)
+      // A list (`- a`) keeps one item per line; a wrapped plain scalar is joined with spaces.
+      value = [value, ...continuation].filter(Boolean).join(continuation.some((l) => l.startsWith('- ')) ? '\n' : ' ')
+    }
+    if (/^"[\s\S]*"$/.test(value)) value = value.slice(1, -1).replace(/\\(["\\])/g, '$1').replace(/\\n/g, '\n')
+    else if (/^'[\s\S]*'$/.test(value)) value = value.slice(1, -1).replace(/''/g, "'")
+    meta[key] = value
   }
   return { meta, body }
 }
@@ -32,6 +58,13 @@ export class SkillLibrary {
   addRoot(dir: string, source: 'usuario' | 'projeto'): void {
     if (this.roots.some((root) => path.resolve(root.dir).toLowerCase() === path.resolve(dir).toLowerCase())) return
     this.roots.push({ dir, source })
+  }
+
+  removeRoot(dir: string): void {
+    const target = path.resolve(dir).toLowerCase()
+    for (let index = this.roots.length - 1; index >= 0; index--) {
+      if (path.resolve(this.roots[index].dir).toLowerCase() === target) this.roots.splice(index, 1)
+    }
   }
 
   async reload(): Promise<SkillMeta[]> {

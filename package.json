@@ -15,6 +15,9 @@
     "test:watch": "vitest",
     "dist": "npm run build && electron-builder --win nsis",
     "dist:dir": "npm run build && electron-builder --win dir",
+    "pack:chrome-extension": "node scripts/pack-chrome-extension.mjs",
+    "test:connectors": "node scripts/mcp-connectors-test.cjs",
+    "connector-icons": "node scripts/connector-icons.mjs",
     "build:chrome-host": "cd resources/bin/chrome-host && go build -o ../openclod-chrome-host.exe .",
     "install:chrome-companion": "node scripts/install-chrome-companion.mjs"
   },
@@ -22,10 +25,11 @@
     "@lydell/node-pty": "^1.2.0-beta.15",
     "diff": "^5.2.0",
     "dompurify": "^3.2.4",
+    "fflate": "^0.8.3",
     "marked": "^15.0.7",
     "playwright": "^1.64.1",
-    "zod": "^3.24.1",
-    "zod-to-json-schema": "^3.24.1"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -52,9 +56,10 @@
     "electron-vite": "^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "simple-icons": "^16.36.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
-    "vitest": "^3.0.5"
+    "vitest": "^5.0.5"
   },
   "build": {
     "appId": "com.openclod.desktop",
@@ -91,7 +96,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
+      "icon": "build/icon.png",
       "artifactName": "Openclod Desktop-${version}-setup.${ext}"
     },
     "nsis": {

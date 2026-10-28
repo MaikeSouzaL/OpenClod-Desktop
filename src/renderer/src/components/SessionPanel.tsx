@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, t
 import type {
   AppSettings,
   CapabilityReport,
+  ContextBreakdown,
   FileChange,
   SessionState
 } from '../../../shared/types'
@@ -14,16 +15,19 @@ import { FilesPane } from './FilesPane'
 import { ChangesPane } from './ChangesPane'
 import { ErrorBoundary } from './ErrorBoundary'
 import { TasksPanel } from './TasksPanel'
+import { PlanStepDetail } from './PlanStepDetail'
 import type { ActivityState } from '../lib/activity'
 import {
   MODE_LABELS,
   formatTokens,
+  lastRequestTokens,
   levelLabel,
   relativeTime,
   shortPath
 } from '../lib/format'
 import { errorMessage, unwrap } from '../lib/api'
 import type { LogEntry } from '../lib/types'
+import { billableTokens } from '../../../shared/limits'
 
 const PLAN_ICON: Record<string, IconName> = {
   pending: 'clock',
@@ -67,6 +71,9 @@ interface SessionPanelProps {
   capabilities: CapabilityReport | null
   settings: AppSettings | null
   tab: PanelTab | null
+  /** Plan step selected from the dock; the plan tab opens focused on it. */
+  planFocus: string | null
+  onPlanFocus(itemId: string | null): void
   /** Work the agent is doing (commands, other agents) for the tasks tab. */
   work: ActivityState
   onWorkChange(next: ActivityState): void
@@ -90,6 +97,8 @@ export function SessionPanel({
   capabilities,
   settings,
   tab,
+  planFocus,
+  onPlanFocus,
   work,
   onWorkChange,
   onStopTurn,
@@ -202,8 +211,16 @@ export function SessionPanel({
             onReveal={onReveal}
           />
         ) : null}
-        {tab === 'plan' ? <PlanPane session={session} /> : null}
-        {tab === 'changes' ? <ChangesPane root={session.meta.cwd} changes={changes} onReveal={onReveal} /> : null}
+        {tab === 'plan' ? (
+          <PlanPane
+            session={session}
+            activity={work}
+            focusId={planFocus}
+            onFocus={onPlanFocus}
+            running={['thinking', 'streaming', 'tool', 'waiting_approval'].includes(session.state)}
+          />
+        ) : null}
+        {tab === 'changes' ? <ChangesPane sessionId={session.meta.id} root={session.meta.cwd} changes={changes} onReveal={onReveal} /> : null}
         {tab === 'tasks' ? <TasksPanel sessionId={session.meta.id} activity={work} onClear={onWorkChange} onStopTurn={onStopTurn} /> : null}
         {tab === 'activity' ? <ActivityPane logs={logs} onClear={onClearLogs} /> : null}
         {tab === 'captures' ? <CapturesPane /> : null}
@@ -258,7 +275,7 @@ function contextBreakdown(session: SessionState): Array<{ id: string; label: str
   }
   return [
     { id: 'messages', label: 'Mensagens', tokens: messages },
-    { id: 'browser', label: 'Imagens', tokens: images },
+    { id: 'images', label: 'Imagens', tokens: images },
     { id: 'tools', label: 'Ferramentas', tokens: tools },
     { id: 'mcp', label: 'Chamadas', tokens: calls },
     { id: 'system', label: 'Instruções do sistema', tokens: 1100 },
@@ -286,15 +303,33 @@ function ContextPane({
 }): ReactElement {
   const [compacting, setCompacting] = useState(false)
   const [compactNote, setCompactNote] = useState('')
+  // What the next request really carries, measured by the session's runner. A session that had no turn since the app
+  // opened has no runner, so the pane shows its own rough estimate and says so.
+  const [measured, setMeasured] = useState<ContextBreakdown | null>(null)
+  useEffect(() => {
+    let current = true
+    void window.forja.sessions
+      .contextBreakdown(session.meta.id)
+      .then((result) => {
+        if (current) setMeasured(result.ok ? result.value : null)
+      })
+      .catch(() => {
+        if (current) setMeasured(null)
+      })
+    return () => {
+      current = false
+    }
+  }, [session.meta.id, session.messages.length, session.state, session.meta.model])
   const done = session.plan.filter((item) => item.status === 'done').length
   const provider = settings?.providers.find((item) => item.id === session.meta.providerId)
   const contextWindow = provider?.contextWindow ?? 0
-  const breakdown = contextBreakdown(session)
+  const breakdown = measured?.items ?? contextBreakdown(session)
   const estimated = breakdown.reduce((total, row) => total + row.tokens, 0)
-  const used = Math.max(session.usage.input, estimated)
+  const used = Math.max(lastRequestTokens(session), estimated)
   const ratio = contextWindow ? Math.min(100, Math.round((used / contextWindow) * 100)) : 0
   const mcp = capabilities?.mcp ?? []
   const busy = ['thinking', 'streaming', 'tool', 'waiting_approval'].includes(session.state)
+  const sessionTokens = billableTokens(session.usage)
 
   const compact = async (): Promise<void> => {
     setCompacting(true)
@@ -336,6 +371,16 @@ function ContextPane({
             <span>{provider?.label ?? session.meta.providerId}</span>
             <em title={session.meta.model}>{session.meta.model}</em>
           </div>
+          <div className="env-row" title="Tokens de entrada não cacheados + saída acumulados nesta sessão">
+            <Icon name="gauge" size={13} />
+            <span>Consumo</span>
+            <em
+              title={`${formatTokens(session.usage?.input ?? 0)} entrada · ${formatTokens(session.usage?.cachedInput ?? 0)} cache · ${formatTokens(session.usage?.output ?? 0)} saída`}
+            >
+              {formatTokens(sessionTokens)} tokens
+              {session.usage?.costUsd ? ` · US$ ${session.usage.costUsd.toFixed(2)}` : ''}
+            </em>
+          </div>
           <div className="env-row">
             <Icon name="clock" size={13} />
             <span>Início</span>
@@ -355,9 +400,15 @@ function ContextPane({
             {formatTokens(used)} / {contextWindow ? formatTokens(contextWindow) : '—'}
           </span>
         </div>
-        <div className="context-bar" title={`${formatTokens(used)} tokens estimados`}>
+        <div className="context-bar" title={measured ? `${formatTokens(used)} tokens (medido no prompt, nas ferramentas e no histórico)` : `${formatTokens(used)} tokens estimados`}>
           {breakdown.map((row) => {
-            const width = used ? (row.tokens / used) * 100 : 0
+            // Widths are relative to the context window, not to the used
+            // total: an 8%-used session must fill 8% of the track.
+            const width = contextWindow
+              ? (row.tokens / contextWindow) * 100
+              : used
+                ? (row.tokens / used) * 100
+                : 0
             return width > 0.2 ? <span key={row.id} className={`seg seg-${row.id}`} style={{ width: `${width}%` }} /> : null
           })}
         </div>
@@ -375,7 +426,10 @@ function ContextPane({
           })}
         </ul>
         <div className="context-foot">
-          <span>{Math.max(0, contextWindow - used) ? `${formatTokens(Math.max(0, contextWindow - used))} até a janela` : 'janela cheia'}</span>
+          <span>
+            {Math.max(0, contextWindow - used) ? `${formatTokens(Math.max(0, contextWindow - used))} até a janela` : 'janela cheia'}
+            {measured ? '' : ' · estimativa (ainda sem turno nesta sessão)'}
+          </span>
           <button type="button" className="btn tiny" onClick={() => void compact()} disabled={compacting || busy}>
             {compacting ? 'Compactando…' : 'Compactar sessão'}
           </button>
@@ -404,7 +458,12 @@ function ContextPane({
               <li key={server.name}>
                 <span className={`dot ${server.state === 'ready' ? 'on' : server.state === 'error' ? 'off' : 'idle'}`} />
                 <span>{server.name}</span>
-                <em>{server.state}{server.tools.length ? ` · ${server.tools.length} ferramentas` : ''}</em>
+                <em>
+                  {server.state}
+                  {server.tools.length ? ` · ${server.tools.length} ferramentas` : ''}
+                  {server.resources.length ? ` · ${server.resources.length} recursos` : ''}
+                  {server.prompts.length ? ` · ${server.prompts.length} prompts` : ''}
+                </em>
               </li>
             ))
           ) : (
@@ -466,7 +525,19 @@ function ContextPane({
 /* Plan                                                                */
 /* ------------------------------------------------------------------ */
 
-function PlanPane({ session }: { session: SessionState }): ReactElement {
+function PlanPane({
+  session,
+  activity,
+  focusId,
+  onFocus,
+  running
+}: {
+  session: SessionState
+  activity: ActivityState
+  focusId: string | null
+  onFocus(itemId: string | null): void
+  running: boolean
+}): ReactElement {
   if (!session.plan.length) {
     return (
       <div className="panel-empty">
@@ -475,17 +546,41 @@ function PlanPane({ session }: { session: SessionState }): ReactElement {
       </div>
     )
   }
+  const selected =
+    session.plan.find((item) => item.id === focusId) ??
+    session.plan.find((item) => item.status === 'active') ??
+    session.plan[0]
+
   return (
-    <ol className="plan-list">
-      {session.plan.map((item) => (
-        <li key={item.id} className={`plan-item status-${item.status}`}>
-          <span className={`plan-icon ${item.status === 'active' ? 'spin' : ''}`}>
-            <Icon name={PLAN_ICON[item.status] ?? 'clock'} size={14} />
-          </span>
-          <span>{item.text}</span>
-        </li>
-      ))}
-    </ol>
+    <div className="plan-pane">
+      <ol className="plan-list">
+        {session.plan.map((item) => {
+          const saved = item.activity?.length ?? 0
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                className={`plan-item status-${item.status} ${item.id === selected.id ? 'is-selected' : ''} ${item.interrupted ? 'is-interrupted' : ''}`}
+                onClick={() => onFocus(item.id)}
+                aria-pressed={item.id === selected.id}
+              >
+                <span className={`plan-icon ${item.status === 'active' && running && !item.interrupted ? 'spin' : ''}`}>
+                  <Icon name={item.interrupted ? 'alert' : (PLAN_ICON[item.status] ?? 'clock')} size={14} />
+                </span>
+                <span className="plan-item-body">
+                  <span className="plan-item-text">{item.text}</span>
+                  <span className="plan-item-meta">
+                    {item.interrupted ? 'interrompido' : item.status}
+                    {saved ? ` · ${saved} ação${saved > 1 ? 'ões' : ''}` : ''}
+                  </span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
+      <PlanStepDetail item={selected} live={activity} running={running} />
+    </div>
   )
 }
 

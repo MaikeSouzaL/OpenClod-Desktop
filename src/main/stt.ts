@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { SttEvent, SttModelInfo, SttReady, SttStartOptions, SttStatusInfo } from '../shared/api.js'
 import { sanitizedEnv } from '../core/security/policy.js'
@@ -107,6 +108,10 @@ export class SttService {
   private stopping = false
   private disposed = false
   private lastError: string | undefined
+  /** Model/language kept warm in the sidecar; start() reuses it. */
+  private loaded: { model: string; language: string } | null = null
+  /** In-flight model load (preload or first mic click). */
+  private loading: Promise<SttReady> | null = null
 
   constructor(options: SttServiceOptions) {
     this.options = options
@@ -129,7 +134,6 @@ export class SttService {
 
   async start(options: SttStartOptions = {}): Promise<SttReady> {
     if (this.disposed) throw new Error('o serviço de voz foi encerrado')
-    if (this.child) await this.stop()
 
     const availability = sttAvailability()
     if (!availability.available) throw new Error(availability.reason ?? 'o reconhecimento de voz não está disponível')
@@ -143,9 +147,27 @@ export class SttService {
     const model = availability.models.some((item) => item.id === requested) ? requested : availability.models[0].id
     const language = normalizeLanguage(options.language)
 
+    // Keep the model and the Python process warm between dictations.
+    if (this.loaded?.model === model && this.loaded?.language === language) {
+      if (this.loading) return this.loading
+      if (this.ready && this.child) {
+        this.send({ type: 'reset' })
+        return this.ready
+      }
+    }
+    if (this.loading) {
+      await this.loading.catch(() => undefined)
+      if (this.loaded?.model === model && this.loaded?.language === language && this.ready) {
+        this.send({ type: 'reset' })
+        return this.ready
+      }
+    }
+    if (this.child) await this.shutdown()
+
     this.lastError = undefined
     this.stopping = false
     this.stdoutBuffer = ''
+    this.loaded = { model, language }
     const child = spawn(python, ['-I', '-X', 'utf8', script, modelsDir], {
       cwd: path.dirname(script),
       env: {
@@ -169,33 +191,61 @@ export class SttService {
       }, START_TIMEOUT_MS)
       this.readyWait = { resolve, reject, timer }
     })
+    this.loading = ready
 
-    this.send({ type: 'start', model, language, device: 'auto', partial_interval_ms: 1200, silence_ms: 700 })
-    return ready
+    this.send({
+      type: 'start',
+      model,
+      language,
+      device: 'auto',
+      // More frequent live previews; the sidecar coalesces them and never runs
+      // two partial decodes at the same time.
+      partial_interval_ms: 800,
+      silence_ms: 700,
+      cpu_threads: Math.max(4, Math.min(8, Math.floor(os.cpus().length / 2)))
+    })
+    try {
+      return await ready
+    } finally {
+      this.loading = null
+    }
   }
 
-  /** Finalizes what is buffered (so the last utterance still arrives), then exits. */
+  /** Loads the model without starting a listening session, so the mic click is instant. */
+  async preload(options: SttStartOptions = {}): Promise<SttReady | null> {
+    if (this.disposed) return null
+    // Never reset a session that may already be listening: preload only helps
+    // when there is no warm model yet.
+    if (this.loading) return this.loading.catch(() => null)
+    if (this.ready && this.child) return this.ready
+    try {
+      return await this.start(options)
+    } catch (err) {
+      this.log(`preload do modelo falhou: ${(err as Error).message}`)
+      return null
+    }
+  }
+
+  /**
+   * Finalizes the buffered utterance and clears the session state, but keeps
+   * the Python process and the model loaded for the next click.
+   */
   async stop(): Promise<boolean> {
     const child = this.child
-    if (!child) return true
+    if (!child || !this.ready) return true
     this.stopping = true
     try {
-      if (this.ready && child.exitCode === null) {
-        const flushed = new Promise<void>((resolve) => {
-          const timer = setTimeout(() => {
-            this.flushWait = null
-            resolve()
-          }, FLUSH_TIMEOUT_MS)
-          this.flushWait = { resolve, timer }
-        })
-        this.send({ type: 'flush' })
-        await flushed
-      }
-      if (child.exitCode === null) this.send({ type: 'stop' })
-      await waitForExit(child, EXIT_TIMEOUT_MS)
+      const flushed = new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          this.flushWait = null
+          resolve()
+        }, FLUSH_TIMEOUT_MS)
+        this.flushWait = { resolve, timer }
+      })
+      this.send({ type: 'flush' })
+      await flushed
+      if (this.child && this.ready) this.send({ type: 'reset' })
     } finally {
-      if (child.exitCode === null) this.kill()
-      this.reset()
       this.stopping = false
     }
     return true
@@ -219,6 +269,28 @@ export class SttService {
     this.disposed = true
     this.kill()
     this.reset()
+    this.loaded = null
+    this.loading = null
+  }
+
+  /** Kills the sidecar (model/language change or app quit). */
+  private async shutdown(): Promise<void> {
+    const child = this.child
+    if (!child) {
+      this.reset()
+      this.loaded = null
+      return
+    }
+    this.stopping = true
+    try {
+      if (this.ready && child.exitCode === null) this.send({ type: 'stop' })
+      await waitForExit(child, EXIT_TIMEOUT_MS)
+    } finally {
+      if (child.exitCode === null) this.kill()
+      this.reset()
+      this.stopping = false
+      this.loaded = null
+    }
   }
 
   private reset(): void {
@@ -355,11 +427,13 @@ export class SttService {
     }
     this.child = null
     this.ready = null
+    this.loaded = null
     if (!wasStopping && !this.disposed) this.options.emit({ type: 'exit' })
   }
 
   private fail(reason: string): void {
     this.lastError = reason
+    this.loaded = null
     const waiter = this.readyWait
     this.readyWait = null
     if (waiter) {

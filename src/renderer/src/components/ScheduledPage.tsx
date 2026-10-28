@@ -5,6 +5,7 @@ import { Icon } from './Icons'
 import { MenuPopover, type MenuItem } from './Chrome'
 import { relativeTime } from '../lib/format'
 import { errorMessage, unwrap } from '../lib/api'
+import { surfaceFor, type TaskSurface } from '../lib/scheduled-surface'
 
 const WEEKDAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
 
@@ -27,46 +28,79 @@ interface Template {
   name: string
   prompt: string
   schedule: ScheduleSpec
-  icon: 'code' | 'checkSquare' | 'refresh' | 'list' | 'search' | 'hammer'
+  icon: 'code' | 'checkSquare' | 'refresh' | 'list' | 'search' | 'hammer' | 'folder' | 'file'
+  /** Session surface of each run; a template without one opens a Code session. */
+  surface?: TaskSurface
+  /** Built-in job instead of a prompt session. */
+  action?: 'improvement-review'
+  actionOptions?: { useAi?: boolean; days?: number }
 }
 
-/** Developer-oriented starting points, mirroring the template cards of the reference app. */
+/** Cowork starting points first (work in a folder), then developer-oriented ones, mirroring the template cards of the reference app. */
 const TEMPLATES: Template[] = [
+  {
+    name: 'Organizar os arquivos novos da pasta',
+    prompt: 'Veja os arquivos que chegaram nesta pasta desde a última execução e organize-os por tipo e data, sem apagar nada. No fim, liste o que foi movido e o que ficou de fora.',
+    schedule: { kind: 'weekly', day: 5, time: '17:00' },
+    icon: 'folder',
+    surface: 'cowork'
+  },
+  {
+    name: 'Resumo semanal da pasta',
+    prompt: 'Leia os arquivos desta pasta alterados nos últimos 7 dias e grave um resumo em Markdown (resumo-semanal.md) com os pontos principais, decisões e pendências.',
+    schedule: { kind: 'weekly', day: 1, time: '09:00' },
+    icon: 'file',
+    surface: 'cowork'
+  },
   {
     name: 'Revisão diária do código',
     prompt: 'Revise as alterações não commitadas e os commits das últimas 24 horas. Aponte bugs prováveis, riscos de segurança e código sem teste, com arquivo e linha.',
     schedule: { kind: 'weekdays', time: '09:00' },
-    icon: 'code'
+    icon: 'code',
+    surface: 'code'
   },
   {
     name: 'Rodar os testes',
     prompt: 'Rode a suíte de testes do projeto. Se algo falhar, resuma cada falha com a causa provável e o arquivo envolvido. Não altere código.',
     schedule: { kind: 'daily', time: '08:00' },
-    icon: 'checkSquare'
+    icon: 'checkSquare',
+    surface: 'code'
   },
   {
     name: 'Dependências e vulnerabilidades',
     prompt: 'Liste dependências desatualizadas e vulnerabilidades conhecidas (por exemplo npm outdated e npm audit). Proponha atualizações seguras, sem aplicá-las.',
     schedule: { kind: 'weekly', day: 1, time: '10:00' },
-    icon: 'refresh'
+    icon: 'refresh',
+    surface: 'code'
   },
   {
     name: 'Resumo semanal do repositório',
     prompt: 'Resuma o que mudou no repositório nesta semana: commits, áreas afetadas, pendências e próximos passos sugeridos.',
     schedule: { kind: 'weekly', day: 5, time: '17:00' },
-    icon: 'list'
+    icon: 'list',
+    surface: 'code'
   },
   {
     name: 'Caçar TODO e FIXME',
     prompt: 'Procure TODO, FIXME e HACK no código e organize por prioridade e área, com arquivo e linha.',
     schedule: { kind: 'weekly', day: 3, time: '14:00' },
-    icon: 'search'
+    icon: 'search',
+    surface: 'code'
   },
   {
     name: 'Conferir o build',
     prompt: 'Rode o build do projeto. Se quebrar, explique o erro e onde corrigir. Não altere código.',
     schedule: { kind: 'daily', time: '12:00' },
-    icon: 'hammer'
+    icon: 'hammer',
+    surface: 'code'
+  },
+  {
+    name: 'Revisão semanal de melhorias',
+    prompt: 'Lê as limitações recorrentes, falhas por ferramenta, aprovações recusadas, uso por provedor e a memória do projeto, e salva um relatório com evidências na memória e na Atividade. Somente leitura: nada é aplicado.',
+    schedule: { kind: 'weekly', day: 1, time: '09:00' },
+    icon: 'search',
+    action: 'improvement-review',
+    actionOptions: { useAi: true, days: 14 }
   }
 ]
 
@@ -81,12 +115,19 @@ interface Draft {
   day: number
   at: string
   enabled: boolean
+  priority: 'low' | 'normal' | 'high'
+  maxRetries: number
+  retryDelaySec: number
+  surface: TaskSurface
+  action?: 'improvement-review'
+  actionOptions?: { useAi?: boolean; days?: number }
 }
 
-function draftFrom(projectId: string, source?: Partial<Template> & { schedule?: ScheduleSpec; id?: string; enabled?: boolean; projectId?: string }): Draft {
+function draftFrom(projectId: string, source?: Partial<Template> & { schedule?: ScheduleSpec; id?: string; enabled?: boolean; projectId?: string; priority?: 'low' | 'normal' | 'high'; maxRetries?: number; retryDelayMs?: number }): Draft {
   const schedule = source?.schedule ?? { kind: 'daily', time: '09:00' }
   return {
     id: source?.id,
+    surface: surfaceFor(source),
     name: source?.name ?? '',
     prompt: source?.prompt ?? '',
     projectId: source?.projectId ?? projectId,
@@ -95,7 +136,12 @@ function draftFrom(projectId: string, source?: Partial<Template> & { schedule?: 
     minute: schedule.kind === 'hourly' ? schedule.minute : 0,
     day: schedule.kind === 'weekly' ? schedule.day : 1,
     at: schedule.kind === 'once' ? schedule.at.slice(0, 16) : new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
-    enabled: source?.enabled ?? true
+    enabled: source?.enabled ?? true,
+    priority: source?.priority ?? 'normal',
+    maxRetries: source?.maxRetries ?? 0,
+    retryDelaySec: Math.round((source?.retryDelayMs ?? 0) / 1000),
+    action: source?.action,
+    actionOptions: source?.actionOptions
   }
 }
 
@@ -137,7 +183,11 @@ function TaskDialog({
         prompt: form.prompt.trim(),
         projectId: form.projectId,
         schedule: scheduleOf(form),
-        enabled: form.enabled
+        enabled: form.enabled,
+        priority: form.priority,
+        maxRetries: form.maxRetries,
+        retryDelayMs: form.retryDelaySec * 1000,
+        ...(form.action ? { action: form.action, actionOptions: form.actionOptions ?? {} } : { surface: form.surface })
       }
       const task = form.id ? await unwrap(window.forja.schedules.update(form.id, input)) : await unwrap(window.forja.schedules.create(input))
       onSaved(task)
@@ -154,7 +204,7 @@ function TaskDialog({
         <header className="modal-head">
           <div>
             <h2>{form.id ? 'Editar tarefa' : 'Nova tarefa agendada'}</h2>
-            <p>O Openclod abre uma sessão nova no projeto e envia a instrução no horário marcado, enquanto o app estiver aberto.</p>
+            <p>O Openclod abre uma sessão nova (Cowork ou Code) no projeto e envia a instrução no horário marcado, enquanto o app estiver aberto.</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} title="Fechar">
             <Icon name="x" size={16} />
@@ -176,10 +226,34 @@ function TaskDialog({
               ))}
             </select>
           </label>
-          <label>
-            Instrução para o agente
-            <textarea value={form.prompt} rows={6} maxLength={20000} onChange={(event) => set('prompt', event.target.value)} placeholder="O que o agente deve fazer a cada execução" />
-          </label>
+          {form.action ? null : (
+            <label>
+              Tipo de sessão
+              <select value={form.surface} onChange={(event) => set('surface', event.target.value as TaskSurface)}>
+                <option value="cowork">Cowork: trabalho em uma pasta (documentos, arquivos, pesquisa)</option>
+                <option value="code">Code: sessão de código do projeto</option>
+              </select>
+            </label>
+          )}
+          {form.action ? (
+            <div className="task-action-note">
+              <strong>Tarefa interna: revisão de melhorias</strong>
+              <p>{form.prompt}</p>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={form.actionOptions?.useAi !== false}
+                  onChange={(event) => set('actionOptions', { ...form.actionOptions, useAi: event.target.checked })}
+                />{' '}
+                Usar IA para analisar (envia as evidências, sem segredos, ao provedor padrão)
+              </label>
+            </div>
+          ) : (
+            <label>
+              Instrução para o agente
+              <textarea value={form.prompt} rows={6} maxLength={20000} onChange={(event) => set('prompt', event.target.value)} placeholder="O que o agente deve fazer a cada execução" />
+            </label>
+          )}
           <div className="task-form-row">
             <label>
               Frequência
@@ -225,6 +299,24 @@ function TaskDialog({
           <label className="check-row">
             <input type="checkbox" checked={form.enabled} onChange={(event) => set('enabled', event.target.checked)} /> Ativada
           </label>
+          <div className="task-form-row">
+            <label>
+              Prioridade
+              <select value={form.priority} onChange={(event) => set('priority', event.target.value as Draft['priority'])}>
+                <option value="low">Baixa</option>
+                <option value="normal">Normal</option>
+                <option value="high">Alta</option>
+              </select>
+            </label>
+            <label>
+              Retentativas
+              <input type="number" min={0} max={5} value={form.maxRetries} onChange={(event) => set('maxRetries', Math.max(0, Math.min(5, Number(event.target.value) || 0)))} />
+            </label>
+            <label>
+              Espera entre tentativas (s)
+              <input type="number" min={0} max={300} value={form.retryDelaySec} onChange={(event) => set('retryDelaySec', Math.max(0, Math.min(300, Number(event.target.value) || 0)))} />
+            </label>
+          </div>
         </div>
         <footer className="modal-foot">
           <span className="muted">{describeSchedule(scheduleOf(form))}</span>
@@ -343,8 +435,8 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
         </span>
       </header>
       <p className="page-lead">
-        Rode instruções do agente em horários fixos: revisões, testes, relatórios. As execuções acontecem enquanto o Openclod estiver aberto; uma execução
-        perdida com o app fechado roda uma vez ao abrir.
+        Rode instruções do agente em horários fixos: relatórios, organização de pastas, revisões, testes. Cada execução abre uma sessão Cowork ou Code, à sua
+        escolha. As execuções acontecem enquanto o Openclod estiver aberto; uma execução perdida com o app fechado roda uma vez ao abrir.
       </p>
       <div className="page-tools">
         <div className="page-search">
@@ -376,9 +468,14 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
             <div key={task.id} className={`task-row ${task.enabled ? '' : 'paused'}`}>
               <span className={`dot ${task.lastStatus === 'error' ? 'off' : task.enabled ? 'on' : 'idle'}`} />
               <div className="task-main">
-                <strong>{task.name}</strong>
+                <strong>
+                  {task.name}
+                  {task.action ? <span className="badge" title="Roda a revisão de melhorias, sem abrir sessão">interna</span> : null}
+                </strong>
                 <span>
                   {describeSchedule(task.schedule)} · {projectName(task.projectId)}
+                  {task.action ? '' : ` · ${(task.surface ?? 'code') === 'cowork' ? 'Cowork' : 'Code'}`} · prioridade {task.priority ?? 'normal'}
+                  {task.maxRetries ? ` · até ${task.maxRetries} retentativa(s)` : ''}
                 </span>
               </div>
               <div className="task-meta">

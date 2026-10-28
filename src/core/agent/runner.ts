@@ -5,14 +5,19 @@ import type {
   AgentMode,
   ApprovalDecision,
   ApprovalRequest,
+  BudgetInfo,
+  ContextBreakdown,
   HarnessEvent,
   HarnessLimits,
   ImagePart,
+  LimitationReport,
   Message,
   PlanItem,
   PolicyConfig,
   Provider,
   ProviderConfig,
+  QuestionAnswer,
+  QuestionRequest,
   RunState,
   StopReason,
   ToolCall,
@@ -30,12 +35,28 @@ import type { MemoryFact, MemoryStore } from '../memory/store.js'
 import type { ProjectMemory } from '../memory/project.js'
 import type { HookOutcome, HookRunner } from '../hooks/runner.js'
 import { claudeToolInput } from '../hooks/runner.js'
-import { buildSystemPrompt, loadProjectInstructions } from './context.js'
+import { buildSystemPrompt, describeSkills, loadProjectInstructions } from './context.js'
+import { composeTurnContext, createTurnContextState, hydrateTurnContext, isTurnContext, noteTurnPlan, resetTurnContext, type TurnContextState } from './turn-context.js'
+import { buildPack } from '../memory/pack.js'
+import { digestCapsule } from '../memory/state-page.js'
+import { renderSuggestions, suggest, type Candidate } from './suggest.js'
+import { mergePlanTimes } from './plan-times.js'
+import { appendPlanActivity, planActivityEntry } from './plan-activity.js'
+import { buildAutoLimitation } from './auto-limitation.js'
+import { detectRepetition, MAX_REASONING_ONLY_CHARS, MAX_REASONING_ONLY_MS, type RepetitionHit } from './loop-detection.js'
+import { addUsage, usageCost } from './usage.js'
+import { billableTokens, effectiveMaxTokens } from '../../shared/limits.js'
 import { compactIfNeeded, estimateContextTokens } from './compaction.js'
 import { evaluateTool, toolsForMode } from '../security/permissions.js'
+import { CORE_TOOL_NAMES, DEFERRED_ESSENTIAL_TOOL_NAMES, TEAM_CORE_TOOL_NAMES } from '../tools/lazy.js'
+import { summarizeMcpTools } from '../mcp/tools.js'
 import { scanForInjection } from '../security/policy.js'
 import { errorKindOf, isRetryableKind } from '../providers/http.js'
-import { id, sleep, truncate, truncateMiddle } from '../util/ids.js'
+import type { FallbackCandidate } from '../providers/chain.js'
+import { describeFailure, isAccountLevelKind, type ProviderHealth } from '../providers/health.js'
+import { accountKeyOf } from '../providers/order.js'
+import { describeImage, inlineImageDescriptions, pendingImages, recordDescription, type DescribeCandidate } from '../vision/relay.js'
+import { estimateTokens, id, sleep, truncate, truncateMiddle } from '../util/ids.js'
 import type { ProviderBlocks, ProviderErrorKind, ReasoningEffort, SessionSurface, ToolSpec } from '../../shared/types.js'
 import type { AgentRegistry } from '../agents/registry.js'
 import type { SubagentCaller } from '../agents/types.js'
@@ -44,6 +65,8 @@ import { DEFAULT_MAX_AGENT_DEPTH } from '../agents/limits.js'
 const TOOL_TIMEOUT_MS = 10 * 60 * 1000
 /** Inline budget for one tool result; longer output is written to a file instead. */
 const MAX_RESULT_CHARS = 60_000
+/** Non-read_file tools spill earlier: their output is re-sent every iteration. */
+const MAX_TOOL_RESULT_CHARS = 16_000
 /** What the model still sees of a spilled output: a head and a tail, never the whole thing. */
 const SPILL_HEAD_CHARS = 10_000
 const SPILL_TAIL_CHARS = 4_000
@@ -51,20 +74,98 @@ const SPILL_TAIL_CHARS = 4_000
 const READ_FILE_MAX_BYTES = 512 * 1024
 /** Size cap for the summary handed to PostCompact hooks. */
 const COMPACT_SUMMARY_HOOK_CHARS = 20_000
+/** Each source of the per-turn context (wiki, index, facts) gets this long; past it that source adds nothing. */
+const TURN_CONTEXT_STEP_MS = 2_500
+
+/** A conversation longer than this, taken over by another model, is summarised before the first request. */
+const MODEL_SWITCH_COMPACTION_TOKENS = 20_000
+
+/** "há 12 min", "há 3 h", "há 2 dias": how long ago a continuity capsule was written. */
+function ageLabel(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso || '')) / 60_000))
+  if (!Number.isFinite(minutes)) return 'há tempos'
+  if (minutes < 60) return `há ${Math.max(1, minutes)} min`
+  if (minutes < 60 * 48) return `há ${Math.round(minutes / 60)} h`
+  return `há ${Math.round(minutes / 1440)} dias`
+}
+
+/** Reason recorded when the user stops a turn; turn_end carries `cancelled` so it is not counted as a failure. */
+/** Local servers (Ollama, LM Studio, llama.cpp) cost nothing per token, so a missing tariff is correct there. */
+function isLocalProvider(config: ProviderConfig): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(config.baseUrl ?? '')
+}
+
+export const TURN_CANCELLED = 'turno cancelado pelo usuário'
 /** Modes that may use MCP server tools (read-only modes never do: every MCP tool is at least `exec` risk). */
 const MCP_MODES = new Set<string>(['ask', 'code', 'debug', 'autonomous', 'web', 'computer'])
 /** Delegation tools: offered only when this runner has someone to delegate to. */
 const AGENT_TOOLS = new Set<string>(['agent', 'list_agents'])
 /** Automatic "continue" requests after the model hits its output cap. */
+const TOOL_ALIASES: Record<string, string[]> = {
+  mouse: ['computer_mouse_move', 'computer_mouse_button', 'computer_click', 'computer_cursor_position'],
+  ponteiro: ['computer_mouse_move', 'computer_mouse_button', 'computer_click', 'computer_cursor_position'],
+  cursor: ['computer_cursor_position', 'computer_mouse_move', 'computer_click'],
+  tela: ['computer_screenshot', 'computer_snapshot'],
+  screenshot: ['computer_screenshot', 'computer_snapshot'],
+  captura: ['computer_screenshot', 'computer_snapshot'],
+  janela: ['computer_list_windows', 'computer_wait_for_window', 'computer_activate', 'computer_snapshot'],
+  window: ['computer_list_windows', 'computer_wait_for_window', 'computer_activate', 'computer_snapshot'],
+  desktop: ['computer_screenshot', 'computer_open_path', 'computer_launch'],
+  navegador: ['browser_'],
+  browser: ['browser_'],
+  abrir: ['computer_open_path', 'computer_launch', 'browser_open'],
+  open: ['computer_open_path', 'computer_launch', 'browser_open'],
+  teclado: ['computer_press_key', 'computer_type_text'],
+  keyboard: ['computer_press_key', 'computer_type_text'],
+  // The former essentials, found by the words a model uses for them ("catálogo de skills", "passagem de bastão"...).
+  skill: ['list_skills'],
+  skills: ['list_skills'],
+  agente: ['list_agents'],
+  agentes: ['list_agents'],
+  agents: ['list_agents'],
+  handoff: ['memory_handoff'],
+  bastão: ['memory_handoff'],
+  bastao: ['memory_handoff'],
+  servidores: ['mcp_servers', 'mcp_reload'],
+  servers: ['mcp_servers', 'mcp_reload'],
+  briefing: ['memory_brief']
+}
+
+/** The former essentials a request names: by the words people use for them (TOOL_ALIASES) or by the tool's own name. */
+function essentialsNamedBy(query: string): Set<string> {
+  const wanted = query.toLowerCase()
+  const named = new Set<string>()
+  for (const [key, names] of Object.entries(TOOL_ALIASES)) {
+    if (!wanted.includes(key)) continue
+    for (const name of names) if (DEFERRED_ESSENTIAL_TOOL_NAMES.has(name)) named.add(name)
+  }
+  // By its own name too, except `task`: an ordinary English word in a request about code.
+  for (const name of DEFERRED_ESSENTIAL_TOOL_NAMES) if (name.includes('_') && wanted.includes(name)) named.add(name)
+  return named
+}
+
 const MAX_LENGTH_CONTINUATIONS = 2
 /** Stream-level retries per turn (HTTP-level retries happen in postStream). */
 const MAX_STREAM_RETRIES = 2
 /** Times a Stop hook may send the agent back to work in one turn. */
 const MAX_STOP_HOOK_LOOPS = 3
-/** How many models one turn may switch to before giving up. */
-const MAX_MODEL_FALLBACKS = 8
+/** Times the plan guard may send the agent back to finish an open checklist item. */
+const MAX_PLAN_GUARD_LOOPS = 2
+/** Iterations of a turn without update_plan, while the plan has open steps, before the agent is reminded to bring it up to date. */
+const PLAN_REMINDER_EVERY = 12
+/** Reminders per turn (the iteration cap is 60 by default: a reminder every 12 is at most four or five). */
+const MAX_PLAN_REMINDERS = 4
+/** How many models one turn may switch to before giving up (the user can tick several models per provider). */
+const MAX_MODEL_FALLBACKS = 16
+/** Pictures described per request by the vision relay (the newest first matter), and how many at once. */
+const MAX_DESCRIBED_PER_REQUEST = 6
+const VISION_PARALLEL = 3
+/** After every vision model failed, the relay leaves the pictures alone for this long. */
+const VISION_REST_MS = 2 * 60_000
 
 function isFallbackKind(kind: ProviderErrorKind | undefined): boolean {
+  // Failures another model or provider can get around. A bad request here means "this model is unavailable on this
+  // provider"; the switch is always announced in the conversation, never silent.
   return (
     kind === 'quota' ||
     kind === 'rate_limit' ||
@@ -119,6 +220,46 @@ export function repairOrphanToolCalls(messages: Message[]): { messages: Message[
 
 const MAX_INLINE_IMAGE_BYTES = 25 * 1024 * 1024
 const TARGET_INLINE_IMAGE_BYTES = 15 * 1024 * 1024
+/** How many of the automatic "after" pictures (one per browser/computer action) go out with each request. */
+const ACTION_VIEWS_KEPT = 3
+
+/** Tools whose images the agent asked for on purpose: those follow the normal budget, never this view-trimming. */
+const EXPLICIT_CAPTURE = new Set(['browser_screenshot', 'computer_screenshot', 'computer_snapshot'])
+
+/**
+ * Every browser and computer action now returns a picture of the result. Only the newest few go out with a
+ * request (the older ones become a note): a local model with a 64k window would otherwise spend it on pictures
+ * of screens it already left. Captures the model requested explicitly keep following trimInlineImages instead.
+ */
+export function keepRecentActionViews(messages: Message[], keep = ACTION_VIEWS_KEPT): Message[] {
+  const isView = (part: Message['parts'][number]): boolean =>
+    part.type === 'tool_result' &&
+    Boolean(part.images?.length) &&
+    (part.name.startsWith('browser_') || part.name.startsWith('computer_')) &&
+    !EXPLICIT_CAPTURE.has(part.name)
+  let seen = 0
+  let changed = false
+  const out = [...messages]
+  for (let m = out.length - 1; m >= 0; m--) {
+    const message = out[m]
+    if (!message.parts.some(isView)) continue
+    const parts = [...message.parts]
+    for (let p = parts.length - 1; p >= 0; p--) {
+      const part = parts[p]
+      if (!isView(part) || part.type !== 'tool_result') continue
+      seen++
+      if (seen <= keep) continue
+      changed = true
+      parts[p] = {
+        ...part,
+        images: undefined,
+        text: `${part.text ?? ''}\n[a captura desta etapa saiu do contexto: a página mudou depois; valem as capturas mais recentes]`.trim()
+      }
+    }
+    out[m] = { ...message, parts: parts as Message['parts'] }
+  }
+  return changed ? out : messages
+}
 
 /**
  * Screen captures accumulate fast. Before a request, keep the newest images up
@@ -169,8 +310,12 @@ export function trimInlineImages(
 
 const CONTINUE_PROMPT =
   'Sua resposta anterior foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir o que já escreveu.'
+const CUT_ANSWER_PROMPT =
+  '<resposta-interrompida>\nA resposta acima foi cortada no meio por uma falha do provedor anterior, e você é o modelo que assumiu a conversa. Continue exatamente de onde ela parou, sem repetir o que já foi escrito e sem comentar a troca de modelo.\n</resposta-interrompida>'
 const FINAL_STEP_PROMPT =
   'Você atingiu o limite de iterações deste turno. Não chame mais ferramentas. Responda agora com um resumo: o que foi feito, o que foi verificado, o que falta e o próximo passo.'
+const BUDGET_FINAL_PROMPT =
+  'O orçamento de tokens deste turno acabou. Não chame mais ferramentas. Responda agora com um resumo curto: o que foi feito, o que ficou pendente no plano e o próximo passo exato. O usuário poderá continuar de onde parou em um novo turno.'
 
 export interface ProjectMeta {
   name: string
@@ -213,6 +358,8 @@ export interface RunnerDeps {
   hooks?: HookRunner
   emit: (event: HarnessEvent) => void
   approve: (request: ApprovalRequest) => Promise<ApprovalDecision | boolean>
+  /** Asks the user structured questions; absent for subagents and isolated tests. */
+  ask?: (request: QuestionRequest) => Promise<QuestionAnswer[] | null>
   /** Starts a subagent for the `agent` / `task` tools; `caller` describes this runner (see agents/runtime.ts). */
   runSubagent?: (spec: SubagentSpec, caller: SubagentCaller) => Promise<SubagentOutcome>
   /** Agent definitions this runner may delegate to. Without it the `agent` and `list_agents` tools are not offered. */
@@ -224,7 +371,14 @@ export interface RunnerDeps {
   /** UI surface; Cowork and Chat get their own operating guidance. */
   surface?: SessionSurface
   /** Ordered alternatives to switch to when the active model is exhausted or unavailable. */
-  fallback?: Array<{ provider: Provider; config: ProviderConfig }>
+  fallback?: FallbackCandidate[]
+  /** What the harness has learned about which providers work (shared by every session); optional in isolated tests. */
+  health?: ProviderHealth
+  /**
+   * Models that can read images, in the order to try. When the active model cannot, the pictures of the conversation
+   * are described by the first of these that answers and the text goes in their place (core/vision/relay.ts).
+   */
+  vision?: { candidates(): DescribeCandidate[] }
   persist?: (state: RunnerSnapshot) => void
   systemExtra?: string
   initial?: { messages?: Message[]; plan?: PlanItem[]; usage?: Usage }
@@ -257,21 +411,16 @@ export interface RunnerSnapshot {
 export interface SendOptions {
   images?: ImagePart[]
   hidden?: boolean
-}
-
-function addUsage(total: Usage, delta: Usage, config: ProviderConfig): Usage {
-  const input = total.input + (delta.input ?? 0)
-  const output = total.output + (delta.output ?? 0)
-  const cachedInput = (total.cachedInput ?? 0) + (delta.cachedInput ?? 0)
-  const cost =
-    (config.inputCostPerMTok ? (input / 1_000_000) * config.inputCostPerMTok : 0) +
-    (config.outputCostPerMTok ? (output / 1_000_000) * config.outputCostPerMTok : 0)
-  return {
-    input,
-    output,
-    cachedInput: cachedInput || undefined,
-    costUsd: cost || total.costUsd
-  }
+  /** Preallocated id so a filesystem checkpoint can be keyed before the turn starts. */
+  messageId?: string
+  /**
+   * Work that must finish before the first model call, run with the user's message already on screen (an audio or video
+   * attached to the message is processed here, with progress notices). Its text becomes a hidden message after the user's;
+   * its images only reach a model that can see them. A failure is reported and the turn goes on without it.
+   */
+  prepare?: (control: { signal: AbortSignal; progress: (note: string) => void }) => Promise<{ text: string; images?: ImagePart[] } | null | undefined>
+  /** Name the preparation shows under in the live activity (a running tool with its elapsed time); defaults to `preparar`. */
+  prepareLabel?: string
 }
 
 /** Ids come from the model; keep only characters that are safe in a file name. */
@@ -354,19 +503,43 @@ export class SessionRunner {
   /** Active provider/config; a fallback may replace them between iterations. */
   private provider: Provider
   private providerConfig: ProviderConfig
-  private fallback: Array<{ provider: Provider; config: ProviderConfig }>
+  private fallback: FallbackCandidate[]
+  /** After every vision model failed, the relay rests until then instead of failing again in each request. */
+  private visionRestUntil = 0
   private lastToolSignature = ''
   private repeatedCalls = 0
+  /** A fourth identical tool call ends the turn instead of nudging forever. */
+  private toolLoopTripped = false
   private toolCallCount = 0
   private startedAt = 0
-  private memoryFacts: MemoryFact[] = []
-  /** Bounded wiki briefing from the project memory (pages + open handoffs). */
-  private projectMemoryBrief = ''
-  /** Bounded recall from the project's AI-Memory index (recent + matches). */
-  private aiMemoryBrief = ''
+  /** Usage of the current user turn; `usage` remains the session total. */
+  private turnUsage: Usage = { input: 0, output: 0 }
+  /** Actual prompt size of the last provider call, including tool schemas. */
+  private lastRequestTokens = 0
+  /** The no-tariff warning is shown once per runner. */
+  private costNoticeShown = false
+  private limitKind: 'tokens' | 'cost' | 'iterations' | 'time' | 'tools' | null = null
+  private budgetReported = false
+  /** Iteration of the current turn being prepared, and when the plan was last written or the agent last reminded about it. */
+  private iterationNow = 0
+  private planTouchedAt = 0
+  private planRemindedAt = 0
+  private planReminders = 0
+  /** Provider error class of the last failed request, used by the auto limitation card. */
+  private lastErrorKind: string | null = null
+  /** Non-core tools enabled by tool_load during this turn. */
+  private loadedTools = new Set<string>()
+  /** True until the first request after another model took over the conversation (see `compact`). */
+  private modelChanged = false
+  /** What the hidden per-turn context already put into the history (see turn-context.ts). */
+  private readonly turnContext: TurnContextState = createTurnContextState()
+  /** Size of each section of the last turn context, for the context meter. */
+  private lastTurnContextSections: Array<{ name: string; chars: number }> = []
   private sessionStartContext: string[] | null = null
   /** Directories holding spilled tool output; read-only tools may open files there. */
   private readonly spillRoots: string[] = []
+  /** Ids of the interrupted plan items already announced in this runner. */
+  private resumeNoticeFor: string | null = null
 
   constructor(deps: RunnerDeps) {
     this.deps = deps
@@ -378,6 +551,10 @@ export class SessionRunner {
       : []
     this.plan = deps.initial?.plan ? [...deps.initial.plan] : []
     this.usage = deps.initial?.usage ?? { input: 0, output: 0 }
+    hydrateTurnContext(this.turnContext, this.messages)
+    // A session whose last answer came from another model: the user switched models (or one ran out of quota).
+    const previousModel = [...this.messages].reverse().find((message) => message.role === 'assistant' && message.model)?.model
+    this.modelChanged = Boolean(previousModel && previousModel !== this.providerConfig.model)
   }
 
   get sessionId(): string {
@@ -395,6 +572,17 @@ export class SessionRunner {
 
   private persist(): void {
     this.deps.persist?.(this.snapshot())
+  }
+
+  /** Stores what one tool did under the step that was active when it finished. */
+  private recordPlanActivity(call: ToolCall, result: ToolResult, startedAt: number, endedAt: number): void {
+    const entry = planActivityEntry(call.id, call.name, call.args, result, startedAt, endedAt)
+    if (!entry) return
+    const next = appendPlanActivity(this.plan, entry)
+    if (next === this.plan) return
+    this.plan = next
+    this.emit({ type: 'plan', sessionId: this.deps.sessionId, items: this.plan })
+    this.persist()
   }
 
   private setState(state: RunState, detail?: string): void {
@@ -431,6 +619,67 @@ export class SessionRunner {
     return true
   }
 
+  /**
+   * Where the tokens of the NEXT request go, measured from the real system prompt, the real tool schemas and the real
+   * history (the panel used to show fixed numbers: 1 100 for the system prompt, 320 for skills). The sizes are estimates
+   * of the same kind the compaction uses (characters / 3.4); `lastRequest` is what the provider reported.
+   */
+  contextBreakdown(): ContextBreakdown {
+    const system = this.buildSystem()
+    const instructions = loadProjectInstructions(this.deps.cwd) ?? ''
+    let skillsText = ''
+    try {
+      const list = this.deps.services.skills.list()
+      skillsText = list.length ? describeSkills(list) : ''
+    } catch {
+      /* no skill library */
+    }
+    const tokens = (text: string): number => estimateTokens(text)
+    const specs = this.toolSpecs(this.availableTools())
+    const mcpSpecs = specs.filter((spec) => spec.name.startsWith('mcp__'))
+    const otherSpecs = specs.filter((spec) => !spec.name.startsWith('mcp__'))
+    let turnContexts = 0
+    let summary = 0
+    let conversation = 0
+    let toolResults = 0
+    let toolCalls = 0
+    let images = 0
+    for (const message of this.messages) {
+      if (isTurnContext(message)) {
+        turnContexts += tokens(message.parts.map((part) => (part.type === 'text' ? part.text : '')).join('\n'))
+        continue
+      }
+      for (const part of message.parts) {
+        if (part.type === 'text') {
+          if (message.hidden && part.text.startsWith('[Contexto compactado')) summary += tokens(part.text)
+          else conversation += tokens(part.text)
+        } else if (part.type === 'reasoning') conversation += tokens(part.text)
+        else if (part.type === 'tool_result') toolResults += tokens(part.text)
+        else if (part.type === 'tool_call') toolCalls += tokens(JSON.stringify(part.args ?? {}))
+        else if (part.type === 'image') images += 850
+      }
+    }
+    const items = [
+      { id: 'system', label: 'Instruções do sistema', tokens: Math.max(0, tokens(system) - tokens(instructions) - tokens(skillsText)) },
+      { id: 'instructions', label: 'Instruções do projeto (CLAUDE.md)', tokens: tokens(instructions) },
+      { id: 'skills', label: 'Skills (índice)', tokens: tokens(skillsText) },
+      { id: 'tools', label: 'Ferramentas (schemas)', tokens: tokens(JSON.stringify(otherSpecs)) },
+      { id: 'mcp', label: 'Ferramentas MCP (schemas)', tokens: tokens(JSON.stringify(mcpSpecs)) },
+      { id: 'memory', label: 'Memória e contexto do turno', tokens: turnContexts },
+      { id: 'summary', label: 'Resumo da conversa antiga', tokens: summary },
+      { id: 'messages', label: 'Mensagens', tokens: conversation },
+      { id: 'results', label: 'Resultados de ferramentas', tokens: toolResults },
+      { id: 'calls', label: 'Chamadas de ferramentas', tokens: toolCalls },
+      { id: 'images', label: 'Imagens', tokens: images }
+    ].filter((item) => item.tokens > 0)
+    return {
+      items,
+      total: items.reduce((sum, item) => sum + item.tokens, 0),
+      window: this.providerConfig.contextWindow,
+      lastRequest: this.lastRequestTokens
+    }
+  }
+
   /** Manual compaction triggered from the context panel. */
   async compactNow(): Promise<boolean> {
     if (this.busy) throw new Error('aguarde o turno atual terminar para compactar')
@@ -440,6 +689,8 @@ export class SessionRunner {
       messages: this.messages,
       provider: this.provider,
       contextWindow: this.providerConfig.contextWindow,
+      tools: this.toolSpecs(this.availableTools()),
+      usedTokens: this.lastRequestTokens,
       keepRecent: 4,
       force: true,
       onNote: (note) =>
@@ -456,6 +707,7 @@ export class SessionRunner {
     }
     const before = this.messages.length
     this.messages = result.messages
+    this.lastRequestTokens = 0
     this.persist()
     await this.afterCompaction('manual', before)
     return true
@@ -463,6 +715,8 @@ export class SessionRunner {
 
   /** PostCompact hooks run once the shorter history is in place and saved. */
   private async afterCompaction(trigger: 'manual' | 'auto' | 'overflow', before: number, signal?: AbortSignal): Promise<void> {
+    // The history that held the turn contexts is gone: the next turn sends the map, the plan and the pages again.
+    resetTurnContext(this.turnContext)
     const first = this.messages[0]?.parts[0]
     await this.runHook(
       'PostCompact',
@@ -484,21 +738,210 @@ export class SessionRunner {
   }
 
   private availableTools(): string[] {
-    const allowed = [...toolsForMode(this.deps.mode)]
-    // MCP tools are registered per server at runtime, so no static mode list can name them.
-    // Read-only modes never get them: every MCP tool is at least `exec` risk.
-    if (MCP_MODES.has(this.deps.mode)) {
-      for (const name of this.deps.registry.names()) if (name.startsWith('mcp__')) allowed.push(name)
+    const allowed = new Set(toolsForMode(this.deps.mode))
+    // Lazy meta-tools stay available so the model can discover everything else.
+    allowed.add('tool_search')
+    allowed.add('tool_list')
+    allowed.add('tool_load')
+    for (const name of this.indirectMcpTools()) allowed.add(name)
+    // First-class MCP tools (mcp__server__tool): sent directly unless the server's tools are deferred.
+    for (const tool of this.mcpToolDefs()) allowed.add(tool.name)
+    for (const name of this.loadedTools) allowed.add(name)
+    // Local plugins are dynamic; they only enter after tool_load.
+    for (const name of this.deps.registry.names()) {
+      if (name.startsWith('plugin__') && this.loadedTools.has(name)) allowed.add(name)
     }
+    return [...allowed].filter((name) => (this.isCoreTool(name) || this.loadedTools.has(name)) && this.toolAllowed(name).ok)
+  }
+
+  /** Max effort or the user's "separate into agents" toggle: delegating is the point of the session. */
+  private teamMode(): boolean {
+    return this.deps.effort === 'max' || Boolean(this.deps.autoAgents)
+  }
+
+  /**
+   * `mcp_catalog` and `mcp_call`, the indirect path to a server's tools. They are in no mode's list (they exist only when the
+   * app has MCP servers to talk to) and are no longer sent in every request: tool_search finds them, tool_load enables them.
+   */
+  private indirectMcpTools(): string[] {
+    return this.deps.services.mcp && MCP_MODES.has(this.deps.mode) ? ['mcp_catalog', 'mcp_call'] : []
+  }
+
+  /** The former essentials this runner may use but has not loaded (see DEFERRED_ESSENTIAL_TOOL_NAMES). */
+  private deferredEssentialTools(): string[] {
+    const modeTools = new Set([...toolsForMode(this.deps.mode), ...this.indirectMcpTools()])
+    return [...DEFERRED_ESSENTIAL_TOOL_NAMES].filter((name) => modeTools.has(name) && this.toolAllowed(name).ok)
+  }
+
+  /**
+   * Tools sent in every request: the fixed core set, the MCP tools of servers that are not deferred and the delegation helpers
+   * when delegating is the point: team mode, or an agent whose definition may call others (its allowlist names them).
+   */
+  private isCoreTool(name: string): boolean {
+    if (CORE_TOOL_NAMES.has(name)) return true
+    if (TEAM_CORE_TOOL_NAMES.has(name) && (this.teamMode() || Boolean(this.deps.allowedTools?.includes(name)))) return true
+    const mcp = this.deps.registry.get(name)?.mcp
+    return Boolean(mcp && !mcp.deferred)
+  }
+
+  /**
+   * MCP tools this session may use. Modes that write may use all of them; the read-only modes (plan, review)
+   * only the ones that declare themselves read-only and never ask for approval.
+   */
+  private mcpToolDefs(): ToolDef[] {
+    const open = MCP_MODES.has(this.deps.mode)
+    return this.deps.registry
+      .list()
+      .filter((tool) => tool.mcp && (open || (tool.risk === 'read' && tool.approval !== 'ask')))
+  }
+
+  /** Mode, policy, hard allowlist and delegation checks shared by search/load. */
+  private toolAllowed(name: string): { ok: boolean; reason?: string } {
     const hard = this.deps.allowedTools ? new Set(this.deps.allowedTools) : null
-    return allowed.filter((name) => {
-      if (hard && !hard.has(name)) return false
+    if (hard && !hard.has(name)) return { ok: false, reason: 'não permitida para este agente' }
+    const tool = this.deps.registry.get(name)
+    if (!tool) return { ok: false, reason: 'ferramenta não registrada' }
+    if (tool.requires === 'network' && !this.deps.policy.allowNetwork) {
+      return { ok: false, reason: 'acesso de rede desativado' }
+    }
+    if (AGENT_TOOLS.has(name) && !this.canDelegate()) {
+      return { ok: false, reason: 'delegação indisponível nesta sessão' }
+    }
+    return { ok: true }
+  }
+
+  private searchTools(query: string, limit = 30): Array<{
+    name: string
+    description: string
+    risk: 'read' | 'write' | 'exec' | 'destructive' | 'network'
+    requires?: string
+    loaded: boolean
+  }> {
+    const wanted = query.trim().toLowerCase()
+    const aliases = Object.entries(TOOL_ALIASES)
+      .filter(([key]) => wanted === key || wanted.includes(key))
+      .flatMap(([, names]) => names)
+    const max = Math.max(1, Math.min(50, limit))
+    const candidates = new Set(toolsForMode(this.deps.mode))
+    for (const name of this.deps.registry.names()) {
+      if (name.startsWith('plugin__')) candidates.add(name)
+    }
+    for (const tool of this.mcpToolDefs()) candidates.add(tool.name)
+    for (const name of this.indirectMcpTools()) candidates.add(name)
+    const tokens = wanted.split(/\s+/).filter(Boolean)
+    const hits: Array<{
+      name: string
+      description: string
+      risk: 'read' | 'write' | 'exec' | 'destructive' | 'network'
+      requires?: string
+      loaded: boolean
+    }> = []
+    for (const name of candidates) {
+      if (this.isCoreTool(name) || this.loadedTools.has(name)) continue
+      if (this.deps.allowedTools && !this.deps.allowedTools.includes(name)) continue
+      if (!this.toolAllowed(name).ok) continue
       const tool = this.deps.registry.get(name)
-      if (!tool) return false
-      if (tool.requires === 'network' && !this.deps.policy.allowNetwork) return false
-      if (AGENT_TOOLS.has(name) && !this.canDelegate()) return false
-      return true
-    })
+      if (!tool) continue
+      const aliasMatch = aliases.some((alias) =>
+        alias.endsWith('_') ? name.startsWith(alias) : name === alias
+      )
+      const lowerName = name.toLowerCase()
+      const lowerDescription = tool.description.toLowerCase()
+      // The whole phrase, or every word of it somewhere in the name or the description ("jira create issue").
+      const textMatch =
+        lowerName.includes(wanted) ||
+        lowerDescription.includes(wanted) ||
+        (tokens.length > 1 && tokens.every((token) => lowerName.includes(token) || lowerDescription.includes(token)))
+      if (wanted && !aliasMatch && !textMatch) {
+        continue
+      }
+      hits.push({
+        name,
+        description: tool.description,
+        risk: tool.risk,
+        requires: tool.requires,
+        loaded: false
+      })
+    }
+    return hits.sort((a, b) => a.name.localeCompare(b.name)).slice(0, max)
+  }
+
+  private listToolCatalog(limit = 200): Array<{
+    name: string
+    description: string
+    risk: 'read' | 'write' | 'exec' | 'destructive' | 'network'
+    requires?: string
+    loaded: boolean
+  }> {
+    const names = new Set(toolsForMode(this.deps.mode))
+    for (const name of this.deps.registry.names()) {
+      if (name.startsWith('plugin__')) names.add(name)
+    }
+    for (const tool of this.mcpToolDefs()) names.add(tool.name)
+    for (const name of this.indirectMcpTools()) names.add(name)
+    const hits: Array<{
+      name: string
+      description: string
+      risk: 'read' | 'write' | 'exec' | 'destructive' | 'network'
+      requires?: string
+      loaded: boolean
+    }> = []
+    for (const name of names) {
+      if (this.deps.allowedTools && !this.deps.allowedTools.includes(name)) continue
+      if (!this.toolAllowed(name).ok) continue
+      const tool = this.deps.registry.get(name)
+      if (!tool) continue
+      hits.push({
+        name,
+        description: tool.description,
+        risk: tool.risk,
+        requires: tool.requires,
+        loaded: this.isCoreTool(name) || this.loadedTools.has(name)
+      })
+    }
+    return hits.sort((a, b) => a.name.localeCompare(b.name)).slice(0, Math.max(1, Math.min(300, limit)))
+  }
+
+  private loadTools(names: string[]): {
+    loaded: string[]
+    rejected: Array<{ name: string; reason: string }>
+  } {
+    const loaded: string[] = []
+    const rejected: Array<{ name: string; reason: string }> = []
+    const modeTools = new Set([...toolsForMode(this.deps.mode), ...this.indirectMcpTools()])
+    const mcpNames = new Set(this.mcpToolDefs().map((tool) => tool.name))
+    // `mcp__server__*` loads every tool of a server at once (a server can have more than 20).
+    let wanted: string[] = []
+    let globbed = false
+    for (const name of names) {
+      if (name.includes('*') && name.startsWith('mcp__')) {
+        globbed = true
+        const pattern = new RegExp(`^${name.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`)
+        const matches = [...mcpNames].filter((candidate) => pattern.test(candidate))
+        if (!matches.length) rejected.push({ name, reason: 'nenhuma ferramenta MCP corresponde' })
+        wanted.push(...matches)
+      } else wanted.push(name)
+    }
+    wanted = [...new Set(wanted)].slice(0, globbed ? 60 : 20)
+    for (const name of wanted) {
+      if (this.isCoreTool(name)) {
+        if (this.availableTools().includes(name)) loaded.push(name)
+        else rejected.push({ name, reason: 'não disponível neste modo' })
+        continue
+      }
+      if (!modeTools.has(name) && !name.startsWith('plugin__') && !mcpNames.has(name)) {
+        rejected.push({ name, reason: 'não disponível neste modo' })
+        continue
+      }
+      const check = this.toolAllowed(name)
+      if (!check.ok) {
+        rejected.push({ name, reason: check.reason ?? 'não permitida' })
+        continue
+      }
+      this.loadedTools.add(name)
+      loaded.push(name)
+    }
+    return { loaded, rejected }
   }
 
   /** `agent` / `list_agents` make sense only when a registry exists and names at least one agent this runner may call. */
@@ -553,7 +996,9 @@ export class SessionRunner {
       providerConfig: this.providerConfig,
       effort: deps.effort,
       limits: deps.limits,
-      availableTools: this.availableTools(),
+      // A specialist may find (tool_search) the MCP tools the caller has not loaded yet, if its definition names them; the
+      // essentials that wait for tool_load in this session (memory_search, list_skills, list_agents...) stay in its pool too.
+      availableTools: [...new Set([...this.availableTools(), ...this.deferredEssentialTools(), ...this.mcpToolDefs().map((tool) => tool.name)])],
       signal,
       hooks: deps.hooks,
       workspace: deps.workspace,
@@ -577,9 +1022,6 @@ export class SessionRunner {
       provider: this.providerConfig.label,
       surface: this.deps.surface,
       skills: this.deps.services.skills.list().map((s) => ({ name: s.name, description: s.description })),
-      memory: this.memoryFacts,
-      projectMemory: this.projectMemoryBrief,
-      longTermMemory: this.aiMemoryBrief,
       agentsMd: loadProjectInstructions(this.deps.cwd),
       projectName: this.deps.project.name,
       gitBranch: this.deps.project.branch,
@@ -590,26 +1032,108 @@ export class SessionRunner {
     })
   }
 
-  private async refreshMemory(query = ''): Promise<void> {
+  /**
+   * What the harness knows for this turn, as ONE hidden message (see turn-context.ts): the plan if it changed outside the
+   * model's own calls, the memory pages that match the request and the pages they are linked to (memory/pack.ts), the
+   * facts and connected servers when they changed, open handoffs, and a map of the memory on the first turn. Nothing of
+   * it goes in the system prompt, so the provider's cache survives. Every source is bounded in time and best effort: a
+   * slow or broken memory service never delays the model call, it just contributes nothing.
+   */
+  private async buildTurnContext(query: string): Promise<string | null> {
+    const services = this.deps.services
+    const state = this.turnContext
+    const projectId = this.deps.projectId
+    const bounded = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {
+      let timer: NodeJS.Timeout | undefined
+      try {
+        return await Promise.race([
+          work(),
+          new Promise<T>((resolve) => {
+            timer = setTimeout(() => resolve(fallback), TURN_CONTEXT_STEP_MS)
+          })
+        ])
+      } catch {
+        return fallback
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+    // A subagent works on one delegated task: it is not handed the unfinished work of the user's other sessions.
+    const isChild = (this.deps.depth ?? 0) > 0
+    const [facts, pages, indexed, handoffs, capsules, map] = await Promise.all([
+      bounded(async () => (await services.memory.all()).slice(-40).map((fact: MemoryFact) => fact.text), [] as string[]),
+      bounded(() => services.projectMemory.listPages(), [] as Awaited<ReturnType<ProjectMemory['listPages']>>),
+      bounded(
+        async () => (projectId && services.aiMemory?.search ? await services.aiMemory.search(projectId, query, 12) : []),
+        [] as Array<{ path: string }>
+      ),
+      bounded(() => services.projectMemory.listHandoffs(), [] as Awaited<ReturnType<ProjectMemory['listHandoffs']>>),
+      isChild
+        ? Promise.resolve([] as Awaited<ReturnType<ProjectMemory['openWork']>>)
+        : bounded(
+            () => services.projectMemory.openWork({ excludeContext: `sessao:${this.deps.sessionId}` }),
+            [] as Awaited<ReturnType<ProjectMemory['openWork']>>
+          ),
+      state.mapSent ? Promise.resolve('') : bounded(async () => (await services.projectMemory.map()).text, '')
+    ])
+    const pack = buildPack(pages, query, {
+      indexed: indexed.map((hit) => hit.path.replace(/^pages\//, '').replace(/\.md$/, '')),
+      seen: state.seen,
+      // This session's own capsule says what the history already says.
+      exclude: (page) => page.tags.includes('estado') && page.context === `sessao:${this.deps.sessionId}`
+    })
+    const work: string[] = []
+    capsules.forEach((capsule, position) => {
+      const label = capsule.status === 'concluido' ? 'última sessão, concluída' : capsule.status === 'interrompido' ? 'interrompida' : 'em aberto'
+      work.push(`- ${capsule.title} [${capsule.slug}] — ${label}, atualizada ${ageLabel(capsule.updated)}`)
+      // The first capsule is put in front of the model whole: after "continue de onde paramos" there is nothing else to go on.
+      if (position === 0) work.push(...digestCapsule(capsule.body).split('\n').map((line) => `  ${line}`))
+      else if (capsule.next) work.push(`  Próximo passo: ${capsule.next}`)
+    })
+    for (const handoff of handoffs.slice(0, 3)) work.push(`- handoff ${handoff.id}: ${handoff.summary}${handoff.next ? ` · próximo: ${handoff.next}` : ''}`)
+    const openWork = work.length
+      ? `${work.join('\n')}\n(detalhes: memory_page action=read slug=<slug>${handoffs.length ? '; para assumir um handoff: tool_load memory_handoff e chame action=accept id=<id>' : ''})`
+      : undefined
+    const suggested = this.suggestionsFor(query)
+    const result = composeTurnContext(state, {
+      plan: this.plan,
+      facts,
+      mcp: summarizeMcpTools(this.mcpToolDefs()) || undefined,
+      map: map || undefined,
+      openWork,
+      recall: pack.text || undefined,
+      suggestions: suggested.text
+    })
+    this.lastTurnContextSections = result.sections
+    // A suggestion counts as made only if it reached the message (the budget can cut the last section).
+    if (result.sections.some((section) => section.name === 'sugestoes')) for (const name of suggested.names) state.suggested.add(name)
+    if (result.sections.some((section) => section.name === 'memoria')) {
+      const updated = new Map(pages.map((page) => [page.slug, page.updated]))
+      for (const entry of pack.entries) state.seen.set(entry.slug, updated.get(entry.slug) ?? '*')
+    }
+    return result.text
+  }
+
+  /**
+   * Skills, agents and tools that are not in the context but match the request (see suggest.ts). The system prompt carries
+   * no catalogue: the harness looks for what fits and names it, once, when the request calls for it.
+   */
+  private suggestionsFor(query: string): { text?: string; names: string[] } {
+    const candidates: Candidate[] = []
     try {
-      this.memoryFacts = await this.deps.services.memory.all()
+      for (const skill of this.deps.services.skills.list()) candidates.push({ kind: 'skill', name: skill.name, description: skill.description })
     } catch {
-      this.memoryFacts = []
+      /* no skill library in this session */
     }
     try {
-      this.projectMemoryBrief = (await this.deps.services.projectMemory.brief()).text
+      for (const agent of this.agentCatalog().callable()) candidates.push({ kind: 'agente', name: agent.name, description: agent.description })
     } catch {
-      this.projectMemoryBrief = '(memória do projeto indisponível nesta sessão)'
+      /* no agents in this session */
     }
-    try {
-      const projectId = this.deps.projectId
-      this.aiMemoryBrief =
-        projectId && this.deps.services.aiMemory
-          ? (await this.deps.services.aiMemory.recall(projectId, query, 8)).text
-          : ''
-    } catch {
-      this.aiMemoryBrief = ''
-    }
+    for (const tool of this.listToolCatalog(300)) if (!tool.loaded) candidates.push({ kind: 'ferramenta', name: tool.name, description: tool.description })
+    const picked = suggest(query, candidates, { skip: this.turnContext.suggested })
+    if (!picked.length) return { names: [] }
+    return { text: renderSuggestions(picked), names: picked.map((item) => `${item.kind}:${item.name}`) }
   }
 
   private reportHook(event: string, outcome: HookOutcome): void {
@@ -642,8 +1166,8 @@ export class SessionRunner {
     return outcome
   }
 
-  private hiddenUserMessage(text: string): void {
-    this.messages.push({ id: id('msg'), role: 'user', ts: Date.now(), hidden: true, parts: [{ type: 'text', text }] })
+  private hiddenUserMessage(text: string, images?: ImagePart[]): void {
+    this.messages.push({ id: id('msg'), role: 'user', ts: Date.now(), hidden: true, parts: [{ type: 'text', text }, ...(images ?? [])] })
     this.persist()
   }
 
@@ -657,18 +1181,19 @@ export class SessionRunner {
   }
 
   /**
-   * Builds the tool_result part. Output beyond MAX_RESULT_CHARS is written to
-   * a file and replaced by a head/tail preview plus its path; if the file
+   * Builds the tool_result part. Output beyond the inline cap is written to a
+   * file and replaced by a head/tail preview plus its path; if the file
    * cannot be written the old middle-out truncation applies. read_file output
-   * is only truncated: spilling it would just copy a file the model can
-   * already read in smaller slices.
+   * keeps the larger cap and is only truncated: spilling it would just copy a
+   * file the model can already read in smaller slices.
    */
   private async toolResultPart(call: ToolCall, result: ToolResult): Promise<Message['parts'][number]> {
     const raw = result.text ?? ''
+    const cap = call.name === 'read_file' ? MAX_RESULT_CHARS : MAX_TOOL_RESULT_CHARS
     let text = raw
-    if (raw.length > MAX_RESULT_CHARS) {
+    if (raw.length > cap) {
       const notice = call.name === 'read_file' ? null : await this.spillOutput(call, raw)
-      text = notice ?? truncateMiddle(raw, MAX_RESULT_CHARS)
+      text = notice ?? truncateMiddle(raw, cap)
     }
     return {
       type: 'tool_result',
@@ -676,7 +1201,7 @@ export class SessionRunner {
       name: call.name,
       ok: result.ok,
       text,
-      images: result.images,
+      images: result.images?.map((image) => ({ ...image })),
       detail: result.summary
     }
   }
@@ -710,6 +1235,8 @@ export class SessionRunner {
     const deps = this.deps
     return {
       sessionId: deps.sessionId,
+      vision: this.provider.supportsVision,
+      model: this.providerConfig.model,
       cwd: deps.cwd,
       mode: deps.mode,
       policy: deps.policy,
@@ -717,6 +1244,7 @@ export class SessionRunner {
       signal,
       tracker: deps.tracker,
       environment: deps.environment,
+      surface: deps.surface,
       services: deps.services,
       projectId: deps.projectId,
       emit: (event) => this.emit(event),
@@ -724,9 +1252,15 @@ export class SessionRunner {
         const decision = await deps.approve({ ...request, id: id('appr'), sessionId: deps.sessionId })
         return typeof decision === 'boolean' ? decision : decision.approved
       },
+      ask: deps.ask
+        ? (request) => deps.ask!({ ...request, id: id('qst'), sessionId: deps.sessionId })
+        : undefined,
       setPlan: (items) => {
-        this.plan = items
-        this.emit({ type: 'plan', sessionId: deps.sessionId, items })
+        this.planTouchedAt = this.iterationNow
+        this.plan = mergePlanTimes(this.plan, items, Date.now())
+        // The model wrote this plan itself (it is in the history as the tool call): the next turn need not repeat it.
+        noteTurnPlan(this.turnContext, this.plan)
+        this.emit({ type: 'plan', sessionId: deps.sessionId, items: this.plan })
         this.persist()
       },
       runSubagent: async (spec) => {
@@ -738,6 +1272,9 @@ export class SessionRunner {
         if (!deps.createAgent) throw new Error('criação de agentes indisponível nesta sessão')
         return deps.createAgent(input)
       },
+      searchTools: (query, limit) => this.searchTools(query, limit),
+      listTools: () => this.listToolCatalog(),
+      loadTools: (names) => this.loadTools(names),
       log: (level, message) =>
         this.emit({
           type: 'audit',
@@ -750,25 +1287,87 @@ export class SessionRunner {
 
   async send(text: string, options: SendOptions = {}): Promise<void> {
     if (this.busy) throw new Error('já existe um turno em execução nesta sessão')
+    // Heal an earlier abort/crash before the provider sees the history. The
+    // provider serializers also normalize the sequence, but persisting the
+    // missing results keeps the transcript and the next requests stable.
+    const repaired = repairOrphanToolCalls(this.messages)
+    if (repaired.repaired) {
+      this.messages = repaired.messages
+      this.persist()
+      this.emit({
+        type: 'notice',
+        sessionId: this.deps.sessionId,
+        level: 'warn',
+        text: `${repaired.repaired} resultado(s) de ferramenta ausente(s) foram marcados como interrompidos para manter a conversa válida.`
+      })
+    }
     this.busy = true
     this.toolCallCount = 0
     this.repeatedCalls = 0
+    this.toolLoopTripped = false
     this.startedAt = Date.now()
+    this.turnUsage = { input: 0, output: 0 }
+    this.lastRequestTokens = 0
+    this.limitKind = null
+    this.budgetReported = false
+    this.iterationNow = 0
+    this.planTouchedAt = 0
+    this.planRemindedAt = 0
+    this.planReminders = 0
+    this.lastErrorKind = null
+    // Loaded tools last for the turn, except MCP tools and the former essentials: once found and loaded they stay for the
+    // session (as in Claude Code), so the next request does not repeat tool_search/tool_load. The tool list is the head of
+    // the provider's cached prompt: one that shrinks back at every turn would break the cache again each time, and these
+    // schemas are small.
+    for (const name of [...this.loadedTools]) {
+      if (!this.deps.registry.get(name)?.mcp && !DEFERRED_ESSENTIAL_TOOL_NAMES.has(name)) this.loadedTools.delete(name)
+    }
+    // A request that names a former essential in the words people use for it ("catálogo de skills", "handoff") gets it in the
+    // tool list from the first call. A strong model finds it with tool_search; a small one does not look for a tool it cannot
+    // see (a 4B model went 4 for 4 with the tools in the list and 2 for 4 without them), and the model that would have spent
+    // a tool_load call spends none. Only the user's own words count, and the usual checks (mode, permissions) still apply.
+    if (!options.hidden) for (const name of essentialsNamedBy(text)) this.loadTools([name])
     this.controller = new AbortController()
     const signal = this.controller.signal
+    // Provider requests use a turn-scoped child controller. A loop guard can
+    // abort it without making the turn look like a user cancellation, while a
+    // real user abort still propagates to every stream of the turn.
+    const providerAbort = new AbortController()
+    signal.addEventListener('abort', () => providerAbort.abort(), { once: true })
     const unlinkParent = this.linkParentSignal(this.controller)
+    const turnStart = this.messages.length
+    const blockedBefore = new Set(this.plan.filter((item) => item.status === 'blocked').map((item) => item.id))
 
     const userMessage: Message = {
-      id: id('msg'),
+      id: options.messageId ?? id('msg'),
       role: 'user',
       ts: Date.now(),
       hidden: options.hidden,
       parts: [
         { type: 'text', text },
-        ...(options.images ?? [])
+        // Copies: the vision relay writes the description onto the picture, and the caller's object must stay as it was.
+        ...(options.images ?? []).map((image) => ({ ...image }))
       ]
     }
     this.addMessage(userMessage)
+    const interrupted = this.plan.filter((item) => item.interrupted)
+    if (interrupted.length) {
+      const key = interrupted.map((item) => item.id).join(',')
+      if (this.resumeNoticeFor !== key) {
+        this.resumeNoticeFor = key
+        this.hiddenUserMessage(
+          [
+            '<retomada>',
+            'A execução anterior foi interrompida pelo fechamento do app no passo:',
+            ...interrupted.map((item) => `- ${item.text}`),
+            'Reabra esse item como active com update_plan e continue exatamente dele. Não avance para os próximos passos sem concluí-lo.',
+            '</retomada>'
+          ].join('\n')
+        )
+      }
+    } else {
+      this.resumeNoticeFor = null
+    }
     this.setState('thinking')
     this.emit({ type: 'turn_start', sessionId: this.deps.sessionId, messageId: userMessage.id })
 
@@ -778,11 +1377,42 @@ export class SessionRunner {
     let lengthContinuations = 0
     let streamRetries = 0
     let stopHookLoops = 0
+    let planGuardLoops = 0
     let overflowCompactions = 0
     let fallbacksUsed = 0
+    /** Set when reasoning, visible text or an identical tool call starts looping. */
+    const loopState: {
+      current: { channel: 'raciocínio' | 'resposta' | 'ferramenta'; detail: string; sample?: string } | null
+    } = { current: null }
 
     try {
-      await this.refreshMemory(text)
+      if (options.prepare) {
+        // Shown like a tool that is running (its name, the elapsed time, the last progress note), so a minute of
+        // processing is not a silent "thinking"; it is not a model tool call and never enters the history.
+        const sessionId = this.deps.sessionId
+        const prepareId = id('prep')
+        const label = options.prepareLabel ?? 'preparar'
+        this.emit({ type: 'tool_start', sessionId, toolCallId: prepareId, name: label, args: {} })
+        let prepared: Awaited<ReturnType<NonNullable<SendOptions['prepare']>>> = null
+        let failure = ''
+        try {
+          prepared = await options.prepare({
+            signal,
+            progress: (note) => {
+              this.emit({ type: 'notice', sessionId, level: 'info', desktop: false, text: note })
+              this.emit({ type: 'tool_progress', sessionId, toolCallId: prepareId, name: label, text: note })
+            }
+          })
+          if (prepared?.text) this.hiddenUserMessage(prepared.text, this.provider.supportsVision ? prepared.images : undefined)
+        } catch (err) {
+          failure = (err as Error).message
+          // A cancelled turn is handled by the loop's first check; anything else is reported and the turn goes on.
+          if (!signal.aborted) this.emit({ type: 'notice', sessionId, level: 'warn', text: `preparação do pedido falhou: ${failure}` })
+        }
+        this.emit({ type: 'tool_end', sessionId, toolCallId: prepareId, name: label, ok: !failure, summary: failure ? `falhou: ${failure.slice(0, 120)}` : 'concluído' })
+      }
+      const turnContext = await this.buildTurnContext(text)
+      if (turnContext) this.hiddenUserMessage(turnContext)
 
       if (this.sessionStartContext === null) {
         const started = await this.runHook('SessionStart', { source: this.messages.length > 1 ? 'resume' : 'startup' })
@@ -804,44 +1434,78 @@ export class SessionRunner {
       for (let iteration = 1; iteration <= this.deps.limits.maxIterations; iteration++) {
         if (signal.aborted) {
           stopReason = 'error'
-          errorMessage = 'turno cancelado pelo usuário'
+          errorMessage = TURN_CANCELLED
           this.setState('cancelled', errorMessage)
           break
         }
 
+        let budgetFinal = false
         const limitError = this.checkLimits()
         if (limitError) {
-          stopReason = 'error'
-          errorMessage = limitError
-          this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'error', text: limitError })
-          this.setState('error', limitError)
-          break
+          if (this.limitKind === 'tokens' || this.limitKind === 'cost') {
+            budgetFinal = true
+            if (!this.budgetReported) {
+              this.budgetReported = true
+              this.emit({ type: 'budget', sessionId: this.deps.sessionId, info: this.budgetInfo(iteration) })
+              this.emit({
+                type: 'notice',
+                sessionId: this.deps.sessionId,
+                level: 'warn',
+                text: `${limitError}. Vou gerar um resumo e parar; o plano fica salvo para continuar.`
+              })
+            }
+          } else {
+            stopReason = 'error'
+            errorMessage = limitError
+            this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'error', text: limitError })
+            this.setState('error', limitError)
+            break
+          }
         }
 
-        // The last iteration keeps the tool list (cache-friendly) but forbids
-        // calls, so the turn ends with a summary instead of a bare error.
-        const finalStep = iteration === this.deps.limits.maxIterations
-        if (finalStep) this.hiddenUserMessage(FINAL_STEP_PROMPT)
+        // The last iteration (or a budget stop) keeps the tool list
+        // (cache-friendly) but forbids calls, so the turn ends with a summary.
+        const finalStep = budgetFinal || iteration === this.deps.limits.maxIterations
+        this.iterationNow = iteration
+        if (finalStep) this.hiddenUserMessage(budgetFinal ? BUDGET_FINAL_PROMPT : FINAL_STEP_PROMPT)
+        else this.remindAboutPlan(iteration)
 
         let system = this.buildSystem()
-        const compacted = await this.compact(system, signal, false)
-        if (compacted) system = this.buildSystem()
+        const takenOver = this.modelChanged
+        this.modelChanged = false
+        const compacted = await this.compact(system, signal, false, takenOver)
+        if (compacted) {
+          system = this.buildSystem()
+          // The turn contexts went away with the old history: this turn's (plan, memory map, pages) goes back after the summary.
+          const again = await this.buildTurnContext(text)
+          if (again) this.hiddenUserMessage(again)
+        }
 
         const assistantId = id('msg')
         const toolNames = this.availableTools()
-        const requestMessages = trimInlineImages(this.messages)
-        const contextUsed = estimateContextTokens(system, requestMessages)
+        const tools = this.toolSpecs(toolNames)
+        // A model that cannot read images never gets one: a model that can describes each picture first (once).
+        await this.describePendingImages(signal, text)
+        const requestMessages = inlineImageDescriptions(trimInlineImages(keepRecentActionViews(this.messages)), {
+          vision: this.provider.supportsVision
+        })
+        const contextUsed = Math.max(
+          estimateContextTokens(system, requestMessages, tools),
+          this.lastRequestTokens
+        )
         const requestedOutput = this.providerConfig.maxOutputTokens ?? 32_000
         const outputRoom = this.providerConfig.contextWindow - contextUsed - Math.ceil(contextUsed * 0.15)
         const maxTokens = Math.max(1_024, Math.min(requestedOutput, outputRoom))
         const request = {
           system,
           messages: requestMessages,
-          tools: this.toolSpecs(toolNames),
+          tools,
           toolChoice: finalStep ? ('none' as const) : undefined,
           effort: this.deps.effort,
           maxTokens,
-          signal
+          signal: providerAbort.signal,
+          // Another model is ready to take over: do not sit out a long rate-limit pause here.
+          fastFail: this.hasReserve()
         }
 
         this.setState('streaming')
@@ -853,11 +1517,67 @@ export class SessionRunner {
         let usageDelta: Usage | null = null
         let providerBlocks: ProviderBlocks | undefined
         let iterationStop: StopReason = 'stop'
+        let lastLoopCheckAt = 0
+        let lastLoopCheckLength = 0
+        let reasoningOnlySince = Date.now()
+        const reasoningBudgetMs =
+          this.deps.effort === 'max' || this.deps.effort === 'xhigh' ? 300_000 : MAX_REASONING_ONLY_MS
+
+        const tripLoop = (channel: 'raciocínio' | 'resposta' | 'ferramenta', detail: string, sample?: string): void => {
+          if (loopState.current) return
+          loopState.current = { channel, detail, ...(sample ? { sample } : {}) }
+          this.lastErrorKind = 'loop'
+          const where = channel === 'ferramenta' ? 'na ferramenta' : channel === 'resposta' ? 'na resposta' : 'no raciocínio'
+          this.emit({
+            type: 'notice',
+            sessionId: this.deps.sessionId,
+            level: 'warn',
+            text: `Loop detectado ${where}: ${detail}. Interrompi a resposta para não gastar o restante do turno.`
+          })
+          this.hiddenUserMessage(
+            [
+              '<loop-guard>',
+              `O turno anterior foi interrompido automaticamente porque o modelo entrou em loop de ${channel}: ${detail}.`,
+              'Não repita a mesma cadeia de raciocínio, resposta ou chamada de ferramenta.',
+              'Reformule a abordagem, reduza o escopo, use outra ferramenta ou peça uma decisão ao usuário antes de continuar.',
+              '</loop-guard>'
+            ].join('\n')
+          )
+          providerAbort.abort()
+        }
+
+        const inspectLoop = (channel: 'raciocínio' | 'resposta', buffer: string): void => {
+          if (loopState.current) return
+          const now = Date.now()
+          if (channel === 'raciocínio' && !textBuffer && !toolCalls.length) {
+            const elapsed = now - reasoningOnlySince
+            if (elapsed >= reasoningBudgetMs || buffer.length >= MAX_REASONING_ONLY_CHARS) {
+              tripLoop(
+                channel,
+                buffer.length >= MAX_REASONING_ONLY_CHARS
+                  ? `o modelo produziu ${buffer.length} caracteres de raciocínio sem responder ou chamar ferramenta`
+                  : `o modelo passou ${Math.round(elapsed / 1000)}s só raciocinando, sem responder ou chamar ferramenta`,
+                buffer.slice(-240)
+              )
+              return
+            }
+          }
+          // Checking the whole tail on every token would be wasteful. A short
+          // gate catches a loop within half a second without throttling the UI.
+          if (now - lastLoopCheckAt < 400 && buffer.length - lastLoopCheckLength < 200) return
+          lastLoopCheckAt = now
+          lastLoopCheckLength = buffer.length
+          const hit: RepetitionHit | null = detectRepetition(buffer)
+          if (hit) {
+            tripLoop(channel, `o modelo repetiu o mesmo trecho ${hit.repeats} vezes`, hit.sample)
+          }
+        }
 
         try {
           for await (const event of this.provider.stream(request)) {
             switch (event.type) {
               case 'text_delta':
+                if (!textBuffer) reasoningOnlySince = Date.now()
                 textBuffer += event.text
                 this.emit({
                   type: 'text_delta',
@@ -865,6 +1585,7 @@ export class SessionRunner {
                   messageId: assistantId,
                   text: event.text
                 })
+                inspectLoop('resposta', textBuffer)
                 break
               case 'reasoning_delta':
                 reasoningBuffer += event.text
@@ -874,8 +1595,12 @@ export class SessionRunner {
                   messageId: assistantId,
                   text: event.text
                 })
+                inspectLoop('raciocínio', reasoningBuffer)
                 break
               case 'tool_call_start':
+                // A tool call is progress: do not count the preceding reasoning
+                // as an idle reasoning-only stream.
+                reasoningOnlySince = Date.now()
                 // The `tool_start` event is emitted once, with arguments, right
                 // before execution. Emitting here too duplicated every card in
                 // the UI and every tool in the activity panel.
@@ -897,25 +1622,67 @@ export class SessionRunner {
               default:
                 break
             }
+            if (loopState.current) break
           }
         } catch (err) {
-          if (signal.aborted) {
+          if (loopState.current) {
+            // The abort came from our own loop guard, not from the user.
+          } else if (signal.aborted) {
             stopReason = 'error'
-            errorMessage = 'turno cancelado pelo usuário'
+            errorMessage = TURN_CANCELLED
             this.setState('cancelled', errorMessage)
             break
+          } else {
+            providerError = (err as Error).message
+            errorKind = errorKindOf(err)
+            this.lastErrorKind = errorKind
+            iterationStop = 'error'
           }
-          providerError = (err as Error).message
-          errorKind = errorKindOf(err)
-          iterationStop = 'error'
         }
 
         if (usageDelta) {
+          if (!this.costNoticeShown && (usageDelta.input ?? 0) > 0 && this.providerConfig.inputCostPerMTok === undefined && this.providerConfig.outputCostPerMTok === undefined && !isLocalProvider(this.providerConfig)) {
+            this.costNoticeShown = true
+            this.emit({
+              type: 'notice',
+              sessionId: this.deps.sessionId,
+              level: 'warn',
+              text: `O provedor "${this.providerConfig.label}" não tem tarifa configurada: o custo aparece como US$ 0 e o limite de custo por turno (US$ ${this.deps.limits.maxCostUsd}) não protege este uso. Informe os preços em Configurações → Provedores (o limite de tokens continua valendo).`,
+              desktop: false
+            })
+          }
           this.usage = addUsage(this.usage, usageDelta, this.providerConfig)
-          this.emit({ type: 'usage', sessionId: this.deps.sessionId, usage: usageDelta, total: this.usage })
+          this.turnUsage = addUsage(this.turnUsage, usageDelta, this.providerConfig)
+          this.lastRequestTokens = (usageDelta.input ?? 0) + (usageDelta.output ?? 0)
+          this.emit({
+            type: 'usage',
+            sessionId: this.deps.sessionId,
+            usage: usageDelta,
+            total: this.usage,
+            turn: this.turnUsage,
+            limit: effectiveMaxTokens(this.deps.limits, this.providerConfig.contextWindow),
+            providerId: this.providerConfig.id,
+            providerLabel: this.providerConfig.label,
+            model: this.providerConfig.model,
+            costUsd: usageCost(usageDelta, this.providerConfig)
+          })
+        }
+
+        if (loopState.current) {
+          stopReason = 'error'
+          const where =
+            loopState.current.channel === 'ferramenta'
+              ? 'na ferramenta'
+              : loopState.current.channel === 'resposta'
+                ? 'na resposta'
+                : 'no raciocínio'
+          errorMessage = `Loop detectado ${where}: ${loopState.current.detail}. O turno foi interrompido para não gastar o orçamento restante; o plano e a conversa foram preservados.`
+          this.setState('error', errorMessage)
+          break
         }
 
         if (providerError) {
+          this.lastErrorKind = errorKind ?? 'unknown'
           const nothingEmitted = !textBuffer && !toolCalls.length
           if (errorKind === 'context_overflow' && overflowCompactions < 1) {
             overflowCompactions++
@@ -930,35 +1697,53 @@ export class SessionRunner {
               continue
             }
           }
-          if (nothingEmitted && errorKind && isRetryableKind(errorKind) && streamRetries < MAX_STREAM_RETRIES) {
+          // With another model ready to take over, a transient failure is not waited out: one more try at most,
+          // none at all for a limit or an overload (the other model answers in seconds).
+          const reserve = errorKind ? this.hasReserve(errorKind) : false
+          const retryBudget = reserve ? (errorKind === 'rate_limit' || errorKind === 'overloaded' ? 0 : 1) : MAX_STREAM_RETRIES
+          if (nothingEmitted && errorKind && isRetryableKind(errorKind) && streamRetries < retryBudget) {
             streamRetries++
             const delay = (this.deps.retryBaseMs ?? 2000) * streamRetries
             this.emit({
               type: 'notice',
               sessionId: this.deps.sessionId,
               level: 'warn',
+              desktop: false,
               text: `Falha transitória do provedor (${errorKind}); nova tentativa em ${delay / 1000}s.`
             })
             await sleep(delay, signal).catch(() => undefined)
             iteration--
             continue
           }
-          // Quota/rate limit/auth: switch to the next model and keep the same
-          // conversation and project memory, instead of aborting the task.
-          if (nothingEmitted && errorKind && isFallbackKind(errorKind) && this.fallback.length && fallbacksUsed < MAX_MODEL_FALLBACKS) {
-            const next = this.fallback.shift() as { provider: Provider; config: ProviderConfig }
-            const previous = `${this.providerConfig.label}/${this.providerConfig.model}`
-            this.provider = next.provider
-            this.providerConfig = next.config
-            fallbacksUsed++
-            this.emit({
-              type: 'notice',
-              sessionId: this.deps.sessionId,
-              level: 'warn',
-              text: `${previous} falhou (${errorKind}); continuando com ${next.config.label}/${next.config.model}. O contexto e a memória do projeto foram preservados.`
-            })
-            iteration--
-            continue
+          // What the harness learned: this provider (or this model) cannot answer right now (a failure that a retry cured
+          // is not recorded). Every session shares it.
+          if (errorKind && isFallbackKind(errorKind)) this.deps.health?.mark(this.providerConfig, errorKind)
+          // No balance / rate limit / refused key / outage / context window too small: move the conversation to the
+          // next model that works, with the same history, plan and project memory, instead of aborting the task.
+          if (errorKind && (isFallbackKind(errorKind) || errorKind === 'context_overflow') && !toolCalls.length && fallbacksUsed < MAX_MODEL_FALLBACKS) {
+            const next = await this.takeFallback(
+              errorKind,
+              this.providerConfig,
+              errorKind === 'context_overflow' ? { minContextWindow: this.providerConfig.contextWindow } : {}
+            )
+            if (next) {
+              // An answer that already reached the screen stays as it is; the next model is told to pick it up from there.
+              const cutAnswer = textBuffer.trim().length > 0
+              if (cutAnswer) {
+                this.addMessage({
+                  id: assistantId,
+                  role: 'assistant',
+                  ts: Date.now(),
+                  parts: [{ type: 'text', text: textBuffer }],
+                  model: this.providerConfig.model
+                })
+              }
+              this.switchModel(next, errorKind)
+              if (cutAnswer) this.hiddenUserMessage(CUT_ANSWER_PROMPT)
+              fallbacksUsed++
+              iteration--
+              continue
+            }
           }
           this.messages.push({
             id: assistantId,
@@ -996,11 +1781,27 @@ export class SessionRunner {
           usage: usageDelta ?? undefined
         })
 
+        if (budgetFinal && toolCalls.length) {
+          // The provider ignored toolChoice: do not spend more tokens running tools.
+          stopReason = 'stop'
+          break
+        }
+
         if (!toolCalls.length) {
           if (finalStep) {
+            if (budgetFinal) {
+              // The budget notice already explained the stop; the summary is
+              // the final assistant message.
+              stopReason = 'stop'
+              break
+            }
             stopReason = 'length'
             errorMessage = `limite de ${this.deps.limits.maxIterations} iterações atingido; o agente resumiu o progresso`
             this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'warn', text: errorMessage })
+            // The turn is over: the plan must not keep showing a step "in progress" (it resumes on the next turn).
+            this.blockActivePlanItems()
+            // Like a token or cost stop, the user is offered to continue from where it stopped (not for a subagent's own cap).
+            if (!this.deps.depth) this.emit({ type: 'budget', sessionId: this.deps.sessionId, info: this.budgetInfo(iteration, 'iterations') })
             break
           }
           if (iterationStop === 'length' && lengthContinuations < MAX_LENGTH_CONTINUATIONS) {
@@ -1008,6 +1809,26 @@ export class SessionRunner {
             this.hiddenUserMessage(CONTINUE_PROMPT)
             continue
           }
+          // A plan is a promise to the user: never end with open work while
+          // the agent can still act. Blocked items are a legitimate stop.
+          const openPlan = this.plan.filter((item) => item.status === 'pending' || item.status === 'active')
+          if (openPlan.length && planGuardLoops < MAX_PLAN_GUARD_LOOPS) {
+            planGuardLoops++
+            this.hiddenUserMessage(
+              [
+                '<plan-guard>',
+                'O plano ainda tem itens abertos:',
+                ...openPlan.map((item) => `- [${item.status}] ${item.text}`),
+                'Continue o trabalho agora. Conclua cada item ou marque como blocked com o motivo exato.',
+                'Não encerre o turno nem peça uma decisão sem antes atualizar o plano com update_plan.',
+                '</plan-guard>'
+              ].join('\n')
+            )
+            continue
+          }
+          // Out of nudges: stop the animated spinner honestly instead of
+          // showing work in progress after the turn is over.
+          if (openPlan.length) this.blockActivePlanItems()
           const stopHook = await this.runHook(
             this.deps.depth ? 'SubagentStop' : 'Stop',
             { stop_hook_active: stopHookLoops > 0, last_assistant_message: textBuffer },
@@ -1035,12 +1856,18 @@ export class SessionRunner {
           }
           const part = await this.toolResultPart(call, result)
 
-          // Vision-less models still receive a textual description.
-          if (part.type === 'tool_result' && part.images?.length) {
-            if (!this.provider.supportsVision) {
-              part.text += `\n[${part.images.length} imagem(ns) capturada(s) — o modelo atual não suporta visão]`
-              part.images = undefined
-            }
+          // Vision-less models still receive a textual description, but the
+          // images stay in the stored part so the user can see the screenshot
+          // in the chat (providers that do not accept them never receive them).
+          // With a model that reads images available, the vision relay describes the picture before the next request
+          // and the description is added then; the note below is for when there is none.
+          if (part.type === 'tool_result' && part.images?.length && !this.provider.supportsVision && !(this.deps.vision?.candidates().length)) {
+            // Say it plainly: a text-only model that is merely "told" an image exists tends to describe one anyway
+            // and to keep asking for more screenshots. Point it at the tools that return text instead.
+            part.text +=
+              `\n[${part.images.length} imagem(ns) capturada(s) — o modelo atual não suporta visão e NÃO recebeu a imagem. ` +
+              'Não descreva nem deduza o que ela mostra e não repita a captura: use computer_snapshot / browser_snapshot / ' +
+              'browser_read para ler a tela em texto, ou image_ocr / image_inspect em um arquivo de imagem salvo.]'
           }
           resultParts.push(part)
 
@@ -1056,13 +1883,22 @@ export class SessionRunner {
         }
         this.addMessage({ id: id('msg'), role: 'tool', ts: Date.now(), parts: resultParts })
 
+        if (this.toolLoopTripped) {
+          tripLoop(
+            'ferramenta',
+            `a mesma chamada de ferramenta foi repetida ${this.repeatedCalls} vezes sem mudar o estado`,
+            this.lastToolSignature
+          )
+          stopReason = 'error'
+          errorMessage = `Loop detectado na ferramenta: ${this.lastToolSignature} foi chamada ${this.repeatedCalls} vezes. ` +
+            'O turno foi interrompido para não gastar o restante do orçamento; o plano e a conversa foram preservados.'
+          this.setState('error', errorMessage)
+          break
+        }
+
         const changes = this.deps.tracker.changes()
         if (changes.length) this.emit({ type: 'diff', sessionId: this.deps.sessionId, files: changes })
 
-        // Memory tools may have changed what the system prompt shows next turn.
-        if (toolCalls.some((c) => c.name === 'memory_write' || c.name === 'memory_page' || c.name === 'memory_handoff')) {
-          await this.refreshMemory()
-        }
         stopReason = 'tool_use'
       }
       // Some local servers ignore tool_choice "none"; the loop then runs out
@@ -1079,34 +1915,270 @@ export class SessionRunner {
       this.setState('error', errorMessage)
     } finally {
       unlinkParent()
+      try {
+        this.recordAutoLimitation({ stopReason, errorMessage, goal: text, turnStart, blockedBefore, loop: Boolean(loopState.current) })
+      } catch (err) {
+        // A failed self-analysis must never prevent the turn from ending.
+        this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'warn', text: `análise da falha indisponível: ${(err as Error).message}` })
+      }
       this.busy = false
       this.controller = null
       if (stopReason !== 'error') this.setState('done')
-      this.emit({ type: 'turn_end', sessionId: this.deps.sessionId, messageId: turnId, stopReason, error: errorMessage })
+      this.emit({
+        type: 'turn_end',
+        sessionId: this.deps.sessionId,
+        messageId: turnId,
+        stopReason,
+        error: errorMessage,
+        ...(errorMessage === TURN_CANCELLED ? { cancelled: true } : {})
+      })
       this.persist()
     }
   }
 
-  /** Budget-driven (or forced, after a context overflow) compaction. */
-  private async compact(system: string, signal: AbortSignal, force: boolean): Promise<boolean> {
+  /**
+   * Last-resort self-analysis: when a turn fails or blocks a step without the
+   * model calling `report_limitation`, the harness records what it tried, the
+   * exact error and a suggested fix, so the transcript never ends in a bare
+   * error. The part is never sent to the provider.
+   */
+  private recordAutoLimitation(input: {
+    stopReason: StopReason
+    errorMessage?: string
+    goal: string
+    turnStart: number
+    blockedBefore: Set<string>
+    loop?: boolean
+  }): void {
+    if (this.controller?.signal.aborted) return
+    if (input.errorMessage === TURN_CANCELLED) return
+    const reported = this.messages
+      .slice(input.turnStart)
+      .some((message) => message.parts.some((part) => part.type === 'tool_call' && part.name === 'report_limitation'))
+    if (reported) return
+    const blocked = this.plan.filter((item) => item.status === 'blocked' && !input.blockedBefore.has(item.id))
+    const failed = input.stopReason === 'error'
+    if (!failed && !blocked.length) return
+
+    const active = this.plan.find((item) => item.status === 'active')
+    // If this turn failed before doing anything, the persisted activity of the
+    // current step still shows what the agent tried in earlier turns.
+    const attempts = this.attemptsSince(input.turnStart)
+    const recentPlanAttempts = [...(active?.activity ?? []), ...(blocked[0]?.activity ?? [])]
+      .slice(-12)
+      .map((entry) => `${entry.name}: ${entry.title}${entry.status === 'failed' ? ' (falhou)' : ''}`)
+    const report: LimitationReport = buildAutoLimitation({
+      goal: input.goal,
+      error: input.errorMessage,
+      errorKind: input.loop ? 'loop' : this.lastErrorKind ?? undefined,
+      blocked,
+      active,
+      attempts: attempts.length ? attempts : recentPlanAttempts,
+      loop: input.loop
+    })
+    this.addMessage({
+      id: id('msg'),
+      role: 'assistant',
+      ts: Date.now(),
+      parts: [{ type: 'limitation', report }]
+    })
+    this.emit({ type: 'limitation', sessionId: this.deps.sessionId, report })
+  }
+
+  /** What the agent actually did this turn, for the self-analysis card. */
+  private attemptsSince(turnStart: number): string[] {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const message of this.messages.slice(turnStart)) {
+      for (const part of message.parts) {
+        if (part.type !== 'tool_call' || part.name === 'report_limitation') continue
+        const args = part.args && typeof part.args === 'object' ? (part.args as Record<string, unknown>) : {}
+        const detail =
+          typeof args.path === 'string'
+            ? args.path
+            : typeof args.command === 'string'
+              ? args.command
+              : typeof args.query === 'string'
+                ? args.query
+                : typeof args.url === 'string'
+                  ? args.url
+                  : ''
+        const entry = `${part.name}${detail ? `: ${truncate(detail.replace(/\s+/g, ' ').trim(), 180)}` : ''}`
+        if (seen.has(entry)) continue
+        seen.add(entry)
+        out.push(entry)
+        if (out.length >= 12) return out.slice(-12)
+      }
+    }
+    return out.slice(-12)
+  }
+
+  /**
+   * Whether another model could take over after a failure of this kind (no request is made). Account-level failures
+   * (no balance, refused key, no connection) rule out the same provider's other models: they would fail the same way.
+   */
+  private hasReserve(kind?: ProviderErrorKind): boolean {
+    const account = kind !== undefined && isAccountLevelKind(kind)
+    const mine = accountKeyOf(this.providerConfig)
+    return this.fallback.some(
+      (candidate) => !(account && accountKeyOf(candidate.config) === mine) && !this.deps.health?.unavailable(candidate.config)
+    )
+  }
+
+  /**
+   * Takes the next model of the reserve out of the line: skips the same provider after an account-level failure, models
+   * with a window no bigger than `minContextWindow` (a context overflow), models known to be down (unless nothing else is
+   * left) and local servers that are not running. Returns undefined when nothing can take over.
+   */
+  private async takeFallback(
+    kind: ProviderErrorKind,
+    failed: ProviderConfig,
+    options: { minContextWindow?: number } = {}
+  ): Promise<FallbackCandidate | undefined> {
+    const account = isAccountLevelKind(kind)
+    const failedAccount = accountKeyOf(failed)
+    for (const strict of [true, false]) {
+      for (let index = 0; index < this.fallback.length; index++) {
+        const candidate = this.fallback[index]
+        if (account && accountKeyOf(candidate.config) === failedAccount) continue
+        if (options.minContextWindow && candidate.config.contextWindow <= options.minContextWindow) continue
+        if (strict && this.deps.health?.unavailable(candidate.config)) continue
+        if (candidate.probe && !(await candidate.probe())) {
+          // Nothing is listening there: it is not part of this reserve any more.
+          this.deps.health?.mark(candidate.config, 'network')
+          this.fallback.splice(index, 1)
+          index--
+          continue
+        }
+        this.fallback.splice(index, 1)
+        return candidate
+      }
+    }
+    return undefined
+  }
+
+  /** Makes `next` the model of the session: from the next request on it answers, and the user is told in the conversation. */
+  private switchModel(next: FallbackCandidate, kind: ProviderErrorKind): void {
+    const from = this.providerConfig
+    this.provider = next.provider
+    this.providerConfig = next.config
+    // The conversation goes to a model that has not read it: a long one is summarised first.
+    this.modelChanged = true
+    this.lastRequestTokens = 0
+    const text =
+      `${from.label}/${from.model} falhou (${kind}: ${describeFailure(kind)}); continuando com ${next.config.label}/${next.config.model}. ` +
+      'A conversa, o plano e a memória do projeto foram preservados.'
+    // Written for the user, in the conversation (role system: no model ever reads it) and as a notice.
+    this.addMessage({ id: id('msg'), role: 'system', ts: Date.now(), parts: [{ type: 'text', text }], notice: { kind: 'model_switch', level: 'warn' } })
+    this.emit({
+      type: 'model_switch',
+      sessionId: this.deps.sessionId,
+      from: { providerId: from.id, label: from.label, model: from.model },
+      to: { providerId: next.config.id, label: next.config.label, model: next.config.model },
+      reason: kind
+    })
+    // A transition between models is transcript information, not a desktop alert: the user is only notified if the
+    // turn actually fails.
+    this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'warn', desktop: false, text })
+  }
+
+  /**
+   * The vision relay. The active model cannot read images: every picture of the conversation that has no description
+   * yet is described by a model that can, and the description is written onto the picture, so it is paid for once and
+   * every later request (and every model that takes over) reuses it. Nothing here throws: without a model that sees,
+   * the pictures stay undescribed and the request says so.
+   */
+  private async describePendingImages(signal: AbortSignal, question: string): Promise<void> {
+    if (this.provider.supportsVision || Date.now() < this.visionRestUntil) return
+    const pending = pendingImages(this.messages)
+    if (!pending.length) return
+    const candidates = this.deps.vision?.candidates() ?? []
+    if (!candidates.length) return
+    // The newest pictures matter most; a long session of screenshots is not described from the beginning.
+    const batch = pending.slice(-MAX_DESCRIBED_PER_REQUEST)
+    this.emit({
+      type: 'notice',
+      sessionId: this.deps.sessionId,
+      level: 'info',
+      desktop: false,
+      text: `${this.providerConfig.label}/${this.providerConfig.model} não lê imagens: ${batch.length === 1 ? 'a imagem está sendo descrita' : `${batch.length} imagens estão sendo descritas`} por ${candidates[0].config.label}/${candidates[0].config.model}.`
+    })
+    let described = 0
+    let next = 0
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const item = batch[next++]
+        if (!item || signal.aborted) return
+        const result = await describeImage({
+          candidates,
+          image: item.image,
+          question,
+          signal,
+          onFailure: (failure) => this.deps.health?.mark(failure.config, failure.kind)
+        })
+        if (result) {
+          recordDescription(item, result)
+          described++
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(VISION_PARALLEL, batch.length) }, () => worker()))
+    if (signal.aborted) return
+    if (!described) {
+      this.visionRestUntil = Date.now() + VISION_REST_MS
+      this.emit({
+        type: 'notice',
+        sessionId: this.deps.sessionId,
+        level: 'warn',
+        text: 'Nenhum modelo com visão conseguiu descrever a imagem; o modelo atual segue sem ela. Verifique o modelo de visão em Configurações → Provedores.'
+      })
+      return
+    }
+    this.persist()
+  }
+
+  /**
+   * Budget-driven (or forced, after a context overflow) compaction. `modelChanged`: another model is taking over a long
+   * conversation; it starts from the summary and the project memory instead of paying to read 100 000 tokens of history
+   * it never saw (and, if its window is smaller, instead of overflowing).
+   */
+  private async compact(system: string, signal: AbortSignal, force: boolean, modelChanged = false): Promise<boolean> {
+    const tools = this.toolSpecs(this.availableTools())
+    const estimated = estimateContextTokens(system, this.messages, tools)
+    const used = Math.max(estimated, this.lastRequestTokens)
+    const handover = modelChanged && used > MODEL_SWITCH_COMPACTION_TOKENS
+    // Compact earlier than the hard window: every iteration re-sends the whole
+    // conversation, so a 1M-context turn at 75% is needlessly expensive.
+    if (!force && !handover && used < this.providerConfig.contextWindow * 0.65) return false
+    if (handover && !force) {
+      this.emit({
+        type: 'notice',
+        sessionId: this.deps.sessionId,
+        level: 'info',
+        desktop: false,
+        text: `Outro modelo (${this.providerConfig.label}/${this.providerConfig.model}) assumiu esta conversa de ~${Math.round(used / 1000)} mil tokens: resumo o histórico para ele partir do resumo e da memória do projeto.`
+      })
+    }
     const run = (): ReturnType<typeof compactIfNeeded> =>
       compactIfNeeded({
         system,
         messages: this.messages,
         provider: this.provider,
         contextWindow: this.providerConfig.contextWindow,
-        keepRecent: force ? 4 : undefined,
-        force,
+        tools,
+        usedTokens: used,
+        keepRecent: force || handover ? 4 : undefined,
+        force: force || handover,
         signal,
         onNote: (note) => this.emit({ type: 'notice', sessionId: this.deps.sessionId, level: 'info', text: note })
       })
-    if (!force && estimateContextTokens(system, this.messages) < this.providerConfig.contextWindow * 0.75) return false
     const trigger = force ? 'overflow' : 'auto'
     await this.runHook('PreCompact', { trigger }, undefined, signal)
     const result = await run()
     if (!result.compacted) return false
     const before = this.messages.length
     this.messages = result.messages
+    this.lastRequestTokens = 0
     this.persist()
     await this.afterCompaction(trigger, before, signal)
     return true
@@ -1114,19 +2186,76 @@ export class SessionRunner {
 
   private checkLimits(): string | null {
     const limits = this.deps.limits
+    this.limitKind = null
     if (this.toolCallCount >= limits.maxToolCalls) {
+      this.limitKind = 'tools'
       return `limite de ${limits.maxToolCalls} chamadas de ferramenta atingido`
     }
     if (Date.now() - this.startedAt > limits.maxWallClockMs) {
+      this.limitKind = 'time'
       return `limite de tempo (${Math.round(limits.maxWallClockMs / 60000)} min) atingido`
     }
-    if (this.usage.input + this.usage.output > limits.maxTokens) {
-      return `orçamento de tokens esgotado (${this.usage.input + this.usage.output})`
+    const budget = effectiveMaxTokens(limits, this.providerConfig.contextWindow)
+    const used = billableTokens(this.turnUsage)
+    if (budget > 0 && used > budget) {
+      this.limitKind = 'tokens'
+      return `orçamento de tokens do turno esgotado (${used} de ${budget}; ${this.turnUsage.input} entrada, ${this.turnUsage.cachedInput ?? 0} cache, ${this.turnUsage.output} saída)`
     }
-    if (limits.maxCostUsd > 0 && (this.usage.costUsd ?? 0) > limits.maxCostUsd) {
-      return `orçamento de custo esgotado (US$ ${(this.usage.costUsd ?? 0).toFixed(2)})`
+    if (limits.maxCostUsd > 0 && (this.turnUsage.costUsd ?? 0) > limits.maxCostUsd) {
+      this.limitKind = 'cost'
+      return `orçamento de custo do turno esgotado (US$ ${(this.turnUsage.costUsd ?? 0).toFixed(2)} de ${limits.maxCostUsd.toFixed(2)})`
     }
     return null
+  }
+
+  /** The turn ended with a step still marked active: show it as blocked (not as work in progress) and keep it for the next turn. */
+  private blockActivePlanItems(): void {
+    if (!this.plan.some((item) => item.status === 'active')) return
+    const items = this.plan.map((item) => (item.status === 'active' ? { ...item, status: 'blocked' as const, endedAt: Date.now() } : item))
+    this.plan = items
+    this.emit({ type: 'plan', sessionId: this.deps.sessionId, items })
+    this.persist()
+  }
+
+  /**
+   * The plan is the user's view of the work: when many iterations pass without the agent writing it and steps are still open,
+   * a hidden reminder asks it to bring the plan up to date (steps that finished, the one it is on). A few times per turn, for
+   * the user's own session only: a subagent's plan is not on the screen.
+   */
+  private remindAboutPlan(iteration: number): void {
+    if (this.deps.depth || this.planReminders >= MAX_PLAN_REMINDERS) return
+    const open = this.plan.filter((item) => item.status === 'pending' || item.status === 'active')
+    if (!open.length) return
+    const quiet = iteration - Math.max(this.planTouchedAt, this.planRemindedAt)
+    if (quiet < PLAN_REMINDER_EVERY) return
+    this.planRemindedAt = iteration
+    this.planReminders++
+    this.hiddenUserMessage(
+      [
+        '<plan-reminder>',
+        `Faz ${quiet} iterações que o plano não é atualizado. Passos ainda em aberto:`,
+        ...open.map((item) => `- [${item.status}] ${item.text}`),
+        'Se algum passo já terminou, marque-o como done com update_plan agora e indique o que está fazendo (o usuário acompanha o plano na tela). Depois continue o trabalho; não pare por causa deste aviso.',
+        '</plan-reminder>'
+      ].join('\n')
+    )
+  }
+
+  private budgetInfo(iteration: number, kindOverride?: BudgetInfo['kind']): BudgetInfo {
+    const cost = this.limitKind === 'cost'
+    const iterations = kindOverride === 'iterations'
+    return {
+      kind: kindOverride ?? (cost ? 'cost' : 'tokens'),
+      used: iterations ? iteration : cost ? (this.turnUsage.costUsd ?? 0) : billableTokens(this.turnUsage),
+      limit: iterations ? this.deps.limits.maxIterations : cost ? this.deps.limits.maxCostUsd : effectiveMaxTokens(this.deps.limits, this.providerConfig.contextWindow),
+      input: this.turnUsage.input,
+      output: this.turnUsage.output,
+      cachedInput: this.turnUsage.cachedInput ?? 0,
+      iterations: iteration,
+      toolCalls: this.toolCallCount,
+      contextTokens: this.lastRequestTokens,
+      contextWindow: this.providerConfig.contextWindow
+    }
   }
 
   private async executeToolCalls(
@@ -1164,10 +2293,29 @@ export class SessionRunner {
         continue
       }
 
+      if (
+        !this.availableTools().includes(call.name) &&
+        (DEFERRED_ESSENTIAL_TOOL_NAMES.has(call.name) || toolsForMode(this.deps.mode).includes(call.name))
+      ) {
+        // A built-in tool of this mode the model asked for by name (a former essential, or a deferred one such as
+        // computer_screenshot): load it and run the call instead of refusing it. The refusal cost a model call, and models
+        // that did not follow the "tool_search, then tool_load" hint gave up or improvised (seen with computer_screenshot in
+        // the Chat). loadTools still refuses what the policy does not allow, and the call still goes through validation and
+        // approval. MCP tools keep the explicit tool_load: they act on other systems.
+        this.loadTools([call.name])
+      }
+
       if (!this.availableTools().includes(call.name)) {
+        const loadable =
+          toolsForMode(this.deps.mode).includes(call.name) ||
+          this.indirectMcpTools().includes(call.name) ||
+          this.mcpToolDefs().some((def) => def.name === call.name)
+        const hint = loadable
+          ? `use tool_search para encontrá-la e tool_load para habilitá-la neste turno (se já sabe o nome: tool_load({ "tools": ["${call.name}"] }) e repita a chamada)`
+          : `não disponível no modo ${this.deps.mode}`
         results.set(call.id, {
           ok: false,
-          text: `a ferramenta ${call.name} não está disponível no modo ${this.deps.mode}`
+          text: `a ferramenta ${call.name} não está carregada: ${hint}`
         })
         this.emit({
           type: 'tool_end',
@@ -1181,6 +2329,7 @@ export class SessionRunner {
       }
 
       if (this.repeatedCalls >= 3) {
+        if (this.repeatedCalls >= 4) this.toolLoopTripped = true
         results.set(call.id, {
           ok: false,
           text: `chamada idêntica repetida ${this.repeatedCalls} vezes. Pare, verifique o estado atual com outra ferramenta e mude de abordagem.`
@@ -1283,7 +2432,7 @@ export class SessionRunner {
           tool: call.name,
           title: description.title,
           detail: description.detail || JSON.stringify(args).slice(0, 800),
-          risk: tool.risk,
+          risk: evaluation.risk ?? tool.risk,
           preview: description.preview,
           action: evaluation.action,
           resource: evaluation.resource,
@@ -1323,6 +2472,14 @@ export class SessionRunner {
     }
 
     const runOne = async (item: { call: ToolCall; tool: NonNullable<ReturnType<ToolRegistry['get']>> }) => {
+      // The user stopped the turn while earlier calls of this batch were running: the rest must not
+      // start (they would still edit files or ask for new approvals after "Parar").
+      if (signal.aborted) {
+        const skipped: ToolResult = { ok: false, text: 'não executada: o usuário interrompeu o turno antes desta ferramenta começar.' }
+        results.set(item.call.id, skipped)
+        this.emit({ type: 'tool_end', sessionId: this.deps.sessionId, toolCallId: item.call.id, name: item.call.name, ok: false, summary: 'cancelada' })
+        return skipped
+      }
       const started = Date.now()
       this.emit({
         type: 'tool_start',
@@ -1331,10 +2488,25 @@ export class SessionRunner {
         name: item.call.name,
         args: item.call.args
       })
+      const toolCtx: ToolContext = {
+        ...ctx,
+        toolCallId: item.call.id,
+        vision: this.provider.supportsVision,
+        model: this.providerConfig.model,
+        progress: (text, data) =>
+          this.emit({
+            type: 'tool_progress',
+            sessionId: this.deps.sessionId,
+            toolCallId: item.call.id,
+            name: item.call.name,
+            text,
+            data
+          })
+      }
       let result: ToolResult
       try {
         result = await withTimeout(
-          item.tool.execute(item.call.args, ctx),
+          item.tool.execute(item.call.args, toolCtx),
           TOOL_TIMEOUT_MS,
           `ferramenta ${item.call.name} excedeu ${TOOL_TIMEOUT_MS / 1000}s`
         )
@@ -1363,6 +2535,7 @@ export class SessionRunner {
         result = { ...result, text: `${result.text}\n\n<hook-feedback event="PostToolUse">\n${feedback}\n</hook-feedback>` }
       }
       results.set(item.call.id, result)
+      this.recordPlanActivity(item.call, result, started, Date.now())
       this.emit({
         type: 'tool_end',
         sessionId: this.deps.sessionId,

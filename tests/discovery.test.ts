@@ -393,7 +393,6 @@ describe('inferDiscoveryKind', () => {
     expect(inferDiscoveryKind({ kind: 'openai', baseUrl: 'http://127.0.0.1:11434/v1' })).toBe('ollama')
     expect(inferDiscoveryKind({ kind: 'openai', baseUrl: 'http://localhost:1234/v1' })).toBe('lmstudio')
     expect(inferDiscoveryKind({ kind: 'openai', baseUrl: 'https://api.deepseek.com/v1' })).toBe('openai')
-    expect(inferDiscoveryKind({ kind: 'mock', baseUrl: 'mock://local' })).toBe('openai')
     expect(inferDiscoveryKind({ kind: 'ollama', baseUrl: 'http://example.com' })).toBe('ollama')
   })
 })

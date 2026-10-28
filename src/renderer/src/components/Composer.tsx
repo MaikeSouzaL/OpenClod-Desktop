@@ -20,10 +20,19 @@ import type {
   SessionState,
   SkillInfo
 } from '../../../shared/types'
+import type { CustomCommandInfo } from '../../../shared/api'
 import { Icon } from './Icons'
 import { MenuPopover, type MenuItem } from './Chrome'
 import { effortLevelsFor } from '../../../shared/reasoning'
+import { formatTokens } from '../lib/format'
 import { stopDictation, toggleDictation, useDictationSnapshot } from '../lib/dictation-store'
+import {
+  addPathAttachments,
+  isInlineText,
+  pathPromptBlock,
+  type IncomingPath,
+  type PathAttachment
+} from '../lib/path-attachments'
 
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
   readonly: 'Somente leitura',
@@ -94,9 +103,19 @@ const BUILTIN_COMMANDS: BuiltinCommand[] = [
   { id: 'skills', label: '/skills', hint: 'Listar skills instaladas', icon: 'sparkles' }
 ]
 
+/** What the model menu needs to know about a provider besides its models. */
+export interface ProviderMenuState {
+  /** Has a key (or needs none). Without one its models are not offered: sending would only fail. */
+  ready: boolean
+  /** Why the harness is working around it right now ("sem saldo ou cota"...), when it is. */
+  failure?: string
+}
+
 interface ComposerProps {
   session: SessionState | null
   providers: ProviderConfig[]
+  /** State of each provider by id; unknown providers are offered as they are. */
+  providerStates?: Record<string, ProviderMenuState>
   providerId: string
   model: string
   mode: AgentMode
@@ -106,17 +125,24 @@ interface ComposerProps {
   queued: QueuedMessage[]
   skills: SkillInfo[]
   contextPercent: number
+  /** Prompt size of the last call; not the cumulative session usage. */
+  contextUsed: number
+  /** Tokens counted against the turn budget (fresh input + output). */
+  turnTokens: number
+  turnLimit: number
   /** null = the model's own default depth. */
   effort: ReasoningEffort | null
   /** Execution environments available for this session. */
   environments?: EnvironmentProfile[]
   environmentId?: string
   workspaceName?: string
-  seed?: { id: string; text: string }
+  seed?: { id: string; text: string; sessionId?: string | null }
   /** Text dictated by the global shortcut; inserted at the caret. */
-  insert?: { id: string; text: string }
+  insert?: { id: string; text: string; sessionId?: string | null }
   onSend(text: string, images: ImagePart[]): Promise<boolean>
   onQueue(text: string, images: ImagePart[]): void
+  /** Injects a queued prompt into the running turn instead of waiting for it. */
+  onSendQueued(id: string): void
   onRemoveQueued(id: string): void
   onCommand(id: string): void
   onStop(): void
@@ -141,6 +167,7 @@ function nextId(): string {
 export function Composer({
   session,
   providers,
+  providerStates,
   providerId,
   model,
   mode,
@@ -150,11 +177,15 @@ export function Composer({
   queued,
   skills,
   contextPercent,
+  contextUsed,
+  turnTokens,
+  turnLimit,
   workspaceName,
   seed,
   insert,
   onSend,
   onQueue,
+  onSendQueued,
   onRemoveQueued,
   onCommand,
   onStop,
@@ -173,6 +204,7 @@ export function Composer({
   const [text, setText] = useState('')
   const [images, setImages] = useState<ImagePart[]>([])
   const [documents, setDocuments] = useState<TextAttachment[]>([])
+  const [attachedPaths, setAttachedPaths] = useState<PathAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
@@ -192,12 +224,41 @@ export function Composer({
   const busy = BUSY_STATES.includes(runState) || sending
   const provider = providers.find((item) => item.id === providerId) ?? providers[0]
   const modelLabel = model || provider?.model || 'modelo'
-  const attachments = images.length + documents.length
+  const attachments = images.length + documents.length + attachedPaths.length
+  const dictationActive =
+    dictation.phase === 'loading' || dictation.phase === 'listening' || dictation.phase === 'stopping'
+  const dictated =
+    dictation.phase === 'listening' || dictation.phase === 'stopping' ? dictation.text.trim() : ''
+  // Live speech is shown in the textarea without touching `text`; the final
+  // text is inserted at the caret when dictation stops.
+  const shownText = dictated
+    ? `${text}${text && !/\s$/.test(text) ? ' ' : ''}${dictated}`
+    : text
 
   const slashQuery = text.startsWith('/') && !text.includes('\n') && !text.includes(' ') ? text.slice(1).toLowerCase() : null
   const commands = useMemo(
     () => (slashQuery === null ? [] : BUILTIN_COMMANDS.filter((command) => command.id.includes(slashQuery) || command.label.includes(slashQuery))),
     [slashQuery]
+  )
+  // Custom commands (markdown templates in .claude/commands, .forja/commands or the user's commands folder).
+  const [customCommands, setCustomCommands] = useState<CustomCommandInfo[]>([])
+  const commandsCwd = session?.meta.cwd ?? ''
+  useEffect(() => {
+    if (!commandsCwd) {
+      setCustomCommands([])
+      return
+    }
+    let cancelled = false
+    void window.forja.commands.list(commandsCwd).then((result) => {
+      if (!cancelled) setCustomCommands(result.ok ? result.value : [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [commandsCwd, session?.meta.id])
+  const customMatches = useMemo(
+    () => (slashQuery === null ? [] : customCommands.filter((command) => command.name.includes(slashQuery) || command.description.toLowerCase().includes(slashQuery)).slice(0, 12)),
+    [customCommands, slashQuery]
   )
   const skillMatches = useMemo(
     () =>
@@ -210,7 +271,7 @@ export function Composer({
           ).slice(0, 8),
     [skills, slashQuery]
   )
-  const slashRows = commands.length + skillMatches.length
+  const slashRows = commands.length + customMatches.length + skillMatches.length
   const slashOpen = slashQuery !== null && slashRows > 0
 
   useEffect(() => {
@@ -218,7 +279,18 @@ export function Composer({
     if (!node) return
     node.style.height = 'auto'
     node.style.height = `${Math.min(220, Math.max(variant === 'home' ? 28 : 24, node.scrollHeight))}px`
-  }, [text, variant])
+  }, [shownText, variant])
+
+  // While dictating, keep the caret blinking at the end of the live text.
+  // Only do this when the composer already owns focus, so the global shortcut
+  // used in another app never steals focus from that app.
+  useEffect(() => {
+    if (!dictationActive) return
+    const node = textareaRef.current
+    if (!node || document.activeElement !== node) return
+    const end = node.value.length
+    node.setSelectionRange(end, end)
+  }, [shownText, dictationActive])
 
   useEffect(() => {
     textareaRef.current?.focus()
@@ -226,14 +298,17 @@ export function Composer({
 
   useEffect(() => {
     if (!seed || seed.id === seedId) return
+    // A seed created for another session/project must not leak into this one.
+    if ((seed.sessionId ?? null) !== (session?.meta.id ?? null)) return
     setSeedId(seed.id)
     setText(seed.text)
     textareaRef.current?.focus()
-  }, [seed, seedId])
+  }, [seed, seedId, session?.meta.id])
 
   // Global dictation: insert at the caret instead of replacing what the user typed.
   useEffect(() => {
     if (!insert || insert.id === insertId) return
+    if ((insert.sessionId ?? null) !== (session?.meta.id ?? null)) return
     setInsertId(insert.id)
     const addition = insert.text
     const node = textareaRef.current
@@ -249,7 +324,7 @@ export function Composer({
       const caret = start + addition.length
       node.setSelectionRange(caret, caret)
     })
-  }, [insert, insertId, text])
+  }, [insert, insertId, text, session?.meta.id])
 
   useEffect(() => {
     setSlashIndex(0)
@@ -262,22 +337,32 @@ export function Composer({
           `\n\n<anexo nome="${doc.name.replace(/"/g, '')}"${doc.truncated ? ' truncado="true"' : ''}>\n\`\`\`\n${doc.text}\n\`\`\`\n</anexo>`
       )
       .join('')
-    return { text: `${text}${blocks}`.trim(), images }
+    return { text: `${text}${blocks}${pathPromptBlock(attachedPaths)}`.trim(), images }
   }
 
   const submit = async (): Promise<void> => {
     stopDictation()
     const payload = composed()
-    if ((!payload.text && !payload.images.length) || busy) return
+    if ((!payload.text && !payload.images.length) || busy || dictationActive) return
     setSending(true)
+    // Feedback first: the box empties the moment the user sends, and gets its content back if the app refuses the
+    // message. It used to stay full until the main process answered, which looked like a frozen app whenever
+    // starting the turn took a while.
+    const snapshot = { text, images, documents, attachedPaths }
+    setText('')
+    setImages([])
+    setDocuments([])
+    setAttachedPaths([])
+    let accepted = false
     try {
-      const accepted = await onSend(payload.text, payload.images)
-      if (accepted) {
-        setText('')
-        setImages([])
-        setDocuments([])
-      }
+      accepted = await onSend(payload.text, payload.images)
     } finally {
+      if (!accepted) {
+        setText((current) => (current ? current : snapshot.text))
+        setImages((current) => (current.length ? current : snapshot.images))
+        setDocuments((current) => (current.length ? current : snapshot.documents))
+        setAttachedPaths((current) => (current.length ? current : snapshot.attachedPaths))
+      }
       setSending(false)
       textareaRef.current?.focus()
     }
@@ -286,11 +371,12 @@ export function Composer({
   const queue = (): void => {
     stopDictation()
     const payload = composed()
-    if (!payload.text && !payload.images.length) return
+    if ((!payload.text && !payload.images.length) || dictationActive) return
     onQueue(payload.text, payload.images)
     setText('')
     setImages([])
     setDocuments([])
+    setAttachedPaths([])
     textareaRef.current?.focus()
   }
 
@@ -301,13 +387,21 @@ export function Composer({
       onCommand(command.id)
       return
     }
-    const skill = skillMatches[row - commands.length]
+    const custom = customMatches[row - commands.length]
+    if (custom) {
+      setText(`/${custom.name} `)
+      textareaRef.current?.focus()
+      return
+    }
+    const skill = skillMatches[row - commands.length - customMatches.length]
     if (!skill) return
     setText(`Use a skill "${skill.name}" para esta tarefa: `)
     textareaRef.current?.focus()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // While dictating, Enter must not send and the slash menu must stay closed.
+    if (dictationActive) return
     if (slashOpen) {
       if (event.key === 'ArrowDown') {
         event.preventDefault()
@@ -346,34 +440,63 @@ export function Composer({
       return
     }
     const list = Array.from(files).slice(0, room)
+    /** Absolute path when the file came from the OS; empty for clipboard blobs. */
+    const pathOf = (file: File): string => {
+      try {
+        return window.forja.paths.fromFile(file)
+      } catch {
+        return ''
+      }
+    }
+    /** Binaries and oversized text are attached by path, never decoded. */
+    const references: IncomingPath[] = []
+
     for (const file of list) {
+      const path = pathOf(file)
       if (file.type.startsWith('image/')) {
-        if (file.size > 12_000_000) {
-          setLocalError(`${file.name}: imagem maior que 12 MB.`)
+        if (file.size <= 12_000_000) {
+          const result = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result ?? ''))
+            reader.readAsDataURL(file)
+          })
+          const [header, data] = result.split(',')
+          if (!data) continue
+          const mediaType = (header.match(/data:(image\/[a-z+]+)/)?.[1] ?? 'image/png') as ImagePart['mediaType']
+          setImages((current) => [...current.slice(0, MAX_FILES - 1), { type: 'image', mediaType, data, label: file.name }])
           continue
         }
-        const result = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(String(reader.result ?? ''))
-          reader.readAsDataURL(file)
-        })
-        const [header, data] = result.split(',')
-        if (!data) continue
-        const mediaType = (header.match(/data:(image\/[a-z+]+)/)?.[1] ?? 'image/png') as ImagePart['mediaType']
-        setImages((current) => [...current.slice(0, MAX_FILES - 1), { type: 'image', mediaType, data, label: file.name }])
+        if (path) {
+          references.push({ path, kind: 'file' })
+          continue
+        }
+        setLocalError(`${file.name}: imagem maior que 12 MB e sem caminho acessível.`)
         continue
       }
-      if (file.size > MAX_TEXT_BYTES * 4) {
-        setLocalError(`${file.name}: arquivo grande demais (máx. ${Math.round(MAX_TEXT_BYTES / 1000)} kB de texto).`)
+
+      const text = isInlineText(file.name, file.type)
+      if (text && file.size <= MAX_TEXT_BYTES * 4) {
+        const raw = await file.text()
+        const truncated = raw.length > MAX_TEXT_BYTES
+        setDocuments((current) => [
+          ...current.slice(0, MAX_FILES - 1),
+          { id: nextId(), name: file.name, size: file.size, text: truncated ? raw.slice(0, MAX_TEXT_BYTES) : raw, truncated }
+        ])
         continue
       }
-      const raw = await file.text()
-      const truncated = raw.length > MAX_TEXT_BYTES
-      setDocuments((current) => [
-        ...current.slice(0, MAX_FILES - 1),
-        { id: nextId(), name: file.name, size: file.size, text: truncated ? raw.slice(0, MAX_TEXT_BYTES) : raw, truncated }
-      ])
+
+      if (path) {
+        references.push({ path, kind: 'file' })
+        continue
+      }
+      setLocalError(
+        text
+          ? `${file.name}: texto grande demais para embutir e sem caminho acessível.`
+          : `${file.name}: arraste este arquivo do Explorer para anexar pelo caminho.`
+      )
     }
+
+    if (references.length) addPaths(references)
   }
 
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
@@ -386,16 +509,83 @@ export function Composer({
     event.target.value = ''
   }
 
+  const addPaths = (incoming: IncomingPath[]): void => {
+    setLocalError('')
+    if (!incoming.length) return
+    if (attachments >= MAX_FILES) {
+      setLocalError(`Máximo de ${MAX_FILES} anexos por mensagem.`)
+      return
+    }
+    // Functional update: a mixed drop can add a folder and a file in the same
+    // pass, and both must survive the other's stale closure.
+    setAttachedPaths((current) => {
+      const room = MAX_FILES - (images.length + documents.length + current.length)
+      if (room <= 0) return current
+      return addPathAttachments(current, incoming, current.length + room)
+    })
+  }
+
+  const pickFolder = async (): Promise<void> => {
+    const result = await window.forja.paths.pickFolder()
+    if (!result.ok) {
+      setLocalError(result.error)
+      return
+    }
+    if (result.value) addPaths([{ path: result.value, kind: 'folder' }])
+  }
+
   const onDrop = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault()
     setDragActive(false)
-    if (event.dataTransfer.files.length) void addFiles(event.dataTransfer.files)
+    const items = Array.from(event.dataTransfer.items ?? [])
+    const incoming: IncomingPath[] = []
+    const dropped: File[] = []
+    for (const item of items) {
+      if (item.kind !== 'file') continue
+      const file = item.getAsFile()
+      let directory = false
+      try {
+        directory = item.webkitGetAsEntry()?.isDirectory === true
+      } catch {
+        /* older Chromium: fall back to the File itself */
+      }
+      if (directory) {
+        let path = ''
+        try {
+          path = file ? window.forja.paths.fromFile(file) : ''
+        } catch {
+          /* the preload bridge may reject synthetic File objects */
+        }
+        if (path) incoming.push({ path, kind: 'folder' })
+        else setLocalError('Não foi possível ler o caminho da pasta arrastada.')
+        continue
+      }
+      if (file) dropped.push(file)
+    }
+    // Some drag sources only fill `files`; only used when `items` is empty.
+    if (!items.length && event.dataTransfer.files.length) dropped.push(...Array.from(event.dataTransfer.files))
+    if (incoming.length) addPaths(incoming)
+    if (dropped.length) void addFiles(dropped)
   }
 
   const modelItems: MenuItem[] = []
   const query = modelQuery.trim().toLowerCase()
   for (const item of providers) {
     const list = item.models?.length ? item.models : [item.model]
+    const state = providerStates?.[item.id]
+    // A provider without a key cannot answer: one line that opens Settings instead of models that fail on send.
+    // (The one the session is on stays listed, so the menu never hides what is selected.)
+    if (state && !state.ready && item.id !== provider?.id) {
+      if (query && !item.label.toLowerCase().includes(query)) continue
+      modelItems.push({
+        id: `${item.id}::nokey`,
+        label: `${item.label} · sem chave — configurar`,
+        heading: item.label,
+        icon: 'cpu',
+        onSelect: onOpenSettings
+      })
+      continue
+    }
     const matched = query
       ? list.filter((candidate) => candidate.toLowerCase().includes(query) || item.label.toLowerCase().includes(query))
       : list
@@ -403,7 +593,7 @@ export function Composer({
       modelItems.push({
         id: `${item.id}::${candidate}`,
         label: candidate,
-        heading: index === 0 ? item.label : undefined,
+        heading: index === 0 ? (state?.failure ? `${item.label} · ${state.failure}` : item.label) : undefined,
         checked: item.id === provider?.id && candidate === modelLabel,
         icon: index === 0 ? 'cpu' : undefined,
         onSelect: () => onModelChange(item.id, candidate)
@@ -413,7 +603,12 @@ export function Composer({
   modelItems.push({ id: 'sep', separator: true })
   modelItems.push({ id: 'settings', label: 'Configurar modelos…', icon: 'settings', onSelect: onOpenSettings })
 
-  const effortLevels = effortLevelsFor(provider?.kind ?? 'mock', modelLabel, Boolean(provider?.compat?.reasoningEffort))
+  const effortLevels = effortLevelsFor(
+    provider?.kind ?? 'openai',
+    modelLabel,
+    Boolean(provider?.compat?.reasoningEffort),
+    provider?.effortLevels
+  )
   const effortItems: MenuItem[] = effortLevels.length
     ? [
         {
@@ -471,7 +666,8 @@ export function Composer({
   ]
 
   const attachItems: MenuItem[] = [
-    { id: 'file', label: 'Anexar arquivo ou imagem', icon: 'paperclip', onSelect: () => fileRef.current?.click() },
+    { id: 'file', label: 'Anexar arquivo de qualquer tipo', icon: 'paperclip', onSelect: () => fileRef.current?.click() },
+    { id: 'folder', label: 'Anexar pasta para o agente estudar', icon: 'folder', onSelect: () => void pickFolder() },
     { id: 'project', label: 'Abrir pasta de projeto', icon: 'folderOpen', onSelect: onAddProject },
     { id: 'sep1', separator: true },
     ...modeItems,
@@ -500,6 +696,14 @@ export function Composer({
           {queued.map((item) => (
             <span key={item.id} className="queue-chip" title={item.text}>
               <span>{item.text.replace(/\s+/g, ' ').slice(0, 60) || 'anexo'}</span>
+              <button
+                type="button"
+                className="queue-send"
+                onClick={() => onSendQueued(item.id)}
+                title="Enviar agora para a IA"
+              >
+                <Icon name="send" size={10} />
+              </button>
               <button type="button" onClick={() => onRemoveQueued(item.id)} title="Remover da fila">
                 <Icon name="x" size={10} />
               </button>
@@ -519,6 +723,20 @@ export function Composer({
       >
         {attachments ? (
           <div className="attach-row">
+            {attachedPaths.map((item) => (
+              <div key={item.id} className={`attach file kind-${item.kind}`} title={item.path}>
+                <Icon name={item.kind === 'folder' ? 'folder' : 'fileCode'} size={16} />
+                <span className="attach-name">{item.name}</span>
+                <span className="attach-size">{item.kind === 'folder' ? 'pasta' : 'arquivo'}</span>
+                <button
+                  type="button"
+                  title={`Remover ${item.path}`}
+                  onClick={() => setAttachedPaths((current) => current.filter((entry) => entry.id !== item.id))}
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            ))}
             {images.map((image, index) => (
               <div key={`img-${index}`} className="attach image">
                 <img src={`data:${image.mediaType};base64,${image.data}`} alt={image.label ?? 'anexo'} />
@@ -551,11 +769,12 @@ export function Composer({
         <div className="composer-input">
           <textarea
             ref={textareaRef}
-            value={text}
+            value={shownText}
             placeholder={placeholder}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
+            readOnly={dictation.phase === 'listening' || dictation.phase === 'stopping'}
             spellCheck={false}
             rows={1}
             aria-label="Mensagem"
@@ -579,9 +798,28 @@ export function Composer({
                   <span className="slash-hint">{command.hint}</span>
                 </button>
               ))}
+              {customMatches.length ? <div className="slash-head">Comandos do projeto</div> : null}
+              {customMatches.map((custom, offset) => {
+                const index = commands.length + offset
+                return (
+                  <button
+                    key={`custom-${custom.name}`}
+                    type="button"
+                    role="option"
+                    aria-selected={slashIndex === index}
+                    className={`slash-row ${slashIndex === index ? 'active' : ''}`}
+                    onMouseEnter={() => setSlashIndex(index)}
+                    onClick={() => selectSlash(index)}
+                  >
+                    <Icon name="terminal" size={14} />
+                    <span className="slash-label">/{custom.name}</span>
+                    <span className="slash-hint">{custom.argumentHint ? `${custom.argumentHint} · ` : ''}{custom.description || custom.source}</span>
+                  </button>
+                )
+              })}
               {skillMatches.length ? <div className="slash-head">Skills</div> : null}
               {skillMatches.map((skill, offset) => {
-                const index = commands.length + offset
+                const index = commands.length + customMatches.length + offset
                 return (
                   <button
                     key={`skill-${skill.name}`}
@@ -619,7 +857,6 @@ export function Composer({
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,text/*,.md,.json,.csv,.log,.ts,.tsx,.js,.jsx,.css,.html,.py,.rs,.go,.java,.cs,.sql,.yml,.yaml,.toml,.xml"
                 multiple
                 hidden
                 onChange={onFileChange}
@@ -660,10 +897,17 @@ export function Composer({
                 className={`model-btn effort-btn ${effort ? 'is-set' : ''}`}
                 disabled={busy}
                 onClick={() => setEffortOpen((value) => !value)}
-                title={effortLevels.length ? 'Esforço de raciocínio' : 'Este modelo não expõe esforço de raciocínio'}
+                aria-haspopup="menu"
+                aria-expanded={effortOpen}
+                title={
+                  effortLevels.length
+                    ? `Esforço de raciocínio: ${effort ? EFFORT_LABELS[effort] : 'automático'} — clique para escolher`
+                    : 'Este modelo não expõe esforço de raciocínio'
+                }
               >
                 <Icon name="gauge" size={12} />
                 <span>{effort ? EFFORT_LABELS[effort] : 'Auto'}</span>
+                {effortLevels.length ? <Icon name="chevronDown" size={10} /> : null}
               </button>
               {effortOpen ? <MenuPopover items={effortItems} onClose={() => setEffortOpen(false)} align="right" className="model-menu" /> : null}
             </div>
@@ -717,9 +961,9 @@ export function Composer({
                   <span style={{ width: `${Math.max(1, Math.min(100, contextPercent))}%` }} />
                 </div>
                 <div className="context-popover-foot">
-                  <span>{Math.round((session?.usage.input ?? 0) / 1000)}k usados</span>
+                  <span>{Math.round(contextUsed / 1000)}k usados</span>
                   <span>
-                    {Math.max(0, Math.round(((provider?.contextWindow ?? 0) - (session?.usage.input ?? 0)) / 1000))}k livres
+                    {Math.max(0, Math.round(((provider?.contextWindow ?? 0) - contextUsed) / 1000))}k livres
                   </span>
                 </div>
               </div>
@@ -728,15 +972,24 @@ export function Composer({
               type="button"
               className={`round-btn mic-btn state-${dictation.phase}`}
               style={{ ['--level' as string]: dictation.level.toFixed(2) }}
-              onClick={toggleDictation}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                // The mic button must not keep focus: the user wants the caret
+                // blinking in the input while the live transcript arrives.
+                const node = textareaRef.current
+                node?.focus()
+                const end = node?.value.length ?? 0
+                node?.setSelectionRange(end, end)
+                toggleDictation()
+              }}
               disabled={dictation.phase === 'stopping'}
               aria-pressed={dictation.phase === 'listening'}
               title={
                 dictation.phase === 'listening'
-                  ? 'Parar o ditado (Esc ou o atalho global)'
+                  ? 'Parar o ditado (Esc ou clique no microfone)'
                   : dictation.phase === 'loading'
                     ? 'Carregando o modelo de voz… (clique para cancelar)'
-                    : 'Ditado por voz: a pílula aparece e o texto vai para o campo em foco'
+                    : 'Clique para ditar pelo microfone'
               }
             >
               {dictation.phase === 'loading' ? <span className="spinner tiny" /> : <Icon name={dictation.phase === 'listening' ? 'audioLines' : 'mic'} size={16} />}
@@ -750,7 +1003,7 @@ export function Composer({
                 type="button"
                 className="send-btn"
                 onClick={() => void submit()}
-                disabled={!text.trim() && !attachments}
+                disabled={(!text.trim() && !attachments) || dictationActive}
                 title="Enviar (Enter) · Ctrl+Enter adiciona à fila"
               >
                 <Icon name="arrowUp" size={15} />
@@ -782,10 +1035,8 @@ export function Composer({
         <span className="composer-hint">
           {dictation.phase === 'listening' ? (
             <em className="listening-note">
-              <span className="listening-dot" /> Ouvindo… fale normalmente · clique no microfone ou use o atalho para inserir
+              <span className="listening-dot" /> Ouvindo… fale normalmente · clique no microfone para parar e inserir
             </em>
-          ) : provider?.kind === 'mock' ? (
-            <em className="mock-warning">Scripted: não é um modelo real</em>
           ) : (
             <>
               <span className="hint-provider">{provider?.label ?? 'provedor'}</span>
@@ -793,6 +1044,17 @@ export function Composer({
               {Math.round((provider?.contextWindow ?? 0) / 1000)}k
               <span className="hint-sep">·</span>
               {contextPercent}%
+              {turnLimit > 0 ? (
+                <>
+                  <span className="hint-sep">·</span>
+                  <span
+                    className={turnTokens / turnLimit > 0.8 ? 'turn-warn' : undefined}
+                    title="Tokens do turno (entrada não cacheada + saída) / limite"
+                  >
+                    turno {formatTokens(turnTokens)}/{formatTokens(turnLimit)}
+                  </span>
+                </>
+              ) : null}
             </>
           )}
         </span>

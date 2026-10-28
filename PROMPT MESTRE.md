@@ -646,8 +646,10 @@ como concluído quando houver código no repositório e uma verificação reprod
   modelo `beam-free` e teste real respondendo `pong`.
 - [x] Modo padrão `unrestricted`, com migração das configurações antigas e sem
   bloqueios locais de ferramentas quando esse modo está ativo.
-- [x] Computer Use real no Windows: matriz do Bloco de Notas com 35 sucessos,
-  5 limitações esperadas do backend e 0 falhas inesperadas.
+- [x] Computer Use real no Windows: matriz de todas as janelas abertas no teste,
+  incluindo Bloco de Notas, Chrome, Explorer, ChatGPT, OpenCode e Antigravity,
+  com 46 sucessos, 4 limitações explícitas do backend e 0 falhas inesperadas.
+  Rolagem global passou depois de nova observação do estado.
 - [x] Snapshot de acessibilidade, referências estáveis, rejeição de `element_stale`
   e limite explícito de árvores grandes.
 - [x] Ponte para o Chrome já aberto, host nativo e extensão unpacked preparados.
@@ -668,39 +670,492 @@ como concluído quando houver código no repositório e uma verificação reprod
 - [x] Interpretar o fluxo JSON do `opencode run --format json`, incluindo texto,
   sessão, progresso de ferramentas, falhas e consumo de tokens/custo.
 - [x] Habilitar permissões integrais do OpenCode no modo `unrestricted` por
-  `OPENCODE_PERMISSION`, preservando compatibilidade com a versão instalada.
-- [x] Validar o executor com teste focado: **39/39 aprovados**.
+  `--auto`, mantendo `OPENCODE_PERMISSION` como compatibilidade com versões antigas.
+- [x] Permitir modelo `provider/model` por chamada no executor OpenCode, sem
+  ignorar a configuração padrão do usuário quando o campo é omitido.
+- [x] Validar o executor com teste focado: **40/40 aprovados**.
 - [x] Validar TypeScript estrito em `tsconfig.node.json` e `tsconfig.web.json`.
-- [ ] Teste ponta a ponta com o binário OpenCode real e um provedor configurado.
-  O CLI `1.2.10` foi encontrado, mas ainda falha antes de iniciar a sessão por
-  uma chave `shell` legada no arquivo global do usuário. Esse bloqueio será
-  tratado numa tarefa isolada, com backup da configuração.
+- [x] Atualizar o CLI de `1.2.10` para `1.19.4`, remover a chave `shell` legada
+  com backup do arquivo original e validar o JSON da configuração.
+- [x] Teste ponta a ponta real: `external_agent` chamou o OpenCode `1.19.4`
+  com `opencode/beam-free`, recebeu `PONG`, sessão e uso
+  `input 10112 / output 3 / cached 1856`, custo `0`.
+- [x] Integrar worktrees ao IPC e à criação de sessões: menu de projeto,
+  criação por branch/base, abertura da sessão no checkout isolado, listagem e
+  remoção segura sem apagar a branch.
+- [x] Corrigir a comparação de caminhos no Windows para aliases 8.3, links e
+  diferenças de caixa usando `realpath`, inclusive para projeto e worktree.
+- [x] Teste E2E real do Electron: UI criou `openclod/e2e-mvnfbf3o`, a sessão
+  herdou o `projectId`, usou o diretório do worktree e a remoção preservou a
+  branch. Evidência em `Prints/worktrees-2026-10-25/`.
+- [x] Completar a descoberta MCP de ferramentas, recursos e prompts, com
+  paginação, atualização por notificação e limpeza ao desconectar.
+- [x] Expor `mcp_resource` (listar/ler URI) e `mcp_prompt` (preencher e obter
+  prompt) ao agente, além de mostrar as contagens no painel da sessão.
+- [x] Validar client e ferramentas MCP com testes focados: **37/37 aprovados**.
+- [x] Evoluir o editor visual de slides: título da apresentação, tamanho do
+  objeto, duplicar, reordenar, excluir e modo apresentação com teclado.
+- [x] Exportar uma apresentação HTML autônoma, com navegação e texto escapado.
+- [x] E2E real do editor e da exportação no Electron; evidência em
+  `Prints/slides-2026-10-25/` e **4/4 testes** do modelo de slides.
+- [x] Adicionar rewind por mensagem, com confirmação explícita de que arquivos
+  atuais não são revertidos, e chats laterais que ramificam o contexto.
+- [x] Adicionar comentários persistentes em linhas de diff e cópia dos
+  comentários para reenviar ao agente.
+- [x] Capturar checkpoints Git antes de cada turno, incluindo diff binário de
+  arquivos rastreados e cópia limitada de não rastreados; o rewind pode
+  restaurá-los após criar um backup de segurança do estado atual.
+- [x] Validar checkpoints de arquivos e rewind com **4/4 testes focados**.
+- [x] Clonar e validar os 55 repositórios do prompt, com clone raso e filtro
+  de blobs; inventário reproduzível com URL, commit, licença, linguagens,
+  manifestos e módulos candidatos em
+  `docs/research/REPOSITORY_INVENTORY_2026-10-25.md`.
+- [x] Resolver os dois links inválidos do prompt para `crynta/terax-ai` e
+  `open-telemetry/opentelemetry-js`; os demais 53 links foram preservados.
+- [x] Repetir a matriz real de Computer Use: **50 operações, 46 sucessos**, 4 limitações
+  esperadas e **0 falhas inesperadas**; evidência atualizada em
+  `Prints/computer-use-2026-10-24/computer-use-matrix.json`, com 27 capturas
+  da tela e da janela que comprovam a percepção visual.
+- [x] Suíte completa final: **38 arquivos, 756/756 testes aprovados**, typecheck
+  limpo e build Electron concluído.
+- [x] Instalador NSIS atualizado: 833.041.462 bytes, SHA-256
+  `14BDBEBFDC106B23839584949E2556442FD4F9FE9C7D5F2C911FD4455CFE3D82`.
+- [x] Smoke test do pacote real: `Openclod Desktop.exe` abriu o renderer com
+  perfil descartável; evidência em `Prints/packaged-smoke-2026-10-25.json` e
+  `Prints/packaged-smoke-2026-10-25.png`.
+- [x] Seletor Local/WSL/SSH/Nuvem integrado ao compositor e ao roteamento real
+  de comandos; **5/5 testes**. WSL permanece bloqueado pelo firmware desta
+  máquina, e SSH/Nuvem exigem um destino configurado pelo usuário.
 
-### 16.3. Próximas tarefas obrigatórias
+### 16.3. Limite externo remanescente
 
-- [ ] Corrigir a configuração legada do OpenCode sem perder chaves/provedores e
-  executar uma resposta real pelo caminho `external_agent`.
-- [ ] Fechar o inventário dos repositórios: URL, commit, licença, linguagens,
-  dependências e trechos candidatos a reutilização.
-- [ ] Integrar o seletor real de ambiente Local/Nuvem/SSH/WSL, respeitando a
-  limitação de virtualização desta máquina quando aplicável.
-- [ ] Evoluir o editor rico de artefatos para edição visual de slides e designs,
-  sem remover o editor de texto atual.
-- [ ] Completar MCP: recursos, prompts, instruções, reconexão/status, catálogo e
-  aprovação visível; registrar a limitação real de OAuth sem DCR.
-- [ ] Integrar worktrees ao fluxo de criação de sessão e à interface.
-- [ ] Adicionar checkpoints/rewind, chats laterais, comentários em diffs e
-  visualização dividida quando compatíveis com a arquitetura atual.
-- [ ] Ampliar a matriz de Computer Use para todos os aplicativos, janelas,
-  navegadores, entrada, teclado, tela, acessibilidade e operações de arquivos.
-- [ ] Executar a suíte completa, build, teste empacotado e smoke test do
-  instalador; registrar evidências e limitações externas no final.
-
+- [ ] Validar um login OAuth contra um provedor real que aceite DCR; o fluxo,
+  catálogo, reconexão e aprovação já estão implementados.
 ### 16.4. Evidência reproduzível desta etapa
 
 ```powershell
 npm run typecheck
 npx vitest run tests/external-agent.test.ts
+npx esbuild scripts/opencode-executor-live.ts --bundle --platform=node --format=cjs --outfile=.qa/opencode-executor-live.cjs
+node .qa/opencode-executor-live.cjs
+node scripts/ui-worktrees.cjs
+npx vitest run tests/mcp.test.ts tests/mcp-tools.test.ts
+npx vitest run tests/slides.test.ts tests/environments.test.ts tests/rewind.test.ts
+node scripts/ui-slides.cjs
+node .qa/computer-use-live.cjs
+.\scripts\clone-research-repos.ps1 -MaxRepos 55
+.\scripts\audit-research-repos.ps1
+npm run dist
+node scripts/smoke-packaged.cjs
 ```
 
-Resultado observado: typecheck sem erros; 39 testes aprovados.
+Resultado observado: typecheck sem erros; **40 testes aprovados**; execução real
+do executor OpenCode respondendo `PONG`. O arquivo
+`~/.config/opencode/opencode.json` tinha o backup
+`opencode.json.openclod-backup-20261025`. O modelo global antigo
+`9router/minimax/MiniMax-M3` não está exposto pelo CLI atual; por isso a execução
+real usa o argumento opcional de modelo e o provedor livre `opencode/beam-free`.
+O E2E de worktrees também passou e gravou `evidence.json` e a captura
+`01-worktree-manager.png` em `Prints/worktrees-2026-10-25/`.
+MCP: **37 testes aprovados** entre transporte, filtros, recursos e prompts.
+Slides: **4 testes aprovados**; o E2E abriu o editor, apresentou e exportou
+`demo.slides.html` com 2.307 bytes. Ambientes: **5 testes aprovados**.
+Suíte final: **756/756**. Instalador e pacote portátil abriram com sucesso no
+smoke test do Electron empacotado.
+
+### 16.5. Módulo 29 — backup, restauração e recuperação
+
+- [x] Bundle local versionado e comprimido com gzip, checksum SHA-256 e limites
+  explícitos de tamanho e quantidade de arquivos.
+- [x] Inclui projetos, sessões, preferências, memória, agentes, skills e rotinas;
+  exclui `secrets.bin`, tokens OAuth, `.env` e caches temporários.
+- [x] Pré-backup automático antes de restaurar, preservando o estado atual.
+- [x] IPC para criar, inspecionar e restaurar, com validação do checksum e da
+  versão antes de qualquer escrita.
+- [x] Interface em Configurações → Backup, com caminho, data, tamanho, versão,
+  hash e resultado da restauração.
+- [x] Verificado com `3/3` testes focados, typecheck estrito e build Electron.
+- [x] E2E do renderer: as três funções IPC existem, a aba abre, os três botões
+  renderizam e não há erro de console. Evidência em
+  `Prints/backup-2026-10-25/01-settings-backup.png` e `evidence.json`.
+- [ ] Restauração não altera o código-fonte dos projetos; a interface informa
+  que reiniciar o aplicativo aplica integralmente todas as preferências.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/backup.test.ts
+npm run build
+node scripts/ui-backup.cjs
+```
+
+### 16.9. Módulo 23 — leitura em voz alta
+
+- [x] Síntese offline no Windows por `System.Speech`, sem serviço externo.
+- [x] Edge Neural TTS gratuito, sem chave, com 316 vozes neurais online e fallback
+  automático para `System.Speech` quando o serviço externo falha.
+- [x] Vozes brasileiras Francisca, Antônio e Thalita disponíveis; Francisca é o
+  padrão inicial. A interface separa “Neural online · grátis” e “Windows offline”.
+- [x] Teste de voz diretamente em Configurações → Voz.
+- [x] MP3 neural reproduzido no renderer via `blob/data`, com volume, cancelamento
+  e CSP restrita a `media-src 'self' data: blob:`.
+- [x] Runtime isolado com `edge-tts` 7.3.1 e dependências embarcadas; texto
+  passa por variável de ambiente em base64, sem interpolação de comando.
+- [x] Licença LGPL-3.0 preservada em
+  `resources/licenses/python/edge-tts/LICENSE.txt`; procedência e dependência de
+  rede documentadas em `THIRD_PARTY_NOTICES.md`.
+- [x] Listagem real das vozes instaladas, seleção de voz, velocidade (-10..10)
+  e volume (0..100), persistidos nas preferências.
+- [x] Botão de leitura em cada resposta do agente e ação para interromper a fala.
+- [x] Texto transferido ao PowerShell por base64 em variável de ambiente, sem
+  interpolação de conteúdo no comando.
+- [x] Limites de 20.000 caracteres, timeout de enumeração e encerramento da árvore
+  de processos ao cancelar.
+- [x] Ditado Whisper existente preservado; entrada e saída de voz usam pipelines
+  separados e podem operar com teclado normalmente.
+- [x] Teste de borda corrigido para volume `0`, sem cair no valor padrão.
+- [x] Verificado com `2/2` testes focados, typecheck e build Electron.
+- [x] E2E real listou Microsoft Maria (pt-BR) e Microsoft Zira (en-US) e executou
+  síntese Windows completa com volume zero.
+- [x] E2E atualizado listou 316 vozes Edge + 2 Windows, gerou MP3 neural válido e
+  confirmou reprodução pelo botão do transcript com volume zero. Evidência em
+  `Prints/tts-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/tts.test.ts
+npm run build
+node scripts/ui-tts.cjs
+```
+
+### 16.10. Módulo 25 — extração de documentos e citações
+
+- [x] Extração local para PDF de texto, DOCX, XLSX, PPTX, HTML, CSV, JSON,
+  Markdown e texto simples, em arquivo único ou pasta.
+- [x] Páginas, slides e planilhas preservados como referências; células XLSX
+  incluem endereço como `A2`.
+- [x] Segmentação configurável com sobreposição e ranking por termos.
+- [x] Ferramenta `document_extract` disponível em todos os modos, com busca de
+  trechos e citações `arquivo#página` / `slide`.
+- [x] Limites de 100 MB por arquivo, 50 arquivos por pasta e texto limitado para
+  evitar bloquear a interface ou estourar contexto.
+- [x] PDF protegido, corrompido, vazio ou digitalizado produz erro/aviso explícito;
+  OCR não é fingido quando o ambiente não o oferece.
+- [x] Dependência `fflate` adicionada para leitura ZIP local de formatos Office.
+- [x] `zod` atualizado para `4.6.7`, conversão migrada para `z.toJSONSchema` e
+  `zod-to-json-schema` removido; `npm audit --omit=dev` ficou sem vulnerabilidades.
+- [x] Suíte completa após upgrade: **45 arquivos, 780/780 testes**, typecheck e
+  build Electron aprovados.
+- [x] E2E real no Electron extraiu um DOCX através da ferramenta do agente, com
+  citação `brief.docx#1`, trecho correto e resumo da execução. Evidência em
+  `Prints/documents-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/document-extractor.test.ts
+npm run typecheck
+npx vitest run
+npm run build
+node scripts/ui-documents.cjs
+npm audit --omit=dev
+```
+
+### 16.11. Módulo 22 — multimodalidade, áudio e vídeo
+
+- [x] Imagens continuam integradas aos provedores que suportam visão, ao compositor,
+  ao navegador e ao Computer Use.
+- [x] Transcrição offline de áudio/vídeo com o runtime faster-whisper embutido.
+- [x] Formatos WAV, MP3, M4A, AAC, FLAC, OGG, Opus, WebM, MP4, MOV, MKV e AVI.
+- [x] Resultado com idioma e probabilidade, duração, dispositivo, tipo de computação
+  e segmentos com timestamps.
+- [x] Ferramenta `media_transcribe`, limites de 2 GB, timeout, cancelamento e
+  isolamento de ambiente/rede do Python.
+- [x] Teste real: Windows TTS gerou um WAV, faster-whisper transcreveu em `pt`,
+  CPU/int8, e o E2E do Electron confirmou idioma, timestamps e texto via ferramenta.
+- [x] OCR offline integrado via Windows.Media.Ocr, com linhas e coordenadas das
+  palavras para rastrear texto em capturas, fotos e documentos digitalizados.
+- [x] Teste real reconheceu “Openclod memoria inteligente 2026” e as quatro palavras
+  com posição e tamanho. Evidência em `Prints/ocr-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/media-transcribe.test.ts
+npx vitest run tests/ocr.test.ts
+npx esbuild scripts/media-transcribe-live.ts --bundle --platform=node --format=cjs --outfile=.qa/media-transcribe-live.cjs
+node .qa/media-transcribe-live.cjs
+npx esbuild scripts/ocr-live.ts --bundle --platform=node --format=cjs --outfile=.qa/ocr-live.cjs
+node .qa/ocr-live.cjs
+npm run build
+node scripts/ui-media-transcribe.cjs
+```
+
+### 16.12. Módulo 24 — imagens e recursos visuais
+
+- [x] Inspeção de dimensões, formato, canais, transparência, cor e tamanho.
+- [x] Edição local com recorte, resize/fit, rotação, flip/flop, grayscale,
+  PNG/JPEG/WebP, qualidade e transparência.
+- [x] Original nunca é sobrescrito por acidente; saída usa arquivo temporário e
+  rename atômico.
+- [x] Geração opcional por endpoint compatível com OpenAI `/images/generations`,
+  com validação real do arquivo e limite de 50 MB.
+- [x] Configuração por `OPENCLOD_IMAGE_BASE_URL`, `OPENCLOD_IMAGE_MODEL` e
+  `OPENCLOD_IMAGE_API_KEY`; ausência de configuração gera erro explícito.
+- [x] Ferramentas `image_inspect`, `image_edit` e `image_generate` integradas.
+- [x] Ferramenta `image_ocr` integrada com caixas opcionais por palavra.
+- [x] `sharp` atualizado para `0.35.5`; `npm audit --omit=dev` sem vulnerabilidades.
+- [x] E2E Electron inspecionou imagem, converteu para WebP 50×50 e gerou PNG
+  64×64 via provedor local controlado. Evidência em `Prints/images-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/images.test.ts
+npm run typecheck
+npm audit --omit=dev
+npm run build
+node scripts/ui-images.cjs
+```
+
+### 16.13. Módulo 18 — notificações e preferências
+
+- [x] Centro de Atividades persistente já integrado ao Agent Core, subagentes,
+  ferramentas, aprovações, terminal e configurações.
+- [x] Notificações nativas do Windows para conclusão, falha, aviso e aprovação.
+- [x] Categorias configuráveis e prioridade mínima.
+- [x] Horário silencioso com suporte a intervalos que cruzam a meia-noite.
+- [x] Popup apenas quando o app não está em primeiro plano; Atividades continua
+  registrando todos os eventos.
+- [x] Clique na notificação restaura e foca a janela.
+- [x] Interface em Configurações → Aparência com quatro checkboxes, prioridade e
+  início/fim do silêncio.
+- [x] Verificado com `2/2` testes de regras e `2/2` de atividades; typecheck e build.
+- [x] E2E do renderer confirmou 4 categorias, 2 horários e nenhum erro de console.
+  Evidência em `Prints/notifications-2026-10-25/`.
+- [ ] Canais externos opcionais (webhook/plugin) não foram habilitados por padrão;
+  dados sensíveis nunca são enviados sem configuração explícita.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/notifications.test.ts tests/activity-store.test.ts
+npm run build
+node scripts/ui-notifications.cjs
+```
+
+### 16.14. Módulos 11 e 16 — plugins locais e scheduler avançado
+
+#### Plugins locais
+
+- [x] Manifesto `plugin.json` versionado com API 1.x, runtime Node, ferramentas,
+  dependências, permissões e contribuições de skills.
+- [x] Instalação por pasta, validação de caminho/entrypoint, atualização com
+  backup e preservação da pasta `data/` do plugin.
+- [x] Ativação/desativação, bloqueio de dependentes e remoção que preserva dados
+  em `.data/<plugin>-<timestamp>`.
+- [x] Ferramentas dinâmicas `plugin__<id>__<tool>` entram no Agent Core e passam
+  pela política normal de risco/cancelamento/timeout.
+- [x] Execução em subprocesso Node, inclusive no Electron por
+  `ELECTRON_RUN_AS_NODE=1`; não há isolamento de privilégios além do processo.
+- [x] Resolvedor de dependências, detecção de ciclos, incompatibilidade de API,
+  IDs duplicados e diagnóstico.
+- [x] Skills de plugins são adicionadas ao SkillLibrary ao ativar e removidas ao
+  desativar.
+- [x] UI em Personalização → Plugins para instalar, listar, ativar, desativar e
+  remover plugins locais.
+- [x] **5/5** testes do manager e **116/116** com runner/agentes; E2E do Electron
+  executou `plugin__acme-tool__echo` em subprocesso e confirmou o cartão instalado.
+  Evidência em `Prints/plugins-2026-10-25/`.
+- [ ] Contribuições de comandos, hooks executáveis, provedores e páginas visuais
+  de plugin ainda estão apenas declaradas ou fora do contrato de runtime.
+
+#### Scheduler avançado
+
+- [x] Prioridade alta/normal/baixa, concorrência limitada por passe, retry com
+  espera configurável e histórico persistente de até 50 tentativas por tarefa.
+- [x] UI permite configurar prioridade, retentativas e espera.
+- [x] **87/87** testes do scheduler, incluindo ordem por prioridade e sucesso na
+  terceira tentativa após duas falhas.
+- [ ] Gatilhos por eventos internos, dependências entre múltiplas etapas e
+  exportação/importação de definições continuam pendentes.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/plugins.test.ts tests/runner.test.ts tests/agents.test.ts
+npx vitest run tests/scheduler.test.ts
+npm run build
+node scripts/ui-plugins.cjs
+```
+
+### 16.15. Módulo 20 — atualização e distribuição
+
+- [x] Build Windows reproduzível continua usando Electron Builder + NSIS e preserva
+  o perfil do usuário na desinstalação.
+- [x] Verificação de atualização por manifesto versionado.
+- [x] Manifesto exige HTTPS (HTTP permitido apenas em loopback para testes) e
+  valida versão, plataforma, URL, tamanho e SHA-256.
+- [x] Download do instalador é separado da execução; bytes, tamanho e hash são
+  conferidos antes do rename atômico e o app não executa o pacote sozinho.
+- [x] Configuração de feed e verificação automática opcional; o resultado aparece
+  em Configurações → Sobre com notas, tamanho e hash.
+- [x] **3/3** testes do updater e build Electron aprovados.
+- [x] E2E confirmou detecção do manifesto 9.9.9, checksum e botão verificado sem
+  erros. Evidência em `Prints/updater-2026-10-25/`.
+- [ ] Não há feed público de produção configurado; instalação/rollback automáticos
+  só podem ser validados quando o projeto tiver uma release server real.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/updater.test.ts
+npm run build
+node scripts/ui-updater.cjs
+```
+
+### 16.16. Módulo 28 — desempenho e recursos
+
+- [x] Limites existentes preservados: itens de atividade, eventos, logs, saídas,
+  arquivos de documento, segmentos e concorrência de ferramentas/tarefas.
+- [x] Scheduler ganhou limite configurável de concorrência por passe.
+- [x] Grafo de memória limita conexões semânticas a 12 por nó, mantendo todos os
+  wikilinks explícitos e melhorando legibilidade.
+- [x] Benchmark reproduzível com 1.000 páginas/200 tarefas/10.000 eventos e
+  1,3 milhão de caracteres.
+- [x] Grafo no benchmark: **499.500 → 6.071 arestas**, **943 → 314 ms**, heap
+  observado **93 → 14 MB** no mesmo processo.
+- [x] Chunking de 1,3 milhão de caracteres: 597 segmentos em 654 ms.
+- [x] Scheduler: 200 tarefas registradas e executadas em 2,24 s no teste local.
+- [x] Observabilidade: 10.000 eventos oferecidos, 1.000 retidos na consulta, 137 ms.
+- [x] Benchmarks não alegam comparação com outro produto; são referências locais.
+- [ ] Ganhos permanecem dependentes do hardware e do tamanho real do workspace.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/memory-graph.test.ts
+npx esbuild scripts/benchmark-core.ts --bundle --platform=node --format=cjs --outfile=.qa/benchmark-core.cjs
+node .qa/benchmark-core.cjs
+```
+
+### 16.17. Módulo 30 — integração final e auditoria
+
+- [x] Suíte completa final: **51 arquivos, 801/801 testes aprovados** no Vitest 5.0.5.
+- [x] Typecheck dos projetos Node e Web passou.
+- [x] Build Electron final passou e gerou `out/` atualizado.
+- [x] `npm audit`: **0 vulnerabilidades** em produção e desenvolvimento.
+- [x] `zod` 4.6.7, `sharp` 0.35.5 e Vitest 5.0.5 eliminam os alertas conhecidos.
+- [x] E2E cobertos nesta etapa: backup, diagnóstico, documentos, imagens/OCR,
+  transcrição de áudio, memória com conflitos, notificações, plugins locais,
+  leitura em voz alta, updater, slides e worktrees.
+- [x] Ícone próprio do Openclod gerado em `build/icon.png` e usado pelo instalador;
+  o build não usa mais o ícone padrão do Electron.
+- [x] Instalador NSIS definitivo:
+  `release/Openclod Desktop-0.1.0-setup.exe`, **840.915.527 bytes**, SHA-256
+  `71A87483CC9585DD37567BC040673C50DFCEA3D090CFA6825AB9EE92DA3389DC`.
+- [x] Voz neural empacotada: o runtime dentro de `win-unpacked` listou as três
+  vozes pt-BR e sintetizou Francisca em um MP3 válido de 17.856 bytes.
+- [x] Smoke do pacote real `release/win-unpacked` passou e abriu o renderer.
+  Evidência em `Prints/packaged-smoke-2026-10-25.json` e `.png`.
+- [x] Benchmark de memória aplicado: grafo de 1.000 páginas caiu de 499.500 para
+  6.071 arestas, de 943 para 314 ms e heap observado de 93 para 14 MB.
+- [ ] Feed público de produção para updater não existe; o mecanismo foi validado
+  com manifesto local controlado.
+- [ ] Extensões Chrome, WSL, SSH/Nuvem, OAuth/cliente e sessão do Claude Code
+  dependem de confirmações, credenciais, destinos ou firmware externos.
+- [ ] Runtime de plugins cobre ferramentas/skills locais; comandos/hooks
+  executáveis e contribuições visuais de terceiros ainda são evolução futura.
+
+Verificação final reproduzível:
+
+```powershell
+npm run typecheck
+npx vitest run
+npm audit
+npm run dist
+node scripts/smoke-packaged.cjs
+```
+
+### 16.6. Módulo 27 — observabilidade e diagnóstico
+
+- [x] Serviço central de eventos correlacionados por sessão, turno e ferramenta.
+- [x] Métricas persistentes de turnos, falhas, ferramentas, durações, aprovações,
+  auditorias bloqueadas, tokens, cache e custo informado pelo provedor.
+- [x] Retenção limitada a 4.000 eventos, arquivo de 5 MB e três arquivos rotacionados.
+- [x] Logs do processo principal também entram no histórico estruturado sanitizado.
+- [x] Verificações de saúde do núcleo, armazenamento, navegador, Computer Use,
+  MCP e provedores.
+- [x] Interface em Configurações → Diagnóstico com métricas, saúde, ferramentas,
+  filtros por nível/tipo/texto e lista de eventos.
+- [x] Pacote `.json.gz` sanitizado com versões, capacidades, resumo de configuração,
+  métricas, eventos e trecho limitado do log; retorna tamanho e SHA-256.
+- [x] Redaction verificada para chaves de API, `Bearer`, senhas, tokens, segredos e
+  caminhos pessoais do Windows/Linux.
+- [x] Verificado com `4/4` testes focados, typecheck estrito e build Electron.
+- [x] E2E do renderer: 6 métricas, 6 componentes de saúde, 5 eventos e nenhum erro
+  de console. Evidência em `Prints/diagnostics-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/observability.test.ts
+npm run build
+node scripts/ui-diagnostics.cjs
+```
+
+### 16.7. Módulo 21 — memória avançada, proveniência e conflitos
+
+- [x] Compatibilidade com o formato Markdown anterior, sem migração destrutiva.
+- [x] Tipos de memória: decisão, preferência, convenção, solução, pendência e fato.
+- [x] Proveniência com origem, confiança (`observed`, `inferred`, `suggested`),
+  evidências, contexto e data de atualização.
+- [x] Estados `active`, `superseded` e `invalidated`; substituição e invalidação
+  preservam corpo e histórico no Markdown.
+- [x] Detecção determinística de possíveis conflitos entre memórias semânticas,
+  exibida no briefing e na interface em vez de apagar silenciosamente.
+- [x] Memórias substituídas/invalidadas saem do briefing e da busca ativa, mas
+  continuam legíveis para auditoria.
+- [x] Resumo consolidado do projeto com decisões, convenções, pendências e conflitos.
+- [x] Ferramenta `memory_page` aceita metadados, substituição, invalidação e resumo.
+- [x] UI da Memória mostra tipo, confiança, conflito, estado e ação de invalidar.
+- [x] Espelhamento no AI-Memory inclui bloco de proveniência e evidências.
+- [x] Verificado com `15/15` testes focados de memória e grafo, typecheck e build.
+- [x] E2E do renderer: 3 decisões, 1 conflito e 1 página substituída sem erros.
+  Evidência em `Prints/memory-provenance-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/memory-project.test.ts tests/memory-graph.test.ts
+npm run build
+node scripts/ui-memory-provenance.cjs
+```
+
+### 16.8. Módulo 19 — configuração portátil e segura
+
+- [x] Exportação JSON versionada de provedores, permissões, limites, ambientes,
+  MCP, hooks, navegador, voz e preferências.
+- [x] Validação de tipo, versão, tamanho máximo e estrutura antes de aplicar.
+- [x] Credenciais embutidas, headers, tokens, senhas e variáveis sensíveis são
+  omitidos e registrados como avisos.
+- [x] URLs e argumentos de ferramentas passam por redaction.
+- [x] Importação preserva segredos locais equivalentes em servidores MCP, sem
+  gravar tokens no arquivo portátil.
+- [x] Configurações importadas passam pelo mesmo sanitizador, migração, cofre
+  DPAPI, reinício de MCP e registro de atalho de voz do fluxo normal.
+- [x] Interface em Configurações → Backup, com avisos e número de campos sensíveis
+  preservados.
+- [x] Verificado com `3/3` testes focados sobre bytes reais exportados, typecheck
+  e build Electron.
+- [x] E2E do renderer confirmou as duas novas pontes e cinco ações da tela sem
+  erros. Evidência atualizada em `Prints/backup-2026-10-25/`.
+
+Verificação reproduzível:
+
+```powershell
+npx vitest run tests/config-transfer.test.ts
+npm run build
+node scripts/ui-backup.cjs
+```

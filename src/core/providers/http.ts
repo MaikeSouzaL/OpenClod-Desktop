@@ -1,15 +1,23 @@
 import type { ProviderErrorKind } from '../../shared/types.js'
 import { sleep } from '../util/ids.js'
+import { TUNNEL_DOWN_MESSAGE, isTunnelDownResponse } from './tunnel.js'
 
 const CONTEXT_OVERFLOW =
   /context.{0,24}(length|window|limit)|maximum context|too many tokens|prompt is too long|input is too long|reduce the length|context_length_exceeded|exceeds? the (model'?s )?(maximum|max)|max_tokens.{0,40}(exceed|too large)|request too large|string too long/i
-const QUOTA = /insufficient_quota|exceeded your current quota|quota|billing|credit balance|payment required|out of credits/i
+// "No credit": the account, not the request, is the problem. Covers the wording of real providers: OpenAI
+// (insufficient_quota), DeepSeek (insufficient_balance_error), Ollama Cloud ("monthly usage limit ... usage credits"),
+// Anthropic ("usage limit"), Moonshot ("balance ... insufficient, please recharge"), OpenRouter's free tier
+// ("Rate limit exceeded: free-models-per-day. Add 10 credits...": a daily cap, which no wait of a minute cures).
+const QUOTA =
+  /free[- ]models?[- ]per[- ]day|per[- ]day|insufficient[_ ]?(quota|balance|funds|credits?)|(balance|credits?|funds)[^.]{0,24}(insufficient|too low|exhausted|depleted|not enough)|exceeded your (current )?(quota|monthly|daily|weekly|usage)|(monthly|daily|weekly|usage|plan) (usage )?limit|usage credits|quota|billing|credit balance|payment required|out of (credits|tokens)|recharge|top.?up/i
 const RATE_LIMIT = /rate.?limit|too many requests|requests per minute|tpm|rpm/i
 const OVERLOADED = /overloaded|capacity|temporarily unavailable/i
 const AUTH = /invalid.{0,12}(api.?key|token|x-api-key)|unauthori[sz]ed|authentication|permission denied|incorrect api key/i
 
 /** Maps a provider failure to a kind the agent loop can act on. */
 export function classifyProviderError(status: number | undefined, message: string): ProviderErrorKind {
+  // A tunnel (Google Colab) whose notebook is gone answers an HTML page: the provider is unreachable, not "out of balance".
+  if (isTunnelDownResponse(status, message)) return 'network'
   if (status === 402 || QUOTA.test(message)) return 'quota'
   if (status === 401 || status === 403 || AUTH.test(message)) return 'auth'
   if (CONTEXT_OVERFLOW.test(message) || status === 413) return 'context_overflow'
@@ -55,13 +63,16 @@ export class ProviderHttpError extends Error {
     readonly retryAfter?: number,
     private readonly shouldRetryHeader?: boolean
   ) {
-    super(message ?? `HTTP ${status}: ${body.slice(0, 500)}`)
+    super(message ?? (isTunnelDownResponse(status, body) ? `${TUNNEL_DOWN_MESSAGE} (HTTP ${status})` : `HTTP ${status}: ${body.slice(0, 500)}`))
     this.name = 'ProviderHttpError'
     this.kind = classifyProviderError(status, body)
   }
 
   get retryable(): boolean {
     if (this.shouldRetryHeader !== undefined) return this.shouldRetryHeader
+    // A tunnel page (530 "Error 1033": the tunnel process is gone; 502 "Bad gateway": the server behind it stopped) does not
+    // heal within a retry window, so waiting only delays the reserve.
+    if (isTunnelDownResponse(this.status, this.body)) return false
     return this.status === 409 || isRetryableKind(this.kind)
   }
 }
@@ -152,11 +163,19 @@ export interface PostOptions {
   headerTimeoutMs?: number
   /** Base delay of the exponential backoff (tests shrink it). */
   baseDelayMs?: number
+  /**
+   * Another model is waiting to take over: retry once at most and never sit out a long Retry-After. The caller moves
+   * on in seconds instead of minutes (see `ModelRequest.fastFail`).
+   */
+  fastFail?: boolean
   onRetry?: (attempt: number, error: Error, delayMs: number) => void
 }
 
 /** Longest wait honoured from a Retry-After header. */
 const MAX_RETRY_AFTER_MS = 120_000
+/** With a reserve available, a server that asks for more than this is simply left to the reserve. */
+const FAST_FAIL_MAX_WAIT_MS = 4_000
+const FAST_FAIL_ATTEMPTS = 2
 
 function backoff(attempt: number, base: number): number {
   const exp = Math.min(30_000, base * 2 ** (attempt - 1))
@@ -169,7 +188,7 @@ function backoff(attempt: number, base: number): number {
  * instead of duplicating content). Rate limits honour Retry-After.
  */
 export async function postStream(opts: PostOptions): Promise<Response> {
-  const attempts = opts.maxAttempts ?? 5
+  const attempts = opts.fastFail ? Math.min(opts.maxAttempts ?? 5, FAST_FAIL_ATTEMPTS) : (opts.maxAttempts ?? 5)
   const base = opts.baseDelayMs ?? 1000
   let lastError: Error | undefined
 
@@ -218,6 +237,7 @@ export async function postStream(opts: PostOptions): Promise<Response> {
       shouldRetry === 'true' ? true : shouldRetry === 'false' ? false : undefined
     )
     if (!httpError.retryable || attempt === attempts) throw httpError
+    if (opts.fastFail && httpError.retryAfter !== undefined && httpError.retryAfter > FAST_FAIL_MAX_WAIT_MS) throw httpError
     const delay = httpError.retryAfter !== undefined ? Math.min(MAX_RETRY_AFTER_MS, httpError.retryAfter) : backoff(attempt, base)
     opts.onRetry?.(attempt, httpError, delay)
     await sleep(delay, opts.signal)

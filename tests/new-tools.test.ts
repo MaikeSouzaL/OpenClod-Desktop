@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { patchFileTool } from '../src/core/tools/fs'
 import { webResearchTool } from '../src/core/tools/web'
+import { mcpCallTool, mcpCatalogTool } from '../src/core/tools/mcp'
 import { createAgentTool } from '../src/core/agents/tools'
 import { buildSystemPrompt, ensureProjectInstructions, loadProjectInstructions } from '../src/core/agent/context'
 import { WorkspaceGuard } from '../src/core/security/policy'
@@ -196,6 +197,8 @@ describe('team mode prompt', () => {
     expect(buildSystemPrompt({ ...base, teamMode: true })).toContain('Modo equipe')
     expect(buildSystemPrompt({ ...base, teamMode: true })).toContain('agent-smith')
     expect(buildSystemPrompt({ ...base, teamMode: false })).not.toContain('Modo equipe')
+    expect(buildSystemPrompt(base)).toContain('mesma língua da última mensagem')
+    expect(buildSystemPrompt(base)).toContain('texto de raciocínio')
   })
 })
 
@@ -223,5 +226,47 @@ describe('CLAUDE.md', () => {
     expect(text.indexOf('CLAUDE.md')).toBeLessThan(text.indexOf('FORJA.md'))
     expect(text.match(/regras do claude/g)).toHaveLength(1)
     expect(text).toContain('regras do forja')
+  })
+})
+
+describe('lazy MCP catalogue', () => {
+  it('lists tools, returns a schema only on demand and forwards calls', async () => {
+    const dir = temp()
+    const calls: Array<{ server: string; tool: string; args: unknown }> = []
+    const mcp = {
+      catalog: () => [
+        {
+          name: 'rea',
+          state: 'ready',
+          transport: 'stdio',
+          tools: [{ name: 'inspect_binary', description: 'Analisa um binário.' }]
+        }
+      ],
+      schema: (server: string, tool: string) =>
+        server === 'rea' && tool === 'inspect_binary'
+          ? { name: tool, description: 'Analisa um binário.', inputSchema: { type: 'object', properties: {} } }
+          : undefined,
+      call: async (server: string, tool: string, args: Record<string, unknown>) => {
+        calls.push({ server, tool, args })
+        return { ok: true, text: 'analisado', summary: 'ok' }
+      }
+    }
+    const ctx = context(dir, { services: { mcp } as never })
+
+    const list = await mcpCatalogTool.execute({ server: 'rea' }, ctx)
+    expect(list.ok).toBe(true)
+    expect(list.text).toContain('inspect_binary')
+    expect(list.text).not.toContain('"properties"')
+
+    const schema = await mcpCatalogTool.execute({ server: 'rea', tool: 'inspect_binary' }, ctx)
+    expect(schema.text).toContain('"parameters"')
+    expect(schema.text).toContain('"type":"object"')
+
+    const called = await mcpCallTool.execute(
+      { server: 'rea', tool: 'inspect_binary', arguments: { path: 'app.exe' } },
+      ctx
+    )
+    expect(called).toMatchObject({ ok: true, text: 'analisado' })
+    expect(calls).toEqual([{ server: 'rea', tool: 'inspect_binary', args: { path: 'app.exe' } }])
   })
 })

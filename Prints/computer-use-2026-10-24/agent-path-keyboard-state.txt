@@ -1,8 +1,8 @@
-<ax_tree target="janela 1639704" snapshot="snap_7_mvna4kly">
+<ax_tree target="janela 24446370" snapshot="snap_7_mvnhq8za">
 {
   "window": {
     "app": "notepad",
-    "id": 1639704,
+    "id": 24446370,
     "title": "*Sem título - Bloco de Notas"
   },
   "accessibility": {
@@ -12,5 +12,5 @@
   },
   "screenshots": [
     {
-      "id": "shot-1639704-6",
-      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAy8UlEQVR4nOzdfXBd5Z0n+HONwMYvJDT0pDPu3e2xJWdiTBXGwTWRk+liu01bsrtipgpnm+5OSGpGapwEKZsyXcU43dvBS23jmc0VSaCl6c1AZ5remNrFsxPrUvakXFOMRdqOMVsIQ3RlZv8YKpsiBMsmWcBYd+vec9+k+6J7pasX+/l8oFzSc895nuece111v35+55y2NTd+JKqwds0NlY0AAABc0d64eKGysa3W1n/96H+Z5/kAAACwcP75g/+oavuyBZ8JAAAAS0jN1cLYnfcu1EQAAACYH8efrvfqDLEwiqI1165q5XQAAABYQBcv/bL+BopIAQAAgiYWAgAABG2usfAr/+pgnT8BAABY4mYfC//H7/8fn9j5e13/7J9t2fG7v/37n9my43dv37Fzy47f7fjvf2/Ljt9dc8e2f/nD/9R152+1dLYAAAC02Cxj4co1qzMrVz7+1//bh5Zfe3Dor1dd17b/23+1vO2avf/qsUQi+h8ePvjue+9NZjJbP3V7qycMAABAK80yFv7mx2+J/r9fTWYmJyejycnM5ez/k5cnJ7MtUfbXDz64/GvXr2j1bAEAAObRW++er/P/Qs7kPz7/w8/e+9nK9s/e+9n/+PwPWzvWLGPhb93+icw7F38xceEXFyfOX7xw/sKFiQ
+      "id": "shot-24446370-7",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLIAAAINCAIAAAClMsE0AAAxP0lEQVR4nOzdfWxd530n+HNVWZIluXaazFSZzO7OSKSykWVgbdfGhHKm8LZyRUpFpAGs7Hja2A5myFpJTHoDuYBH6W5rrbG1ZtaXTiqXnG5qN1N3I2PXmp2I17AmEAYZ0Wm0sbAwJSO6lOavIhtsYouS4/pNvIN7zn3lfeG95OWL+Hw+EITLc895nuc89wrgV8/vnLN606ZNUY1b1txUuxEAAIDr2g03r6vduLrR3n/29H9e4PEAAACweP754/+w7vZViz4SAAAAlpHVqVQqiqJcLpe8SF6X3r73gaUbGgAAAJ1w6sVm766enp5OpVJJFEzCYWUsjKLophs2LPgYAQAAWBhXP/xF8x1WJYuEtX8DAAAQAtcWAgAABG2+sfCr/+pIk78BAABY5gqxsPJ6whnXFjbyP37n//y13b/V+0/+yZ27fvPXf/vzd+76zTt27b5z1292//e/deeu37zprh3/8nv/sffef7BgIwcAAKADViUXE5auJ6x83cT6mzbm1q8/+mf/+81rbzgy+mcb1qw+9M0/Xbv6lw78q2dTqeh/ePLIe++/P53L3X3PHQt/CgAAAMzdqrktFf79z9wa/e2707np6eloejp3Lf9n+tr0dH5LlP/xo4+u/cqNdR6fDwAAsGz9/L3LTf4s5kj

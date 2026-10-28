@@ -1,0 +1,24 @@
+{
+  "label": "depois",
+  "startedAt": "2026-10-27T19:29:09.851Z",
+  "shotDetect": "Prints\\reserva-2026-10-27\\depois-provedor-detectar-modelos.png",
+  "shotMenu": "Prints\\reserva-2026-10-27\\depois-provedor-seletor-de-modelo.png",
+  "errors": [],
+  "checks": {
+    "antes: o OpenRouter está na lista de provedores, sem chave (como no perfil do usuário)": "ok",
+    "o cartão do OpenRouter diz \"sem chave\" antes de salvar a chave": "ok",
+    "Salvar chave: a tela confirma e o selo \"credencial ok\" aparece na hora": "ok",
+    "Salvar chave: o settings.json guarda só a referência ao cofre (secret:openrouter), nunca a chave": "ok",
+    "Salvar chave: o cofre foi gravado (secrets.bin existe e mudou)": "ok",
+    "Detectar modelos: lista os modelos do servidor e diz \"Salve para aplicar\"": "ok",
+    "Detectar modelos ainda NÃO grava: o settings.json segue sem os modelos até \"Salvar alterações\"": "ok",
+    "o que foi detectado não some se outra coisa das configurações é atualizada com a janela aberta": "ok",
+    "Salvar alterações: grava os 40 modelos e quais leem imagens": "ok",
+    "Salvar alterações: grava o endereço e a referência ao cofre": "ok",
+    "seletor de modelo: o provedor novo aparece com os modelos detectados, sem reiniciar o app": "ok",
+    "seletor de modelo: provedor sem chave aparece como \"sem chave — configurar\", sem modelos que falhariam": "ok",
+    "escolher o modelo novo no seletor muda a sessão (e o compositor mostra)": "ok",
+    "nova conversa: o seletor da tela inicial também lista o provedor novo": "ok",
+    "depois de fechar e abrir o app: provedor, chave (cofre) e modelos continuam": "ok"
+  }
+}

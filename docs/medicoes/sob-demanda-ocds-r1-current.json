@@ -1,0 +1,236 @@
+{
+  "label": "ocds-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-current-mvqtqu15",
+  "startedAt": "2026-10-27T15:19:47.507Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "tool_load",
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 24238,
+      "cachedTokens": 0,
+      "uncachedTokens": 24238,
+      "perCall": [
+        {
+          "input": 7980,
+          "cached": 0,
+          "output": 44
+        },
+        {
+          "input": 8102,
+          "cached": 0,
+          "output": 26
+        },
+        {
+          "input": 8156,
+          "cached": 0,
+          "output": 47
+        }
+      ],
+      "ms": 16136,
+      "final": "Nenhum servidor MCP aparece: a ferramenta retornou \"nenhum MCP configurado\" (para adicionar, use `mcp_search`/`mcp_install`).",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_recall",
+        "memory_page",
+        "tool_search",
+        "tool_load",
+        "memory_handoff",
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqu0zg5_7iw4 criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": true,
+      "usedToolSearch": true,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 6,
+      "inputTokens": 53617,
+      "cachedTokens": 11264,
+      "uncachedTokens": 42353,
+      "perCall": [
+        {
+          "input": 8196,
+          "cached": 0,
+          "output": 211
+        },
+        {
+          "input": 8689,
+          "cached": 5120,
+          "output": 184
+        },
+        {
+          "input": 8871,
+          "cached": 0,
+          "output": 44
+        },
+        {
+          "input": 9173,
+          "cached": 0,
+          "output": 101
+        },
+        {
+          "input": 9296,
+          "cached": 6144,
+          "output": 60
+        },
+        {
+          "input": 9392,
+          "cached": 0,
+          "output": 101
+        }
+      ],
+      "ms": 18149,
+      "final": "Handoff criado e confirmado na listagem.\n\n- **id:** `ho_mvqu0zg5_7iw4`\n- Resumo: \"piso de tokens medido\" · Próximo passo: \"rodar a suíte de testes\"\n\nVerificado: `memory_handoff list` mostra o handoff aberto com esses campos. Quem retomar pr",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_load",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 26413,
+      "cachedTokens": 5760,
+      "uncachedTokens": 20653,
+      "perCall": [
+        {
+          "input": 8420,
+          "cached": 0,
+          "output": 60
+        },
+        {
+          "input": 8583,
+          "cached": 5760,
+          "output": 58
+        },
+        {
+          "input": 9410,
+          "cached": 0,
+          "output": 307
+        }
+      ],
+      "ms": 12071,
+      "final": "**Nenhuma skill casa com \"pdf\".**\n\nA busca retornou 4 que apenas *mencionam* PDF para dizer que não serve:\n- `docx` — \"Não use para PDF\"\n- `pptx` — \"Não use para PDF\"\n- `qa-total` — \"PDF fora de QA (pdf)\" (e cita \"PDF de provas de QA\")\n- `s",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "tool_load",
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 39855,
+      "cachedTokens": 11264,
+      "uncachedTokens": 28591,
+      "perCall": [
+        {
+          "input": 9315,
+          "cached": 0,
+          "output": 201
+        },
+        {
+          "input": 9503,
+          "cached": 5120,
+          "output": 41
+        },
+        {
+          "input": 9665,
+          "cached": 6144,
+          "output": 171
+        },
+        {
+          "input": 11372,
+          "cached": 0,
+          "output": 221
+        }
+      ],
+      "ms": 18102,
+      "final": "A busca `list_agents(query=\"segurança\")` retornou apenas **svg-verifier** (que menciona \"segurança\" só no sentido de validar XML).\n\nNo catálogo completo, o agente que revisa segurança de verdade é o **security-auditor** — auditor de seguran",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "totals": {
+    "modelCalls": 16,
+    "inputTokens": 144123,
+    "uncachedTokens": 115835,
+    "allTargetsOk": true
+  }
+}

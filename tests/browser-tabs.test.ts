@@ -200,8 +200,8 @@ describe('BrowserLayer tabs', () => {
       open: vi.fn(async () => undefined),
       navigate: vi.fn(async () => undefined),
       snapshot: vi.fn(async () => ({ url: 'https://jira.test/browse/CNC-1', title: 'Jira', tree: 'Backlog' })),
-      click: vi.fn(async () => 'https://jira.test/browse/CNC-1'),
-      type: vi.fn(async () => undefined),
+      click: vi.fn(async () => ({ url: 'https://jira.test/browse/CNC-1', cursor: { x: 120, y: 240 } })),
+      type: vi.fn(async () => ({})),
       press: vi.fn(async () => undefined),
       readText: vi.fn(async () => 'Backlog'),
       screenshot: vi.fn(async () => ({ base64: '', width: 1280, height: 720 })),
@@ -239,14 +239,50 @@ describe('BrowserLayer tabs', () => {
       groupName: expect.stringContaining('ses_exis')
     })
     expect(chrome.open).not.toHaveBeenCalled()
+
+    await layer.claimTab({ active: true })
+    expect(chrome.claimTab).toHaveBeenLastCalledWith(
+      expect.objectContaining({ active: true, sessionId: 'ses_existing_chrome' })
+    )
+    await layer.claimTab({ urlContains: '/browse/CNC-' })
+    expect(chrome.claimTab).toHaveBeenLastCalledWith(
+      expect.objectContaining({ urlContains: '/browse/CNC-' })
+    )
   })
 
-  it('fails clearly when Chrome-existing is forced but the extension is disconnected', async () => {
+  it('fails clearly when Chrome-existing is strict and the extension is disconnected', async () => {
     const chrome = {
       mode: 'chrome-existing' as const,
       isAttached: () => false
     }
-    const layer = new BrowserLayer({ chrome: chrome as never, mode: 'chrome-existing' })
+    const layer = new BrowserLayer({ chrome: chrome as never, mode: 'chrome-existing', fallbackToManaged: false })
     await expect(layer.open('https://jira.test')).rejects.toThrow(/extensão do Openclod/i)
+    expect((await layer.status()).available).toBe(false)
+    expect(layer.fallbackNote).toBeNull()
+    expect(fake.state.launches).toHaveLength(0)
+  })
+
+  it('opens an isolated Chromium and says so when the extension is disconnected (default)', async () => {
+    let attached = false
+    const chrome = {
+      mode: 'chrome-existing' as const,
+      isAttached: () => attached,
+      status: async () => ({ available: true, attached: true, engine: 'Chrome (extensão)' }),
+      isOpen: async () => false,
+      open: vi.fn(async () => undefined)
+    }
+    const layer = new BrowserLayer({ sessionId: 'ses_fallback', chrome: chrome as never, mode: 'chrome-existing' })
+
+    await layer.open('https://example.test/')
+    expect(fake.state.launches).toHaveLength(1)
+    expect(chrome.open).not.toHaveBeenCalled()
+    expect(layer.fallbackNote).toMatch(/Chromium próprio e isolado/)
+    expect(layer.fallbackNote).toMatch(/sem os logins/)
+
+    // Once the extension connects, the user's Chrome is used again and the warning goes away.
+    attached = true
+    await layer.open('https://example.test/b')
+    expect(chrome.open).toHaveBeenCalledTimes(1)
+    expect(layer.fallbackNote).toBeNull()
   })
 })

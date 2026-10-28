@@ -1,0 +1,25 @@
+{
+  "scenario": "home",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:17:07.253Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "options": [
+      "Aprovar manualmente",
+      "Aprovar automaticamente",
+      "Ultrarrestrito"
+    ],
+    "policy": "ask"
+  },
+  "seconds": 2,
+  "checks": {
+    "tela-cowork-aberta": "ok",
+    "pasta-de-trabalho-mostra-a-pasta-escolhida": "ok",
+    "tres-modos-de-aprovacao": "ok",
+    "quatro-sugestoes": "ok",
+    "trocar-aprovacao-grava-a-politica": "ok"
+  },
+  "errors": [],
+  "ok": true
+}

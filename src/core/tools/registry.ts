@@ -1,4 +1,4 @@
-import { zodToJsonSchema } from 'zod-to-json-schema'
+import { z } from 'zod'
 import type { ToolSpec } from '../../shared/types.js'
 import type { ToolDef } from './types.js'
 import { externalAgentTools } from './external-agent.js'
@@ -44,9 +44,9 @@ export class ToolRegistry {
       description: tool.description,
       parameters: tool.jsonSchema
         ? tool.jsonSchema
-        : (zodToJsonSchema(tool.schema, {
-            $refStrategy: 'none',
-            target: 'jsonSchema7'
+        : (z.toJSONSchema(tool.schema, {
+            target: 'draft-7',
+            io: 'input'
           }) as Record<string, unknown>)
     }))
   }

@@ -1,0 +1,122 @@
+Lista que a etapa 2 imprime numa T4 (VRAM 15360 MiB, livre 14913 MiB), gerada por: python openclod_llm_server.py catalog --vram 15360 --free 14913
+(catalogo de 2026-10-27; sem a conferencia no registro, que e feita na etapa 2 do notebook)
+
+Agentes com visão e ferramentas (o que o Openclod usa melhor): 13 modelos
+    1. Qwen3.5 9B                           Q8_0      10,4 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+    2. Gemma 4 E4B                          Q8_0       9,0 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+    3. Gemma 4 12B                          Q4_K_M     7,6 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+    4. Qwen3-VL 8B                          Q4_K_M     6,2 GB  ctx 32k   visão, ferramentas, pensamento | Apache-2.0
+    5. Ministral 3 8B                       Q4_K_M     6,0 GB  ctx 32k   visão, ferramentas | Apache-2.0
+    6. Gemma 4 E2B                          Q8_0       6,0 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+    7. Qwen3.5 4B                           Q8_0       5,2 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+    8. Qwen3-VL 4B                          Q8_0       5,1 GB  ctx 32k   visão, ferramentas, pensamento | Apache-2.0
+    9. Ministral 3 3B                       Q8_0       4,5 GB  ctx 64k   visão, ferramentas | Apache-2.0
+   10. Qwen3.5 2B                           Q8_0       2,7 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   11. Qwen3-VL 2B                          Q8_0       2,7 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+   12. Qwen3.5 0.8B                         Q8_0       1,0 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   13. Ministral 3 14B                      Q4_K_M     9,1 GB  ctx 16k   visão, ferramentas | Apache-2.0  contexto curto: só conversa
+
+Agentes só texto (com ferramentas): 22 modelos
+   14. Cogito 8B                            Q8_0       8,5 GB  ctx 32k   ferramentas | Licença Llama
+   15. Hermes 3 8B                          Q8_0       8,5 GB  ctx 32k   ferramentas | Licença Llama
+   16. Llama 3.1 8B                         Q8_0       8,5 GB  ctx 32k   ferramentas | Licença Llama
+   17. Mistral Nemo 12B                     Q4_0       7,1 GB  ctx 32k   ferramentas | Apache-2.0
+   18. Qwen3 8B                             Q4_K_M     5,2 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   19. Qwen3 4B                             Q8_0       4,4 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   20. Nemotron 3 Nano 4B                   Q8_0       4,2 GB  ctx 128k  ferramentas, pensamento | licença: ver a página
+   21. Phi-4 mini 3.8B                      Q8_0       4,1 GB  ctx 64k   ferramentas | MIT
+   22. Cogito 3B                            Q8_0       3,8 GB  ctx 64k   ferramentas | Licença Llama
+   23. Hermes 3 3B                          Q8_0       3,4 GB  ctx 64k   ferramentas | Licença Llama
+   24. Llama 3.2 3B                         Q8_0       3,4 GB  ctx 64k   ferramentas | Licença Llama
+   25. Granite 4 1B                         BF16       3,3 GB  ctx 64k   ferramentas | Apache-2.0
+   26. Qwen3 1.7B                           Q8_0       2,2 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   27. Granite 4 3B                         Q4_K_M     2,1 GB  ctx 128k  ferramentas | Apache-2.0
+   28. Llama 3.2 1B                         Q8_0       1,3 GB  ctx 128k  ferramentas | Licença Llama
+   29. Qwen3 0.6B                           Q8_0       0,8 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   30. Granite 4 350M                       BF16       0,7 GB  ctx 32k   ferramentas | Apache-2.0
+   31. Qwen3 14B                            Q4_K_M     9,3 GB  ctx 16k   ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+   32. Cogito 14B                           Q4_K_M     9,0 GB  ctx 16k   ferramentas | Apache-2.0  contexto curto: só conversa
+   33. SmolLM2 1.7B                         Q8_0       1,8 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+   34. SmolLM2 360M                         F16        0,7 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+   35. SmolLM2 135M                         F16        0,3 GB  ctx 8k    ferramentas | Apache-2.0  contexto curto: só conversa
+
+Código: 5 modelos
+   36. Qwen2.5-Coder 7B                     Q8_0       8,1 GB  ctx 32k   ferramentas | Apache-2.0
+   37. Qwen2.5-Coder 3B                     Q8_0       3,3 GB  ctx 32k   ferramentas | Licença Qwen
+   38. Qwen2.5-Coder 1.5B                   Q8_0       1,6 GB  ctx 32k   ferramentas | Apache-2.0
+   39. Qwen2.5-Coder 0.5B                   Q8_0       0,5 GB  ctx 32k   ferramentas | Apache-2.0
+   40. Qwen2.5-Coder 14B                    Q4_K_M     9,0 GB  ctx 16k   ferramentas | Apache-2.0  contexto curto: só conversa
+
+Raciocínio: 9 modelos
+   41. EXAONE Deep 7.8B                     Q8_0       8,3 GB  ctx 32k   só texto | licença: ver a página
+   42. DeepSeek-R1 (destilados) 7B          Q8_0       8,1 GB  ctx 64k   ferramentas, pensamento | MIT
+   43. OpenThinker 7B                       Q8_0       8,1 GB  ctx 32k   só texto | Apache-2.0
+   44. DeepSeek-R1 (destilados) 8B          Q4_K_M     5,2 GB  ctx 32k   ferramentas, pensamento | MIT
+   45. EXAONE Deep 2.4B                     Q8_0       2,8 GB  ctx 32k   só texto | licença: ver a página
+   46. DeepSeek-R1 (destilados) 1.5B        Q8_0       1,9 GB  ctx 128k  ferramentas, pensamento | MIT
+   47. LFM2.5 Thinking 1.2B                 Q8_0       1,2 GB  ctx 64k   ferramentas, pensamento | licença: ver a página
+   48. Phi-4 reasoning 14B                  Q4_K_M    11,1 GB  ctx 8k    só texto | MIT  contexto curto: só conversa
+   49. DeepSeek-R1 (destilados) 14B         Q4_K_M     9,0 GB  ctx 16k   ferramentas, pensamento | MIT  contexto curto: só conversa
+
+Visão, sem ferramentas: 4 modelos
+   50. MiniCPM-V 8B                         Q8_0       9,1 GB  ctx 32k   visão | licença: ver a página
+   51. Gemma 3 12B                          Q4_K_M     8,2 GB  ctx 64k   visão | Termos do Gemma
+   52. Llama 3.2 Vision 11B                 Q4_K_M     7,8 GB  ctx 32k   visão | licença: ver a página
+   53. Gemma 3 4B                           Q8_0       5,0 GB  ctx 128k  visão | Termos do Gemma
+
+Só conversa (sem ferramentas nem visão): 5 modelos
+   54. Gemma 3 1B                           Q8_0       1,1 GB  ctx 32k   só texto | Termos do Gemma
+   55. Gemma 3 270M                         Q8_0       0,3 GB  ctx 32k   só texto | Termos do Gemma
+   56. Phi-4 14B                            Q4_K_M     9,1 GB  ctx 16k   só texto | MIT  contexto curto: só conversa
+   57. OLMo 2 13B                           Q4_K_M     8,3 GB  ctx 4k    só texto | Apache-2.0  contexto curto: só conversa
+   58. OLMo 2 7B                            Q8_0       7,8 GB  ctx 4k    só texto | Apache-2.0  contexto curto: só conversa
+
+Sem censura (uncensored / abliterated): 39 modelos
+      Menos recusas do que os modelos originais; a qualidade e o uso de ferramentas variam, e o uso é por sua conta.
+   59. Gemma 4 abliterated E4B              Q8_0      11,6 GB  ctx 32k   visão, ferramentas, pensamento | Apache-2.0
+   60. Qwen3.5 abliterated 9B               Q8_0      10,7 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+   61. Qwen3 abliterated 16B                Q4_K_M     9,8 GB  ctx 32k   ferramentas, pensamento, MoE | Apache-2.0
+   62. Gemma 3 abliterated 4B               F16        8,6 GB  ctx 128k  visão | Termos do Gemma
+   63. Dolphin 3 8B                         Q8_0       8,5 GB  ctx 32k   só texto | Licença Llama
+   64. Dolphin 3 abliterated 8B             Q8_0       8,5 GB  ctx 32k   ferramentas | Licença Llama
+   65. Gemma 4 abliterated E2B              Q8_0       8,1 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   66. DeepSeek-R1 abliterated 7B           Q8_0       8,1 GB  ctx 64k   só texto, pensamento | MIT
+   67. Qwen2.5-Coder abliterated 7B         Q8_0       8,1 GB  ctx 32k   ferramentas | Apache-2.0
+   68. Dolphin Mistral 7B                   Q8_0       7,7 GB  ctx 32k   só texto | Apache-2.0
+   69. Gemma 4 abliterated 12B              Q4_K_M     7,6 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   70. Qwen3-VL abliterated 8B              Q4_K_M     6,1 GB  ctx 32k   visão, ferramentas, pensamento | Apache-2.0
+   71. Qwen3.5 abliterated 4B               Q8_0       5,2 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   72. Qwen3-VL abliterated 4B              Q8_0       5,1 GB  ctx 32k   visão, ferramentas, pensamento | Apache-2.0
+   73. DeepSeek-R1 abliterated 8B           Q4_K_M     5,0 GB  ctx 32k   só texto, pensamento | MIT
+   74. Qwen3 abliterated 8B                 Q4_K_M     5,0 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   75. Qwen3 abliterated 4B                 Q8_0       4,3 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   76. Phi-4 mini abliterated 3.8B          Q8_0       4,1 GB  ctx 64k   ferramentas | MIT
+   77. Qwen2.5-Coder abliterated 3B         Q8_0       3,3 GB  ctx 32k   ferramentas | Apache-2.0
+   78. Qwen3.5 abliterated 2B               Q8_0       2,7 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   79. Qwen3-VL abliterated 2B              Q8_0       2,6 GB  ctx 64k   visão, ferramentas, pensamento | Apache-2.0
+   80. DeepSeek-R1 abliterated 1.5B         Q8_0       1,9 GB  ctx 128k  só texto, pensamento | MIT
+   81. Qwen2.5-Coder abliterated 1.5B       Q8_0       1,9 GB  ctx 32k   ferramentas | Apache-2.0
+   82. Qwen3 abliterated 1.7B               Q8_0       1,8 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   83. Gemma 3 abliterated 1B               Q8_0       1,1 GB  ctx 32k   só texto | Termos do Gemma
+   84. Qwen3.5 abliterated 0.8B             Q8_0       1,0 GB  ctx 128k  visão, ferramentas, pensamento | Apache-2.0
+   85. Qwen3 abliterated 0.6B               Q8_0       0,6 GB  ctx 32k   ferramentas, pensamento | Apache-2.0
+   86. Gemma 3 abliterated 270M             F16        0,5 GB  ctx 32k   só texto | Termos do Gemma
+   87. Qwen2.5-Coder abliterated 0.5B       Q8_0       0,5 GB  ctx 32k   ferramentas | Apache-2.0
+   88. DolphinCoder 15B                     Q4_0       9,1 GB  ctx 16k   só texto | OpenRAIL  contexto curto: só conversa
+   89. Qwen3 abliterated 14B                Q4_K_M     9,0 GB  ctx 16k   ferramentas, pensamento | Apache-2.0  contexto curto: só conversa
+   90. DeepSeek-R1 abliterated 14B          Q4_K_M     9,0 GB  ctx 16k   só texto, pensamento | MIT  contexto curto: só conversa
+   91. Qwen2.5-Coder abliterated 14B        Q4_K_M     9,0 GB  ctx 16k   ferramentas | Apache-2.0  contexto curto: só conversa
+   92. Dolphin Llama 3 8B                   Q8_0       8,5 GB  ctx 8k    só texto | Licença Llama  contexto curto: só conversa
+   93. DolphinCoder 7B                      Q8_0       7,9 GB  ctx 16k   só texto | OpenRAIL  contexto curto: só conversa
+   94. Wizard Vicuna Uncensored 13B         Q4_0       7,4 GB  ctx 2k    só texto | licença: ver a página  contexto curto: só conversa
+   95. WizardLM Uncensored 13B              Q4_0       7,4 GB  ctx 4k    só texto | licença: ver a página  contexto curto: só conversa
+   96. Llama 2 Uncensored 7B                Q8_0       7,2 GB  ctx 2k    só texto | Licença Llama  contexto curto: só conversa
+   97. Wizard Vicuna Uncensored 7B          Q8_0       7,2 GB  ctx 2k    só texto | licença: ver a página  contexto curto: só conversa
+
+Não cabem nesta GPU (14,6 GB livres); os mais próximos:
+       gpt-oss 20B                          MXFP4     13,8 GB  precisaria de ~15,0 GB com ctx 8k
+       gpt-oss abliterated 20B              F16       13,8 GB  precisaria de ~15,0 GB com ctx 8k
+       Gemma 3 abliterated 12B              Q8_0      13,4 GB  precisaria de ~15,3 GB com ctx 8k
+       Codestral 22B                        Q4_0      12,6 GB  precisaria de ~15,5 GB com ctx 8k
+       Devstral 24B                         Q4_K_M    14,3 GB  precisaria de ~16,6 GB com ctx 8k
+       Magistral 24B                        Q4_K_M    14,3 GB  precisaria de ~16,6 GB com ctx 8k

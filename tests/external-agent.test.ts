@@ -498,8 +498,21 @@ describe('external_agent: OpenCode', () => {
     const result = await toolFor('ok', log).execute({ agent: 'opencode', prompt: 'x' }, ctx)
     expect(result.ok).toBe(true)
     const seen = readLog(log)
-    expect(seen.argv).toEqual(['run', '--format', 'json', '--'])
+    expect(seen.argv).toEqual(['run', '--format', 'json', '--auto', '--'])
     expect(seen.opencodePermission).toBe('"allow"')
+  })
+
+  it('passes an explicit provider/model to OpenCode', async () => {
+    const log = path.join(dir, 'opencode-model.json')
+    const { ctx } = harness('ask')
+    const result = await toolFor('ok', log).execute({
+      agent: 'opencode',
+      prompt: 'x',
+      model: 'opencode/beam-free'
+    }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(readLog(log).argv).toEqual(['run', '--format', 'json', '-m', 'opencode/beam-free', '--'])
   })
 })
 
@@ -651,7 +664,7 @@ describe('external_agent: registration and approval', () => {
     expect(spec.name).toBe('external_agent')
     const properties = (spec.parameters as { properties: Record<string, { enum?: string[] }> }).properties
     expect(properties.agent.enum).toEqual(['claude', 'codex', 'opencode'])
-    expect(Object.keys(properties)).toEqual(['agent', 'prompt', 'cwd', 'timeout_ms'])
+    expect(Object.keys(properties)).toEqual(['agent', 'prompt', 'model', 'cwd', 'timeout_ms'])
     expect(() => registerExternalAgents(registry)).toThrow(/duplicada/)
   })
 

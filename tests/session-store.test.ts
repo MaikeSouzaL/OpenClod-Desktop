@@ -67,6 +67,33 @@ describe('SessionStore', () => {
     expect(reloaded!.usage).toEqual({ input: 12, output: 7, costUsd: 0.01 })
   })
 
+  it('marks a stale active plan as interrupted on startup', async () => {
+    const meta = await store.createSession({
+      projectId: 'prj_stale',
+      cwd: dir,
+      mode: 'code',
+      providerId: 'mock',
+      model: 'm'
+    })
+    const state = await store.loadSession(meta.id)
+    await store.saveSession({
+      ...state!,
+      state: 'streaming',
+      plan: [
+        { id: 'done', text: 'feito', status: 'done' },
+        { id: 'open', text: 'aguardando decisão', status: 'active' }
+      ]
+    })
+
+    const reopened = new SessionStore(dir)
+    await reopened.init()
+    const reloaded = await reopened.loadSession(meta.id)
+    expect(reloaded!.state).toBe('idle')
+    expect(reloaded!.plan.map((item) => item.status)).toEqual(['done', 'active'])
+    expect(reloaded!.plan[1].interrupted).toBe(true)
+    expect(typeof reloaded!.plan[1].endedAt).toBe('number')
+  })
+
   it('lists sessions newest-first with preview and message count', async () => {
     const first = await store.createSession({
       projectId: 'p',
@@ -260,6 +287,84 @@ describe('SessionStore', () => {
     const reopened = new SessionStore(dir)
     await reopened.init()
     expect(reopened.listProjects().map((p) => p.id)).toEqual([other.id])
+  })
+
+  it('keeps one default model per project and backfills legacy projects', async () => {
+    const alpha = await store.addProject(path.join(dir, 'alpha'), 'Alpha')
+    const beta = await store.addProject(path.join(dir, 'beta'), 'Beta')
+    const alphaSession = await store.createSession({
+      projectId: alpha.id,
+      cwd: alpha.path,
+      mode: 'code',
+      providerId: 'deepseek',
+      model: 'deepseek-flash'
+    })
+    await store.createSession({
+      projectId: beta.id,
+      cwd: beta.path,
+      mode: 'code',
+      providerId: 'anthropic',
+      model: 'claude-sonnet-4-5'
+    })
+
+    // Existing projects without a stored model inherit their latest session.
+    const migrated = new SessionStore(dir)
+    await migrated.init()
+    const projects = migrated.listProjects()
+    expect(projects.find((item) => item.id === alpha.id)?.model).toEqual({
+      providerId: 'deepseek',
+      model: 'deepseek-flash'
+    })
+    expect(projects.find((item) => item.id === beta.id)?.model).toEqual({
+      providerId: 'anthropic',
+      model: 'claude-sonnet-4-5'
+    })
+
+    // Changing Beta does not touch Alpha.
+    await migrated.setProjectModel(beta.id, 'openai', 'gpt-4o')
+    const reopened = new SessionStore(dir)
+    await reopened.init()
+    expect(reopened.listProjects().find((item) => item.id === alpha.id)?.model).toEqual({
+      providerId: 'deepseek',
+      model: 'deepseek-flash'
+    })
+    expect(reopened.listProjects().find((item) => item.id === beta.id)?.model).toEqual({
+      providerId: 'openai',
+      model: 'gpt-4o'
+    })
+    // The session keeps its own model even if the project default changes.
+    expect(reopened.getSession(alphaSession.id)?.meta.model).toBe('deepseek-flash')
+  })
+
+  it('survives 30 simultaneous saves of one session and keeps the last one called', async () => {
+    const meta = await store.createSession({ projectId: 'p', cwd: dir, mode: 'code', providerId: 'mock', model: 'm' })
+    const base = (await store.loadSession(meta.id))!
+    const saves = Array.from({ length: 30 }, (_, index) =>
+      store.saveSession({ ...base, messages: [message(`m${index}`, 'user', `versão ${index}`)] })
+    )
+    const results = await Promise.allSettled(saves)
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(0)
+    const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'sessions', `${meta.id}.json`), 'utf8')) as SessionState
+    expect(onDisk.messages[0].id).toBe('m29')
+    expect((await fs.promises.readdir(path.join(dir, 'sessions'))).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('keeps streaming deltas out of the durable journal and caps its size', async () => {
+    const meta = await store.createSession({ projectId: 'p', cwd: dir, mode: 'code', providerId: 'mock', model: 'm' })
+    await store.appendEvent(meta.id, { type: 'text_delta', sessionId: meta.id, messageId: 'x', text: 'olá' })
+    await store.appendEvent(meta.id, { type: 'reasoning_delta', sessionId: meta.id, messageId: 'x', text: 'hmm' })
+    await store.appendEvent(meta.id, { type: 'turn_start', sessionId: meta.id, messageId: 'x' })
+    const events = (await store.readEvents(meta.id)) as Array<{ type: string }>
+    expect(events.map((event) => event.type)).toEqual(['turn_start'])
+
+    const journal = path.join(dir, 'sessions', `${meta.id}.events.jsonl`)
+    fs.writeFileSync(journal, 'x'.repeat(11 * 1024 * 1024))
+    const fresh = new SessionStore(dir)
+    await fresh.appendEvent(meta.id, { type: 'turn_start', sessionId: meta.id, messageId: 'y' })
+    expect(fs.existsSync(`${journal}.1`)).toBe(true)
+    expect(fs.statSync(journal).size).toBeLessThan(1024)
+    await store.deleteSession(meta.id)
+    expect(fs.existsSync(`${journal}.1`)).toBe(false)
   })
 
   it('clearAll removes every persisted session file', async () => {

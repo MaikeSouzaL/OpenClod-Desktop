@@ -10,12 +10,41 @@ import type {
 } from '../../shared/types.js'
 import { id } from '../util/ids.js'
 
+let tmpSeq = 0
+const writeQueues = new Map<string, Promise<void>>()
+
+/**
+ * Writes through a temporary file and renames it over the target. Writes to the same file are
+ * queued (the last one called wins) and each uses its own temporary name: a single fixed name
+ * made concurrent saves of one session fail on the rename.
+ */
 async function atomicWrite(file: string, data: string): Promise<void> {
-  await fs.promises.mkdir(path.dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.tmp`
-  await fs.promises.writeFile(tmp, data, 'utf8')
-  await fs.promises.rename(tmp, file)
+  const previous = writeQueues.get(file) ?? Promise.resolve()
+  const run = previous
+    .catch(() => undefined)
+    .then(async () => {
+      await fs.promises.mkdir(path.dirname(file), { recursive: true })
+      const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`
+      try {
+        await fs.promises.writeFile(tmp, data, 'utf8')
+        await fs.promises.rename(tmp, file)
+      } catch (err) {
+        await fs.promises.rm(tmp, { force: true }).catch(() => undefined)
+        throw err
+      }
+    })
+  writeQueues.set(file, run)
+  try {
+    await run
+  } finally {
+    if (writeQueues.get(file) === run) writeQueues.delete(file)
+  }
 }
+
+/** Streaming deltas are for the live UI; the finished `message` event already carries the text. */
+const LIVE_ONLY_EVENTS = new Set<string>(['text_delta', 'reasoning_delta', 'tool_progress'])
+const JOURNAL_MAX_BYTES = 10 * 1024 * 1024
+const JOURNAL_CHECK_EVERY = 100
 
 export class SessionStore {
   private projects: Project[] = []
@@ -48,12 +77,37 @@ export class SessionStore {
       try {
         const raw = await fs.promises.readFile(path.join(this.sessionsDir, entry), 'utf8')
         const state = JSON.parse(raw) as SessionState
-        if (state?.meta?.id) this.sessions.set(state.meta.id, state)
+        if (state?.meta?.id) {
+          const normalized = normalizeStaleState(state)
+          this.sessions.set(state.meta.id, normalized ?? state)
+          if (normalized) await this.saveSession(normalized)
+        }
       } catch {
         /* ignore corrupt session */
       }
     }
+    // Projects created before per-project models existed inherit the model of
+    // their most recent session, so switching projects never changes the LLM
+    // of a project that already had one.
+    if (this.backfillProjectModels()) await this.saveProjects()
     this.loaded = true
+  }
+
+  private backfillProjectModels(): boolean {
+    let changed = false
+    for (const project of this.projects) {
+      if (project.model?.providerId && project.model.model) continue
+      let latest: SessionState | undefined
+      for (const state of this.sessions.values()) {
+        if (state.meta.projectId !== project.id) continue
+        if (!state.meta.providerId || !state.meta.model) continue
+        if (!latest || state.meta.updatedAt > latest.meta.updatedAt) latest = state
+      }
+      if (!latest) continue
+      project.model = { providerId: latest.meta.providerId, model: latest.meta.model }
+      changed = true
+    }
+    return changed
   }
 
   /* ------------------------------- projects ------------------------------ */
@@ -81,6 +135,16 @@ export class SessionStore {
     this.projects.push(project)
     await this.saveProjects()
     return project
+  }
+
+  /** Saves the default LLM for this project only. */
+  async setProjectModel(projectId: string, providerId: string, model: string): Promise<Project | null> {
+    await this.init()
+    const project = this.projects.find((item) => item.id === projectId)
+    if (!project) return null
+    project.model = { providerId, model }
+    await this.saveProjects()
+    return { ...project, model: { ...project.model } }
   }
 
   async removeProject(projectId: string): Promise<void> {
@@ -174,12 +238,23 @@ export class SessionStore {
     this.sessions.delete(sessionId)
     await fs.promises.rm(path.join(this.sessionsDir, `${sessionId}.json`), { force: true })
     await fs.promises.rm(path.join(this.sessionsDir, `${sessionId}.events.jsonl`), { force: true })
+    await fs.promises.rm(path.join(this.sessionsDir, `${sessionId}.events.jsonl.1`), { force: true })
   }
 
+  private journalAppends = new Map<string, number>()
+
   async appendEvent(sessionId: string, event: HarnessEvent): Promise<void> {
+    if (LIVE_ONLY_EVENTS.has(event.type)) return
     const file = path.join(this.sessionsDir, `${sessionId}.events.jsonl`)
     const line = `${JSON.stringify({ ts: Date.now(), ...event })}\n`
     await fs.promises.mkdir(path.dirname(file), { recursive: true })
+    // The journal is a bounded audit trail: past the cap the previous generation is replaced.
+    const count = (this.journalAppends.get(sessionId) ?? 0) + 1
+    this.journalAppends.set(sessionId, count)
+    if (count % JOURNAL_CHECK_EVERY === 1) {
+      const size = (await fs.promises.stat(file).catch(() => null))?.size ?? 0
+      if (size > JOURNAL_MAX_BYTES) await fs.promises.rename(file, `${file}.1`).catch(() => undefined)
+    }
     await fs.promises.appendFile(file, line, 'utf8')
   }
 
@@ -228,6 +303,27 @@ export class SessionStore {
     this.sessions.clear()
     const entries = await fs.promises.readdir(this.sessionsDir).catch(() => [] as string[])
     for (const entry of entries) await fs.promises.rm(path.join(this.sessionsDir, entry), { force: true })
+  }
+}
+
+/**
+ * A session read at startup has no turn running. An `active` plan item was
+ * interrupted by the app closing: keep it active (so the next turn resumes it)
+ * and mark it, instead of pretending it was blocked. Busy run states collapse
+ * to idle so the UI does not spin forever.
+ */
+function normalizeStaleState(state: SessionState): SessionState | null {
+  const busy = ['thinking', 'streaming', 'tool', 'waiting_approval'].includes(state.state)
+  const hasActive = state.plan?.some((item) => item.status === 'active') ?? false
+  if (!busy && !hasActive) return null
+  return {
+    ...state,
+    plan: (state.plan ?? []).map((item) =>
+      item.status === 'active'
+        ? { ...item, interrupted: true, endedAt: Date.now() }
+        : item
+    ),
+    state: busy ? 'idle' : state.state
   }
 }
 

@@ -1,0 +1,197 @@
+{
+  "label": "qwenflash-final-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqwvjvf",
+  "startedAt": "2026-10-27T16:50:04.278Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 13518,
+      "cachedTokens": 0,
+      "uncachedTokens": 13518,
+      "perCall": [
+        {
+          "input": 6759,
+          "cached": 0,
+          "output": 38
+        },
+        {
+          "input": 6759,
+          "cached": 0,
+          "output": 43
+        }
+      ],
+      "ms": 9306,
+      "timedOut": false,
+      "final": "Nenhum servidor MCP aparece — a chamada retorna \"nenhum MCP configurado\" (0 servidores).",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqx8vop_4gtk criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 14220,
+      "cachedTokens": 0,
+      "uncachedTokens": 14220,
+      "perCall": [
+        {
+          "input": 7110,
+          "cached": 0,
+          "output": 114
+        },
+        {
+          "input": 7110,
+          "cached": 0,
+          "output": 79
+        }
+      ],
+      "ms": 12993,
+      "timedOut": false,
+      "final": "Handoff registrado.\n\n- **Id:** `ho_mvqx8vop_4gtk`\n- **Resumo:** piso de tokens medido\n- **Próximo passo:** rodar a suíte de testes\n\nQuem retomar deve chamar `memory_handoff accept` com esse id.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 14372,
+      "cachedTokens": 0,
+      "uncachedTokens": 14372,
+      "perCall": [
+        {
+          "input": 7186,
+          "cached": 0,
+          "output": 48
+        },
+        {
+          "input": 7186,
+          "cached": 0,
+          "output": 344
+        }
+      ],
+      "ms": 14150,
+      "timedOut": false,
+      "final": "Nenhuma skill instalada casa com \"pdf\".\n\nA busca retornou 4 candidatas, mas todas só mencionam PDF para **excluir** o uso:\n\n| Skill | Menção a PDF |\n|---|---|\n| `docx` | \"Não use para PDF...\" |\n| `pptx` | \"Não use para ... PDF\" |\n| `svg-mas",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 24285,
+      "cachedTokens": 0,
+      "uncachedTokens": 24285,
+      "perCall": [
+        {
+          "input": 8095,
+          "cached": 0,
+          "output": 151
+        },
+        {
+          "input": 8095,
+          "cached": 0,
+          "output": 77
+        },
+        {
+          "input": 8095,
+          "cached": 0,
+          "output": 221
+        }
+      ],
+      "ms": 16149,
+      "timedOut": false,
+      "final": "**`security-auditor`** — auditor de segurança de aplicação (somente leitura): revisa código e configuração em busca de vulnerabilidades exploráveis (injection, falhas de autenticação/autorização, segredos expostos, desserialização insegura,",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/qwen3.8-flash",
+  "totals": {
+    "modelCalls": 9,
+    "inputTokens": 66395,
+    "uncachedTokens": 66395,
+    "allTargetsOk": true
+  }
+}

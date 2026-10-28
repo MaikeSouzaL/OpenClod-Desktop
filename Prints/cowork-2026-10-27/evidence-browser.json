@@ -1,0 +1,30 @@
+{
+  "scenario": "browser",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:23:12.688Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "tools": {
+      "tool_load": 1,
+      "browser_open": 1,
+      "fetch_url": 1,
+      "glob": 1,
+      "write_file": 1,
+      "read_file": 1
+    },
+    "approvals": [],
+    "site": "# https://example.com\n\n- **Título principal:** \"Example Domain\"\n- **Primeira frase:** \"This domain is for use in documentation examples without needing permission.\"\n",
+    "finalText": "Pronto.\n\n**O que mudou:** criei `site.md` na raiz do projeto com o título e a primeira frase entre aspas.\n\n**Verificado:** abri `https://example.com` no navegador e li a página. A árvore de acessibilidade não expunha o `<h1>`, então confirmei o HTML pela página (status 200): título `Example Domain` e primeira frase `This domain is for use in documentation examples without needing permission.` Reli o arquivo gravado — conteúdo idêntico ao extraído.\n\n**Observações:**\n- A página atual do example.co"
+  },
+  "seconds": 20,
+  "checks": {
+    "sessao-cowork": "ok",
+    "usou-o-navegador-do-app": "ok",
+    "site.md-entregue": "ok",
+    "site.md-traz-o-titulo-real-da-pagina": "ok",
+    "site.md-traz-a-primeira-frase-real": "ok"
+  },
+  "errors": [],
+  "ok": true
+}

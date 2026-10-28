@@ -12,7 +12,7 @@ import {
   openaiReasoningEffort
 } from '../src/core/providers/reasoning'
 import { compactIfNeeded } from '../src/core/agent/compaction'
-import { ScriptedProvider } from '../src/core/providers/mock'
+import { ScriptedProvider } from './support/scripted-provider'
 import type { Message, ProviderConfig, ProviderEvent } from '../src/shared/types'
 
 const servers: http.Server[] = []
@@ -268,18 +268,56 @@ describe('compaction and reasoning', () => {
 describe('OpenAI-compatible reasoning_effort', () => {
   it('sends reasoning_effort only for reasoning models unless forced', async () => {
     const server = await capture((_b, res) => sse(res, [{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]))
-    const run = async (model: string, compat?: ProviderConfig['compat']): Promise<any> => {
+    const run = async (
+      model: string,
+      compat?: ProviderConfig['compat'],
+      effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' = 'xhigh'
+    ): Promise<any> => {
       const provider = new OpenAICompatibleProvider(
         { id: 'o', kind: 'openai', label: 'o', baseUrl: server.url, model, contextWindow: 200_000, supportsVision: false, supportsTools: true, compat },
         'k'
       )
-      for await (const _ of provider.stream({ system: 's', messages: [user], tools: [], effort: 'xhigh' })) void _
+      for await (const _ of provider.stream({ system: 's', messages: [user], tools: [], effort })) void _
       return server.bodies.at(-1)
     }
     expect((await run('gpt-5')).reasoning_effort).toBe('high')
     expect((await run('openai/o4-mini')).reasoning_effort).toBe('high')
     expect((await run('gpt-4.1')).reasoning_effort).toBeUndefined()
     expect((await run('deepseek-chat', { reasoningEffort: true })).reasoning_effort).toBe('high')
+    expect((await run('deepseek-flash', undefined, 'low')).reasoning_effort).toBe('low')
+    expect((await run('deepseek-flash', undefined, 'medium')).reasoning_effort).toBe('high')
+    expect((await run('deepseek-flash', undefined, 'high')).reasoning_effort).toBe('high')
+    expect((await run('deepseek-flash')).reasoning_effort).toBe('high')
+    expect((await run('deepseek-flash', undefined, 'max')).reasoning_effort).toBe('max')
+    expect((await run('deepseek-v4-pro', undefined, 'max')).reasoning_effort).toBe('max')
     expect(resolveCompat({ model: 'gpt-4.1', baseUrl: 'http://x', compat: undefined }).reasoningEffort).toBe(false)
+    expect(resolveCompat({ model: 'deepseek-flash', baseUrl: 'http://x', compat: undefined }).reasoningEffort).toBe(true)
+  })
+
+  it('replays reasoning_content on every assistant turn for DeepSeek V4', async () => {
+    const server = await capture((_b, res) => sse(res, [{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]))
+    const provider = new OpenAICompatibleProvider(
+      { id: 'o', kind: 'openai', label: 'o', baseUrl: server.url, model: 'deepseek-flash', contextWindow: 200_000, supportsVision: false, supportsTools: true },
+      'k'
+    )
+    const messages: Message[] = [
+      user,
+      {
+        id: 'a1',
+        role: 'assistant',
+        ts: 2,
+        parts: [
+          { type: 'reasoning', text: 'raciocínio antigo' },
+          { type: 'text', text: 'resposta 1' }
+        ]
+      },
+      { id: 'u2', role: 'user', ts: 3, parts: [{ type: 'text', text: 'segundo' }] },
+      { id: 'a2', role: 'assistant', ts: 4, parts: [{ type: 'text', text: 'resposta 2' }] }
+    ]
+    for await (const _ of provider.stream({ system: 's', messages, tools: [], effort: 'high' })) void _
+    const body = server.bodies.at(-1)
+    const assistants = body.messages.filter((message: any) => message.role === 'assistant')
+    expect(assistants.map((message: any) => message.reasoning_content)).toEqual(['raciocínio antigo', ''])
+    expect(body.reasoning_effort).toBe('high')
   })
 })

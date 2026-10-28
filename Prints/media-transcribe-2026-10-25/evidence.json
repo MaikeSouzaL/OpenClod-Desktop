@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "source": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\media-transcribe-2026-10-25\\openclod-recado.wav",
+  "text": "O PINCLUD, a memória do projeto usa um grafo inteligente e todos os testes passaram.",
+  "language": "pt",
+  "languageProbability": 1,
+  "duration": 7.615,
+  "segments": [
+    {
+      "start": 0,
+      "end": 7,
+      "text": "O PINCLUD, a memória do projeto usa um grafo inteligente e todos os testes passaram."
+    }
+  ],
+  "device": "cpu",
+  "computeType": "int8",
+  "elapsedMs": 12174,
+  "note": "WAV generated locally by Windows System.Speech and transcribed offline by the bundled faster-whisper runtime."
+}

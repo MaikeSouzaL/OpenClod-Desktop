@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "measuredAt": "2026-10-25T21:48:51.435Z",
+  "runtime": {
+    "node": "v22.22.1",
+    "platform": "win32 x64",
+    "heapMB": 14
+  },
+  "memoryGraph": {
+    "pages": 1000,
+    "nodes": 1000,
+    "edges": 6071,
+    "elapsedMs": 314
+  },
+  "documentChunking": {
+    "inputChars": 1328889,
+    "chunks": 597,
+    "elapsedMs": 654
+  },
+  "schedulerRegistration": {
+    "tasks": 200,
+    "runs": 200,
+    "elapsedMs": 2244
+  },
+  "observability": {
+    "eventsOffered": 10000,
+    "retained": 1000,
+    "elapsedMs": 137
+  },
+  "note": "All measurements are local and reproducible; they are not a comparison against another product."
+}

@@ -1,0 +1,4 @@
+NOTA FISCAL 1021
+Data de emissão: 2026-03-10
+Cliente: Padaria Sol
+Valor: R$ 1.250,00

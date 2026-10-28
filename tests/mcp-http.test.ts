@@ -1,6 +1,6 @@
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { McpClient, parseRpcResponse } from '../src/core/mcp/client'
 
 let server: http.Server | null = null
@@ -87,6 +87,126 @@ describe('MCP over Streamable HTTP', () => {
 
     await client.stop()
     expect(await client.callTool('create', {}).catch((err: Error) => err.message)).toContain('não iniciado')
+  })
+
+  it('prefers an OAuth bearer over a static Authorization header and retries after 401', async () => {
+    const seen: Array<{ method: string; auth: string; protocol: string }> = []
+    let requests = 0
+    server = http.createServer((req, res) => {
+      let body = ''
+      req.on('data', (chunk) => (body += chunk))
+      req.on('end', () => {
+        const message = JSON.parse(body || '{}') as { id?: number; method?: string }
+        seen.push({
+          method: message.method ?? req.method ?? '',
+          auth: String(req.headers.authorization ?? ''),
+          protocol: String(req.headers['mcp-protocol-version'] ?? '')
+        })
+        requests += 1
+        if (requests === 1) {
+          res.writeHead(401, {
+            'content-type': 'application/json',
+            'www-authenticate': 'Bearer resource_metadata="https://example.test/.well-known/oauth-protected-resource"'
+          })
+          res.end('{"error":"invalid_token"}')
+          return
+        }
+        if (message.method === 'initialize') {
+          res.writeHead(200, { 'content-type': 'application/json', 'mcp-session-id': 'sess-oauth' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2025-06-18' } }))
+          return
+        }
+        if (message.method === 'tools/list') {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [] } }))
+          return
+        }
+        res.writeHead(202).end()
+      })
+    })
+    await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', () => resolve()))
+    const { port } = server.address() as AddressInfo
+    const onUnauthorized = vi.fn(async (challenge?: string) => {
+      expect(challenge).toContain('resource_metadata')
+      return 'oauth-token'
+    })
+    const client = new McpClient({
+      name: 'oauth-remote',
+      type: 'http',
+      url: `http://127.0.0.1:${port}/mcp`,
+      headers: { Authorization: 'Basic still-here' },
+      command: '',
+      args: [],
+      enabled: true,
+      onUnauthorized
+    })
+
+    await client.start()
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    expect(seen[0].auth).toBe('Basic still-here')
+    expect(seen[1].auth).toBe('Bearer oauth-token')
+    expect(seen.find((entry) => entry.method === 'tools/list')?.protocol).toBe('2025-06-18')
+    await client.stop()
+  })
+
+  it('falls back to the previous protocol version when the server rejects the new one', async () => {
+    const seen: Array<{ method: string; version: string; header: string }> = []
+    server = http.createServer((req, res) => {
+      let body = ''
+      req.on('data', (chunk) => (body += chunk))
+      req.on('end', () => {
+        const message = JSON.parse(body || '{}') as {
+          id?: number
+          method?: string
+          params?: { protocolVersion?: string }
+        }
+        seen.push({
+          method: message.method ?? '',
+          version: message.params?.protocolVersion ?? '',
+          header: String(req.headers['mcp-protocol-version'] ?? '')
+        })
+        if (message.method === 'initialize') {
+          if (message.params?.protocolVersion !== '2024-11-05') {
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                error: { code: -32602, message: 'unsupported protocol version' }
+              })
+            )
+            return
+          }
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05' } }))
+          return
+        }
+        if (message.method === 'tools/list') {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [] } }))
+          return
+        }
+        res.writeHead(202).end()
+      })
+    })
+    await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', () => resolve()))
+    const { port } = server.address() as AddressInfo
+    const client = new McpClient({
+      name: 'old-remote',
+      type: 'http',
+      url: `http://127.0.0.1:${port}/mcp`,
+      command: '',
+      args: [],
+      enabled: true
+    })
+
+    await client.start()
+    expect(seen.filter((entry) => entry.method === 'initialize').map((entry) => entry.version)).toEqual([
+      '2025-06-18',
+      '2024-11-05'
+    ])
+    expect(seen.find((entry) => entry.method === 'tools/list')?.header).toBe('2024-11-05')
+    await client.stop()
   })
 
   it('surfaces an HTTP error with the method and status', async () => {

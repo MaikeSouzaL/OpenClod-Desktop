@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import { CH, type OpenclodApi, type IpcResult, type SttEvent, type TerminalEvent } from '../shared/api.js'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { CH, type OpenclodApi, type IpcResult, type SttEvent, type TerminalEvent, type TtsState } from '../shared/api.js'
 import type { HarnessEvent } from '../shared/types.js'
 
 function call<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -9,33 +9,75 @@ function call<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
 const api: OpenclodApi = {
   app: {
     capabilities: () => call(CH.appCapabilities),
+    providerUsage: () => call(CH.appProviderUsage),
     presets: () => call(CH.appPresets),
     settings: () => call(CH.appSettings),
     updateSettings: (patch) => call(CH.appUpdateSettings, patch),
     setSecret: (providerId, value) => call(CH.appSetSecret, providerId, value),
     clearSecret: (providerId) => call(CH.appClearSecret, providerId),
-    testProvider: (providerId) => call(CH.appTestProvider, providerId),
+    testProvider: (providerId, draft) => call(CH.appTestProvider, providerId, draft),
     versions: () => call(CH.appVersions),
+    backupExport: () => call(CH.appBackupExport),
+    backupInspect: () => call(CH.appBackupInspect),
+    backupRestore: () => call(CH.appBackupRestore),
+    observability: (filters) => call(CH.appObservability, filters),
+    exportDiagnostics: () => call(CH.appDiagnosticsExport),
+    exportConfiguration: () => call(CH.appConfigExport),
+    importConfiguration: () => call(CH.appConfigImport),
+    checkForUpdates: () => call(CH.appUpdateCheck),
+    downloadUpdate: () => call(CH.appUpdateDownload),
     skills: () => call(CH.appSkills),
     notify: (title, body) => call(CH.appNotify, title, body),
     createSkill: (name, description, body) => call(CH.appCreateSkill, name, description, body),
-    discoverModels: (providerId) => call(CH.appDiscoverModels, providerId),
+    discoverModels: (providerId, draft) => call(CH.appDiscoverModels, providerId, draft),
+    colabPrepare: () => call(CH.colabPrepare),
+    colabInspect: (code) => call(CH.colabInspect, code),
+    colabConnect: (code) => call(CH.colabConnect, code),
+    colabStatus: (fresh) => call(CH.colabStatus, fresh),
+    colabDisconnect: () => call(CH.colabDisconnect),
+    colabRevealNotebook: () => call(CH.colabReveal),
+    colabStartDrag: () => ipcRenderer.send(CH.colabDragStart),
     rememberModel: (providerId, model) => call(CH.appRememberModel, providerId, model),
     mcpPresets: () => call(CH.appMcpPresets),
     mcpCatalog: () => call(CH.appMcpCatalog),
     installMcp: (id, env, headers) => call(CH.appMcpInstall, id, env, headers),
     mcpOAuthStatus: (serverName) => call(CH.appMcpOAuthStatus, serverName),
     authorizeMcp: (serverName) => call(CH.appMcpOAuthAuthorize, serverName),
+    connectorDirectory: () => call(CH.mcpcDirectory),
+    connectorStates: () => call(CH.mcpcStates),
+    connectConnector: (id, input) => call(CH.mcpcConnect, id, input),
+    disconnectConnector: (id) => call(CH.mcpcDisconnect, id),
+    connectorTools: (serverName) => call(CH.mcpcTools, serverName),
+    setToolPolicy: (serverName, tool, policy) => call(CH.mcpcSetToolPolicy, serverName, tool, policy),
+    reloadMcp: () => call(CH.mcpcReload),
+    maskedMcpSettings: () => call(CH.mcpcMaskedSettings),
+    mcpBackups: () => call(CH.appMcpBackups),
+    clearMcpBackups: () => call(CH.appMcpBackupsClear),
     importClaude: () => call(CH.appImportClaude),
   claudeStatus: () => call(CH.appClaudeStatus),
   claudeLogin: () => call(CH.appClaudeLogin),
     pluginCatalog: () => call(CH.appPluginCatalog),
+    plugins: () => call(CH.appPlugins),
+    installLocalPlugin: () => call(CH.appPluginInstallLocal),
+    setPluginEnabled: (pluginId, enabled) => call(CH.appPluginSetEnabled, pluginId, enabled),
+    removePlugin: (pluginId) => call(CH.appPluginRemove, pluginId),
+    pluginDiagnostics: () => call(CH.appPluginDiagnostics),
     agents: (cwd) => call(CH.appAgents, cwd),
     openSkillsFolder: () => call(CH.appOpenSkills),
     chromeCompanion: () => call(CH.appChromeCompanion),
     installChromeCompanion: () => call(CH.appChromeInstall),
     openChromeExtensions: () => call(CH.appChromeExtensions),
-    environmentCheck: (environmentId) => call(CH.appEnvironmentCheck, environmentId)
+    exportChromeExtension: () => call(CH.appChromeExport),
+    revealChromeExtension: () => call(CH.appChromeReveal),
+    environmentCheck: (environmentId) => call(CH.appEnvironmentCheck, environmentId),
+    activity: (filters) => call(CH.activityList, filters),
+    setActivityRead: (itemId, read) => call(CH.activityRead, itemId, read),
+    archiveActivity: (itemId, archived) => call(CH.activityArchive, itemId, archived),
+    clearActivity: (archivedOnly) => call(CH.activityClear, archivedOnly)
+  },
+  paths: {
+    fromFile: (file) => webUtils.getPathForFile(file),
+    pickFolder: () => call(CH.pathsPickFolder)
   },
   projects: {
     list: () => call(CH.projectsList),
@@ -43,7 +85,8 @@ const api: OpenclodApi = {
     remove: (projectId) => call(CH.projectsRemove, projectId),
     delete: (projectId) => call(CH.projectsDelete, projectId),
     pick: () => call(CH.projectsPick),
-    ensureDefault: () => call(CH.projectsEnsureDefault)
+    ensureDefault: () => call(CH.projectsEnsureDefault),
+    setModel: (projectId, providerId, model) => call(CH.projectsSetModel, projectId, providerId, model)
   },
   sessions: {
     list: () => call(CH.sessionsList),
@@ -60,7 +103,10 @@ const api: OpenclodApi = {
     export: (sessionId) => call(CH.sessionsExport, sessionId),
     import: (json) => call(CH.sessionsImport, json),
     archive: (sessionId, archived) => call(CH.sessionsArchive, sessionId, archived),
-    compact: (sessionId) => call(CH.sessionsCompact, sessionId)
+    compact: (sessionId) => call(CH.sessionsCompact, sessionId),
+    contextBreakdown: (sessionId) => call(CH.sessionsContextBreakdown, sessionId),
+    rewind: (sessionId, messageId, restoreFiles) => call(CH.sessionsRewind, sessionId, messageId, restoreFiles),
+    fork: (sessionId, messageId) => call(CH.sessionsFork, sessionId, messageId)
   },
   files: {
     tree: (root, depth) => call(CH.filesTree, root, depth),
@@ -73,7 +119,10 @@ const api: OpenclodApi = {
   },
   git: {
     status: (root) => call(CH.gitStatus, root),
-    diff: (root, path, staged) => call(CH.gitDiff, root, path, staged)
+    diff: (root, path, staged) => call(CH.gitDiff, root, path, staged),
+    listWorktrees: (root) => call(CH.gitWorktreesList, root),
+    createWorktree: (root, branch, baseRef) => call(CH.gitWorktreeCreate, root, branch, baseRef),
+    removeWorktree: (root, path) => call(CH.gitWorktreeRemove, root, path)
   },
   preview: {
     detect: (root) => call(CH.previewDetect, root),
@@ -87,12 +136,24 @@ const api: OpenclodApi = {
   stt: {
     status: () => call(CH.sttStatus),
     start: (options) => call(CH.sttStart, options),
+    preload: (options) => call(CH.sttPreload, options),
     stop: () => call(CH.sttStop),
     audio: (pcm) => ipcRenderer.send(CH.sttAudio, pcm),
     onEvent: (callback) => {
       const listener = (_event: Electron.IpcRendererEvent, payload: SttEvent): void => callback(payload)
       ipcRenderer.on(CH.sttEvent, listener)
       return () => ipcRenderer.removeListener(CH.sttEvent, listener)
+    }
+  },
+  tts: {
+    voices: (provider) => call(CH.ttsVoices, provider),
+    status: () => call(CH.ttsStatus),
+    speak: (options) => call(CH.ttsSpeak, options),
+    stop: () => call(CH.ttsStop),
+    onEvent: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: TtsState): void => callback(payload)
+      ipcRenderer.on(CH.ttsEvent, listener)
+      return () => ipcRenderer.removeListener(CH.ttsEvent, listener)
     }
   },
   dictation: {
@@ -111,11 +172,21 @@ const api: OpenclodApi = {
     state: (state) => ipcRenderer.send(CH.dictationState, state),
     insert: (text) => call(CH.dictationInsert, text)
   },
+  commands: {
+    list: (cwd) => call(CH.commandsList, cwd)
+  },
+  improvements: {
+    status: (projectId) => call(CH.improvementsStatus, projectId),
+    start: (projectId, options) => call(CH.improvementsStart, projectId, options),
+    cancel: () => call(CH.improvementsCancel),
+    setWeekly: (projectId, enabled, options) => call(CH.improvementsWeekly, projectId, enabled, options)
+  },
   memory: {
     status: (projectId) => call(CH.memoryStatus, projectId),
     list: (projectId) => call(CH.memoryList, projectId),
     read: (projectId, slug) => call(CH.memoryRead, projectId, slug),
     delete: (projectId, slug) => call(CH.memoryDelete, projectId, slug),
+    invalidate: (projectId, slug, reason) => call(CH.memoryInvalidate, projectId, slug, reason),
     open: (projectId) => call(CH.memoryOpen, projectId),
     recall: (projectId, query, limit) => call(CH.memoryRecall, projectId, query, limit),
     aiStatus: () => call(CH.memoryAiStatus),
@@ -137,6 +208,9 @@ const api: OpenclodApi = {
   },
   approvals: {
     resolve: (approvalId, approved, always, reason) => call(CH.approvalsResolve, approvalId, approved, always, reason)
+  },
+  questions: {
+    answer: (questionId, answers) => call(CH.questionsAnswer, questionId, answers)
   },
   inbox: {
     list: (sessionId) => call(CH.inboxList, sessionId),

@@ -2,7 +2,8 @@ import { z } from 'zod'
 import type { PlanItem, ToolResult } from '../../shared/types.js'
 import type { ToolDef } from './types.js'
 import type { AgentDefinition } from '../../shared/types.js'
-import { agentLine, formatAgentListing } from '../agents/registry.js'
+import { agentLine } from '../agents/registry.js'
+import { searchCandidates } from '../agent/suggest.js'
 
 export const updatePlanTool: ToolDef = {
   name: 'update_plan',
@@ -75,20 +76,25 @@ export const useSkillTool: ToolDef = {
 
 export const listSkillsTool: ToolDef = {
   name: 'list_skills',
-  description: 'Lista as skills instaladas (nome, descrição e origem).',
+  description:
+    'Lista as skills instaladas (nome, descrição e origem). Com `query`, devolve só as que casam com o assunto, as melhores primeiro: use isso em vez de ler o catálogo inteiro.',
   risk: 'read',
   parallelSafe: true,
-  schema: z.object({}),
-  describe() {
-    return { title: 'Listar skills', detail: 'skills disponíveis' }
+  schema: z.object({ query: z.string().max(200).optional().describe('Assunto ou palavras do pedido, para achar as skills certas') }),
+  describe(raw) {
+    const args = raw as { query?: string }
+    return { title: 'Listar skills', detail: args.query ? `"${args.query}"` : 'skills disponíveis' }
   },
-  async execute(_raw, ctx) {
-    const skills = ctx.services.skills.list()
-    if (!skills.length) return { ok: true, text: 'nenhuma skill instalada', summary: '0 skills' }
+  async execute(raw, ctx) {
+    const args = this.schema.parse(raw) as { query?: string }
+    const installed = ctx.services.skills.list()
+    if (!installed.length) return { ok: true, text: 'nenhuma skill instalada', summary: '0 skills' }
+    const skills = args.query ? searchCandidates(args.query, installed, 10) : installed
+    if (!skills.length) return { ok: true, text: `nenhuma skill casa com "${args.query}" (${installed.length} instaladas; chame sem query para ver todas)`, summary: '0 skills' }
     return {
       ok: true,
       text: skills.map((s) => `- ${s.name} (${s.source}): ${s.description}`).join('\n'),
-      summary: `${skills.length} skills`
+      summary: args.query ? `${skills.length} de ${installed.length} skills` : `${skills.length} skills`
     }
   }
 }
@@ -128,7 +134,8 @@ export const memorySearchTool: ToolDef = {
     const args = this.schema.parse(raw) as { query: string }
     const [facts, pages] = await Promise.all([
       ctx.services.memory.search(args.query),
-      ctx.services.projectMemory.search(args.query)
+      // Ranked by what a page is (durable knowledge first, no auto-generated hubs), like memory_recall.
+      ctx.services.projectMemory.rank(args.query, 8)
     ])
     const lines = [
       ...pages.map((page) => `- [${page.slug}] ${page.title}: ${page.snippet}`),
@@ -175,7 +182,7 @@ const AGENT_INTRO =
 
 export const agentTool: ToolDef = {
   name: 'agent',
-  description: `${AGENT_INTRO} Chame list_agents para ver quais agentes você pode chamar.`,
+  description: `${AGENT_INTRO} Os que casam com o pedido vêm sugeridos em <contexto-do-turno>; para o catálogo, carregue list_agents (tool_load).`,
   // Delegating adds no privilege: the child inherits the caller's policy (and asks when the caller is not in auto mode).
   risk: 'read',
   parallelSafe: true,
@@ -187,12 +194,14 @@ export const agentTool: ToolDef = {
   }),
   dynamicDescription(ctx) {
     const { agents } = ctx
-    const callable = agents.callable()
     const where =
       agents.depth >= agents.maxDepth
         ? `Você está no nível máximo de delegação (${agents.depth} de ${agents.maxDepth}): novas chamadas serão recusadas, faça o trabalho você mesmo.`
         : `Você está no nível ${agents.depth} de ${agents.maxDepth} de delegação.`
-    return `${AGENT_INTRO}\n\nAgentes que você pode chamar:\n${formatAgentListing(callable)}\n\n${where}`
+    // The roster is intentionally not embedded: list_agents returns it only
+    // when the model actually needs to delegate. A 80-agent library must not
+    // cost tokens on every request.
+    return `${AGENT_INTRO}\n\nOs que casam com o pedido vêm sugeridos em <contexto-do-turno>; para o catálogo, use list_agents (tool_load se não estiver no contexto). ${where}`
   },
   describe(a) {
     const args = a as { agent?: string; label?: string }
@@ -222,16 +231,23 @@ function canCallText(agent: AgentDefinition): string {
 
 export const listAgentsTool: ToolDef = {
   name: 'list_agents',
-  description: 'Lista os agentes que você pode chamar com a ferramenta agent (nome, descrição e quais agentes cada um pode chamar).',
+  description:
+    'Lista os agentes que você pode chamar com a ferramenta agent (nome, descrição e quais agentes cada um pode chamar). Com `query`, devolve só os que casam com o assunto, os melhores primeiro: com dezenas de agentes, use isso em vez de ler o catálogo inteiro.',
   risk: 'read',
   parallelSafe: true,
-  schema: z.object({}),
-  describe() {
-    return { title: 'Listar agentes', detail: 'agentes disponíveis' }
+  schema: z.object({ query: z.string().max(200).optional().describe('Assunto ou palavras da tarefa, para achar o agente certo') }),
+  describe(raw) {
+    const args = raw as { query?: string }
+    return { title: 'Listar agentes', detail: args.query ? `"${args.query}"` : 'agentes disponíveis' }
   },
-  async execute(_raw, ctx): Promise<ToolResult> {
-    const agents = ctx.agents.callable()
-    if (!agents.length) return { ok: true, text: 'nenhum agente disponível para você chamar', summary: '0 agentes' }
+  async execute(raw, ctx): Promise<ToolResult> {
+    const args = this.schema.parse(raw) as { query?: string }
+    const callable = ctx.agents.callable()
+    const agents = args.query ? searchCandidates(args.query, callable, 8) : callable
+    if (!callable.length) return { ok: true, text: 'nenhum agente disponível para você chamar', summary: '0 agentes' }
+    if (!agents.length) {
+      return { ok: true, text: `nenhum agente casa com "${args.query}" (${callable.length} disponíveis; chame sem query para ver todos)`, summary: '0 agentes' }
+    }
     const header = `Você está no nível ${ctx.agents.depth} de ${ctx.agents.maxDepth} de delegação.`
     return {
       ok: true,

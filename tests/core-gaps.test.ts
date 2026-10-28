@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { SessionRunner, type RunnerDeps } from '../src/core/agent/runner'
 import { SUMMARY_SECTIONS, SUMMARY_SYSTEM_PROMPT, compactIfNeeded } from '../src/core/agent/compaction'
 import { HOOK_EVENTS, HookRunner, normalizeHookDefinition } from '../src/core/hooks/runner'
-import { ScriptedProvider } from '../src/core/providers/mock'
+import { ScriptedProvider } from './support/scripted-provider'
 import { evaluateTool, toolsForMode } from '../src/core/security/permissions'
 import { WorkspaceGuard } from '../src/core/security/policy'
 import { checkSensitiveAccess, createSensitiveMatcher, sensitiveReason } from '../src/core/security/sensitive'
@@ -76,9 +76,9 @@ function makeRunner(
     provider,
     providerConfig: {
       id: 'mock',
-      kind: 'mock',
+      kind: 'openai',
       label: 'Scripted',
-      baseUrl: '',
+      baseUrl: 'http://localhost:0/v1',
       model: 'scripted',
       contextWindow: 128_000,
       supportsVision: false,
@@ -511,8 +511,8 @@ describe('large tool output spill', () => {
   const toolMessages = (runner: SessionRunner): string[] => runner.messages.filter((m) => m.role === 'tool').map(textOf)
 
   it('writes the full output to a per-session file and shows head, tail and the path', async () => {
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'call_1', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [big])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'call_1', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [big])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('liste')
 
     const file = path.join(scratch, 'ses_spill', 'call_1.txt')
@@ -530,8 +530,8 @@ describe('large tool output spill', () => {
 
   it('defaults to <tmpdir>/forja-tool-output/<sessionId>/<callId>.txt', async () => {
     const sessionId = `ses_spill_${Date.now().toString(36)}`
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'abc', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [big])], { sessionId })
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'abc', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [big])], { sessionId })
     try {
       await runner.send('liste')
       const file = path.resolve(os.tmpdir(), 'forja-tool-output', sessionId, 'abc.txt')
@@ -543,8 +543,8 @@ describe('large tool output spill', () => {
   })
 
   it('keeps model-supplied call ids from escaping the session folder', async () => {
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: '../../evil/..\\x', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [big])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: '../../evil/..\\x', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [big])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('liste')
     const written = fs.readdirSync(path.join(scratch, 'ses_spill'))
     expect(written).toHaveLength(1)
@@ -556,11 +556,11 @@ describe('large tool output spill', () => {
     const first = `PRIMEIRO\n${big}`
     const second = `SEGUNDO\n${big}`
     const provider = new ScriptedProvider([
-      { toolCalls: [{ id: 'c1', name: 'list_ports', args: { n: 1 } }] },
-      { toolCalls: [{ id: 'c1', name: 'list_ports', args: { n: 2 } }] },
+      { toolCalls: [{ id: 'c1', name: 'grep', args: { n: 1 } }] },
+      { toolCalls: [{ id: 'c1', name: 'grep', args: { n: 2 } }] },
       { text: 'ok' }
     ])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [first, second])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
+    const { runner } = makeRunner(provider, [bigTool('grep', [first, second])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('liste duas vezes')
     const dir = path.join(scratch, 'ses_spill')
     expect(fs.readFileSync(path.join(dir, 'c1.txt'), 'utf8')).toBe(first)
@@ -568,9 +568,9 @@ describe('large tool output spill', () => {
   })
 
   it('leaves output under the limit untouched and writes nothing', async () => {
-    const small = 'a'.repeat(50_000)
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [small])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
+    const small = 'a'.repeat(15_000)
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [small])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('liste')
     expect(toolMessages(runner)[0]).toBe(small)
     expect(fs.existsSync(path.join(scratch, 'ses_spill'))).toBe(false)
@@ -579,8 +579,8 @@ describe('large tool output spill', () => {
   it('falls back to the old middle truncation when the file cannot be written', async () => {
     const blocker = path.join(scratch, 'not-a-dir')
     fs.writeFileSync(blocker, 'x')
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [big])], {
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [big])], {
       toolOutputDir: path.join(blocker, 'sub'),
       sessionId: 'ses_spill'
     })
@@ -603,11 +603,11 @@ describe('large tool output spill', () => {
   it('lets read_file open the spilled file afterwards, with offset and limit', async () => {
     const file = path.join(scratch, 'ses_spill', 'c1.txt')
     const provider = new ScriptedProvider([
-      { toolCalls: [{ id: 'c1', name: 'list_ports', args: {} }] },
+      { toolCalls: [{ id: 'c1', name: 'grep', args: {} }] },
       { toolCalls: [{ id: 'c2', name: 'read_file', args: { path: file, offset: 2001, limit: 2 } }] },
       { text: 'ok' }
     ])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [big]), readFileTool], {
+    const { runner } = makeRunner(provider, [bigTool('grep', [big]), readFileTool], {
       toolOutputDir: scratch,
       sessionId: 'ses_spill'
     })
@@ -630,8 +630,8 @@ describe('large tool output spill', () => {
 
   it('tells the model to use run_command when the file is over the read_file size cap and run_command exists', async () => {
     const huge = 'y'.repeat(700 * 1024)
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [huge]), fakeTool('run_command', 'exec')], {
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [huge]), fakeTool('run_command', 'exec')], {
       toolOutputDir: scratch,
       sessionId: 'ses_spill'
     })
@@ -644,8 +644,8 @@ describe('large tool output spill', () => {
 
   it('does not advertise run_command when the mode has no such tool', async () => {
     const huge = 'y'.repeat(700 * 1024)
-    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'list_ports', args: {} }] }, { text: 'ok' }])
-    const { runner } = makeRunner(provider, [bigTool('list_ports', [huge])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
+    const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'grep', args: {} }] }, { text: 'ok' }])
+    const { runner } = makeRunner(provider, [bigTool('grep', [huge])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('liste')
     const shown = toolMessages(runner)[0]
     expect(shown.includes('grande demais para o read_file')).toBe(true)

@@ -2,10 +2,15 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { z } from 'zod'
 import type { EnvironmentProfile, ToolResult } from '../../shared/types.js'
 import type { ToolDef } from './types.js'
+import { commandDeletesFiles } from '../security/deletion.js'
 import { checkCommand, sanitizedEnv } from '../security/policy.js'
 import { truncateMiddle } from '../util/ids.js'
+import { OutputCapture } from '../util/output-capture.js'
+import { StreamDecoder } from '../util/oem-decode.js'
+import { missingOfficeModuleHint, officeEnvPatch, officeInstallRefusal, warmOfficeEnv } from '../util/office-runtime.js'
 
-const MAX_BUFFER = 600_000
+/** After a timeout or abort, wait this long for the pipes to close before answering anyway (detached grandchildren keep them open). */
+const KILL_GRACE_MS = 1_500
 /** Output kept per background process (the tail wins). */
 const BACKGROUND_BUFFER = 200_000
 const registry = new Map<string, Set<ChildProcess>>()
@@ -37,6 +42,25 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
+/** A command that deletes files is as destructive as delete_path: the automatic mode must ask for it too (deletion protection). */
+function shellCallRisk(raw: unknown): { risk: 'destructive' } | undefined {
+  const command = (raw as { command?: unknown } | null)?.command
+  return typeof command === 'string' && commandDeletesFiles(command) ? { risk: 'destructive' } : undefined
+}
+
+const isLocal = (environment?: EnvironmentProfile): boolean => !environment || environment.kind === 'local'
+
+/** Before a local command starts: learns what `python` means on this machine, so the command's PATH can be built right. */
+async function prepareLocalEnv(environment?: EnvironmentProfile): Promise<void> {
+  if (isLocal(environment)) await warmOfficeEnv(sanitizedEnv())
+}
+
+/** In Cowork the document libraries are embedded; installing them on the user's computer is refused with the way to use the embedded ones. */
+function officeInstallBlock(command: string, surface: string | undefined): ToolResult | null {
+  const refusal = surface === 'cowork' ? officeInstallRefusal(command) : null
+  return refusal ? { ok: false, text: `BLOQUEADO: ${refusal}` } : null
+}
+
 export interface EnvironmentSpawn {
   file: string
   args: string[]
@@ -66,9 +90,13 @@ export function environmentSpawn(command: string, cwd: string, environment?: Env
  * operator can point it at a host, a jump box or a container.
  */
 function spawnCommand(command: string, cwd: string, environment?: EnvironmentProfile): ChildProcess {
-  const env = { ...sanitizedEnv(), FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' }
+  const base = { ...sanitizedEnv(), FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' }
+  // Local commands also get the embedded document runtime on PATH (openclod-python, openclod-office); WSL/SSH run elsewhere.
+  const env = isLocal(environment) ? officeEnvPatch(base) : base
   const spec = environmentSpawn(command, cwd, environment)
-  return spawn(spec.file, spec.args, { cwd, shell: spec.shell, windowsHide: true, env })
+  // stdin is closed: the tools have no way to type into a process, and a program that waits for input
+  // (an interactive prompt, a REPL) would otherwise hang until the timeout.
+  return spawn(spec.file, spec.args, { cwd, shell: spec.shell, windowsHide: true, env, stdio: ['ignore', 'pipe', 'pipe'] })
 }
 
 function startBackground(command: string, cwd: string, sessionId: string, environment?: EnvironmentProfile): BackgroundProcess {
@@ -85,8 +113,9 @@ function startBackground(command: string, cwd: string, sessionId: string, enviro
     exitCode: null,
     child
   }
+  const decoder = new StreamDecoder()
   const append = (d: Buffer): void => {
-    record.output += d.toString('utf8')
+    record.output += decoder.write(d)
     if (record.output.length > BACKGROUND_BUFFER) {
       const cut = record.output.length - BACKGROUND_BUFFER
       record.output = record.output.slice(cut)
@@ -191,7 +220,7 @@ export function killTree(pid: number): void {
   }
 }
 
-interface RunResult {
+export interface ShellRunResult {
   code: number | null
   stdout: string
   stderr: string
@@ -199,14 +228,15 @@ interface RunResult {
   pid?: number
 }
 
-function runShell(
+export function runShellCommand(
   command: string,
   cwd: string,
   timeoutMs: number,
   sessionId: string,
   signal: AbortSignal,
-  environment?: EnvironmentProfile
-): Promise<RunResult> {
+  environment?: EnvironmentProfile,
+  onOutput?: (stream: 'out' | 'err', text: string) => void
+): Promise<ShellRunResult> {
   return new Promise((resolve) => {
     let child: ChildProcess
     try {
@@ -216,41 +246,45 @@ function runShell(
       return
     }
     track(sessionId, child)
-    let stdout = ''
-    let stderr = ''
+    const stdout = new OutputCapture()
+    const stderr = new OutputCapture(30_000, 120_000)
     let timedOut = false
+    let settled = false
+
+    const finish = (code: number | null, extraErr = ''): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (graceTimer) clearTimeout(graceTimer)
+      signal.removeEventListener('abort', onAbort)
+      const err = stderr.toString()
+      resolve({ code, stdout: stdout.toString(), stderr: extraErr ? `${err}
+${extraErr}` : err, timedOut, pid: child.pid ?? undefined })
+    }
 
     const append = (target: 'out' | 'err', data: Buffer): void => {
-      const text = data.toString('utf8')
-      if (target === 'out') {
-        if (stdout.length < MAX_BUFFER) stdout += text
-      } else if (stderr.length < MAX_BUFFER) stderr += text
+      const text = (target === 'out' ? stdout : stderr).push(data)
+      onOutput?.(target, text)
     }
 
     child.stdout?.on('data', (d: Buffer) => append('out', d))
     child.stderr?.on('data', (d: Buffer) => append('err', d))
 
+    let graceTimer: NodeJS.Timeout | undefined
+    // Kills the process tree, then answers even if a detached grandchild keeps the pipes open.
+    const terminate = (): void => {
+      if (child.pid) killTree(child.pid)
+      graceTimer ??= setTimeout(() => finish(child.exitCode ?? -1), KILL_GRACE_MS)
+    }
     const timer = setTimeout(() => {
       timedOut = true
-      if (child.pid) killTree(child.pid)
+      terminate()
     }, timeoutMs)
-
-    const onAbort = (): void => {
-      if (child.pid) killTree(child.pid)
-    }
+    const onAbort = (): void => terminate()
     signal.addEventListener('abort', onAbort, { once: true })
 
-    child.on('error', (err) => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', onAbort)
-      resolve({ code: -1, stdout, stderr: `${stderr}\n${err.message}`, timedOut, pid: child.pid ?? undefined })
-    })
-
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', onAbort)
-      resolve({ code, stdout, stderr, timedOut, pid: child.pid ?? undefined })
-    })
+    child.on('error', (err) => finish(-1, err.message))
+    child.on('close', (code) => finish(code))
   })
 }
 
@@ -267,6 +301,7 @@ export const runCommandTool: ToolDef = {
     timeout_ms: z.number().int().min(1000).max(900_000).optional(),
     run_in_background: z.boolean().optional().describe('Não esperar o fim; ler a saída depois com read_process_output')
   }),
+  resolveCall: shellCallRisk,
   describe(a) {
     const args = a as { command: string }
     return { title: 'Executar comando', detail: args.command, preview: args.command, }
@@ -284,7 +319,13 @@ export const runCommandTool: ToolDef = {
       })
       return { ok: false, text: `BLOQUEADO pela política de segurança: ${guard.reason}. Reformule o comando de forma segura.` }
     }
+    const blocked = officeInstallBlock(args.command, ctx.surface)
+    if (blocked) {
+      ctx.log('warn', `instalação de bibliotecas de documentos recusada: ${args.command}`)
+      return blocked
+    }
     const cwd = args.cwd ? ctx.workspace.resolve(args.cwd, ctx.cwd) : ctx.cwd
+    await prepareLocalEnv(ctx.environment)
     if (args.run_in_background) {
       const record = startBackground(args.command, cwd, ctx.sessionId, ctx.environment)
       return {
@@ -296,12 +337,41 @@ export const runCommandTool: ToolDef = {
     }
     const timeoutMs = args.timeout_ms ?? ctx.policy.shellTimeoutSec * 1000
     const started = Date.now()
-    const result = await runShell(args.command, cwd, timeoutMs, ctx.sessionId, ctx.signal, ctx.environment)
+    let liveOutput = ''
+    let lastProgressAt = 0
+    const onOutput = (_stream: 'out' | 'err', text: string): void => {
+      liveOutput = (liveOutput + text).slice(-4000)
+      const now = Date.now()
+      if (now - lastProgressAt < 600) return
+      lastProgressAt = now
+      ctx.progress?.(liveOutput.slice(-1200), { outputAt: now })
+    }
+    const result = await runShellCommand(
+      args.command,
+      cwd,
+      timeoutMs,
+      ctx.sessionId,
+      ctx.signal,
+      ctx.environment,
+      onOutput
+    )
     const elapsed = ((Date.now() - started) / 1000).toFixed(1)
     const parts = [`$ ${args.command}`, `exit=${result.code ?? 'null'} · ${elapsed}s${result.timedOut ? ' · TIMEOUT' : ''}`]
     if (result.stdout.trim()) parts.push(`--- stdout ---\n${truncateMiddle(result.stdout.trim(), 28_000)}`)
     if (result.stderr.trim()) parts.push(`--- stderr ---\n${truncateMiddle(result.stderr.trim(), 12_000)}`)
     if (!result.stdout.trim() && !result.stderr.trim()) parts.push('(sem saída)')
+    // A script that imports a document library under another Python: point at the embedded one instead of letting the model pip-install.
+    const missingModule = result.code === 0 ? null : missingOfficeModuleHint(`${result.stderr}\n${result.stdout}`)
+    if (missingModule) parts.push(missingModule)
+    if (result.timedOut) {
+      // A silent timeout is almost always a process waiting for input, or holding the pipe open (browsers and GUI
+      // programs hand the pipe to children that outlive them). Retrying the same call just burns another timeout.
+      parts.push(
+        `Dica: o limite de ${Math.round(timeoutMs / 1000)}s estourou${result.stdout.trim() || result.stderr.trim() ? '' : ' sem nenhuma saída'}. ` +
+          'Não repita o mesmo comando. Redirecione a saída para um arquivo (`> saida.txt 2>&1`) em vez de usar pipe, ' +
+          'ou use run_in_background=true e leia o resultado depois com read_process_output, e use um timeout menor para falhar cedo.'
+      )
+    }
 
     return {
       ok: result.code === 0 && !result.timedOut,
@@ -325,6 +395,7 @@ export const startProcessTool: ToolDef = {
     cwd: z.string().optional(),
     wait_ms: z.number().int().min(200).max(20_000).optional().describe('Tempo para capturar a saída inicial')
   }),
+  resolveCall: shellCallRisk,
   describe(a) {
     const args = a as { command: string }
     return { title: 'Iniciar serviço', detail: args.command, preview: args.command }
@@ -333,8 +404,11 @@ export const startProcessTool: ToolDef = {
     const args = this.schema.parse(raw) as { command: string; cwd?: string; wait_ms?: number }
     const guard = checkCommand(args.command, ctx.policy)
     if (guard.blocked) return { ok: false, text: `BLOQUEADO pela política: ${guard.reason}` }
+    const blocked = officeInstallBlock(args.command, ctx.surface)
+    if (blocked) return blocked
     const cwd = args.cwd ? ctx.workspace.resolve(args.cwd, ctx.cwd) : ctx.cwd
 
+    await prepareLocalEnv(ctx.environment)
     const record = startBackground(args.command, cwd, ctx.sessionId, ctx.environment)
     await new Promise((r) => setTimeout(r, args.wait_ms ?? 1800))
     const { text } = takeNewOutput(record)
@@ -442,7 +516,7 @@ export const listPortsTool: ToolDef = {
   },
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as { filter?: string }
-    const result = await runShell('netstat -ano -p tcp', ctx.cwd, 15_000, ctx.sessionId, ctx.signal, ctx.environment)
+    const result = await runShellCommand('netstat -ano -p tcp', ctx.cwd, 15_000, ctx.sessionId, ctx.signal, ctx.environment)
     const lines = result.stdout
       .split(/\r?\n/)
       .filter((l) => /LISTENING/i.test(l))

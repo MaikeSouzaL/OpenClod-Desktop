@@ -3,7 +3,9 @@ import { ProviderHttpError, classifyProviderError, isRetryableKind, postStream, 
 import { anthropicReasoning } from './reasoning.js'
 import { resolveCompat } from './compat.js'
 import { STREAM_IDLE_TIMEOUT_MS } from './openai.js'
+import { normalizeToolCallSequence } from './messages.js'
 import { estimateTokens } from '../util/ids.js'
+import { modelSeesImages } from './order.js'
 
 type CacheControl = { cache_control?: { type: 'ephemeral' } }
 
@@ -13,7 +15,12 @@ type AnthropicBlock = (
   | { type: 'redacted_thinking'; data: string }
   | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
   | { type: 'tool_use'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+  | {
+      type: 'tool_result'
+      tool_use_id: string
+      content: string | Array<{ type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }>
+      is_error?: boolean
+    }
 ) &
   CacheControl
 
@@ -25,6 +32,8 @@ interface AnthropicMessage {
 export interface ToAnthropicOptions {
   /** Replay the provider's raw assistant blocks (thinking + signatures). Default true. */
   replayThinking?: boolean
+  /** The model accepts images: tool-result screenshots are sent as image blocks. */
+  vision?: boolean
 }
 
 const THINKING_TYPES = new Set(['thinking', 'redacted_thinking'])
@@ -47,7 +56,7 @@ export function toAnthropicMessages(messages: Message[], options: ToAnthropicOpt
     else out.push({ role, content: blocks })
   }
 
-  for (const message of messages) {
+  for (const message of normalizeToolCallSequence(messages)) {
     if (message.role === 'system') continue
 
     if (message.role === 'user') {
@@ -84,11 +93,22 @@ export function toAnthropicMessages(messages: Message[], options: ToAnthropicOpt
 
     for (const part of message.parts) {
       if (part.type !== 'tool_result') continue
+      const text = part.ok ? part.text || '(sem saída)' : `ERRO: ${part.text || 'falhou'}`
+      // tool_result accepts image blocks next to the text (screenshots from Computer Use / browser).
+      const images = options.vision && part.ok ? (part.images ?? []) : []
       push('user', [
         {
           type: 'tool_result',
           tool_use_id: part.toolCallId,
-          content: part.text,
+          content: images.length
+            ? [
+                { type: 'text', text },
+                ...images.map((image) => ({
+                  type: 'image' as const,
+                  source: { type: 'base64' as const, media_type: image.mediaType, data: image.data }
+                }))
+              ]
+            : text,
           is_error: !part.ok
         }
       ])
@@ -110,7 +130,7 @@ export class AnthropicProvider implements Provider {
   ) {
     this.id = config.id
     this.label = config.label
-    this.supportsVision = config.supportsVision
+    this.supportsVision = modelSeesImages(config)
     this.contextWindow = config.contextWindow
   }
 
@@ -123,7 +143,7 @@ export class AnthropicProvider implements Provider {
   private buildBody(req: ModelRequest, replayThinking: boolean): Record<string, unknown> {
     const compat = resolveCompat(this.config)
     const reasoning = anthropicReasoning(this.config.model, replayThinking ? req.effort : undefined, req.maxTokens ?? this.config.maxOutputTokens)
-    const messages = toAnthropicMessages(req.messages, { replayThinking })
+    const messages = toAnthropicMessages(req.messages, { replayThinking, vision: this.supportsVision })
     const tools = req.tools.map((t) => ({
       name: t.name,
       description: t.description,
@@ -173,13 +193,13 @@ export class AnthropicProvider implements Provider {
 
     let response: Response
     try {
-      response = await postStream({ url, headers, body: this.buildBody(req, true), signal: req.signal })
+      response = await postStream({ url, headers, body: this.buildBody(req, true), signal: req.signal, fastFail: req.fastFail })
     } catch (err) {
       // A thinking block whose signature no longer matches the history (an edited or
       // compacted transcript, another model's block) is rejected with a 400. Documented
       // recovery: resend once without any thinking, then carry on normally.
       if (err instanceof ProviderHttpError && err.status === 400 && /thinking|signature|effort|output_config/i.test(err.message)) {
-        response = await postStream({ url, headers, body: this.buildBody(req, false), signal: req.signal })
+        response = await postStream({ url, headers, body: this.buildBody(req, false), signal: req.signal, fastFail: req.fastFail })
       } else {
         throw err
       }

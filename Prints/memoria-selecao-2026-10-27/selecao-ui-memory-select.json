@@ -1,0 +1,30 @@
+{
+  "label": "selecao",
+  "startedAt": "2026-10-27T20:58:50.103Z",
+  "shotBefore": "Prints\\memoria-selecao-2026-10-27\\selecao-01-cards-com-caixa.png",
+  "shotConfirm": "Prints\\memoria-selecao-2026-10-27\\selecao-02-confirmar-apagar.png",
+  "shotAfter": "Prints\\memoria-selecao-2026-10-27\\selecao-03-depois-de-apagar.png",
+  "errors": [],
+  "checks": {
+    "cada card tem a sua caixa de marcar (9 páginas, 9 caixas) e ninguém começa marcado": "ok",
+    "a barra acima da grade oferece \"Selecionar todas\" e explica o Shift+clique": "ok",
+    "clicar no conteúdo do card continua abrindo a página (a caixa não atrapalha)": "ok",
+    "marcar a caixa de um card o destaca e a barra conta 1 selecionada": "ok",
+    "clicar na caixa NÃO abriu a página": "ok",
+    "Shift+clique marca a faixa inteira entre a última marcada e a clicada (5 cards, os do meio inclusive)": "ok",
+    "desmarcar um card tira só ele da seleção": "ok",
+    "Esc limpa a seleção": "ok",
+    "\"Selecionar todas\" marca todas as páginas da lista e mostra o contador": "ok",
+    "clicar de novo na caixa-mestra desmarca todas": "ok",
+    "buscar tira da seleção o que saiu da lista: sobra só a página que a busca mostra (1 de 1)": "ok",
+    "limpar a busca não traz as marcas de volta (o que estava escondido não é apagado sem querer)": "ok",
+    "\"Limpar seleção\" desmarca tudo": "ok",
+    "com 3 marcadas o botão diz \"Apagar 3\"": "ok",
+    "o primeiro clique só pergunta: \"Confirmar: apagar 3 páginas (1 fixada)\" e nada foi apagado": "ok",
+    "o segundo clique apaga: 6 cards sobram e a tela mostra \"3 página(s) apagada(s).\"": "ok",
+    "os 3 arquivos foram apagados do disco e os outros 6 continuam lá": "ok",
+    "depois de apagar, nada fica marcado e as estatísticas se atualizam (6 páginas)": "ok",
+    "a confirmação aberta e ignorada volta ao botão \"Apagar 1\" sozinha": "ok",
+    "...depois de alguns segundos, sem apagar nada": "ok"
+  }
+}

@@ -1,5 +1,5 @@
 import { diffLines } from 'diff'
-import type { Message, ToolCallPart } from '../../../shared/types'
+import type { LimitationPart, Message, ToolCallPart } from '../../../shared/types'
 
 /**
  * How a run of tool calls is summarized in the transcript, the way Claude
@@ -18,7 +18,8 @@ const CATEGORIES: Array<{ id: string; test: (name: string) => boolean; verb: Ver
   { id: 'browser', test: (n) => n.startsWith('browser_'), verb: { done: ['usou o navegador {n} vez', 'usou o navegador {n} vezes'], running: ['usando o navegador {n} vez', 'usando o navegador {n} vezes'] } },
   { id: 'computer', test: (n) => n.startsWith('computer_'), verb: { done: ['usou o computador {n} vez', 'usou o computador {n} vezes'], running: ['usando o computador {n} vez', 'usando o computador {n} vezes'] } },
   { id: 'agent', test: (n) => n === 'agent' || n === 'task' || n === 'list_agents' || n === 'external_agent', verb: { done: ['chamou {n} agente', 'chamou {n} agentes'], running: ['chamando {n} agente', 'chamando {n} agentes'] } },
-  { id: 'mcp', test: (n) => n.startsWith('mcp__'), verb: { done: ['usou {n} ferramenta MCP', 'usou {n} ferramentas MCP'], running: ['usando {n} ferramenta MCP', 'usando {n} ferramentas MCP'] } }
+  { id: 'mcp', test: (n) => n.startsWith('mcp__'), verb: { done: ['usou {n} ferramenta MCP', 'usou {n} ferramentas MCP'], running: ['usando {n} ferramenta MCP', 'usando {n} ferramentas MCP'] } },
+  { id: 'media', test: (n) => n.startsWith('media_'), verb: { done: ['processou {n} mídia', 'processou {n} mídias'], running: ['processando {n} mídia', 'processando {n} mídias'] } }
 ]
 const OTHER: { id: string; verb: Verb } = {
   id: 'other',
@@ -33,6 +34,16 @@ export function isPlanCall(name: string): boolean {
 /** Calls that are shown as their own diff card instead of inside the collapsed group. */
 export function isEditCall(name: string): boolean {
   return name === 'edit_file' || name === 'write_file'
+}
+
+/** A reported harness limitation gets a visible card, never a collapsed tool row. */
+export function isLimitationCall(name: string): boolean {
+  return name === 'report_limitation'
+}
+
+/** Questions to the user get their own Q&A card in the transcript. */
+export function isQuestionCall(name: string): boolean {
+  return name === 'ask_user'
 }
 
 export function summarizeCalls(names: string[], running: boolean): string {
@@ -58,6 +69,10 @@ export interface AssistantBlock {
   message: Message
   text: string
   calls: ToolCallPart[]
+  /** Thinking of every message folded into this block, in order. */
+  reasoning: string
+  /** Self-analysis cards produced by the harness when the turn fails. */
+  limitations: LimitationPart[]
 }
 
 function textOf(message: Message): string {
@@ -66,6 +81,19 @@ function textOf(message: Message): string {
     .map((part) => (part.type === 'text' ? part.text : ''))
     .join('\n')
     .trim()
+}
+
+function reasoningOf(message: Message): string {
+  return message.parts
+    .filter((part) => part.type === 'reasoning')
+    .map((part) => (part.type === 'reasoning' ? part.text.trim() : ''))
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function appendReasoning(current: string, next: string): string {
+  if (!next) return current
+  return current ? `${current}\n\n${next}` : next
 }
 
 /**
@@ -84,12 +112,15 @@ export function buildAssistantBlocks(messages: Message[]): Array<AssistantBlock 
     }
     const text = textOf(message)
     const calls = message.parts.filter((part): part is ToolCallPart => part.type === 'tool_call')
+    const reasoning = reasoningOf(message)
+    const limitations = message.parts.filter((part): part is LimitationPart => part.type === 'limitation')
     const last = out[out.length - 1]
-    if (last && !('passthrough' in last) && !text && calls.length && !message.error) {
+    if (last && !('passthrough' in last) && !text && calls.length && !message.error && !limitations.length) {
       last.calls.push(...calls)
+      last.reasoning = appendReasoning(last.reasoning, reasoning)
       continue
     }
-    out.push({ message, text, calls: [...calls] })
+    out.push({ message, text, calls: [...calls], reasoning, limitations })
   }
   return out
 }

@@ -1,0 +1,191 @@
+{
+  "label": "beamfree-final-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqwvjvf",
+  "startedAt": "2026-10-27T16:50:07.849Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 12928,
+      "cachedTokens": 6400,
+      "uncachedTokens": 6528,
+      "perCall": [
+        {
+          "input": 6438,
+          "cached": 0,
+          "output": 50
+        },
+        {
+          "input": 6490,
+          "cached": 6400,
+          "output": 33
+        }
+      ],
+      "ms": 10196,
+      "timedOut": false,
+      "final": "Nenhum servidor MCP aparece configurado.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqx8vd4_ikpq criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 13550,
+      "cachedTokens": 6720,
+      "uncachedTokens": 6830,
+      "perCall": [
+        {
+          "input": 6727,
+          "cached": 0,
+          "output": 110
+        },
+        {
+          "input": 6823,
+          "cached": 6720,
+          "output": 47
+        }
+      ],
+      "ms": 8126,
+      "timedOut": false,
+      "final": "Handoff registrado. Id: **ho_mvqx8vd4_ikpq**.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 14530,
+      "cachedTokens": 11264,
+      "uncachedTokens": 3266,
+      "perCall": [
+        {
+          "input": 6857,
+          "cached": 4416,
+          "output": 48
+        },
+        {
+          "input": 7673,
+          "cached": 6848,
+          "output": 458
+        }
+      ],
+      "ms": 10099,
+      "timedOut": false,
+      "final": "Foram encontradas 4 skills que mencionam \"pdf\" (mas nenhuma é uma skill dedicada a PDF — em todas o PDF aparece apenas como exclusão/contexto):\n\n- **docx** — \"Não use para PDF, planilha, apresentação...\"\n- **pptx** — \"Não use para ... PDF, ",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 15833,
+      "cachedTokens": 4800,
+      "uncachedTokens": 11033,
+      "perCall": [
+        {
+          "input": 7839,
+          "cached": 4800,
+          "output": 50
+        },
+        {
+          "input": 7994,
+          "cached": 0,
+          "output": 110
+        }
+      ],
+      "ms": 10081,
+      "timedOut": false,
+      "final": "Agente encontrado: **svg-verifier** — revisor independente de SVG/ícones que valida, entre outros aspectos, segurança ( segurança).",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/beam-free",
+  "totals": {
+    "modelCalls": 8,
+    "inputTokens": 56841,
+    "uncachedTokens": 27657,
+    "allTargetsOk": true
+  }
+}

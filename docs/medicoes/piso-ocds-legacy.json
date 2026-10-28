@@ -1,0 +1,123 @@
+{
+  "label": "ocds-legacy",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-legacy-mvqu4y2r",
+  "startedAt": "2026-10-27T15:23:32.798Z",
+  "samples": [
+    {
+      "firstInput": 9401,
+      "firstCached": 768,
+      "calls": 1,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2954
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 391
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 277
+          }
+        ],
+        "total": 10252,
+        "window": 32768,
+        "lastRequest": 9678
+      }
+    },
+    {
+      "firstInput": 9751,
+      "firstCached": 0,
+      "calls": 2,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2954
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 391
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "memory",
+            "label": "Memória e contexto do turno",
+            "tokens": 331
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 449
+          },
+          {
+            "id": "results",
+            "label": "Resultados de ferramentas",
+            "tokens": 15
+          },
+          {
+            "id": "calls",
+            "label": "Chamadas de ferramentas",
+            "tokens": 7
+          }
+        ],
+        "total": 10777,
+        "window": 32768,
+        "lastRequest": 10190
+      }
+    }
+  ],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "firstInput": [
+    9401,
+    9751
+  ],
+  "breakdown": {
+    "system": 2954,
+    "instructions": 554,
+    "skills": 391,
+    "tools": 6075,
+    "mcp": 1,
+    "memory": 331,
+    "messages": 449,
+    "results": 15,
+    "calls": 7
+  },
+  "errors": []
+}

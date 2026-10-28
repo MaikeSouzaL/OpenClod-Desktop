@@ -24,6 +24,9 @@
     "src/renderer/**/*.tsx",
     "src/shared/**/*.ts",
     "src/preload/**/*.ts",
-    "src/core/util/dictation.ts"
+    "src/core/util/dictation.ts",
+    "src/core/artifacts/**/*.ts",
+    "src/core/providers/order.ts",
+    "src/core/providers/health.ts"
   ]
 }

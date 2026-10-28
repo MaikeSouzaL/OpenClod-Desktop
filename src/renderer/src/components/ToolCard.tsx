@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ToolResultPart } from '../../../shared/types'
 import { Icon, type IconName } from './Icons'
 import { basename, toolFamily, toolLabel } from '../lib/format'
+import { formatDuration } from '../lib/activity'
 import type { LiveTool } from '../lib/types'
 
 const FAMILY_ICON: Record<string, IconName> = {
@@ -48,14 +49,32 @@ export function ToolCard({ name, args, result, live }: ToolCardProps): ReactElem
   const running = live?.running ?? false
   const [open, setOpen] = useState(failed)
   const [copied, setCopied] = useState(false)
+  const [now, setNow] = useState(Date.now())
+  const openedForProgress = useRef(false)
+
+  useEffect(() => {
+    if (!running) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [running])
+
+  // The first live chunk opens the card once, so a long command shows its
+  // output without forcing the user to expand it. Collapsing is respected.
+  useEffect(() => {
+    if (!running || !live?.progress || openedForProgress.current) return
+    openedForProgress.current = true
+    setOpen(true)
+  }, [running, live?.progress])
 
   const family = toolFamily(name)
   const icon = FAMILY_ICON[family] ?? FAMILY_ICON.default
   const summary = live?.summary ?? result?.detail ?? summarizeArgs(name, args)
-  const text = live?.text ?? result?.text ?? ''
+  const text = running ? (live?.text ?? result?.text ?? '') : (result?.text ?? live?.text ?? '')
   const images = result?.images ?? []
   const files = live?.files ?? []
   const data = useMemo(() => live?.data ?? {}, [live?.data])
+  const elapsedMs = running && live?.startedAt ? now - live.startedAt : 0
+  const sinceOutputMs = running ? now - (live?.updatedAt ?? live?.startedAt ?? now) : 0
 
   const copy = async (): Promise<void> => {
     try {
@@ -77,6 +96,15 @@ export function ToolCard({ name, args, result, live }: ToolCardProps): ReactElem
         <span className="tool-summary" title={summary}>
           {summary}
         </span>
+        {running ? (
+          <span
+            className="tool-live-time"
+            title={sinceOutputMs > 5000 ? `Sem saída há ${formatDuration(sinceOutputMs)}` : 'Executando'}
+          >
+            {formatDuration(elapsedMs)}
+            {sinceOutputMs > 5000 ? ' · sem saída' : ''}
+          </span>
+        ) : null}
         <span className={`tool-state ${failed ? 'bad' : running ? 'busy' : result ? 'good' : ''}`}>
           {failed ? <Icon name="alert" size={13} /> : result && !running ? <Icon name="check" size={13} /> : null}
         </span>
@@ -85,9 +113,21 @@ export function ToolCard({ name, args, result, live }: ToolCardProps): ReactElem
 
       {open ? (
         <div className="tool-body">
+          {running ? (
+            <>
+              <div className="tool-section-label row">
+                <span>Saída ao vivo</span>
+                <span className="tool-live-meta">
+                  {formatDuration(elapsedMs)}
+                  {sinceOutputMs > 5000 ? ` · sem saída há ${formatDuration(sinceOutputMs)}` : ''}
+                </span>
+              </div>
+              <pre className="tool-pre result live">{text || '(aguardando saída...)'}</pre>
+            </>
+          ) : null}
           <div className="tool-section-label">Argumentos</div>
           <pre className="tool-pre">{JSON.stringify(args ?? {}, null, 2)}</pre>
-          {text ? (
+          {text && !running ? (
             <>
               <div className="tool-section-label row">
                 <span>Resultado</span>

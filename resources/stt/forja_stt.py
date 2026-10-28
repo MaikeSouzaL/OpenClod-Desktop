@@ -275,10 +275,11 @@ class Job:
 class Decoder(threading.Thread):
     MAX_PENDING = 12  # finals waiting for the decoder (bounded; submit blocks instead of dropping)
 
-    def __init__(self, model, cfg: Config):
+    def __init__(self, model, cfg: Config, device: str = "cpu"):
         super().__init__(name="forja-decoder", daemon=True)
         self.model = model
         self.cfg = cfg
+        self.device = device
         self._cond = threading.Condition()
         self._fifo = collections.deque()
         self._partial = None
@@ -297,6 +298,15 @@ class Decoder(threading.Thread):
     def can_take_partial(self) -> bool:
         with self._cond:
             return self._partial is None and not self._partial_running and not self._fifo
+
+    def reset(self) -> None:
+        """Drops pending jobs and per-utterance caches; the loaded model stays."""
+        with self._cond:
+            self._fifo.clear()
+            self._partial = None
+            self._partial_text.clear()
+            self._lang_lock.clear()
+            self._cond.notify_all()
 
     def submit_partial(self, job: Job) -> None:
         with self._cond:
@@ -358,14 +368,17 @@ class Decoder(threading.Thread):
             language=language,
             task="transcribe",
             condition_on_previous_text=False,
-            vad_filter=True,
+            # The streaming VAD already isolated speech for partials; running the
+            # VAD again doubles the audio preprocessing without changing the text.
+            vad_filter=not partial,
             vad_parameters=self._vad_options,
             initial_prompt=self.cfg.initial_prompt,
         )
         if partial:
             kwargs.update(beam_size=1, best_of=1, temperature=0.0, without_timestamps=True)
         else:
-            kwargs.update(beam_size=5)
+            # CUDA can afford the better beam; CPU dictation needs to finish fast.
+            kwargs.update(beam_size=5 if self.device == "cuda" else 1)
         segments, info = self.model.transcribe(audio, **kwargs)
         kept = [seg.text.strip() for seg in segments if self._keep_segment(seg)]
         if self.cfg.language is None and info.language_probability >= 0.5:
@@ -469,7 +482,11 @@ class Segmenter(threading.Thread):
             item = self.audio_q.get()
             try:
                 if isinstance(item, tuple):
-                    self.flush()
+                    command = item[0] if item else "flush"
+                    if command == "reset":
+                        self.reset()
+                    else:
+                        self.flush()
                 else:
                     self.feed(item)
             except Exception as exc:
@@ -600,6 +617,21 @@ class Segmenter(threading.Thread):
             self._finalize(cut_frames=0, reason="flush-early", exact_end=True)
         self.decoder.submit_marker("flushed")
 
+    def reset(self) -> None:
+        """Drops the stream state between dictation sessions; the model stays loaded."""
+        self.chunks = []
+        self.buf_len = 0
+        self.total = 0
+        self.frames = 0
+        self.in_speech = False
+        self.streak = 0
+        self.active = False
+        self.speech_frames = 0
+        self.silence_frames = 0
+        self.last_partial_at = 0
+        self.vad.reset()
+        self.decoder.reset()
+
 
 # --------------------------------------------------------------------------------------
 # Model loading
@@ -672,6 +704,53 @@ def default_models_dir(argv) -> str:
 
 def main(argv) -> int:
     models_dir = default_models_dir(argv)
+    file_path = None
+    file_model = os.environ.get("FORJA_STT_MODEL", "base")
+    file_language = os.environ.get("FORJA_STT_LANGUAGE", "pt")
+    for index, arg in enumerate(argv):
+        if arg == "--transcribe-file" and index + 1 < len(argv):
+            file_path = argv[index + 1]
+        elif arg.startswith("--transcribe-file="):
+            file_path = arg.split("=", 1)[1]
+        elif arg == "--model" and index + 1 < len(argv):
+            file_model = argv[index + 1]
+        elif arg.startswith("--model="):
+            file_model = arg.split("=", 1)[1]
+        elif arg == "--language" and index + 1 < len(argv):
+            file_language = argv[index + 1]
+        elif arg.startswith("--language="):
+            file_language = arg.split("=", 1)[1]
+    if file_path:
+        if not os.path.isfile(file_path):
+            die("Arquivo de midia nao encontrado: %s" % file_path, 2)
+        cfg = Config({"model": file_model, "language": file_language, "device": "auto"}, models_dir)
+        model, device, compute_type = load_model(cfg)
+        segments, info = model.transcribe(
+            file_path,
+            language=cfg.language,
+            task="transcribe",
+            beam_size=5,
+            vad_filter=True,
+            word_timestamps=False,
+            condition_on_previous_text=True,
+        )
+        items = []
+        for segment in segments:
+            text = (segment.text or "").strip()
+            if text:
+                items.append({"start": round(float(segment.start), 3), "end": round(float(segment.end), 3), "text": text})
+        emit({
+            "type": "transcription",
+            "text": " ".join(item["text"] for item in items).strip(),
+            "segments": items,
+            "language": getattr(info, "language", cfg.language or "auto"),
+            "language_probability": round(float(getattr(info, "language_probability", 0) or 0), 4),
+            "duration": round(float(getattr(info, "duration", 0) or 0), 3),
+            "device": device,
+            "compute_type": compute_type,
+        })
+        sys.stdout.flush()
+        os._exit(0)
     audio_q: "queue.Queue" = queue.Queue(maxsize=4096)  # ~7 min of 100 ms chunks
     started = threading.Event()
 
@@ -690,7 +769,7 @@ def main(argv) -> int:
         except Exception as exc:
             log("Silero VAD unavailable (%s: %s); using the energy fallback" % (type(exc).__name__, exc))
             vad = EnergyVad()
-        decoder = Decoder(model, cfg)
+        decoder = Decoder(model, cfg, device)
         decoder.start()
         Segmenter(cfg, vad, decoder, audio_q).start()
         load_ms = int((time.perf_counter() - t0) * 1000)
@@ -747,6 +826,9 @@ def main(argv) -> int:
         elif kind == "flush":
             if started.is_set():
                 audio_q.put(("flush",))
+        elif kind == "reset":
+            if started.is_set():
+                audio_q.put(("reset",))
         elif kind == "start":
             if started.is_set():
                 emit_error("O motor de voz ja foi iniciado.", fatal=False)

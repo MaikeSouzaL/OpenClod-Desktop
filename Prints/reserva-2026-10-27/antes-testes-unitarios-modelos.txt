@@ -1,0 +1,7 @@
+ × tests/reserve-settings.test.ts > ProviderReserve > tries the models ticked for a provider in Settings (fallbackModels), saved with the settings, not only its own model 24ms
+ × tests/provider-chain.test.ts > the reserve chain > tries the models the user ticked for a provider, in the provider's list order with its own model first, and none of the others 11ms
+ × tests/provider-chain.test.ts > the reserve chain > a provider with every box cleared is out of the line, and one never touched keeps just its own model 2ms
+ × tests/provider-chain.test.ts > the reserve chain > the models ticked for the provider in use are its first alternates (they help with per-model failures) 2ms
+ Test Files  2 failed (2)
+      Tests  4 failed | 25 passed (29)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯

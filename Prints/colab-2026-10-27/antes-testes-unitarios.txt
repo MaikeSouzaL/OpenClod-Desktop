@@ -1,0 +1,24 @@
+# Testes novos do Colab contra o código ANTIGO (cópia descartável do projeto sem: classificação de túnel caído em http.ts, sem retry-zero para 530/502 de túnel, sem 'probeFor' em chain.ts e reserve.ts)
+# Gerado em 2026-10-27 14:01 com: python make_old_code_copy.py && npx vitest run tests/colab-tunnel.test.ts tests/colab-reserve.test.ts tests/colab-service.test.ts
+
+     × the tunnel process is gone (real HTTP 530 "Error 1033" page): moves to the next provider at once, says why in the conversation, and stays there 2062ms
+     × the tunnel is up but the notebook stopped (real HTTP 502 "Bad gateway" page): moves to the next provider at once, says why in the conversation, and stays there 1918ms
+     × a server that stops answering altogether (session frozen) is not waited for 5 minutes when a reserve exists 11ms
+     × the probe says yes while the server answers and marks the failure when it does not 7ms
+     × a refused key (the notebook restarted) is an auth failure of the whole provider 5ms
+     × a Colab provider on this computer (the test mode) is probed with the authenticated request, not just the open port 5ms
+     × is a connection failure of the whole provider, not "no balance" or "bad request" 12ms
+     × gives the user the plain message instead of 6 KB of HTML 20ms
+     × does not wait and retry a tunnel that is gone or stopped, but keeps retrying an ordinary 502 2ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/colab-reserve.test.ts > Colab falls: the reserve takes over by itself > the tunnel process is gone (real HTTP 530 "Error 1033" page): moves to the next provider at once, says why in the conversation, and stays there
+ FAIL  tests/colab-reserve.test.ts > Colab falls: the reserve takes over by itself > the tunnel is up but the notebook stopped (real HTTP 502 "Bad gateway" page): moves to the next provider at once, says why in the conversation, and stays there
+ FAIL  tests/colab-reserve.test.ts > Colab falls: the reserve takes over by itself > a server that stops answering altogether (session frozen) is not waited for 5 minutes when a reserve exists
+ FAIL  tests/colab-reserve.test.ts > the chain knows how to tell a live Colab from a dead one > the probe says yes while the server answers and marks the failure when it does not
+ FAIL  tests/colab-reserve.test.ts > the chain knows how to tell a live Colab from a dead one > a refused key (the notebook restarted) is an auth failure of the whole provider
+ FAIL  tests/colab-reserve.test.ts > the chain knows how to tell a live Colab from a dead one > a Colab provider on this computer (the test mode) is probed with the authenticated request, not just the open port
+ FAIL  tests/colab-tunnel.test.ts > tunnel down: how the harness classifies it > is a connection failure of the whole provider, not "no balance" or "bad request"
+ FAIL  tests/colab-tunnel.test.ts > tunnel down: how the harness classifies it > gives the user the plain message instead of 6 KB of HTML
+ FAIL  tests/colab-tunnel.test.ts > tunnel down: how the harness classifies it > does not wait and retry a tunnel that is gone or stopped, but keeps retrying an ordinary 502
+ Test Files  2 failed | 1 passed (3)
+      Tests  9 failed | 45 passed (54)

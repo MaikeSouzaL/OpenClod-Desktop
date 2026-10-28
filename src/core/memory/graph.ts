@@ -10,6 +10,7 @@ export interface NativeMemoryGraphNode {
   degree: number
   terms: string[]
   summary?: string
+  status?: 'active' | 'superseded' | 'invalidated'
 }
 
 export interface NativeMemoryGraphEdge {
@@ -38,6 +39,7 @@ export function buildNativeMemoryGraph(pages: MemoryPage[]): {
     degree: 0,
     terms: graphTerms(`${page.title} ${page.body}`),
     summary: page.body.replace(/\s+/g, ' ').trim().slice(0, 600)
+    ,status: page.status ?? 'active'
   }))
   const edges = new Map<string, NativeMemoryGraphEdge>()
   const add = (source: string, target: string, kind: NativeMemoryGraphEdge['kind'], weight: number): void => {
@@ -60,12 +62,17 @@ export function buildNativeMemoryGraph(pages: MemoryPage[]): {
     }
   }
 
+  const semanticDegree = new Map<string, number>()
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const tags = intersectionCount(nodes[i].tags, nodes[j].tags)
       const terms = intersectionCount(nodes[i].terms, nodes[j].terms)
+      if (!tags && terms < 2) continue
+      if ((semanticDegree.get(nodes[i].id) ?? 0) >= 12 || (semanticDegree.get(nodes[j].id) ?? 0) >= 12) continue
       if (tags) add(nodes[i].id, nodes[j].id, 'tag', 4 + tags)
-      else if (terms >= 2) add(nodes[i].id, nodes[j].id, 'term', Math.min(8, terms))
+      else add(nodes[i].id, nodes[j].id, 'term', Math.min(8, terms))
+      semanticDegree.set(nodes[i].id, (semanticDegree.get(nodes[i].id) ?? 0) + 1)
+      semanticDegree.set(nodes[j].id, (semanticDegree.get(nodes[j].id) ?? 0) + 1)
     }
   }
 

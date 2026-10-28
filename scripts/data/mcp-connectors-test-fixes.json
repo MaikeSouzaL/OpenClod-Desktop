@@ -1,0 +1,94 @@
+{
+  "fixes": [
+    {
+      "id": "oauth-discovery-challenge",
+      "title": "Descoberta OAuth: seguir o resource_metadata do 401 na primeira conexão",
+      "cause": "A primeira conexão de um conector OAuth chama `begin()` direto, sem nenhum 401 antes, e a descoberta só olhava os caminhos `.well-known` derivados da URL do MCP. Servidores atrás de um gateway ou com o documento em outro caminho (Bill, Guidepoint, Haloo, iSolved, Morning Consult, American Express/Resy, Metaview) só dizem onde ele está no `WWW-Authenticate` de um pedido sem credenciais, e alguns escrevem a URL sem aspas, que a regex antiga não lia.",
+      "files": ["src/main/mcp-oauth.ts"],
+      "regression": ["tests/mcp-oauth.test.ts"],
+      "note": "Sem metadados nos caminhos do RFC, `discover()` pergunta o 401 (POST initialize e, se o POST for 400/404/405, o GET do SSE antigo) e segue o `resource_metadata` (com ou sem aspas) e o `scope` anunciados. Não custa nenhuma requisição quando o documento do RFC responde."
+    },
+    {
+      "id": "dcr-localhost",
+      "title": "Registro dinâmico: repetir como localhost quando o servidor recusa 127.0.0.1",
+      "cause": "Muitos servidores aceitam `http://localhost:<porta>` mas recusam o literal `http://127.0.0.1:<porta>` no registro dinâmico (CoinDesk: \"http allowed only for localhost\"; DevRev: \"redirect_uri is not valid: 127.0.0.1\"; Grain, Caisey, Eedi, eToro, Pitchbook, Tango...). O registro dinâmico registra a URL que receber, então a URL fixa só importa para o aplicativo OAuth do próprio usuário.",
+      "files": ["src/main/mcp-oauth.ts"],
+      "regression": ["tests/mcp-oauth.test.ts"],
+      "note": "Uma recusa 400/422 que culpa a URL de retorno é repetida UMA vez com localhost; o login real e o ensaio usam a URL que foi registrada na URL de autorização e na troca do código. O listener de retorno passou a atender também o loopback IPv6 (::1), para `localhost` chegar qualquer que seja o endereço que o navegador resolver. O aplicativo OAuth do usuário (oauth-static) continua com a URL fixa."
+    },
+    {
+      "id": "dry-run-client-name",
+      "title": "Nome do cliente do ensaio: curto e sem pontuação",
+      "cause": "O ensaio registrava \"Openclod Desktop (teste de conectividade)\" (41 caracteres, com parênteses). A Shippo recusa client_name acima de 39 (\"client_name must be at most 39 characters\") e o Calendly só aceita letras, números, hífen e espaço (\"may only contain alphanumeric characters, hyphens, and spaces\"): a falha era do nome de teste, não do login real (que usa \"Openclod Desktop\").",
+      "files": ["src/main/mcp-oauth.ts", "docs/MCP_OAUTH.md"],
+      "regression": ["tests/mcp-oauth.test.ts"]
+    },
+    {
+      "id": "protocol-2025-11-25",
+      "title": "Aceitar a revisão 2025-11-25 do protocolo quando o servidor responde com ela",
+      "cause": "Os conectores da Square respondem 2025-11-25 ao `initialize` mesmo quando o cliente oferece 2025-06-18, e o cliente recusava a versão (\"versão de protocolo MCP não suportada\"). O que o cliente usa (initialize, tools, resources, prompts, progresso, cancelamento, elicitation) não muda nessa revisão.",
+      "files": ["src/core/mcp/client.ts", "src/core/mcp/hints.ts"],
+      "regression": ["tests/mcp-client-http.test.ts"],
+      "note": "O cliente continua oferecendo 2025-06-18; 2025-11-25 só é aceita na resposta. Uma versão desconhecida continua recusada."
+    },
+    {
+      "id": "html-answer-message",
+      "title": "Mensagens que dizem o que o servidor devolveu (resposta HTML e recusa de registro)",
+      "cause": "Um WAF que redireciona o POST para uma página de erro (Akamai na frente do Credit Karma) terminava em \"resposta MCP inválida\", e uma recusa do registro dinâmico só mostrava o status, sem a descrição do servidor (\"client_name must be at most 39 characters\", \"Trusted Hosts\", \"dynamic client registration is disabled\"...). Sem isso não dava para separar defeito nosso de bloqueio do serviço.",
+      "files": ["src/core/mcp/client.ts", "src/main/mcp-oauth.ts"],
+      "regression": ["tests/mcp-client-http.test.ts", "tests/mcp-oauth.test.ts"]
+    },
+    {
+      "id": "uv-cache-hint",
+      "title": "Dica para o uv que não consegue instalar um pacote por arquivo em uso",
+      "cause": "Nesta máquina todo `uvx mcp-server-*` falhava com \"Failed to install: pywin32 ... failed to remove directory ... (os error 32)\" (cache do uv com arquivos em uso: antivírus, processo preso ou cache danificado; reproduzido fora do Openclod com o uv 0.11.17 e o 0.11.21). Com um cache novo (UV_CACHE_DIR) os mesmos servidores sobem. O erro chegava ao usuário sem explicação.",
+      "files": ["src/core/mcp/hints.ts"],
+      "regression": ["tests/mcp-policy.test.ts"]
+    },
+    {
+      "id": "learning-commons-credentials",
+      "title": "Learning Commons: o formulário de chave de API não tinha campo",
+      "cause": "A entrada `learning-commons` está como `api-key` no diretório, mas sem `credentials`: o card não teria onde digitar a chave. A documentação do serviço diz que a chave vai no cabeçalho `x-api-key` (ou `Authorization: Bearer`).",
+      "files": ["resources/mcp-directory.json", "scripts/lib/mcp-directory-core.mjs"],
+      "note": "As credenciais acrescentadas à mão numa entrada do diretório do Claude agora sobrevivem a uma nova coleta (`mcp-directory-build.mjs`)."
+    },
+    {
+      "id": "sqlite-mcp-2x",
+      "title": "SQLite local: fixar o mcp na linha 1.x",
+      "cause": "`uvx mcp-server-sqlite` (pede `mcp>=1.6.0`, sem teto) passou a resolver o mcp 2.3.0, que removeu `Server.list_resources`: o servidor morria na partida com \"AttributeError: 'Server' object has no attribute 'list_resources'\". O pacote está arquivado e não será atualizado.",
+      "files": ["src/core/mcp/catalog.ts", "resources/mcp-directory.json"],
+      "regression": ["tests/mcp-catalog.test.ts"],
+      "note": "`--with mcp~=1.6` no uvx (sem `<`, porque no Windows o uvx roda por `cmd.exe /c` e `<` seria um redirecionamento). O teste do catálogo agora recusa `< > | & ^` nos argumentos."
+    },
+    {
+      "id": "loopback-hint",
+      "title": "Dica para um servidor local que não está ouvindo (Figma Desktop)",
+      "cause": "O conector \"figma\" aponta para http://127.0.0.1:3845/mcp, que só existe com o Figma Desktop aberto e o servidor MCP do modo Dev ligado. Sem isso a dica era a genérica \"confira a internet, VPN/proxy\".",
+      "files": ["src/core/mcp/hints.ts"],
+      "regression": ["tests/mcp-policy.test.ts"]
+    },
+    {
+      "id": "registration-200-error",
+      "title": "Registro dinâmico que responde 200 com corpo de erro",
+      "cause": "O Cloze responde HTTP 200 com {\"error\":\"unapproved_software_statement\"} e o app dizia só \"registro OAuth sem client_id\", escondendo que o servidor só aceita clientes aprovados.",
+      "files": ["src/main/mcp-oauth.ts"],
+      "regression": ["tests/mcp-oauth.test.ts"]
+    }
+  ],
+  "investigations": [
+    { "id": "calendly", "finding": "O registro foi recusado por causa do NOSSO nome de teste: {\"errors\":{\"name\":[\"may only contain alphanumeric characters, hyphens, and spaces.\"]}}. Com o nome sem pontuação o registro passa (corrigido)." },
+    { "id": "jasper", "finding": "Recusava \"Invalid client registration data\" para http://127.0.0.1:...; com http://localhost:... o registro passa (HTTP 201, testado à mão). Corrigido pelo fallback para localhost, inclusive para 400 sem motivo." },
+    { "id": "shippo", "finding": "client_name acima de 39 caracteres recusado pelo servidor (\"client_name must be at most 39 characters\"): era o nome do ensaio (corrigido)." },
+    { "id": "strava", "finding": "400 invalid_client_metadata \"Unable to register client\" também com localhost, scope e os grant types anunciados (uma variante extra testada à mão). O serviço não diz o motivo e nenhuma variante do corpo passou." },
+    { "id": "oxford-economics", "finding": "400 com corpo vazio em todas as variantes testadas à mão (localhost, client_secret_post que é o único método anunciado, com e sem refresh_token). Política do serviço sem mensagem." },
+    { "id": "cloze-mcp", "finding": "O registro responde HTTP 200 com {\"error\":\"unapproved_software_statement\",\"error_description\":\"This client is not approved. Contact support@cloze.com for help.\"}: só clientes aprovados." },
+    { "id": "bloomberg-law", "finding": "403 {\"message\":\"Forbidden\"} no endpoint de registro: recusa sem dar o motivo (o corpo é só \"Forbidden\")." },
+    { "id": "figma-remote", "finding": "403 Forbidden no endpoint de registro, sem motivo. Alternativa que funciona sem registro: o servidor local do Figma Desktop (conector \"figma\", precisa do app aberto)." },
+    { "id": "intuit-credit-karma", "finding": "O Akamai responde 302 para /Error_Credit_Karma.htm ao POST do initialize (curl, 1 requisição); o cliente seguia o redirecionamento e terminava num HTML 200. É bloqueio de WAF; a mensagem agora diz isso." },
+    { "id": "cargurus", "finding": "HTTP 406 com corpo vazio tanto com Accept \"application/json, text/event-stream\" quanto só com \"text/event-stream\" (curl, 1 requisição de cada). O endpoint /chat-mcp/v1/stream não aceita um cliente MCP genérico." },
+    { "id": "risotto", "finding": "A URL do diretório (dashboard.tryrisotto.com/settings/integrations/mcp) é uma página do painel: POST responde 405 e o GET devolve HTML. Provavelmente não é o endpoint do servidor MCP; a conferir com o serviço." },
+    { "id": "order-by-cash-app", "finding": "Respondia protocolo 2025-11-25 ao nosso 2025-06-18 e o cliente recusava; agora é aceito (corrigido) e o conector abre sem login." },
+    { "id": "learning-commons", "finding": "401 \"No API key found in request\" com WWW-Authenticate: Key. A documentação do serviço diz para mandar a chave em x-api-key (ou Authorization: Bearer); o diretório não tinha o campo da chave (corrigido)." },
+    { "id": "fetch", "finding": "Todos os servidores `uvx` falharam nesta máquina com \"Failed to install: pywin32 ... (os error 32)\" no cache padrão do uv, também fora do Openclod (uv 0.11.17 e 0.11.21). Com UV_CACHE_DIR numa pasta nova o mesmo servidor sobe. A dica pt-BR do app agora explica." }
+  ]
+}

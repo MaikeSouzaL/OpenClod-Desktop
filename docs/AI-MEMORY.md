@@ -41,19 +41,55 @@ Versões antigas gravavam um arquivo por turno em `s/<hash>/<turno>.md`; elas
 são consolidadas em uma página por sessão no início do app, para o grafo não
 ficar com um nó por turno.
 
-## Recall antes de cada turno
+## Contexto do turno (a busca automática)
 
-Antes de montar o system prompt, o runner consulta o AI-Memory com o texto do
-pedido e com as páginas recentes. O resultado entra na seção
-**“Memória indexada do projeto (AI-Memory)”**. Assim uma LLM nova já começa
-sabendo decisões, convenções, erros e conversas anteriores.
+A memória **não** é mais despejada no prompt do sistema (isso derrubava o cache
+do provedor a cada turno: ver [`docs/MEMORIA-E-TOKENS.md`](MEMORIA-E-TOKENS.md)).
+Antes de cada pedido o runner monta **uma** mensagem oculta
+`<contexto-do-turno>` logo depois da mensagem do usuário, com só o que importa
+para aquele pedido:
 
-Ferramentas do agente:
+- **Memória que casa com o pedido** (`src/core/memory/pack.ts`): páginas
+  ranqueadas pelo que elas *são* (decisão/solução/convenção valem mais que log
+  de turno; os hubs automáticos "Índice: palavra" nunca entram), pela cobertura
+  do pedido e pela recência, mais os vizinhos duráveis dos melhores resultados
+  (links e backlinks, as "sinapses"). Páginas já enviadas antes não se repetem
+  até mudarem. Um pedido sem assunto ("ola", "tente novamente") não recupera nada.
+- **Trabalho em aberto** de outras sessões: a cápsula de continuidade (abaixo) e
+  os handoffs abertos.
+- **Mapa da memória** (poucas linhas) só no primeiro turno; **plano**, **fatos**
+  e **servidores MCP** só quando mudaram; **sugestões** de skills, agentes e
+  ferramentas sob demanda que casam com o pedido.
 
-- `memory_brief` — briefing nativo (páginas fixadas, recentes e handoffs).
-- `memory_page` — criar/ler/listar/apagar páginas curadas.
-- `memory_handoff` — passagem de bastão com dono único.
-- `memory_recall` — busca no índice AI-Memory, com fallback lexical nativo.
+Ferramentas do agente (o modelo as usa quando o contexto do turno não basta):
+
+- `memory_brief` — briefing nativo (páginas fixadas, recentes e handoffs). Sob demanda: o mapa já vem no contexto do turno.
+- `memory_page` — buscar (mesmo ranking), ler (mostra links e backlinks para
+  seguir; também abre páginas que só existem no índice), escrever (liga a página
+  às duráveis relacionadas), listar, apagar, invalidar.
+- `memory_handoff` — passagem de bastão com dono único. Sob demanda: chamar pelo nome já a carrega (a cápsula de continuidade
+  cobre a continuação entre modelos sem ela; sem ela um modelo pode gravar uma página no lugar do handoff).
+- `memory_recall` — busca ranqueada com as ligações de cada página; cai para o
+  índice AI-Memory quando a wiki não tem nada.
+
+## Cápsula de continuidade
+
+Depois de **cada turno** o app grava (ou reescreve) **uma página por sessão**,
+`estado-<sessão>` (`src/core/memory/state-page.ts`): situação (em aberto,
+interrompido ou concluído), objetivo, último pedido, resultado, plano com
+status, **próximo passo** e arquivos. Sem que o modelo precise lembrar. Uma
+sessão nova no mesmo projeto recebe a cápsula do trabalho em aberto no contexto
+do turno, e é isso que faz "continue de onde paramos" funcionar com **outro**
+modelo. Quando um modelo assume uma conversa longa (troca de modelo ou fallback
+por cota), o runner resume o histórico antes da primeira chamada, para ele
+partir do resumo e da memória em vez de reler tudo.
+
+## Higiene
+
+Os "Índice: <palavra>" gerados de palavras que só aparecem em logs de turno
+(abre, falta, afzer…) eram 24 das 73 páginas do maior projeto real. Agora só
+nasce hub para assunto que alguma página durável carrega, e os antigos vão para
+`wiki/.archive` (nada é apagado).
 
 ## Interface
 
@@ -64,10 +100,30 @@ projeto. A tela mostra:
 - contagem de páginas, fixadas, handoffs e páginas no índice;
 - status do sidecar e porta;
 - busca no índice AI-Memory;
-- exportar/importar Markdown e abrir a pasta.
+- exportar/importar Markdown e abrir a pasta;
+- **marcar vários cards e apagar em massa** (abaixo).
 
 Transcritos de sessão ficam fora da grade para não afogar a lista; continuam
 pesquisáveis pelo agente e por **Buscar no índice**.
+
+### Marcar páginas e apagar em massa
+
+Cada card tem uma caixa no canto. A barra acima da grade tem **Selecionar todas** (a
+caixa mostra um traço quando só algumas estão marcadas) e, com seleção, **Limpar
+seleção** e **Apagar N**.
+
+- **Shift+clique** na caixa marca a faixa entre a última marcada e a clicada; **Esc**
+  limpa a seleção. Clicar no conteúdo do card continua abrindo a página.
+- A seleção é **só o que está na tela**: ao buscar, o que saiu da lista é desmarcado (e
+  não volta quando a busca é limpa), então nada escondido é apagado sem querer.
+- **Apagar pede dois cliques**: o primeiro troca o botão por "Confirmar: apagar N
+  páginas" (com "(2 fixadas)" quando há fixadas) e, se você não confirmar em 6 s, volta
+  sozinho. Não há desfazer.
+- A exclusão usa a mesma operação do botão **Apagar** da página aberta, uma página por
+  vez (o arquivo da wiki, a linha do índice e a cópia no AI-Memory). Se alguma falhar, a
+  tela diz quantas foram apagadas e o título das que não foram.
+
+Verificação em app real (perfil descartável): `node scripts/ui-memory-select.cjs`.
 
 ## Grafo de memória (estilo Obsidian)
 

@@ -1,0 +1,328 @@
+{
+  "label": "depois",
+  "startedAt": "2026-10-27T19:33:38.700Z",
+  "scenarios": {
+    "401": {
+      "t": {
+        "seconds": 7,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (auth: chave recusada); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 4
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (auth: chave recusada); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\depois-401-conversa.png"
+    },
+    "402": {
+      "t2": {
+        "seconds": 15,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "fake-pro:ok, guardei.",
+          "qwen3.5:4b:CAJU"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "CAJU",
+        "failures": [],
+        "count": 6
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\depois-402-conversa.png"
+    },
+    "429": {
+      "t": {
+        "seconds": 7,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:ok"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "ok",
+        "failures": [],
+        "count": 4
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\depois-429-conversa.png"
+    },
+    "partial": {
+      "t": {
+        "seconds": 7,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "fake-pro:A capital da França é",
+          "qwen3.5:4b:Paris."
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "Paris.",
+        "failures": [],
+        "count": 6
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\depois-partial-conversa.png"
+    },
+    "overflow": {
+      "t": {
+        "seconds": 7,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (context_overflow: janela de contexto excedida); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 4
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (context_overflow: janela de contexto excedida); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\depois-overflow-conversa.png"
+    },
+    "refused": {
+      "t": {
+        "seconds": 11,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (network: sem conexão); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 4
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "Provedor A (falso)/fake-pro falhou (network: sem conexão); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "hitsA": 4,
+      "shot": "Prints\\reserva-2026-10-27\\depois-refused-conversa.png"
+    },
+    "real-402": {
+      "before": {
+        "id": "ses_7ae60aab-b3ea-4f9b-937a-097387f4f53b",
+        "title": "Reserva DeepSeek real",
+        "projectId": "prj_8676a277-55b4-42b2-b5cd-bf5721496434",
+        "cwd": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-reserva-kmq4CK\\projeto",
+        "mode": "code",
+        "surface": "code",
+        "providerId": "deepseek",
+        "model": "deepseek-flash",
+        "createdAt": 1793129718788,
+        "updatedAt": 1793129718788,
+        "totalUsage": {
+          "input": 0,
+          "output": 0
+        }
+      },
+      "t": {
+        "seconds": 9,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "DeepSeek/deepseek-flash falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 4
+      },
+      "ui": {
+        "model": "qwen3.5:4b",
+        "provider": "Ollama (modelo real)",
+        "notices": [
+          "DeepSeek/deepseek-flash falhou (quota: sem saldo ou cota); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ]
+      },
+      "deepseek": "HTTP 402: {\"error\":{\"message\":\"Insufficient Balance (request_id: a8039f09-4b85-4cb4-b6a0-a359622a32ab)\",\"type\":\"insufficient_balance_error\",\"param\":null,\"code\":",
+      "shot": "Prints\\reserva-2026-10-27\\depois-real-402-conversa.png"
+    },
+    "openrouter": {
+      "skipped": "sem chave no cofre"
+    },
+    "modelos": {
+      "t": {
+        "seconds": 7,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Provedor B (falso)/fake-b-1. A conversa, o plano e a memória do projeto foram preservados.",
+          "Provedor B (falso)/fake-b-1 falhou (rate_limit: limite de uso atingido); continuando com Provedor B (falso)/fake-b-2. A conversa, o plano e a memória do projeto foram preservados.",
+          "Provedor B (falso)/fake-b-2 falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 6
+      },
+      "hits": {
+        "a": 1,
+        "b1": 1,
+        "b2": 1,
+        "b3": 0
+      }
+    }
+  },
+  "shotModelos": "Prints\\reserva-2026-10-27\\depois-modelos-da-reserva.png",
+  "shotOrdem": "Prints\\reserva-2026-10-27\\depois-ordem-da-reserva.png",
+  "fakeHits": "ok,402,429,401,partial,overflow,refused,refused,refused,refused,402,429,429",
+  "proxyRequests": 11,
+  "errors": [],
+  "checks": {
+    "configuração dos provedores de teste gravada": "ok",
+    "402: o turno 1 é respondido pelo provedor A (ainda com saldo)": "ok",
+    "402: o turno terminou com resposta (não parou por falta de crédito)": "ok",
+    "402: quem respondeu foi o LLM real da reserva": "ok",
+    "402: o contexto foi preservado (o modelo novo sabe a palavra-código)": "ok",
+    "402: o provedor esgotado foi chamado só uma vez no turno": "ok",
+    "402: a conversa avisa a troca (linha na conversa, com os dois nomes e o motivo)": "ok",
+    "402: a linha de aviso aparece na tela": "ok",
+    "402: a sessão passou a usar o modelo que funciona": "ok",
+    "402: o seletor de modelo do compositor mostra o modelo novo": "ok",
+    "402: o rodapé do compositor mostra o provedor novo": "ok",
+    "402: o turno seguinte continua no modelo que funciona": "ok",
+    "402: o provedor esgotado NÃO é tentado de novo a cada turno": "ok",
+    "402: uma conversa nova pedida no provedor esgotado já começa no que funciona": "ok",
+    "402: depois de salvar as configurações a sessão continua no modelo que funciona": "ok",
+    "402: nem salvar as configurações fez o esgotado ser chamado de novo": "ok",
+    "402: depois de reabrir o app o seletor continua mostrando o modelo que funciona": "ok",
+    "402: depois de reabrir o app a resposta vem do modelo que funciona, sem tocar no esgotado": "ok",
+    "429: a conversa terminou com resposta de um LLM que funciona": "ok",
+    "429: a conversa avisa a troca e o motivo": "ok",
+    "429: o seletor do compositor mostra o modelo novo": "ok",
+    "429: sem esperar o Retry-After de 1 hora (turno em menos de 3 min, uma só chamada ao limitado)": "ok",
+    "401: a conversa terminou com resposta de um LLM que funciona": "ok",
+    "401: a conversa avisa a troca e o motivo": "ok",
+    "401: o seletor do compositor mostra o modelo novo": "ok",
+    "partial: a conversa terminou com resposta de um LLM que funciona": "ok",
+    "partial: a conversa avisa a troca e o motivo": "ok",
+    "partial: o seletor do compositor mostra o modelo novo": "ok",
+    "partial: a metade da resposta que já estava na tela foi mantida": "ok",
+    "partial: o modelo novo continuou a resposta (texto depois da metade)": "ok",
+    "overflow: a conversa terminou com resposta de um LLM que funciona": "ok",
+    "overflow: a conversa avisa a troca e o motivo": "ok",
+    "overflow: o seletor do compositor mostra o modelo novo": "ok",
+    "refused: a conversa terminou com resposta de um LLM que funciona": "ok",
+    "refused: a conversa avisa a troca e o motivo": "ok",
+    "refused: o seletor do compositor mostra o modelo novo": "ok",
+    "real-402: a sessão começou no DeepSeek (provedor padrão do usuário)": "ok",
+    "real-402: com o DeepSeek sem saldo de verdade, o LLM local real respondeu": "ok",
+    "real-402: a conversa avisa \"DeepSeek ... sem saldo\"": "ok",
+    "real-402: o seletor mostra o modelo local": "ok",
+    "modelos: o item do provedor ainda não mostra a lista de modelos (começa fechado)": "ok",
+    "modelos: ao abrir, lista os modelos do provedor com uma caixa por modelo": "ok",
+    "modelos: sem mexer, só o modelo principal está marcado": "ok",
+    "modelos: \"Selecionar todos\" marca todos": "ok",
+    "modelos: desmarcar um deixa os outros": "ok",
+    "modelos: a linha do provedor resume \"2 modelos\"": "ok",
+    "modelos: \"Salvar alterações\" grava só os modelos marcados": "ok",
+    "modelos: depois dos dois modelos marcados falharem, o LLM real respondeu": "ok",
+    "modelos: foram tentados nesta ordem: o esgotado, o 1º marcado, o 2º marcado": "ok",
+    "modelos: o modelo que NÃO foi marcado nunca foi chamado": "ok",
+    "modelos: a conversa avisou as três trocas": "ok",
+    "ordem: Configurações → Provedores mostra a lista \"Ordem da reserva\"": "ok",
+    "ordem: a lista segue a ordem escolhida e mostra o estado de cada provedor": "ok",
+    "ordem: o botão \"Subir\" troca a ordem": "ok",
+    "ordem: \"Salvar alterações\" grava a ordem e quem fica fora": "ok"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "label": "chat",
+  "startedAt": "2026-10-27T18:47:52.234Z",
+  "model": "qwen3.5:4b",
+  "shotHome": "Prints\\chat-computer-2026-10-27\\chat-01-inicio.png",
+  "sessionMode": "computer",
+  "attempts": 3,
+  "seconds": 402,
+  "tools": [
+    "run_command",
+    "run_command",
+    "run_command",
+    "run_command",
+    "list_dir",
+    "list_dir",
+    "memory_page",
+    "memory_page",
+    "run_command",
+    "run_command",
+    "run_command",
+    "run_command",
+    "list_dir",
+    "list_dir"
+  ],
+  "shotAfter": "",
+  "errors": [],
+  "checks": {
+    "o app abre no Início (Chat), com o campo \"Como posso ajudar você hoje?\"": "ok",
+    "a primeira mensagem do Início abriu uma conversa de Chat": "ok",
+    "a conversa do Chat abre em Computer Use (e não mais em \"Perguntar\", que só lê)": "ok",
+    "o modelo CRIOU a pasta no computador (não só explicou como fazer)": "ok",
+    "...usando ferramentas que o Chat antes não tinha (terminal ou Computer Use)": "ok",
+    "...e disse o que fez": "ok",
+    "a conversa terminou sem erro": "ok"
+  }
+}

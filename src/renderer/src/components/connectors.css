@@ -1,0 +1,1433 @@
+/* ==========================================================================
+   Conectores (Personalização): diretório de aplicativos no estilo do Claude.
+   Só variáveis do tema (claro/escuro) de styles.css; nenhum ícone de terceiros.
+   ========================================================================== */
+
+:root {
+  --cnx-ok: var(--green);
+  --cnx-warn: var(--amber);
+  --cnx-bad: var(--red);
+  --cnx-busy: var(--blue);
+}
+
+.cnx {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cnx .page-lead {
+  margin: 0;
+}
+
+.cnx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cnx button:focus-visible,
+.cnx input:focus-visible,
+.cnx select:focus-visible,
+.cnx-backdrop button:focus-visible,
+.cnx-backdrop input:focus-visible,
+.cnx-backdrop select:focus-visible,
+.cnx-backdrop a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------ toolbar ------------------------------ */
+
+.cnx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cnx-search {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--text-3);
+}
+
+.cnx-search:focus-within {
+  border-color: var(--accent);
+}
+
+.cnx-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none !important;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.cnx-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.cnx-search.small {
+  height: 30px;
+  min-width: 0;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+.cnx-search.small input {
+  font-size: 12px;
+}
+
+.cnx-segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+}
+
+.cnx-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.cnx-segmented button:hover {
+  color: var(--text-2);
+}
+
+.cnx-segmented button.active {
+  background: var(--elevated);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.cnx-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.cnx-segmented button.active .cnx-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cnx-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cnx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.cnx-chip span {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cnx-chip:hover {
+  background: var(--hover);
+  border-color: var(--border);
+}
+
+.cnx-chip.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.cnx-chip.active span {
+  color: var(--accent);
+}
+
+.cnx-chip.more {
+  border-style: dashed;
+  color: var(--text-3);
+}
+
+.cnx-native {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cnx-native-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.cnx-native-item em {
+  color: var(--text-3);
+  font-style: normal;
+}
+
+/* The two capabilities that come with Openclod have no brand: a small neutral tile with the glyph, like a logo would be. */
+.cnx-native-glyph {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--text-2);
+  background: var(--hover);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* ------------------------------- status ------------------------------- */
+
+.cnx-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cnx-dot.tone-ok {
+  background: var(--cnx-ok);
+}
+
+.cnx-dot.tone-muted {
+  background: var(--text-3);
+  opacity: 0.6;
+}
+
+.cnx-dot.pulse {
+  animation: cnx-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cnx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+.cnx-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cnx-status.tone-ok {
+  color: var(--cnx-ok);
+}
+
+.cnx-status.tone-warn {
+  color: var(--cnx-warn);
+}
+
+.cnx-status.tone-bad {
+  color: var(--cnx-bad);
+}
+
+.cnx-status.tone-busy {
+  color: var(--cnx-busy);
+}
+
+.cnx-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cnx-pill.tone-accent {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cnx-pill.tone-ok {
+  border-color: color-mix(in srgb, var(--cnx-ok) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--cnx-ok) 10%, transparent);
+  color: var(--cnx-ok);
+}
+
+.cnx-pill.tone-warn {
+  border-color: color-mix(in srgb, var(--cnx-warn) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--cnx-warn) 10%, transparent);
+  color: var(--cnx-warn);
+}
+
+.cnx-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* ------------------------------- callouts ------------------------------ */
+
+.cnx-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.cnx-callout > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.cnx-callout > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.cnx-callout strong {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.cnx-callout p {
+  margin: 3px 0 0;
+}
+
+.cnx-callout .cnx-tech {
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.cnx-callout.tone-bad {
+  border-color: color-mix(in srgb, var(--cnx-bad) 40%, var(--border));
+  background: color-mix(in srgb, var(--cnx-bad) 8%, var(--elevated));
+}
+
+.cnx-callout.tone-bad > svg {
+  color: var(--cnx-bad);
+}
+
+.cnx-callout.tone-warn {
+  border-color: color-mix(in srgb, var(--cnx-warn) 42%, var(--border));
+  background: color-mix(in srgb, var(--cnx-warn) 9%, var(--elevated));
+}
+
+.cnx-callout.tone-warn > svg {
+  color: var(--cnx-warn);
+}
+
+.cnx-callout.tone-ok {
+  border-color: color-mix(in srgb, var(--cnx-ok) 40%, var(--border));
+  background: color-mix(in srgb, var(--cnx-ok) 8%, var(--elevated));
+}
+
+.cnx-callout.tone-ok > svg {
+  color: var(--cnx-ok);
+}
+
+/* ------------------------------- sections ------------------------------ */
+
+.cnx-block h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cnx-block h2 small {
+  color: var(--cnx-warn);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cnx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.cnx-more {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 4px;
+}
+
+.cnx-empty {
+  padding-top: 48px;
+}
+
+/* -------------------------------- cards -------------------------------- */
+
+.cnx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--elevated);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 158px;
+}
+
+.cnx-card:hover {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--elevated) 82%, var(--hover));
+}
+
+.cnx-card.is-connected {
+  border-color: color-mix(in srgb, var(--cnx-ok) 28%, var(--border-soft));
+}
+
+.cnx-card.is-needs-auth {
+  border-color: color-mix(in srgb, var(--cnx-warn) 36%, var(--border-soft));
+}
+
+.cnx-card.is-error {
+  border-color: color-mix(in srgb, var(--cnx-bad) 36%, var(--border-soft));
+}
+
+.cnx-card-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.cnx-card-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cnx-card-title {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cnx-card-title:hover {
+  color: var(--accent);
+}
+
+.cnx-card-title:focus-visible {
+  border-radius: 4px;
+  outline-offset: 3px;
+}
+
+.cnx-card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  min-height: 2.9em;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.cnx-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.cnx-card-action {
+  flex: 0 0 auto;
+}
+
+.cnx-mono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  user-select: none;
+  background: hsl(var(--h) 52% 52% / 0.16);
+  border: 1px solid hsl(var(--h) 52% 58% / 0.26);
+  color: hsl(var(--h) 66% 76%);
+}
+
+:root[data-theme='light'] .cnx-mono {
+  background: hsl(var(--h) 62% 50% / 0.12);
+  border-color: hsl(var(--h) 55% 45% / 0.28);
+  color: hsl(var(--h) 66% 32%);
+}
+
+/* The logo of a service: an image that ships inside the app, already composed on its own backdrop (light for dark
+   marks, dark for white marks), so the same file reads on both themes. The ring keeps the edge of a white tile visible. */
+.cnx-logo {
+  display: block;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f1f2f4;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12), 0 1px 3px rgb(0 0 0 / 0.35);
+  user-select: none;
+}
+
+.cnx-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+:root[data-theme='light'] .cnx-logo {
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.12), 0 1px 3px rgb(15 23 42 / 0.12);
+}
+
+.cnx-skeleton {
+  cursor: default;
+  pointer-events: none;
+}
+
+.shimmer {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--hover) 0%, color-mix(in srgb, var(--hover) 55%, var(--active)) 50%, var(--hover) 100%);
+  background-size: 200% 100%;
+  animation: cnx-shimmer 1.4s ease-in-out infinite;
+}
+
+.shimmer.line {
+  height: 11px;
+}
+
+.shimmer.w60 {
+  width: 60%;
+}
+
+.shimmer.w40 {
+  width: 40%;
+}
+
+.shimmer.w80 {
+  width: 80%;
+}
+
+.cnx-skeleton .cnx-mono.shimmer {
+  width: 40px;
+  height: 40px;
+  border: 0;
+}
+
+@keyframes cnx-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* -------------------------------- drawer ------------------------------- */
+
+.cnx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.12s ease;
+}
+
+.cnx-drawer-backdrop {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.cnx-drawer {
+  width: min(600px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  animation: cnx-slide 0.18s ease;
+}
+
+@keyframes cnx-slide {
+  from {
+    transform: translateX(28px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.cnx-drawer-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.cnx-drawer-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cnx-drawer-title h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.cnx-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 28px;
+}
+
+.cnx-lead {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.cnx-statusbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--elevated);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.cnx-statusbar strong {
+  font-weight: 600;
+}
+
+.cnx-statusbar.tone-ok {
+  border-color: color-mix(in srgb, var(--cnx-ok) 34%, var(--border-soft));
+}
+
+.cnx-statusbar.tone-ok .cnx-dot,
+.cnx-statusbar.tone-ok strong {
+  color: var(--cnx-ok);
+}
+
+.cnx-statusbar.tone-warn .cnx-dot,
+.cnx-statusbar.tone-warn strong {
+  color: var(--cnx-warn);
+}
+
+.cnx-statusbar.tone-bad .cnx-dot,
+.cnx-statusbar.tone-bad strong {
+  color: var(--cnx-bad);
+}
+
+.cnx-statusbar.tone-busy .cnx-dot,
+.cnx-statusbar.tone-busy strong {
+  color: var(--cnx-busy);
+}
+
+.cnx-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.cnx-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.cnx-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cnx-muted {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.cnx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cnx-danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cnx-bad) 50%, var(--border));
+  color: var(--cnx-bad);
+}
+
+.cnx-waiting {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--cnx-busy) 36%, var(--border-soft));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cnx-busy) 6%, var(--elevated));
+}
+
+.cnx-waiting-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cnx-waiting-head strong {
+  font-size: 13.5px;
+}
+
+.cnx-spinner {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 2px solid color-mix(in srgb, var(--cnx-busy) 28%, transparent);
+  border-top-color: var(--cnx-busy);
+  border-radius: 50%;
+  animation: cnx-spin 0.8s linear infinite;
+}
+
+@keyframes cnx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cnx-authurl,
+.cnx-redirect code {
+  display: block;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.cnx-redirect {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--cnx-warn) 36%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cnx-warn) 6%, var(--elevated));
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.cnx-redirect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cnx-redirect-row code {
+  flex: 1;
+}
+
+.cnx-facts {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 9px 14px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.cnx-facts dt {
+  color: var(--text-3);
+}
+
+.cnx-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.cnx-facts code,
+.cnx-chips code,
+.cnx-tool-name code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.cnx-facts a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.cnx-facts a:hover {
+  text-decoration: underline;
+}
+
+.cnx-probe {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.cnx-probe .cnx-dot {
+  margin-top: 6px;
+}
+
+.cnx-probe.tone-ok .cnx-dot {
+  color: var(--cnx-ok);
+}
+
+.cnx-probe.tone-warn .cnx-dot {
+  color: var(--cnx-warn);
+}
+
+.cnx-probe.tone-bad .cnx-dot {
+  color: var(--cnx-bad);
+}
+
+.cnx-probe.tone-muted .cnx-dot {
+  color: var(--text-3);
+}
+
+.cnx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cnx-chips code {
+  padding: 2px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--elevated);
+  color: var(--text-2);
+}
+
+/* -------------------------------- tools -------------------------------- */
+
+.cnx-tools-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+}
+
+.cnx-tools-all > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cnx-tools-all strong {
+  font-size: 13px;
+}
+
+.cnx-tool-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cnx-tool {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--elevated);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
+.cnx-tool + .cnx-tool {
+  border-top: 1px solid var(--border-soft);
+}
+
+.cnx-tool-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cnx-tool-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cnx-tool-name code {
+  color: var(--text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.cnx-tool-main p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cnx-policy {
+  --policy: var(--text-3);
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cnx-policy.policy-allow {
+  --policy: var(--cnx-ok);
+}
+
+.cnx-policy.policy-ask {
+  --policy: var(--cnx-warn);
+}
+
+.cnx-policy.policy-deny {
+  --policy: var(--cnx-bad);
+}
+
+.cnx-policy-dot {
+  position: absolute;
+  left: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--policy);
+  pointer-events: none;
+}
+
+.cnx-policy select {
+  height: 30px;
+  min-width: 142px;
+  padding: 0 8px 0 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cnx-policy select:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* -------------------------------- forms -------------------------------- */
+
+.cnx-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cnx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.cnx-field label,
+.cnx-headers legend {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cnx-field label em {
+  margin-left: 4px;
+  color: var(--cnx-warn);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.cnx-field label em.opt {
+  color: var(--text-3);
+}
+
+.cnx-field input,
+.cnx-field select,
+.cnx-header-row input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.cnx-field input:focus,
+.cnx-field select:focus,
+.cnx-header-row input:focus,
+.cnx-secret:focus-within input {
+  border-color: var(--accent);
+}
+
+.cnx-field input[aria-invalid='true'] {
+  border-color: var(--cnx-bad);
+}
+
+.cnx-field small,
+.cnx-headers small {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.cnx-field small.is-bad,
+.cnx-headers small.is-bad {
+  color: var(--cnx-bad);
+}
+
+.cnx-secret {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.cnx-secret input {
+  padding-right: 36px !important;
+  font-family: var(--mono);
+}
+
+.cnx-secret-toggle {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+}
+
+.cnx-secret-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.cnx-secret-toggle[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.cnx-form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cnx-form-actions.end {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.cnx-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.cnx-note-block {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.cnx-note-block code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.cnx-headers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cnx-headers legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.cnx-headers .btn {
+  align-self: flex-start;
+}
+
+.cnx-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 28px;
+  align-items: center;
+  gap: 8px;
+}
+
+.cnx-dialog {
+  width: min(520px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.cnx-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cnx-dialog-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+/* ------------------- forms: arguments, kind of connector, advanced ------------------- */
+
+.cnx-field textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--text);
+  font: 12.5px/1.5 var(--mono);
+  outline: none;
+  resize: vertical;
+}
+
+.cnx-field textarea:focus {
+  border-color: var(--accent);
+}
+
+.cnx-field textarea[aria-invalid='true'] {
+  border-color: var(--cnx-bad);
+}
+
+.cnx-field input[readonly] {
+  color: var(--text-3);
+  cursor: default;
+}
+
+.cnx-kind {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cnx-kind label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--elevated);
+  cursor: pointer;
+}
+
+.cnx-kind label.is-on {
+  border-color: var(--accent);
+}
+
+.cnx-kind label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cnx-kind input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.cnx-kind span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cnx-kind strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cnx-kind small {
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.cnx-advanced {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--elevated);
+}
+
+.cnx-advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cnx-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cnx-advanced > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--text-3);
+  border-bottom: 1.5px solid var(--text-3);
+  transform: rotate(-45deg);
+  transition: transform 0.12s ease;
+}
+
+.cnx-advanced[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.cnx-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+/* ------------------------- settings: MCP (pointer to Conectores) ------------------------ */
+
+.mcp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mcp-settings .cnx-callout {
+  margin: 0;
+}
+
+/* ------------------------------- responsive ------------------------------ */
+
+@media (max-width: 760px) {
+  .cnx-kind {
+    grid-template-columns: 1fr;
+  }
+
+  .cnx-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cnx-facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .cnx-facts dd {
+    margin-bottom: 8px;
+  }
+
+  .cnx-tool {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cnx-dot.pulse,
+  .cnx-spinner,
+  .shimmer,
+  .cnx-drawer,
+  .cnx-backdrop {
+    animation: none;
+  }
+}

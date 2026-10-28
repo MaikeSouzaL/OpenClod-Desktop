@@ -1,0 +1,23 @@
+COLAB REAL: O QUE O TÚNEL RESPONDE DEPOIS DE "Desconectar e excluir o ambiente de execução" (2026-10-27)
+========================================================================================================
+
+O "Sim" do diálogo foi dado por volta das 15:12. Sondei o endereço público do túnel com GET /healthz (sem chave), do computador do usuário:
+
+  15:13:48  HTTP 200   o servidor do Colab AINDA estava no ar, ao menos um minuto depois do clique (a VM é recolhida depois)
+  15:13:53  HTTP 502   o servidor sumiu; o cloudflared ainda segura o túnel ("Bad gateway")
+  15:14:00  HTTP 530   o túnel sumiu
+
+Consequência: quem para o runtime e pergunta logo em seguida ainda é atendido pelo servidor antigo. O primeiro roteiro de queda (scripts/ui-colab-real.cjs) caiu
+nessa corrida (a sessão continuou no Colab porque o Colab ainda respondia); o roteiro agora espera o túnel parar de responder antes de perguntar.
+
+Resposta do túnel morto (GET /healthz e GET /v1/models, com uma chave inventada):
+
+  HTTP 530, server: cloudflare, text/html; charset=UTF-8, 7736 bytes
+  título: "Cloudflare Tunnel error | [endereço do túnel] | Cloudflare"
+  classificador do Openclod (isTunnelDownResponse): reconhece como túnel caído, nas duas rotas
+  mensagem para o usuário: "O túnel do Google Colab não respondeu: a sessão do Colab provavelmente terminou (ou o notebook parou).
+                            Rode o notebook de novo e cole o novo código de conexão."
+
+O que isto cobre e o que não cobre: as páginas 502 e 530 são exatamente as que os testes usam (tests/fixtures/colab) e o E2E de queda já tinha passado com a borda real da
+Cloudflare (tunel-ui-colab.json, 47 de 47). O que NÃO foi observado, de ponta a ponta, é a reserva assumindo no meio de uma conversa com o Colab REAL sendo
+recolhido: a tentativa caiu na corrida acima e a execução real do notebook foi uma só.

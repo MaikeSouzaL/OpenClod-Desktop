@@ -1,0 +1,15 @@
+ × tests/runner.test.ts > model fallback > keeps a partial answer on screen and lets the next model continue it, instead of ending the turn 17ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > leaves the provider that ran out of credit for ANOTHER provider, tells the user in the conversation, and stays there 55ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > skips the other models of the same provider after "no balance" (the account is the problem), not after a rate limit 18ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > does not wait out a rate limit when another provider is ready, and asks the first one to fail fast 31ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > teaches the shared health registry, and the next session skips what is known to be down 13ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > passes over a local server that is not running without spending a request on it 17ms
+ × tests/runner-fallback.test.ts > the session moves to a provider that works > walks the whole chain: the second provider fails too, the third answers, and the user is told twice 20ms
+ × tests/runner-fallback.test.ts > failures in the middle of an answer and context windows > a rate limit that cuts an answer in half keeps the half on screen, and the next model is told to continue it 9ms
+ × tests/runner-fallback.test.ts > failures in the middle of an answer and context windows > a context overflow that compaction cannot fix goes to a model with a BIGGER window, never a smaller one 8ms
+ × tests/runner-fallback.test.ts > the vision relay: a model that cannot read images gets a description > describes the user's picture once with a model that can see; the text-only model never receives the picture 10ms
+ × tests/runner-fallback.test.ts > the vision relay: a model that cannot read images gets a description > describes a screenshot returned by a tool, and keeps the description after the picture is gone 41ms
+ × tests/runner-fallback.test.ts > the vision relay: a model that cannot read images gets a description > tries the next model with vision when the first fails, and rests after every one failed 9ms
+ Test Files  2 failed (2)
+      Tests  12 failed | 35 passed (47)
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯

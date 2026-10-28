@@ -1,0 +1,51 @@
+{
+  "label": "depois",
+  "startedAt": "2026-10-27T14:49:06.479Z",
+  "first": {
+    "seconds": 104,
+    "timedOut": false,
+    "state": "done",
+    "lastText": "BANANA-77",
+    "lastModel": "qwen3.5:4b",
+    "described": [
+      "Retângulo vermelho à esquerda\n\nBANANA-77\nretângulo vermelho à esquerda\n\nEsta é uma imagem simples e minimalista, provavelmente um logotipo ou marca. Ela está organizada horizontalmente em uma única li"
+    ],
+    "count": 3
+  },
+  "second": {
+    "seconds": 27,
+    "timedOut": false,
+    "state": "done",
+    "lastText": "Vermelho.",
+    "lastModel": "qwen3.5:4b",
+    "described": [
+      "Retângulo vermelho à esquerda\n\nBANANA-77\nretângulo vermelho à esquerda\n\nEsta é uma imagem simples e minimalista, provavelmente um logotipo ou marca. Ela está organizada horizontalmente em uma única li"
+    ],
+    "count": 6
+  },
+  "shot": "Prints\\reserva-2026-10-27\\depois-visao-conversa.png",
+  "degraded": {
+    "state": "done",
+    "lastText": "A imagem contém um texto que diz \"Bem-vindo ao Projeto Visão - Tecnologia de Visão Artificial 2024\" com informações sobre visão computacional e IA.",
+    "lastModel": "qwen3.5:4b",
+    "described": [
+      ""
+    ],
+    "count": 3
+  },
+  "errors": [],
+  "textRequests": 3,
+  "visionRequests": 1,
+  "checks": {
+    "o LLM de texto respondeu sobre a imagem": "ok",
+    "a resposta usa o que a imagem mostra (BANANA-77), lido por um modelo com visão": "ok",
+    "o LLM de texto NUNCA recebeu os bytes da imagem": "ok",
+    "o que o LLM de texto recebeu no lugar da imagem é a descrição escrita pelo modelo com visão (BANANA-77)": "ok",
+    "o modelo com visão recebeu a imagem, uma única vez": "ok",
+    "a descrição ficou guardada junto da imagem na sessão": "ok",
+    "uma segunda pergunta sobre a mesma imagem é respondida pela descrição guardada": "ok",
+    "a imagem não é descrita de novo (o modelo com visão não recebeu outra imagem)": "ok",
+    "sem nenhum modelo com visão disponível o turno termina com resposta, sem erro": "ok",
+    "e o LLM de texto continua sem receber a imagem": "ok"
+  }
+}

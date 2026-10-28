@@ -3,10 +3,57 @@ import path from 'node:path'
 import { applyPatch } from 'diff'
 import { z } from 'zod'
 import type { FileChange, ToolResult } from '../../shared/types.js'
-import type { ToolDef } from './types.js'
+import type { ToolContext, ToolDef } from './types.js'
 import { truncateMiddle } from '../util/ids.js'
+import { withFileLock } from '../util/file-lock.js'
 
 const MAX_READ_BYTES = 512 * 1024
+
+/**
+ * What each tracker saw when it last read a file. A write that finds a different
+ * stamp means the file changed after the model looked at it (the user saved, a
+ * formatter ran, another agent edited), and overwriting would silently drop that change.
+ */
+const readStamps = new WeakMap<object, Map<string, string>>()
+
+function stampOf(target: string): string | null {
+  try {
+    const stat = fs.statSync(target)
+    return `${stat.mtimeMs}:${stat.size}`
+  } catch {
+    return null
+  }
+}
+
+function rememberRead(ctx: ToolContext, target: string): void {
+  ctx.tracker.markRead(target)
+  const stamp = stampOf(target)
+  if (!stamp) return
+  const known = readStamps.get(ctx.tracker) ?? new Map<string, string>()
+  known.set(target, stamp)
+  readStamps.set(ctx.tracker, known)
+}
+
+function changedSinceRead(ctx: ToolContext, target: string): boolean {
+  const known = readStamps.get(ctx.tracker)?.get(target)
+  return Boolean(known && stampOf(target) !== known)
+}
+
+/** Reads an existing file as UTF-8, refusing files that a text round-trip would corrupt. */
+async function readUtf8Strict(target: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const buffer = await fs.promises.readFile(target)
+  const text = buffer.toString('utf8')
+  if (!Buffer.from(text, 'utf8').equals(buffer)) {
+    return {
+      ok: false,
+      error: 'o arquivo não é UTF-8 válido (por exemplo Windows-1252); editar como texto corromperia os acentos. Altere-o por um comando que preserve a codificação.'
+    }
+  }
+  return { ok: true, text }
+}
+
+const STALE_MESSAGE = (name: string): string =>
+  `${name} mudou no disco depois da última leitura (outra edição, formatador ou agente). Leia o arquivo de novo antes de alterá-lo.`
 
 function numberLines(content: string, startLine: number): string {
   return content
@@ -51,7 +98,7 @@ export const readFileTool: ToolDef = {
     const offset = args.offset ?? 1
     const limit = args.limit ?? 400
     const slice = lines.slice(offset - 1, offset - 1 + limit)
-    ctx.tracker.markRead(target)
+    rememberRead(ctx, target)
     const header = `${args.path} (${lines.length} linhas, mostrando ${offset}-${Math.min(lines.length, offset + slice.length - 1)})`
     const body = numberLines(slice.join('\n'), offset)
     const suffix =
@@ -88,25 +135,33 @@ export const writeFileTool: ToolDef = {
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as { path: string; content: string }
     const target = ctx.workspace.resolve(args.path, ctx.cwd)
-    const existed = fs.existsSync(target)
-    if (existed && !ctx.tracker.hasRead(target)) {
-      return {
-        ok: false,
-        text: `o arquivo ${args.path} já existe e não foi lido nesta sessão. Leia antes de sobrescrever (ou use edit_file).`
+    return withFileLock(target, async () => {
+      const existed = fs.existsSync(target)
+      if (existed && !ctx.tracker.hasRead(target)) {
+        return {
+          ok: false,
+          text: `o arquivo ${args.path} já existe e não foi lido nesta sessão. Leia antes de sobrescrever (ou use edit_file).`
+        }
       }
-    }
-    const before = existed ? await fs.promises.readFile(target, 'utf8') : null
-    await fs.promises.mkdir(path.dirname(target), { recursive: true })
-    await fs.promises.writeFile(target, args.content, 'utf8')
-    ctx.tracker.markRead(target)
-    ctx.tracker.recordChange(target, before, args.content)
-    return {
-      ok: true,
-      text: `${existed ? 'arquivo atualizado' : 'arquivo criado'}: ${args.path} (${args.content.length} caracteres)`,
-      files: [target],
-      summary: `${existed ? 'atualizado' : 'criado'} ${path.basename(target)}`,
-      data: { path: target, bytes: Buffer.byteLength(args.content) }
-    }
+      if (existed && changedSinceRead(ctx, target)) return { ok: false, text: STALE_MESSAGE(args.path) }
+      let before: string | null = null
+      if (existed) {
+        const current = await readUtf8Strict(target)
+        // A non-UTF-8 original cannot be shown as a diff, but replacing it wholesale is still the caller's explicit intent.
+        before = current.ok ? current.text : '(conteúdo binário ou em outra codificação)'
+      }
+      await fs.promises.mkdir(path.dirname(target), { recursive: true })
+      await fs.promises.writeFile(target, args.content, 'utf8')
+      rememberRead(ctx, target)
+      ctx.tracker.recordChange(target, before, args.content)
+      return {
+        ok: true,
+        text: `${existed ? 'arquivo atualizado' : 'arquivo criado'}: ${args.path} (${args.content.length} caracteres)`,
+        files: [target],
+        summary: `${existed ? 'atualizado' : 'criado'} ${path.basename(target)}`,
+        data: { path: target, bytes: Buffer.byteLength(args.content) }
+      }
+    })
   }
 }
 
@@ -193,32 +248,38 @@ export const editFileTool: ToolDef = {
       replace_all?: boolean
     }
     const target = ctx.workspace.resolve(args.path, ctx.cwd)
-    if (!fs.existsSync(target)) return { ok: false, text: `arquivo não encontrado: ${args.path}` }
-    if (!ctx.tracker.hasRead(target)) {
-      return { ok: false, text: `leia ${args.path} antes de editá-lo` }
-    }
-    const before = await fs.promises.readFile(target, 'utf8')
-    const outcome = applyEdit(before, args.old_string, args.new_string, args.replace_all)
-    if (!outcome.ok) {
-      if (outcome.error === 'identical') return { ok: false, text: 'old_string e new_string são iguais; nada a alterar.' }
-      if (outcome.error === 'ambiguous') {
-        return {
-          ok: false,
-          text: `o trecho aparece ${outcome.occurrences} vezes em ${args.path}. Inclua mais contexto ou use replace_all.`
-        }
+    return withFileLock(target, async () => {
+      if (!fs.existsSync(target)) return { ok: false, text: `arquivo não encontrado: ${args.path}` }
+      if (!ctx.tracker.hasRead(target)) {
+        return { ok: false, text: `leia ${args.path} antes de editá-lo` }
       }
-      return { ok: false, text: `trecho não encontrado em ${args.path}. Confirme o conteúdo exato (indentação inclusa).` }
-    }
-    const { after, occurrences } = outcome
-    await fs.promises.writeFile(target, after, 'utf8')
-    ctx.tracker.recordChange(target, before, after)
-    return {
-      ok: true,
-      text: `editado ${args.path} (${occurrences} ocorrência${occurrences > 1 ? 's' : ''})${outcome.note ? ` — ${outcome.note}` : ''}`,
-      files: [target],
-      summary: `${occurrences} substituição(ões) em ${path.basename(target)}`,
-      data: { path: target, occurrences }
-    }
+      if (changedSinceRead(ctx, target)) return { ok: false, text: STALE_MESSAGE(args.path) }
+      const current = await readUtf8Strict(target)
+      if (!current.ok) return { ok: false, text: current.error }
+      const before = current.text
+      const outcome = applyEdit(before, args.old_string, args.new_string, args.replace_all)
+      if (!outcome.ok) {
+        if (outcome.error === 'identical') return { ok: false, text: 'old_string e new_string são iguais; nada a alterar.' }
+        if (outcome.error === 'ambiguous') {
+          return {
+            ok: false,
+            text: `o trecho aparece ${outcome.occurrences} vezes em ${args.path}. Inclua mais contexto ou use replace_all.`
+          }
+        }
+        return { ok: false, text: `trecho não encontrado em ${args.path}. Confirme o conteúdo exato (indentação inclusa).` }
+      }
+      const { after, occurrences } = outcome
+      await fs.promises.writeFile(target, after, 'utf8')
+      rememberRead(ctx, target)
+      ctx.tracker.recordChange(target, before, after)
+      return {
+        ok: true,
+        text: `editado ${args.path} (${occurrences} ocorrência${occurrences > 1 ? 's' : ''})${outcome.note ? ` — ${outcome.note}` : ''}`,
+        files: [target],
+        summary: `${occurrences} substituição(ões) em ${path.basename(target)}`,
+        data: { path: target, occurrences }
+      }
+    })
   }
 }
 
@@ -246,40 +307,50 @@ export const patchFileTool: ToolDef = {
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as { path: string; patch: string; dry_run?: boolean }
     const target = ctx.workspace.resolve(args.path, ctx.cwd)
-    if (!fs.existsSync(target)) return { ok: false, text: `arquivo não encontrado: ${args.path}` }
-    if (!ctx.tracker.hasRead(target)) return { ok: false, text: `leia ${args.path} antes de aplicar o patch` }
-    const before = await fs.promises.readFile(target, 'utf8')
-    let after: string | false
-    try {
-      after = applyPatch(before, args.patch)
-    } catch (err) {
-      return { ok: false, text: `patch inválido: ${(err as Error).message}` }
-    }
-    if (after === false) {
-      return {
-        ok: false,
-        text: `o patch não se aplica a ${args.path}. Confira os cabeçalhos e o contexto (o arquivo pode ter mudado); leia o trecho e gere um patch novo.`
+    return withFileLock(target, async () => {
+      if (!fs.existsSync(target)) return { ok: false, text: `arquivo não encontrado: ${args.path}` }
+      if (!ctx.tracker.hasRead(target)) return { ok: false, text: `leia ${args.path} antes de aplicar o patch` }
+      if (changedSinceRead(ctx, target)) return { ok: false, text: STALE_MESSAGE(args.path) }
+      const current = await readUtf8Strict(target)
+      if (!current.ok) return { ok: false, text: current.error }
+      const before = current.text
+      const crlf = before.includes('\r\n')
+      let after: string | false
+      try {
+        // The model writes LF; apply on LF text and restore the file's own line endings afterwards.
+        const applied = applyPatch(crlf ? before.replace(/\r\n/g, '\n') : before, args.patch)
+        after = applied === false ? false : crlf ? applied.replace(/\r?\n/g, '\r\n') : applied
+      } catch (err) {
+        return { ok: false, text: `patch inválido: ${(err as Error).message}` }
       }
-    }
-    if (after === before) return { ok: false, text: 'o patch não altera o arquivo (mesmo conteúdo).' }
-    if (args.dry_run) {
+      if (after === false) {
+        return {
+          ok: false,
+          text: `o patch não se aplica a ${args.path}. Confira os cabeçalhos e o contexto (o arquivo pode ter mudado); leia o trecho e gere um patch novo.`
+        }
+      }
+      if (after === before) return { ok: false, text: 'o patch não altera o arquivo (mesmo conteúdo).' }
+      if (args.dry_run) {
+        return {
+          ok: true,
+          text: `patch válido para ${args.path}; prévia:\n${after.slice(0, 4000)}`,
+          summary: 'patch validado (dry-run)',
+          data: { path: target, dryRun: true }
+        }
+      }
+      await fs.promises.writeFile(target, after, 'utf8')
+      rememberRead(ctx, target)
+      ctx.tracker.recordChange(target, before, after)
+      const beforeLines = before.split('\n')
+      const changed = after.split('\n').filter((line, index) => line !== beforeLines[index]).length
       return {
         ok: true,
-        text: `patch válido para ${args.path}; prévia:\n${after.slice(0, 4000)}`,
-        summary: 'patch validado (dry-run)',
-        data: { path: target, dryRun: true }
+        text: `patch aplicado em ${args.path} (${changed} linha(s) alterada(s))`,
+        files: [target],
+        summary: `patch em ${path.basename(target)}`,
+        data: { path: target, changed }
       }
-    }
-    await fs.promises.writeFile(target, after, 'utf8')
-    ctx.tracker.recordChange(target, before, after)
-    const changed = after.split('\n').filter((line, index) => line !== before.split('\n')[index]).length
-    return {
-      ok: true,
-      text: `patch aplicado em ${args.path} (${changed} linha(s) alterada(s))`,
-      files: [target],
-      summary: `patch em ${path.basename(target)}`,
-      data: { path: target, changed }
-    }
+    })
   }
 }
 
@@ -300,14 +371,16 @@ export const listDirTool: ToolDef = {
     const args = this.schema.parse(raw) as { path?: string; depth?: number }
     const root = ctx.workspace.resolve(args.path ?? '.', ctx.cwd)
     const depth = args.depth ?? 1
+    const maxEntries = 300
     const skip = new Set(['node_modules', '.git', 'dist', 'out', 'build', '.next', '__pycache__', '.venv', 'target', 'release'])
     const lines: string[] = []
 
     const walk = async (dir: string, level: number, prefix: string): Promise<void> => {
-      if (level > depth || lines.length > 500) return
+      if (level > depth || lines.length >= maxEntries) return
       const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => [])
       entries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
       for (const entry of entries) {
+        if (lines.length >= maxEntries) return
         if (skip.has(entry.name)) continue
         const full = path.join(dir, entry.name)
         if (entry.isDirectory()) {
@@ -323,11 +396,13 @@ export const listDirTool: ToolDef = {
 
     await walk(root, 1, '')
     const relative = path.relative(ctx.cwd, root) || '.'
+    const truncated =
+      lines.length >= maxEntries ? `\n... (lista truncada em ${maxEntries} entradas; use path ou depth para focar)` : ''
     return {
       ok: true,
-      text: `<directory path="${relative}">\n${lines.join('\n')}\n</directory>`,
+      text: `<directory path="${relative}">\n${lines.join('\n')}${truncated}\n</directory>`,
       files: [root],
-      summary: `${lines.length} entradas em ${relative}`
+      summary: `${lines.length} entradas em ${relative}${truncated ? ' (truncada)' : ''}`
     }
   }
 }

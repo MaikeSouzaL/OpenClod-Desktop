@@ -1,0 +1,36 @@
+{
+  "scenario": "skill",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:21:15.250Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "tools": {
+      "list_dir": 1,
+      "use_skill": 1,
+      "read_file": 1,
+      "write_file": 1,
+      "run_command": 1,
+      "grep": 1
+    },
+    "headings": [
+      "Contexto",
+      "Achados",
+      "Riscos",
+      "Próximos passos"
+    ],
+    "finalText": "Pronto. Criei `relatorio.md` seguindo a skill `padrao-relatorio-interno`.\n\n**O que mudou**\n- `relatorio.md` (novo): relatório curto para a diretoria sobre o 1º trimestre de 2026, com exatamente as quatro seções `## Contexto`, `## Achados`, `## Riscos`, `## Próximos passos`, cada achado iniciado por ▶ e a última linha literal `Selo de qualidade: ZETA-7`.\n\n**Números (fonte: `vendas.csv`)**\n- Receita do trimestre: R$ 35.150 (jan 10.200 · fev 11.800 · mar 13.150)\n- Média mensal: R$ 11.716,67 · jan→mar: +28,9% (+R$ 2.950)\n- Crescimento desacelerando: +15,7% em fev, +11,4% em mar\n\n**Verificado**\n- E",
+    "plan": []
+  },
+  "seconds": 61,
+  "checks": {
+    "sessao-cowork": "ok",
+    "carregou-a-skill-com-use_skill": "ok",
+    "relatorio.md-entregue": "ok",
+    "quatro-secoes-na-ordem-da-skill": "ok",
+    "achados-comecam-com-o-simbolo-da-skill": "ok",
+    "ultima-linha-e-o-selo-da-skill": "ok"
+  },
+  "errors": [],
+  "ok": true
+}

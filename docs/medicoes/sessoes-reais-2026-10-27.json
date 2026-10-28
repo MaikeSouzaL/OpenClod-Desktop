@@ -1,0 +1,26 @@
+{
+  "fonte": "sessões reais do usuário (%APPDATA%\\Openclod Desktop\\data\\sessions), só números; títulos e conteúdo não foram copiados",
+  "medidoEm": "2026-10-27",
+  "scripts": ["scratchpad/session-usage.cjs", "scratchpad/cache-by-position.cjs"],
+  "sessoes": 4,
+  "chamadas": 412,
+  "mediaEntradaPorChamada": 98839,
+  "primeiraChamadaDeSessaoNova": { "ola": 8891, "oi": 12203 },
+  "cachePorPosicaoDaChamada": {
+    "primeiraDoTurno": { "chamadas": 27, "entradaMedia": 83896, "emCacheMedia": 2081, "semCacheMedia": 81815, "fracaoEmCache": "2%" },
+    "logoAposUpdatePlan": { "chamadas": 9, "entradaMedia": 114903, "emCacheMedia": 9785, "semCacheMedia": 105118, "fracaoEmCache": "9%" },
+    "demais": { "chamadas": 376, "entradaMedia": 99527, "emCacheMedia": 91284, "semCacheMedia": 8243, "fracaoEmCache": "92%" },
+    "total": { "chamadas": 412, "fracaoEmCache": "85%" }
+  },
+  "parteDosTokensSemCache": { "primeiraDoTurno": "35%", "aposUpdatePlan": "15%", "demais": "50%" },
+  "providerUsageDeepSeek": { "chamadas": 989, "entrada": 237433841, "emCache": 216602752, "saida": 657020, "custoUsd": 6.54 },
+  "memoriaDoMaiorProjeto": {
+    "paginas": 73,
+    "hubsAutomaticos": 24,
+    "duraveis": 3,
+    "sessoes": 3,
+    "turnos": 43,
+    "linksEntreDuraveis": 0,
+    "depoisDaLimpeza": { "paginas": 54, "hubsArquivados": 19, "hubsQueSobraram": ["config", "atlassian", "mcp", "jira", "backlog"] }
+  }
+}

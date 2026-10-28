@@ -10,6 +10,51 @@ export interface SnapshotResult {
   url: string
   title: string
   tree: string
+  /** Approximate page point in DIP, so the desktop cursor shows where the agent is reading. */
+  cursor?: BrowserCursor
+}
+
+/** A screen point in DIP (Electron/Chrome window coordinates). */
+export interface BrowserCursor {
+  x: number
+  y: number
+}
+
+export interface BrowserClickResult {
+  url: string
+  cursor?: BrowserCursor
+  /** How many elements matched the target equally well (the first one was clicked). */
+  matches?: number
+  /** The click opened another tab/window, which is now the active one. */
+  openedTab?: string
+}
+
+/**
+ * What a capture of the page should look like. The automatic view after each action asks for a JPEG no wider
+ * than `maxWidth` (a full HD PNG is megabytes and thousands of tokens); `browser_screenshot` keeps the PNG.
+ */
+export interface ScreenshotOptions {
+  format?: 'png' | 'jpeg'
+  /** JPEG quality, 30-95. */
+  quality?: number
+  /** Scale the capture down to this width in pixels (0 = as captured). */
+  maxWidth?: number
+}
+
+export interface ScreenshotRequest extends ScreenshotOptions {
+  sessionId: string
+  groupName: string
+}
+
+export interface ScreenshotResult {
+  base64: string
+  width: number
+  height: number
+  /** image/png unless a JPEG was asked for (older extension builds only answered PNG). */
+  mediaType?: 'image/png' | 'image/jpeg' | 'image/webp'
+  url?: string
+  title?: string
+  cursor?: BrowserCursor
 }
 
 /** Implemented by the Chrome native-messaging bridge in the main process. */
@@ -21,28 +66,135 @@ export interface ChromeBrowserBackend {
   open(input: { url: string; sessionId: string; groupName: string; newTab: boolean }): Promise<void>
   navigate(input: { url: string; sessionId: string; groupName: string }): Promise<void>
   snapshot(input: { sessionId: string; groupName: string; maxChars: number }): Promise<SnapshotResult>
-  click(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string } }): Promise<string>
-  type(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string }; value: string; submit: boolean }): Promise<void>
+  click(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string } }): Promise<BrowserClickResult>
+  type(input: { sessionId: string; groupName: string; target: { selector?: string; role?: string; name?: string; text?: string }; value: string; submit: boolean }): Promise<{ cursor?: BrowserCursor }>
   press(input: { sessionId: string; groupName: string; key: string }): Promise<void>
-  readText(input: { sessionId: string; groupName: string; selector?: string }): Promise<string>
-  screenshot(input: { sessionId: string; groupName: string }): Promise<{ base64: string; width: number; height: number }>
+  readText(input: { sessionId: string; groupName: string; selector?: string; html?: boolean; maxChars?: number }): Promise<string>
+  screenshot(input: ScreenshotRequest): Promise<ScreenshotResult>
   waitFor(input: { sessionId: string; groupName: string; selector: string; timeoutMs: number }): Promise<void>
   tabsList(input: { sessionId: string; groupName: string }): Promise<Array<{ id: string; title: string; url: string; active: boolean }>>
   newTab(input: { url?: string; sessionId: string; groupName: string }): Promise<string>
   /** Adds a user-opened tab to this session's group without creating one. */
-  claimTab?(input: { tabId?: string; url?: string; sessionId: string; groupName: string }): Promise<string>
+  claimTab?(input: {
+    tabId?: string
+    url?: string
+    /** Adopt the tab in focus in the last focused Chrome window. */
+    active?: boolean
+    /** Adopt the only tab whose URL contains this fragment. */
+    urlContains?: string
+    sessionId: string
+    groupName: string
+  }): Promise<string>
   switchTab(input: { id: string; sessionId: string; groupName: string }): Promise<void>
   closeTab(input: { id?: string; sessionId: string; groupName: string }): Promise<void>
   consoleEntries(sessionId: string): ConsoleEntry[]
   errors(sessionId: string): string[]
+  /** Fetches what the page logged since the last call; the sync readers above then return it. */
+  refreshConsole?(input: { sessionId: string; groupName: string }): Promise<void>
+  network?(input: { sessionId: string; groupName: string; clear?: boolean }): Promise<NetworkCapture>
+  cookiesGet?(input: { sessionId: string; groupName: string; name?: string }): Promise<CookieList>
+  cookiesSet?(input: { sessionId: string; groupName: string; cookie: CookieInput }): Promise<{ ok: boolean; name: string; domain?: string }>
+  cookiesRemove?(input: { sessionId: string; groupName: string; name: string; url?: string }): Promise<{ ok: boolean; name: string }>
+}
+
+/** A page request the agent can inspect (method, URL, status, timing and the capped request/response bodies). */
+export interface NetworkRequest {
+  method: string
+  url: string
+  status: number
+  type?: string
+  ms?: number
+  reqBody?: string
+  resBody?: string
+  fromCache?: boolean
+  error?: string
+  ts?: number
+}
+
+export interface NetworkCapture {
+  installed: boolean
+  /** fetch/XHR captured in the page, with request/response bodies. */
+  requests: NetworkRequest[]
+  /** Every request of the tab (navigation, resources) from the extension's webRequest log — metadata, no bodies. */
+  all?: NetworkRequest[]
+}
+
+export interface BrowserCookie {
+  name: string
+  value: string
+  domain?: string
+  path?: string
+  secure?: boolean
+  httpOnly?: boolean
+  sameSite?: string
+  session?: boolean
+  expires?: number | null
+}
+
+export interface CookieList {
+  url: string
+  count: number
+  cookies: BrowserCookie[]
+}
+
+export interface CookieInput {
+  name: string
+  value?: string
+  url?: string
+  domain?: string
+  path?: string
+  secure?: boolean
+  httpOnly?: boolean
+  sameSite?: string
+  expires?: number
 }
 
 export interface BrowserLayerOptions {
   sessionId?: string
   chrome?: ChromeBrowserBackend
   mode?: 'auto' | 'chrome-existing' | 'playwright'
+  /**
+   * In "chrome-existing" mode, open an isolated Chromium of our own when the extension is not connected
+   * instead of failing every browser tool. Default true; the model is told it is not the user's Chrome.
+   */
+  fallbackToManaged?: boolean
   groupBySession?: boolean
 }
+
+/**
+ * The cleaned HTML for `browser_read html=true` in the isolated Chromium; the same rules as `openclodReadHtml` in
+ * the Chrome extension (resources/chrome-extension/background.js): no scripts, styles, SVG drawings, comments or
+ * event handlers, long attributes cut, and never the value of a password or hidden field.
+ */
+const READ_HTML_JS = `function (selector, maxChars) {
+  const root = selector ? document.querySelector(selector) : document.body
+  if (!root) return '(nenhum elemento casa com ' + selector + ')'
+  const clone = root.cloneNode(true)
+  const live = root.querySelectorAll('input, textarea, select')
+  clone.querySelectorAll('input, textarea, select').forEach((field, index) => {
+    const source = live[index]
+    const type = (field.getAttribute('type') || '').toLowerCase()
+    if (type === 'password' || type === 'hidden') { field.removeAttribute('value'); return }
+    if (source && 'value' in source && source.value) field.setAttribute('value', String(source.value).slice(0, 200))
+    if (source && (source.type === 'checkbox' || source.type === 'radio') && source.checked) field.setAttribute('checked', '')
+  })
+  for (const node of clone.querySelectorAll('script, style, noscript, template, link, meta')) node.remove()
+  for (const svg of clone.querySelectorAll('svg')) svg.replaceChildren()
+  const walker = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT)
+  const comments = []
+  while (walker.nextNode()) comments.push(walker.currentNode)
+  for (const comment of comments) comment.remove()
+  for (const el of clone.querySelectorAll('*')) {
+    for (const attribute of [...el.attributes]) {
+      const name = attribute.name
+      if (name === 'style' || name.startsWith('on') || (name.startsWith('data-') && !/^data-(test|testid|qa|cy|target|action)/.test(name))) el.removeAttribute(name)
+      else if (attribute.value.length > 160) el.setAttribute(name, attribute.value.slice(0, 160) + '…')
+    }
+  }
+  const html = clone.outerHTML.replace(/\\n\\s*\\n+/g, '\\n').replace(/[ \\t]{2,}/g, ' ')
+  const limit = Number(maxChars) || 30000
+  return html.length > limit ? html.slice(0, limit) + '\\n…[HTML truncado: use selector para ler só uma parte]' : html
+}`
 
 type PlaywrightModule = typeof import('playwright')
 type Browser = import('playwright').Browser
@@ -64,12 +216,16 @@ export class BrowserLayer {
   private tabSeq = 0
   private consoleLog: ConsoleEntry[] = []
   private networkErrors: string[] = []
+  /** Recent requests captured in the isolated-Chromium path (the Chrome extension keeps its own in the page). */
+  private networkLog: NetworkRequest[] = []
   private headed = false
   private chromeHasTabs = false
   private readonly sessionId: string
   private readonly chrome?: ChromeBrowserBackend
   private readonly mode: 'auto' | 'chrome-existing' | 'playwright'
   private readonly groupBySession: boolean
+  private readonly fallbackToManaged: boolean
+  private usingFallback = false
   lastError: string | null = null
 
   constructor(options: BrowserLayerOptions = {}) {
@@ -77,6 +233,17 @@ export class BrowserLayer {
     this.chrome = options.chrome
     this.mode = options.mode ?? 'playwright'
     this.groupBySession = options.groupBySession !== false
+    this.fallbackToManaged = options.fallbackToManaged !== false
+  }
+
+  /**
+   * Set while "chrome-existing" is configured but the extension is not connected and an isolated Chromium
+   * is being used instead. Tools put it in front of the model so it knows there are no logins/tabs of the user.
+   */
+  get fallbackNote(): string | null {
+    return this.usingFallback
+      ? 'Aviso: a extensão do Chrome não está conectada; este é um Chromium próprio e isolado do Openclod (sem os logins nem as abas do usuário). Para usar o Chrome dele, conecte a extensão em Configurações → Navegador.'
+      : null
   }
 
   private get groupName(): string {
@@ -91,8 +258,16 @@ export class BrowserLayer {
   private requireChromeIfRequested(): ChromeBrowserBackend | null {
     const chrome = this.chromeBackend()
     if (!chrome && this.mode === 'chrome-existing') {
-      throw new Error('Chrome existente não conectado. Instale a extensão do Openclod e abra a ponte em Configurações → Navegador.')
+      if (this.fallbackToManaged) {
+        this.usingFallback = true
+        return null
+      }
+      throw new Error(
+        'Chrome existente não conectado. Instale a extensão do Openclod e abra a ponte em Configurações → Navegador ' +
+          '(ou ative "abrir um Chromium isolado quando a extensão não estiver conectada").'
+      )
     }
+    if (chrome) this.usingFallback = false
     return chrome
   }
 
@@ -111,7 +286,7 @@ export class BrowserLayer {
         this.chromeHasTabs = await this.chrome.isOpen(this.sessionId)
         return await this.chrome.status()
       }
-      if (this.mode === 'chrome-existing') {
+      if (this.mode === 'chrome-existing' && !this.fallbackToManaged) {
         return {
           available: false,
           mode: this.mode,
@@ -177,6 +352,11 @@ export class BrowserLayer {
         locale: 'pt-BR',
         ignoreHTTPSErrors: false
       })
+      // Tabs the page itself opens (target=_blank, window.open, OAuth popups) become tracked tabs and the active one.
+      this.context.on('page', (opened) => {
+        if (this.creatingPage || [...this.tabs.values()].includes(opened)) return
+        this.registerPage(opened)
+      })
       this.context.on('console', (msg) => {
         this.consoleLog.push({ type: msg.type(), text: msg.text(), ts: Date.now() })
         if (this.consoleLog.length > 300) this.consoleLog.shift()
@@ -186,6 +366,9 @@ export class BrowserLayer {
       })
       this.context.on('response', (res) => {
         if (res.status() >= 400) this.networkErrors.push(`HTTP ${res.status()} ${res.url()}`)
+        const req = res.request()
+        this.networkLog.push({ method: req.method(), url: res.url(), status: res.status(), type: req.resourceType(), ts: Date.now() })
+        if (this.networkLog.length > 200) this.networkLog.shift()
       })
       this.context.on('requestfailed', (req) => {
         this.networkErrors.push(`FALHA ${req.url()} · ${req.failure()?.errorText ?? ''}`)
@@ -201,9 +384,19 @@ export class BrowserLayer {
     await page.goto(url, { waitUntil: 'domcontentloaded' })
   }
 
+  private creatingPage = false
+
   private async createPage(): Promise<Page> {
     if (!this.context) throw new Error('contexto do navegador indisponível')
-    const page = await this.context.newPage()
+    this.creatingPage = true
+    try {
+      return this.registerPage(await this.context.newPage())
+    } finally {
+      this.creatingPage = false
+    }
+  }
+
+  private registerPage(page: Page): Page {
     const id = `tab_${++this.tabSeq}`
     this.tabs.set(id, page)
     this.activeTab = id
@@ -235,13 +428,19 @@ export class BrowserLayer {
   }
 
   /** Uses an existing Chrome tab for this session and groups it, without a second browser. */
-  async claimTab(input: { tabId?: string; url?: string } = {}): Promise<string> {
+  async claimTab(
+    input: { tabId?: string; url?: string; active?: boolean; urlContains?: string } = {}
+  ): Promise<string> {
     const chrome = this.requireChromeIfRequested()
     if (!chrome?.claimTab) throw new Error('vincular aba existente exige o Chrome conectado')
-    if (!input.tabId?.trim() && !input.url?.trim()) throw new Error('informe tab_id ou url da aba existente')
+    if (!input.tabId?.trim() && !input.url?.trim() && !input.active && !input.urlContains?.trim()) {
+      throw new Error('informe tab_id, url, url_contains ou active=true para escolher a aba')
+    }
     const id = await chrome.claimTab({
       ...(input.tabId?.trim() ? { tabId: input.tabId.trim() } : {}),
       ...(input.url?.trim() ? { url: input.url.trim() } : {}),
+      ...(input.urlContains?.trim() ? { urlContains: input.urlContains.trim() } : {}),
+      ...(input.active ? { active: true } : {}),
       sessionId: this.sessionId,
       groupName: this.groupName
     })
@@ -328,7 +527,7 @@ export class BrowserLayer {
     return { url: page.url(), title: await page.title(), tree }
   }
 
-  async click(target: { selector?: string; role?: string; name?: string; text?: string }): Promise<string> {
+  async click(target: { selector?: string; role?: string; name?: string; text?: string }): Promise<BrowserClickResult> {
     const chrome = this.requireChromeIfRequested()
     if (chrome) {
       this.chromeHasTabs = true
@@ -336,21 +535,25 @@ export class BrowserLayer {
     }
     const page = this.requirePage()
     const locator = this.locate(target)
+    const matches = await locator.count().catch(() => 1)
+    const before = this.activeTab
     await locator.first().click({ timeout: 15_000 })
     await page.waitForTimeout(250)
-    return page.url()
+    // A link with target=_blank or window.open() creates a tab: follow it, as a person would.
+    const opened = this.activeTab !== before ? this.activeTab : undefined
+    const now = this.activePage() ?? page
+    return { url: now.url(), matches, ...(opened ? { openedTab: opened } : {}) }
   }
 
   async type(
     target: { selector?: string; role?: string; name?: string; text?: string },
     value: string,
     submit = false
-  ): Promise<void> {
+  ): Promise<{ cursor?: BrowserCursor }> {
     const chrome = this.requireChromeIfRequested()
     if (chrome) {
       this.chromeHasTabs = true
-      await chrome.type({ sessionId: this.sessionId, groupName: this.groupName, target, value, submit })
-      return
+      return chrome.type({ sessionId: this.sessionId, groupName: this.groupName, target, value, submit })
     }
     const page = this.requirePage()
     const locator = this.locate(target)
@@ -360,6 +563,7 @@ export class BrowserLayer {
       await page.keyboard.press('Enter')
       await page.waitForTimeout(500)
     }
+    return {}
   }
 
   async press(key: string): Promise<void> {
@@ -372,29 +576,56 @@ export class BrowserLayer {
     await this.requirePage().keyboard.press(key)
   }
 
-  async readText(selector?: string): Promise<string> {
+  /** Visible text, or with `html` the cleaned HTML (tags, ids, classes, ARIA and form attributes). */
+  async readText(selector?: string, options: { html?: boolean; maxChars?: number } = {}): Promise<string> {
     const chrome = this.requireChromeIfRequested()
     if (chrome) {
       this.chromeHasTabs = true
-      return chrome.readText({ sessionId: this.sessionId, groupName: this.groupName, selector })
+      return chrome.readText({
+        sessionId: this.sessionId,
+        groupName: this.groupName,
+        ...(selector ? { selector } : {}),
+        ...(options.html ? { html: true } : {}),
+        ...(options.maxChars ? { maxChars: options.maxChars } : {})
+      })
     }
     const page = this.requirePage()
+    if (options.html) {
+      return page.evaluate(`(${READ_HTML_JS})(${JSON.stringify(selector ?? '')}, ${Number(options.maxChars) || 30_000})`) as Promise<string>
+    }
     const text = selector
       ? await page.locator(selector).first().innerText()
       : await page.locator('body').innerText()
-    return text.slice(0, 25_000)
+    return text.slice(0, options.maxChars ?? 25_000)
   }
 
-  async screenshot(): Promise<{ base64: string; width: number; height: number }> {
+  async screenshot(options: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const chrome = this.requireChromeIfRequested()
     if (chrome) {
       this.chromeHasTabs = true
-      return chrome.screenshot({ sessionId: this.sessionId, groupName: this.groupName })
+      const shot = await chrome.screenshot({ sessionId: this.sessionId, groupName: this.groupName, ...options })
+      return { ...shot, mediaType: shot.mediaType ?? 'image/png' }
     }
     const page = this.requirePage()
-    const buffer = await page.screenshot({ type: 'png', fullPage: false })
+    await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined)
+    const jpeg = options.format === 'jpeg'
     const size = page.viewportSize() ?? { width: 1440, height: 900 }
-    return { base64: buffer.toString('base64'), width: size.width, height: size.height }
+    // The isolated Chromium's viewport is already 1440 px wide: one image pixel per CSS pixel is small enough,
+    // so `maxWidth` only matters for the user's Chrome (a 4K screen).
+    const buffer = await page.screenshot({
+      type: jpeg ? 'jpeg' : 'png',
+      ...(jpeg ? { quality: Math.max(30, Math.min(95, options.quality ?? 70)) } : {}),
+      scale: 'css',
+      fullPage: false
+    })
+    return {
+      base64: buffer.toString('base64'),
+      width: size.width,
+      height: size.height,
+      mediaType: jpeg ? 'image/jpeg' : 'image/png',
+      url: page.url(),
+      title: await page.title().catch(() => '')
+    }
   }
 
   async waitFor(selector: string, timeoutMs = 15_000): Promise<void> {
@@ -407,12 +638,92 @@ export class BrowserLayer {
     await this.requirePage().locator(selector).first().waitFor({ state: 'visible', timeout: timeoutMs })
   }
 
+  /** With the user's Chrome the page's console is read on demand through the extension. */
+  async collectConsole(): Promise<void> {
+    const chrome = this.chromeBackend()
+    if (!chrome?.refreshConsole) return
+    await chrome.refreshConsole({ sessionId: this.sessionId, groupName: this.groupName }).catch(() => undefined)
+  }
+
   consoleEntries(): ConsoleEntry[] {
     return this.chromeBackend()?.consoleEntries(this.sessionId) ?? [...this.consoleLog]
   }
 
   errors(): string[] {
     return this.chromeBackend()?.errors(this.sessionId) ?? [...this.networkErrors]
+  }
+
+  /** Recent requests of the page (method, URL, status, timing and, in the user's Chrome, the bodies). */
+  async network(clear = false): Promise<NetworkCapture> {
+    const chrome = this.chromeBackend()
+    if (chrome?.network) return chrome.network({ sessionId: this.sessionId, groupName: this.groupName, clear })
+    const requests = [...this.networkLog]
+    if (clear) this.networkLog = []
+    return { installed: Boolean(this.context), requests }
+  }
+
+  async cookiesGet(name?: string): Promise<CookieList> {
+    const chrome = this.chromeBackend()
+    if (chrome?.cookiesGet) return chrome.cookiesGet({ sessionId: this.sessionId, groupName: this.groupName, ...(name ? { name } : {}) })
+    const page = this.requirePage()
+    const url = page.url()
+    const cookies = await this.context!.cookies(url)
+    const list = (name ? cookies.filter((cookie) => cookie.name === name) : cookies).map((cookie) => ({
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: String(cookie.sameSite),
+      session: cookie.expires === -1,
+      expires: cookie.expires === -1 ? null : Math.round(cookie.expires)
+    }))
+    return { url, count: list.length, cookies: list }
+  }
+
+  async cookiesSet(cookie: CookieInput): Promise<{ ok: boolean; name: string; domain?: string }> {
+    const chrome = this.chromeBackend()
+    if (chrome?.cookiesSet) return chrome.cookiesSet({ sessionId: this.sessionId, groupName: this.groupName, cookie })
+    const page = this.requirePage()
+    const url = cookie.url || page.url()
+    await this.context!.addCookies([
+      {
+        name: cookie.name,
+        value: cookie.value ?? '',
+        url,
+        ...(cookie.domain ? { domain: cookie.domain } : {}),
+        ...(cookie.path ? { path: cookie.path } : {}),
+        ...(cookie.secure !== undefined ? { secure: cookie.secure } : {}),
+        ...(cookie.httpOnly !== undefined ? { httpOnly: cookie.httpOnly } : {}),
+        ...(cookie.sameSite ? { sameSite: cookie.sameSite as 'Strict' | 'Lax' | 'None' } : {}),
+        ...(cookie.expires ? { expires: cookie.expires } : {})
+      }
+    ])
+    return { ok: true, name: cookie.name, domain: cookie.domain }
+  }
+
+  async cookiesRemove(name: string, url?: string): Promise<{ ok: boolean; name: string }> {
+    const chrome = this.chromeBackend()
+    if (chrome?.cookiesRemove) return chrome.cookiesRemove({ sessionId: this.sessionId, groupName: this.groupName, name, ...(url ? { url } : {}) })
+    const page = this.requirePage()
+    const target = url || page.url()
+    // Playwright has no single-cookie delete: keep every cookie of the context except this one for this URL.
+    const host = (() => {
+      try {
+        return new URL(target).hostname
+      } catch {
+        return ''
+      }
+    })()
+    const all = await this.context!.cookies()
+    await this.context!.clearCookies()
+    await this.context!.addCookies(
+      all
+        .filter((cookie) => !(cookie.name === name && (!host || cookie.domain.replace(/^\./, '') === host || host.endsWith(cookie.domain.replace(/^\./, '')))))
+        .map((cookie) => ({ ...cookie, sameSite: cookie.sameSite }))
+    )
+    return { ok: true, name }
   }
 
   /** Elements are located semantically first, falling back to CSS/text. */

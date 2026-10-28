@@ -2,28 +2,56 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { resourcePath } from '../../core/util/resources.js'
+import { extensionVersion, syncExtensionFiles, zipExtension } from './package.js'
 
 export interface ChromeCompanionStatus {
   installed: boolean
+  /** Folder the user loads in chrome://extensions (a stable per-user copy once installed). */
   extensionPath: string
   hostPath: string
   manifestPath: string
   chromePath?: string
   detail: string
   extensionConnected?: boolean
+  extensionVersion?: string
+  /** Version of the extension bundled with this app. */
+  bundledVersion?: string
+  /** True when Chrome runs an older extension than the one bundled: reload it in chrome://extensions. */
+  extensionOutdated?: boolean
 }
 
 const HOST_NAME = 'com.openclod.desktop'
 const EXTENSION_ID = 'iflajofnlenfolhiemmfbonmiinnookf'
 const EXTENSION_LINK_NAME = 'Openclod - Carregar extensão no Chrome.lnk'
 
-/** Per-user registry key under HKCU; no administrator elevation is needed. */
+/** Chromium-based browsers read native-messaging hosts from their own per-user registry key; same extension id. */
+const NATIVE_HOST_KEYS = [
+  `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST_NAME}`,
+  `HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\${HOST_NAME}`,
+  `HKCU\\Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\${HOST_NAME}`,
+  `HKCU\\Software\\Chromium\\NativeMessagingHosts\\${HOST_NAME}`
+]
+
+/** Per-user registry keys under HKCU; no administrator elevation is needed. */
 function manifestPath(): string {
   return path.join(process.env.APPDATA || '', 'Openclod Desktop', 'NativeMessagingHosts', `${HOST_NAME}.json`)
 }
 
-function extensionPath(): string {
+/** The extension that ships inside the app (read-only, moves with the install folder). */
+function bundledExtensionPath(): string {
   return resourcePath('chrome-extension') ?? ''
+}
+
+/**
+ * Chrome remembers an unpacked extension by its folder. The copy lives in the user's data folder so that
+ * updating or moving the app never breaks the path Chrome has stored.
+ */
+export function stableExtensionPath(): string {
+  return path.join(process.env.APPDATA || '', 'Openclod Desktop', 'chrome-extension')
+}
+
+function extensionPath(): string {
+  return fs.existsSync(path.join(stableExtensionPath(), 'manifest.json')) ? stableExtensionPath() : bundledExtensionPath()
 }
 
 function hostPath(): string {
@@ -39,19 +67,33 @@ function findChrome(): string | undefined {
   return candidates.find((candidate) => candidate && fs.existsSync(candidate))
 }
 
+/** Refreshes the stable copy when the bundled extension changed (new app version). Never throws. */
+export function syncStableExtension(): { updated: boolean; path: string } {
+  const bundled = bundledExtensionPath()
+  const stable = stableExtensionPath()
+  if (!bundled || !fs.existsSync(path.join(bundled, 'manifest.json'))) return { updated: false, path: stable }
+  if (!fs.existsSync(path.join(stable, 'manifest.json'))) return { updated: false, path: stable } // not installed yet
+  try {
+    const { copied, removed } = syncExtensionFiles(bundled, stable)
+    return { updated: copied.length + removed.length > 0, path: stable }
+  } catch {
+    return { updated: false, path: stable }
+  }
+}
+
 export function chromeCompanionStatus(): ChromeCompanionStatus {
   const ext = extensionPath()
   const host = hostPath()
   const manifest = manifestPath()
   const chrome = findChrome()
   const installed = Boolean(ext && host && chrome && fs.existsSync(manifest))
-  const registryRegistered = installed
   return {
-    installed: registryRegistered,
+    installed,
     extensionPath: ext,
     hostPath: host,
     manifestPath: manifest,
     chromePath: chrome,
+    bundledVersion: extensionVersion(bundledExtensionPath()),
     detail: installed
       ? 'Host nativo e arquivos da extensão instalados. O Chrome exige a confirmação da extensão local na tela de extensões.'
       : !chrome
@@ -62,12 +104,19 @@ export function chromeCompanionStatus(): ChromeCompanionStatus {
   }
 }
 
-/** Writes the native-messaging manifest and registers it for the current Windows user. */
+/**
+ * Copies the extension to its stable folder, writes the native-messaging manifest and registers it for the
+ * current Windows user in every Chromium browser we know (Chrome, Edge, Brave, Chromium).
+ */
 export async function installChromeCompanion(): Promise<ChromeCompanionStatus> {
   if (process.platform !== 'win32') throw new Error('a integração com Chrome existente está disponível no Windows')
+  const before = chromeCompanionStatus()
+  if (!before.chromePath) throw new Error(before.detail)
+  const bundled = bundledExtensionPath()
+  if (!bundled || !before.hostPath) throw new Error(before.detail)
+
+  syncExtensionFiles(bundled, stableExtensionPath())
   const status = chromeCompanionStatus()
-  if (!status.chromePath) throw new Error(status.detail)
-  if (!status.extensionPath || !status.hostPath) throw new Error(status.detail)
 
   const target = path.dirname(status.manifestPath)
   await fs.promises.mkdir(target, { recursive: true })
@@ -80,15 +129,30 @@ export async function installChromeCompanion(): Promise<ChromeCompanionStatus> {
   }
   await fs.promises.writeFile(status.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 
-  const key = `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST_NAME}`
-  await new Promise<void>((resolve, reject) => {
-    execFile('reg.exe', ['ADD', key, '/ve', '/t', 'REG_SZ', '/d', status.manifestPath, '/f'], { windowsHide: true }, (error) => {
-      if (error) reject(error)
-      else resolve()
-    })
-  })
+  await Promise.all(
+    NATIVE_HOST_KEYS.map(
+      (key) =>
+        new Promise<void>((resolve, reject) => {
+          execFile('reg.exe', ['ADD', key, '/ve', '/t', 'REG_SZ', '/d', status.manifestPath, '/f'], { windowsHide: true }, (error) => {
+            // Chrome's key is required; the others are a convenience for the user's other browsers.
+            if (error && key === NATIVE_HOST_KEYS[0]) reject(error)
+            else resolve()
+          })
+        })
+    )
+  )
   await createExtensionShortcut(status)
   return chromeCompanionStatus()
+}
+
+/** Writes `openclod-chrome-extension-v<version>.zip` (manifest at the root) and returns where. */
+export function exportChromeExtension(destinationDir?: string): { path: string; bytes: number; files: number; version: string } {
+  const source = extensionPath()
+  if (!source) throw new Error('arquivos da extensão ausentes no pacote')
+  const version = extensionVersion(source) ?? '0'
+  const dir = destinationDir || path.join(process.env.USERPROFILE || '', 'Desktop')
+  const result = zipExtension(source, path.join(dir, `openclod-chrome-extension-v${version}.zip`))
+  return { ...result, version }
 }
 
 /**
@@ -116,10 +180,9 @@ async function createExtensionShortcut(status: ChromeCompanionStatus): Promise<v
 }
 
 /**
- * Automates the final unpacked-extension enrollment through Computer Use.
- * Chrome does not publish a supported silent-install API for unpacked
- * extensions, so the one non-scriptable confirmation is performed in the
- * actual Chrome window instead of asking the user to repeat every step.
+ * Opens chrome://extensions in the user's Chrome. Chrome does not publish a supported silent-install API for
+ * unpacked extensions, so the one confirmation ("Load unpacked" and the folder) stays with the user; the
+ * folder path is on the clipboard-friendly Settings card and in the desktop shortcut.
  */
 export async function openChromeExtensions(): Promise<ChromeCompanionStatus> {
   const status = chromeCompanionStatus()

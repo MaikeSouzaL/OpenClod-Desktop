@@ -183,6 +183,99 @@ describe('SettingsStore secrets and migration', () => {
     expect(second.secretValue('openai')).toBe('sk-test-123')
   })
 
+  it('keeps a vault key linked when a stale provider list is saved', async () => {
+    const store = new SettingsStore(dir, fakeCrypto)
+    await store.init()
+    await store.setSecret('deepseek', 'sk-deepseek')
+    const staleProviders = store.get().providers.map((provider) =>
+      provider.id === 'deepseek' ? { ...provider, apiKeyRef: 'env:DEEPSEEK_API_KEY' } : provider
+    )
+
+    await store.update({ providers: staleProviders })
+
+    expect(store.get().providers.find((provider) => provider.id === 'deepseek')?.apiKeyRef).toBe('secret:deepseek')
+    expect(store.resolver().get('deepseek')).toBe('sk-deepseek')
+  })
+
+  it('heals a stored key that an older build unlinked from its provider', async () => {
+    const first = new SettingsStore(dir, fakeCrypto)
+    await first.init()
+    await first.setSecret('deepseek', 'sk-deepseek')
+    const stale = first.get()
+    stale.providers = stale.providers.map((provider) =>
+      provider.id === 'deepseek' ? { ...provider, apiKeyRef: 'env:DEEPSEEK_API_KEY' } : provider
+    )
+    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(stale))
+
+    const second = new SettingsStore(dir, fakeCrypto)
+    await second.init()
+
+    expect(second.get().providers.find((provider) => provider.id === 'deepseek')?.apiKeyRef).toBe('secret:deepseek')
+    expect(second.resolver().get('deepseek')).toBe('sk-deepseek')
+  })
+
+  it('backfills the three DeepSeek V4 effort levels once', async () => {
+    const first = new SettingsStore(dir, fakeCrypto)
+    await first.init()
+    const old = first.get()
+    old.settingsVersion = 5
+    old.providers = old.providers.map((provider) =>
+      provider.id === 'deepseek' ? { ...provider, effortLevels: ['max'] } : provider
+    )
+    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(old))
+
+    const migrated = new SettingsStore(dir, fakeCrypto)
+    await migrated.init()
+    expect(migrated.get().providers.find((provider) => provider.id === 'deepseek')?.effortLevels).toEqual([
+      'low',
+      'high',
+      'max'
+    ])
+    expect(migrated.migrations.join(' ')).toMatch(/DeepSeek V4.*low\/high\/max/)
+
+    // A later explicit choice (only max) is preserved on the next start.
+    const settings = migrated.get()
+    settings.providers = settings.providers.map((provider) =>
+      provider.id === 'deepseek' ? { ...provider, effortLevels: ['max'] } : provider
+    )
+    await migrated.update({ providers: settings.providers })
+    const again = new SettingsStore(dir, fakeCrypto)
+    await again.init()
+    expect(again.get().providers.find((provider) => provider.id === 'deepseek')?.effortLevels).toEqual(['max'])
+  })
+
+  it('removes the retired Scripted provider from an old settings file and falls back to DeepSeek', async () => {
+    fs.writeFileSync(
+      path.join(dir, 'settings.json'),
+      JSON.stringify({
+        settingsVersion: 6,
+        defaultProviderId: 'mock',
+        lastModel: { providerId: 'mock', model: 'scripted' },
+        providers: [
+          { id: 'mock', kind: 'mock', label: 'Scripted (autoteste)', baseUrl: '', model: 'scripted' },
+          { id: 'deepseek', kind: 'openai', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-flash' }
+        ]
+      })
+    )
+    const store = new SettingsStore(dir, fakeCrypto)
+    await store.init()
+    const settings = store.get()
+    expect(settings.providers.map((provider) => provider.id)).not.toContain('mock')
+    expect(settings.providers.some((provider) => provider.kind === ('mock' as never))).toBe(false)
+    expect(settings.defaultProviderId).toBe('deepseek')
+    expect(settings.lastModel).toBeUndefined()
+    expect(store.migrations.join(' ')).toContain('Scripted')
+
+    // Persisted: the next start does not see it again, and nothing re-adds it.
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')) as { providers: Array<{ id: string }>; defaultProviderId: string }
+    expect(saved.providers.map((provider) => provider.id)).not.toContain('mock')
+    expect(saved.defaultProviderId).toBe('deepseek')
+    const again = new SettingsStore(dir, fakeCrypto)
+    await again.init()
+    expect(again.get().providers.map((provider) => provider.id)).not.toContain('mock')
+    expect(again.migrations.join(' ')).not.toContain('Scripted')
+  })
+
   it('reads the secrets file written by 0.1.0', () => {
     const legacyInner = Buffer.from(JSON.stringify({ openai: Buffer.from('sk-legacy', 'utf8').toString('base64') }), 'utf8').toString('base64')
     const file = fakeCrypto.encryptString(legacyInner)
@@ -206,6 +299,50 @@ describe('SettingsStore secrets and migration', () => {
     const again = new SettingsStore(dir, fakeCrypto)
     await again.init()
     expect(again.get().policy.mode).toBe('ask')
+  })
+
+  it('migrates the old 3M turn cap to automatic and fills DeepSeek costs', async () => {
+    const legacy = {
+      settingsVersion: 3,
+      policy: { mode: 'unrestricted' },
+      limits: { maxTokens: 3_000_000 },
+      providers: [
+        {
+          id: 'deepseek',
+          kind: 'openai',
+          label: 'DeepSeek',
+          baseUrl: 'https://api.deepseek.com/v1',
+          model: 'deepseek-flash',
+          contextWindow: 1_048_576,
+          supportsVision: false,
+          supportsTools: true
+        }
+      ]
+    }
+    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(legacy))
+    const store = new SettingsStore(dir, fakeCrypto)
+    await store.init()
+    const settings = store.get()
+    expect(settings.limits.maxTokens).toBe(0)
+    expect(settings.providers.find((provider) => provider.id === 'deepseek')).toMatchObject({
+      inputCostPerMTok: 0.3,
+      outputCostPerMTok: 1.2,
+      cachedInputCostPerMTok: 0.006
+    })
+    expect(store.migrations.some((message) => message.includes('3M'))).toBe(true)
+  })
+
+  it('removes the legacy microphone shortcut during migration', async () => {
+    fs.writeFileSync(
+      path.join(dir, 'settings.json'),
+      JSON.stringify({
+        settingsVersion: 4,
+        voice: { model: 'base', language: 'pt', shortcut: 'Control+Alt+Space' }
+      })
+    )
+    const store = new SettingsStore(dir, fakeCrypto)
+    await store.init()
+    expect(store.get().voice?.shortcut).toBe('')
   })
 
   it('keeps an explicit read-only choice during migration', async () => {

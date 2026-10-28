@@ -1,0 +1,21 @@
+{
+  "model": "deepseek/deepseek-flash",
+  "seconds": 10,
+  "checks": {
+    "turno-terminou-sem-erro": "ok",
+    "modelo-chamou-a-ferramenta-do-plugin": "ok",
+    "argumento-message-correto": "ok",
+    "resultado-da-ferramenta-veio-do-subprocesso": "ok",
+    "ui-do-plugin-completa": "ok",
+    "sem-erros-de-console-ou-pagina": "ok"
+  },
+  "usage": {
+    "input": 53831,
+    "output": 288,
+    "cachedInput": 35200,
+    "costUsd": 0.0061461
+  },
+  "errors": [],
+  "ok": true,
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\plugins-2026-10-25\\01-installed-plugin.png"
+}

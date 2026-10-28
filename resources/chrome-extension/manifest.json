@@ -2,11 +2,33 @@
   "manifest_version": 3,
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA53+fbMDd48U+vtY+YjEiqqIStJZZN8rhy0OOlcf1Ovfgd8Np8Y4bBzycwriyxG+nxqJj7wxPF1e9RB8vaBfUlozPd5cuLGuG8l8U1vSXiBeewvrPPksge/fOXGZiTH5n6rPFEqzkgEkXjSsKtBujadoDhgGBWymdVeuVx2BcTm1KRjnxWDDO+WpmdiiJxIsZjwqbKy+9M7JPrwz53Rb6Inu0t+5kPjJuyrP769BnUFWLNNNA5cgvF+RTGRH9fHLn2sA1L3cGGTY8GnpflcVGO/WDDheL0REUK153vUWbGhir1rS9zsya+HDSEsTq6kZgBqj7KOxtewc68Jm86IWxMQIDAQAB",
   "name": "Openclod Desktop Bridge",
-  "version": "0.1.1",
-  "description": "Permite ao Openclod usar o Chrome já aberto, organizando cada sessão em um grupo de abas.",
-  "permissions": ["tabs", "tabGroups", "scripting", "nativeMessaging"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "short_name": "Openclod",
+  "version": "0.2.1",
+  "description": "Permite ao Openclod usar o Chrome já aberto, organizando cada sessão em um grupo de abas, com aviso na página e botão para parar o agente.",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "permissions": ["tabs", "tabGroups", "scripting", "nativeMessaging", "storage", "alarms", "cookies", "webRequest"],
+  "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
-  "action": { "default_title": "Openclod Desktop" },
+  "action": {
+    "default_title": "Openclod Desktop",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "commands": {
+    "stop-agent": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Parar o agente do Openclod"
+    }
+  },
   "minimum_chrome_version": "116"
 }

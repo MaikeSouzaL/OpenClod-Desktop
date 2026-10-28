@@ -1,0 +1,40 @@
+{
+  "ok": true,
+  "image": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\ocr-2026-10-25\\openclod-ocr.png",
+  "text": "Openclod memoria inteligente 2026",
+  "lines": [
+    {
+      "text": "Openclod memoria inteligente 2026",
+      "words": [
+        {
+          "text": "Openclod",
+          "x": 32,
+          "y": 82,
+          "width": 156,
+          "height": 37
+        },
+        {
+          "text": "memoria",
+          "x": 204,
+          "y": 82,
+          "width": 141,
+          "height": 28
+        },
+        {
+          "text": "inteligente",
+          "x": 359,
+          "y": 82,
+          "width": 171,
+          "height": 37
+        },
+        {
+          "text": "2026",
+          "x": 543,
+          "y": 84,
+          "width": 77,
+          "height": 26
+        }
+      ]
+    }
+  ]
+}

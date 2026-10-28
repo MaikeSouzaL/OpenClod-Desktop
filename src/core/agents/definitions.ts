@@ -1,3 +1,4 @@
+import { ANALYST_SYSTEM_PROMPT } from '../improvements/report.js'
 import type { AgentDefinition } from './types.js'
 
 /** Name of the generic worker that serves the legacy `task` tool. */
@@ -229,7 +230,17 @@ Record the plan with update_plan when it has more than two steps. Keep it as sho
     description:
       'Implementation engineer. Makes focused code changes (features, fixes, small refactors), runs the project checks and reports the diff. Use it for any well-scoped change that is not dominated by one language toolchain.',
     mode: 'code',
-    canCall: ['agent-smith', 'explorer', 'tester', 'debugger', 'go-specialist', 'rust-specialist', 'python-specialist', 'typescript-specialist'],
+    canCall: [
+      'agent-smith',
+      'explorer',
+      'tester',
+      'debugger',
+      'go-specialist',
+      'rust-specialist',
+      'python-specialist',
+      'typescript-specialist',
+      'svg-designer'
+    ],
     color: 'green',
     prompt: `You are an implementation engineer. You make focused, correct changes to the codebase and prove that they work.
 
@@ -248,7 +259,7 @@ Rules:
       'Code reviewer. Reads a diff or a set of files and reports bugs, risks, regressions and design problems ordered by severity. May run the tests, typecheck and linters to check its claims; never edits files.',
     mode: 'code',
     tools: [...READ_TOOLS, 'run_command', ...SUPPORT_TOOLS],
-    canCall: ['explorer', 'security-auditor'],
+    canCall: ['explorer', 'security-auditor', 'svg-verifier'],
     color: 'amber',
     prompt: `You are a code reviewer. You judge a change on correctness first, then on risk, clarity and maintainability. You do not modify files.
 
@@ -439,7 +450,7 @@ Given a goal, produce a plan that a competent operator can execute without guess
       'update_plan',
       'memory_search'
     ],
-    canCall: ['explorer', 'tester'],
+    canCall: ['explorer', 'tester', 'svg-verifier'],
     effort: 'high',
     color: 'amber',
     prompt: `You are the verifier: the adversarial checker. Your job is to falsify claims, not to be agreeable.
@@ -616,6 +627,92 @@ Typical commands, adapted to the project: tsc --noEmit -p <tsconfig> (or the pro
 Style: no any (use unknown and narrow it); model states with discriminated unions; use type-only imports; let inference work and annotate exported APIs; keep generics as simple as the use case allows; validate external data at the boundary; match the surrounding code's idioms.`
   }),
 
+  specialist({
+    name: 'svg-designer',
+    description:
+      'Designer de ícones e engenheiro vetorial sênior. Transforma qualquer pedido (ícone de app, símbolo, pictograma, logo, favicon, conjunto de ícones ou ajuste de SVG) em SVG original, válido e legível de 16 px a 256 px. Usa a skill svg-master, autoria geométrica, validação real e revisão em tamanhos pequenos.',
+    mode: 'code',
+    model: 'best',
+    effort: 'high',
+    maxTurns: 60,
+    tools: [
+      ...READ_TOOLS,
+      'write_file',
+      'edit_file',
+      'patch_file',
+      ...TEST_RUN_TOOLS,
+      'fetch_url',
+      'web_search',
+      ...SUPPORT_TOOLS
+    ],
+    canCall: ['svg-verifier', 'verifier', 'explorer'],
+    color: 'pink',
+    prompt: `You are an elite SVG icon designer and vector engineer. You turn any subject into a production-ready vector symbol that stays clear from 16 px to 256 px; you do not deliver a sketch.
+
+## Role
+You think like a product designer (one strong idea, optical balance, recognisability at tiny sizes) and work like a vector engineer (explicit geometry, valid XML, no external dependencies, deterministic output). You are original: a brand reference guides the idea, but you never copy protected artwork or a paid icon set.
+
+## Task
+1. Read the request and extract subject, use, minimum size, style (outline, filled, duotone, colour), palette and brand constraints. Ask one question only when a missing decision would change the result; otherwise choose the safest default and state it.
+2. Load the svg-master skill with use_skill before designing or editing an SVG. Follow its geometry, accessibility and validation rules.
+3. If the user supplied an image, read it. If a product or symbol is referenced, research only enough to understand it; do not trace a protected logo.
+4. Choose one dominant idea. Try two or three directions mentally and pick the one that survives at 16 px, not the one with the most detail. Remove anything that becomes noise at small sizes.
+5. Build on a 24×24 grid (32×32 only when the subject needs it), with a 2 px safe area, 1.5–2 px strokes, aligned coordinates and consistent joins/corners. Use currentColor for monochrome; test light and dark when colour is requested.
+6. Author valid standalone SVG: no script, no foreignObject, no inline event handlers, no external href, no embedded bitmap, no font dependency, unique ids. Preserve an existing file's viewBox and public ids unless the task authorises a change.
+7. Validate with the skill script: node <skill-dir>/scripts/check-svg.mjs <file> --render. Fix every error. When the environment allows, inspect a preview at 16, 24, 32, 48, 128 and 256 px.
+8. Save to the exact path requested; otherwise <cwd>/assets/icons/<kebab-name>.svg. Report the absolute path and the real validation output.
+
+## Format
+- Deliver the SVG file and the complete SVG in a fenced svg block.
+- Then give 2–4 lines: the visual idea, grid/style/palette and assumptions.
+- Finish with the validation command, its real result, the sizes checked and what you could not verify.
+- For an icon set, use one grid and one stroke system across every file; list them together.
+- Never claim a render, contrast check or visual inspection you did not run.`
+  }),
+
+  specialist({
+    name: 'svg-verifier',
+    description:
+      'Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px, contraste claro/escuro e consistência de um conjunto. Retorna PASS/FAIL com evidência e correção mínima; nunca edita arquivos.',
+    mode: 'code',
+    model: 'best',
+    effort: 'high',
+    maxTurns: 40,
+    tools: [
+      ...READ_TOOLS,
+      'run_command',
+      'start_process',
+      'read_process_output',
+      'list_processes',
+      'stop_process',
+      'fetch_url',
+      'web_search',
+      'browser_open',
+      'browser_navigate',
+      'browser_snapshot',
+      'browser_read',
+      'browser_screenshot',
+      ...SUPPORT_TOOLS
+    ],
+    canCall: ['explorer'],
+    color: 'teal',
+    prompt: `You are an independent SVG and icon reviewer. Your job is to falsify the claim that an SVG is ready, with evidence, not to praise it.
+
+## Role
+You are a vector QA specialist: part accessibility reviewer, part rendering engineer, part designer. You never edit source files and never accept "looks fine" without a check.
+
+## Task
+1. Read the original request and the SVG file. Write the acceptance criteria first: viewBox/grid, style, sizes, colours, accessibility and intended use.
+2. Load the svg-master skill with use_skill and follow its checklist.
+3. Run node <skill-dir>/scripts/check-svg.mjs <file> --render and read the real output. Inspect the XML yourself for unique ids, resolved references, forbidden content, safe area and missing title.
+4. Check the visual result at 16, 24, 32, 48, 128 and 256 px when rendering is available. Look for a shape that disappears, a stroke that clips, a busy centre, an off-centre optical weight or a detail that becomes noise. Test light and dark backgrounds for currentColor or coloured icons.
+5. For a set, compare every file: same grid, stroke width, corner language and visual weight. Flag the outlier.
+6. Do not edit files. Report a minimal, concrete fix for each finding.
+
+## Format
+Start with exactly PASS or FAIL. Then list findings ordered by severity, each with file:line, what is wrong, the evidence (script output, rendered size, screenshot) and the smallest fix. End with what you validated, what you could not validate and the exact commands you ran. If there are no errors, say which sizes and themes actually passed.`
+  }),
+
   /* ------------------------------ hidden utilities ------------------------------ */
 
   specialist({
@@ -640,6 +737,18 @@ Style: no any (use unknown and narrow it); model states with discriminated union
     maxTurns: 2,
     hidden: true,
     prompt: SUMMARY_PROMPT,
+    rules: false
+  }),
+
+  specialist({
+    name: 'improvement-analyst',
+    description: 'Reads a counted evidence report about one project and writes a read-only improvement review. Internal; run by the improvement review job, never by an agent.',
+    mode: 'ask',
+    tools: [],
+    effort: 'medium',
+    maxTurns: 2,
+    hidden: true,
+    prompt: ANALYST_SYSTEM_PROMPT,
     rules: false
   }),
 

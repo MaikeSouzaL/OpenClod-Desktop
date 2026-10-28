@@ -1,0 +1,154 @@
+{
+  "label": "before",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-before-mvqp58d9",
+  "startedAt": "2026-10-27T13:27:30.014Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 20548,
+      "cachedTokens": 10880,
+      "uncachedTokens": 9668,
+      "perCall": [
+        {
+          "input": 10247,
+          "cached": 768,
+          "output": 25
+        },
+        {
+          "input": 10301,
+          "cached": 10112,
+          "output": 27
+        }
+      ],
+      "ms": 6353,
+      "final": "Nenhum servidor MCP aparece — a resposta da ferramenta foi: \"nenhum MCP configurado\"."
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqq065x_c6l4 criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 21146,
+      "cachedTokens": 20352,
+      "uncachedTokens": 794,
+      "perCall": [
+        {
+          "input": 10508,
+          "cached": 9856,
+          "output": 91
+        },
+        {
+          "input": 10638,
+          "cached": 10496,
+          "output": 75
+        }
+      ],
+      "ms": 6124,
+      "final": "Handoff criado.\n\n- **id:** `ho_mvqq065x_c6l4`\n- resumo: \"piso de tokens medido\"\n- próximo passo: \"rodar a suíte de testes\"\n\nQuem retomar deve chamar `memory_handoff action=accept id=ho_mvqq065x_c6l4`."
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "list_skills",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- qa-total (usuario): QA total de qualquer projeto (web, API, mobile, CLI, biblioteca), como um testador sênior: estuda código e regras, enumera toda a superfície, testa tudo com prova (payload, banco",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 34022,
+      "cachedTokens": 31872,
+      "uncachedTokens": 2150,
+      "perCall": [
+        {
+          "input": 10717,
+          "cached": 9856,
+          "output": 39
+        },
+        {
+          "input": 11220,
+          "cached": 10752,
+          "output": 164
+        },
+        {
+          "input": 12085,
+          "cached": 11264,
+          "output": 206
+        }
+      ],
+      "ms": 10241,
+      "final": "**Nenhuma skill cobre PDF.**\n\nA busca \"pdf\" devolveu dois resultados, mas só por menção textual — ambos citam PDF para dizer quando **não** se aplica:\n\n- `qa-total` — \"PDF de provas de QA\" (entra apenas como entrega de evidências de QA), e "
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 36615,
+      "cachedTokens": 33024,
+      "uncachedTokens": 3591,
+      "perCall": [
+        {
+          "input": 11503,
+          "cached": 9856,
+          "output": 40
+        },
+        {
+          "input": 11665,
+          "cached": 11520,
+          "output": 98
+        },
+        {
+          "input": 13447,
+          "cached": 11648,
+          "output": 193
+        }
+      ],
+      "ms": 10177,
+      "final": "A busca `list_agents(query=\"segurança\")` devolveu **1 resultado**: `svg-verifier` — mas ele revisa segurança apenas no contexto de SVG (XML, ids seguros), não segurança de aplicação.\n\nNo catálogo completo, porém, há o agente certo: **`secur"
+    }
+  ],
+  "errors": [],
+  "totals": {
+    "modelCalls": 10,
+    "inputTokens": 112331,
+    "uncachedTokens": 16203,
+    "allTargetsOk": true
+  }
+}

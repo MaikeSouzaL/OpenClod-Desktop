@@ -1,0 +1,168 @@
+{
+  "label": "baseline-lazy-interleaved",
+  "startedAt": "2026-10-27T12:21:13.835Z",
+  "modelA": "deepseek-flash",
+  "modelB": "deepseek-v4-pro",
+  "lazyA": true,
+  "interleave": 8,
+  "sessionA": {
+    "session": {
+      "sessionId": "ses_f0707656-562e-4435-a51a-b3d494bfce56",
+      "projectId": "prj_45801055-fc11-440f-baab-d827ebe8f4a7",
+      "provider": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "seconds": 36,
+    "timedOut": false,
+    "asked": [],
+    "calls": 6,
+    "input": 84698,
+    "cached": 46848,
+    "output": 5207,
+    "firstInput": 10832,
+    "tools": [
+      "list_dir",
+      "update_plan",
+      "write_file",
+      "write_file",
+      "write_file",
+      "write_file",
+      "run_command",
+      "update_plan"
+    ],
+    "usedMemory": [],
+    "askedUser": false,
+    "models": [
+      "deepseek-flash"
+    ],
+    "finalText": "Passos 1 e 2 concluídos. Parei no passo 2, como pedido.\n\n## Arquivos criados\n- `package.json` — ESM (`\"type\": \"module\"`), sem dependências, `npm test` → `node --test`\n- `src/index.js` — `lerLinhas` e `validarLinha`\n- `test/lerLinhas.test.js` — 11 testes\n- `test/validarLinha.test.js` — 6 testes\n\n## O que ficou implementado\n- **`lerLinhas(texto)`**: descarta a primeira linha (cabeçalho), split por `",
+    "state": "done"
+  },
+  "afterA": {
+    "files": [
+      "CLAUDE.md",
+      "package.json",
+      "src/index.js",
+      "test/lerLinhas.test.js",
+      "test/validarLinha.test.js"
+    ],
+    "hidden": {
+      "passo 1: lerLinhas converte o valor e usa o cabeçalho": true,
+      "passo 2: validarLinha recusa valor negativo com a mensagem exata": true,
+      "passo 3: exportarCsv usa ; CRLF, vírgula decimal com duas casas": false,
+      "passo 3: exportarCsv termina com o rodapé de total": false
+    }
+  },
+  "detours": [
+    {
+      "seconds": 4,
+      "calls": 1,
+      "input": 11371,
+      "timedOut": false
+    },
+    {
+      "seconds": 4,
+      "calls": 1,
+      "input": 12277,
+      "timedOut": false
+    },
+    {
+      "seconds": 4,
+      "calls": 1,
+      "input": 12983,
+      "timedOut": false
+    },
+    {
+      "seconds": 6,
+      "calls": 1,
+      "input": 13819,
+      "timedOut": false
+    },
+    {
+      "seconds": 6,
+      "calls": 1,
+      "input": 12990,
+      "timedOut": false
+    },
+    {
+      "seconds": 4,
+      "calls": 1,
+      "input": 14281,
+      "timedOut": false
+    },
+    {
+      "seconds": 6,
+      "calls": 1,
+      "input": 14577,
+      "timedOut": false
+    },
+    {
+      "seconds": 6,
+      "calls": 1,
+      "input": 14887,
+      "timedOut": false
+    }
+  ],
+  "sessionB": {
+    "session": {
+      "sessionId": "ses_0c283ac1-e968-4e49-9be6-37db59f4e43f",
+      "projectId": "prj_45801055-fc11-440f-baab-d827ebe8f4a7",
+      "provider": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "seconds": 77,
+    "timedOut": false,
+    "asked": [],
+    "calls": 10,
+    "input": 232587,
+    "cached": 139520,
+    "output": 4769,
+    "firstInput": 15188,
+    "tools": [
+      "memory_brief",
+      "memory_page",
+      "memory_recall",
+      "list_dir",
+      "memory_page",
+      "list_dir",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "update_plan",
+      "edit_file",
+      "write_file",
+      "run_command",
+      "update_plan"
+    ],
+    "usedMemory": [
+      "memory_brief",
+      "memory_page",
+      "memory_recall",
+      "memory_page"
+    ],
+    "askedUser": false,
+    "models": [
+      "deepseek-v4-pro"
+    ],
+    "finalText": "Concluído o passo 3. A biblioteca `relatorio` está completa.\n\n## O que mudou\n- `src/index.js` — adicionei `exportarCsv(linhas)` e a função auxiliar `formatarValor`:\n  - cabeçalho `nome;valor`;\n  - uma linha por registro, no formato `nome;valor` com vírgula decimal e duas casas (`1234,50`);\n  - rodapé `# total;<soma>` no mesmo formato;\n  - todas as linhas, inclusive a última, terminam em CRLF.\n- `t",
+    "state": "done"
+  },
+  "afterB": {
+    "files": [
+      "CLAUDE.md",
+      "package.json",
+      "src/index.js",
+      "test/exportarCsv.test.js",
+      "test/lerLinhas.test.js",
+      "test/validarLinha.test.js"
+    ],
+    "hidden": {
+      "passo 1: lerLinhas converte o valor e usa o cabeçalho": true,
+      "passo 2: validarLinha recusa valor negativo com a mensagem exata": true,
+      "passo 3: exportarCsv usa ; CRLF, vírgula decimal com duas casas": true,
+      "passo 3: exportarCsv termina com o rodapé de total": true
+    }
+  },
+  "errors": []
+}

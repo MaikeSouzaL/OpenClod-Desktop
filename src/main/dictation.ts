@@ -4,9 +4,10 @@ import type { AppSettings } from '../shared/types.js'
 import { CH, type DictationState } from '../shared/api.js'
 
 /**
- * Wispr-Flow-style dictation: a global shortcut starts/stops the microphone,
- * a floating pill shows what is being heard, and the final text is inserted
- * into the field the user was typing in.
+ * Wispr-Flow-style dictation: the microphone button starts/stops the capture,
+ * an optional global shortcut can do the same, a floating pill shows what is
+ * being heard, and the final text is inserted into the field the user was
+ * typing in. By default no global shortcut is registered.
  *
  * The microphone and Whisper live in the renderer (getUserMedia + the STT
  * bridge); this controller only owns the shortcut, the overlay and insertion.
@@ -35,8 +36,8 @@ export class DictationController {
     this.deps = deps
   }
 
-  /** (Re)registers the global shortcut. Safe to call on every settings save. */
-  register(shortcut = 'Control+Alt+Space'): void {
+  /** (Re)registers the optional global shortcut. Empty disables it. */
+  register(shortcut = ''): void {
     const next = shortcut.trim()
     if (this.shortcut === next) return
     if (this.shortcut) {
@@ -70,6 +71,11 @@ export class DictationController {
   /** State comes from the renderer's dictation engine, about 10 times a second. */
   update(state: DictationState): void {
     this.lastState = state
+    // Click-first dictation: the composer shows the live text; the pill is opt-in.
+    if (this.deps.getSettings().voice?.overlay !== true) {
+      this.hideOverlay()
+      return
+    }
     const overlay = this.showOverlay()
     if (!overlay) return
     const payload = JSON.stringify({
@@ -269,7 +275,7 @@ const OVERLAY_HTML = `<!doctype html>
     <div class="dot"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></div>
     <div class="body">
       <div class="status" id="status">Pronto</div>
-      <div class="text empty" id="text">Segure o atalho e fale…</div>
+      <div class="text empty" id="text">Clique no microfone e fale…</div>
     </div>
     <div class="bars" id="bars"></div>
   </div>
@@ -284,7 +290,7 @@ const OVERLAY_HTML = `<!doctype html>
       const phase = state && state.phase ? state.phase : 'idle'
       document.body.className = 'phase-' + phase
       status.textContent = labels[phase] || 'Pronto'
-      const value = (state && state.text) || (phase === 'listening' ? 'Fale normalmente…' : phase === 'error' ? (state.error || 'Falha no microfone') : 'Segure o atalho e fale…')
+      const value = (state && state.text) || (phase === 'listening' ? 'Fale normalmente…' : phase === 'error' ? (state.error || 'Falha no microfone') : 'Clique no microfone e fale…')
       text.textContent = value
       text.classList.toggle('empty', !state || !state.text)
       const level = state && typeof state.level === 'number' ? state.level : 0

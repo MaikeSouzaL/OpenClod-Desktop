@@ -1,0 +1,35 @@
+{
+  "checks": {
+    "conectados-whatsapp-mostra-o-logo": "ok",
+    "conectados-mercadopago-mostra-o-logo": "ok",
+    "conectados-appwrite-api-mostra-o-logo": "ok",
+    "conectados-appwrite-docs-mostra-o-logo": "ok",
+    "conectados-appwrite-cli-mcp-mostra-o-logo": "ok",
+    "conectados-atlassian-mostra-o-logo": "ok",
+    "conectados-jira-mostra-o-logo": "ok",
+    "conectados-rea-mostra-as-iniciais": "ok",
+    "conectados-bridge_gpt-mostra-as-iniciais": "ok",
+    "conectados-affinitas-mostra-as-iniciais": "ok",
+    "conectados-figcraft-mostra-as-iniciais": "ok",
+    "iniciais-de-um-nome-so-sao-a-primeira-letra": "ok",
+    "iniciais-continuam-coloridas-por-nome": "ok",
+    "logo-do-cartao-tem-40px-quadrado-e-cantos-arredondados": "ok",
+    "diretorio-amostra-de-16-logos-carrega-com-naturalWidth-maior-que-0": "ok",
+    "primeira-pagina-do-diretorio-quase-toda-com-logo": "ok",
+    "nenhuma-imagem-vem-da-internet": "ok",
+    "detalhe-de-conector-personalizado-mostra-o-logo": "ok",
+    "logo-do-detalhe-tem-46px": "ok",
+    "sem-erros-de-console-ou-pagina": "ok"
+  },
+  "shots": [
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-01-grade.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-02-conectados.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-07-diretorio.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-03-detalhe-whatsapp.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-04-detalhe-github.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-05-grade-tema-claro.png",
+    "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\conectores-2026-10-27\\depois\\depois-06-conectados-tema-claro.png"
+  ],
+  "errors": [],
+  "ok": true
+}

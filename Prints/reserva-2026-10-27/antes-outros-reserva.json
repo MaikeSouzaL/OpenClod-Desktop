@@ -1,0 +1,127 @@
+{
+  "label": "antes-outros",
+  "startedAt": "2026-10-27T14:26:47.486Z",
+  "scenarios": {
+    "401": {
+      "t": {
+        "seconds": 5,
+        "timedOut": false,
+        "state": "error",
+        "meta": {
+          "providerId": "fake-a",
+          "model": "fake-pro"
+        },
+        "notes": [],
+        "answeredBy": [],
+        "lastText": "",
+        "failures": [
+          "HTTP 401: {\"error\":{\"message\":\"Incorrect API key provided: sk-test-***\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}"
+        ],
+        "count": 3
+      },
+      "ui": {
+        "model": "fake-pro",
+        "provider": "Provedor A (falso)",
+        "notices": []
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\antes-outros-401-conversa.png"
+    },
+    "429": {
+      "t": {
+        "seconds": 152,
+        "timedOut": true,
+        "state": "streaming",
+        "meta": {
+          "providerId": "fake-a",
+          "model": "fake-pro"
+        },
+        "notes": [],
+        "answeredBy": [],
+        "lastText": "",
+        "failures": [],
+        "count": 1
+      },
+      "ui": {
+        "model": "fake-pro",
+        "provider": "Provedor A (falso)",
+        "notices": []
+      },
+      "hitsA": 2,
+      "shot": "Prints\\reserva-2026-10-27\\antes-outros-429-conversa.png"
+    },
+    "partial": {
+      "t": {
+        "seconds": 5,
+        "timedOut": false,
+        "state": "error",
+        "meta": {
+          "providerId": "fake-a",
+          "model": "fake-pro"
+        },
+        "notes": [],
+        "answeredBy": [
+          "?:A capital da França é"
+        ],
+        "lastText": "A capital da França é",
+        "failures": [
+          "Rate limit exceeded: too many requests"
+        ],
+        "count": 4
+      },
+      "ui": {
+        "model": "fake-pro",
+        "provider": "Provedor A (falso)",
+        "notices": []
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\antes-outros-partial-conversa.png"
+    },
+    "overflow": {
+      "t": {
+        "seconds": 5,
+        "timedOut": false,
+        "state": "error",
+        "meta": {
+          "providerId": "fake-a",
+          "model": "fake-pro"
+        },
+        "notes": [],
+        "answeredBy": [],
+        "lastText": "",
+        "failures": [
+          "HTTP 400: {\"error\":{\"message\":\"This model's maximum context length is 8192 tokens. However, your messages resulted in 20000 tokens. Please reduce the length of "
+        ],
+        "count": 4
+      },
+      "ui": {
+        "model": "fake-pro",
+        "provider": "Provedor A (falso)",
+        "notices": []
+      },
+      "hitsA": 1,
+      "shot": "Prints\\reserva-2026-10-27\\antes-outros-overflow-conversa.png"
+    }
+  },
+  "fakeHits": "429,429,401,partial,overflow",
+  "proxyRequests": 0,
+  "errors": [],
+  "checks": {
+    "configuração dos provedores de teste gravada": "ok",
+    "429: a conversa terminou com resposta de um LLM que funciona": "FALHOU: {\"state\":\"streaming\",\"failures\":[],\"seconds\":152}",
+    "429: a conversa avisa a troca e o motivo": "FALHOU: []",
+    "429: o seletor do compositor mostra o modelo novo": "FALHOU: {\"ui\":{\"model\":\"fake-pro\",\"provider\":\"Provedor A (falso)\",\"notices\":[]},\"meta\":{\"providerId\":\"fake-a\",\"model\":\"fake-pro\"}}",
+    "429: sem esperar o Retry-After de 1 hora (turno em menos de 3 min, uma só chamada ao limitado)": "FALHOU: {\"seconds\":152,\"hits\":2}",
+    "401: a conversa terminou com resposta de um LLM que funciona": "FALHOU: {\"state\":\"error\",\"failures\":[\"HTTP 401: {\\\"error\\\":{\\\"message\\\":\\\"Incorrect API key provided: sk-test-***\\\",\\\"type\\\":\\\"invalid_request_error\\\",\\\"code\\\":\\\"invalid_api_key\\\"}}\"],\"seconds\":5}",
+    "401: a conversa avisa a troca e o motivo": "FALHOU: []",
+    "401: o seletor do compositor mostra o modelo novo": "FALHOU: {\"ui\":{\"model\":\"fake-pro\",\"provider\":\"Provedor A (falso)\",\"notices\":[]},\"meta\":{\"providerId\":\"fake-a\",\"model\":\"fake-pro\"}}",
+    "partial: a conversa terminou com resposta de um LLM que funciona": "FALHOU: {\"state\":\"error\",\"failures\":[\"Rate limit exceeded: too many requests\"],\"seconds\":5}",
+    "partial: a conversa avisa a troca e o motivo": "FALHOU: []",
+    "partial: o seletor do compositor mostra o modelo novo": "FALHOU: {\"ui\":{\"model\":\"fake-pro\",\"provider\":\"Provedor A (falso)\",\"notices\":[]},\"meta\":{\"providerId\":\"fake-a\",\"model\":\"fake-pro\"}}",
+    "partial: a metade da resposta que já estava na tela foi mantida": "FALHOU: [\"?:A capital da França é\"]",
+    "partial: o modelo novo continuou a resposta (texto depois da metade)": "FALHOU: A capital da França é",
+    "overflow: a conversa terminou com resposta de um LLM que funciona": "FALHOU: {\"state\":\"error\",\"failures\":[\"HTTP 400: {\\\"error\\\":{\\\"message\\\":\\\"This model's maximum context length is 8192 tokens. However, your messages resulted in 20000 tokens. Please reduce the length of \"],\"seconds\":5}",
+    "overflow: a conversa avisa a troca e o motivo": "FALHOU: []",
+    "overflow: o seletor do compositor mostra o modelo novo": "FALHOU: {\"ui\":{\"model\":\"fake-pro\",\"provider\":\"Provedor A (falso)\",\"notices\":[]},\"meta\":{\"providerId\":\"fake-a\",\"model\":\"fake-pro\"}}"
+  }
+}

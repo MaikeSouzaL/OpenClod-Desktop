@@ -37,6 +37,8 @@ export interface Evaluation {
   effect: PermissionEffect
   /** Rule that decided it, when a rule matched. */
   rule?: string
+  /** Risk the decision was made with, when a per-call override (mcp_call) changed it. */
+  risk?: ToolDef['risk']
 }
 
 const EXECUTE_TOOLS = new Set([
@@ -46,6 +48,7 @@ const EXECUTE_TOOLS = new Set([
   'git_commit',
   'git_checkout',
   'computer_launch',
+  'computer_open_path',
   'computer_activate'
 ])
 
@@ -89,12 +92,22 @@ export function evaluateTool(
   cwd: string = process.cwd(),
   args?: unknown
 ): Evaluation {
-  const base = evaluateToolBase(tool, preview, policy, cwd, args)
+  // A tool that fronts other tools (mcp_call) resolves its target's risk and approval from the arguments.
+  const call = tool.resolveCall?.(args)
+  const effective: ToolDef =
+    call && (call.risk || call.approval)
+      ? { ...tool, ...(call.risk ? { risk: call.risk } : {}), ...(call.approval ? { approval: call.approval } : {}) }
+      : tool
+  // Hidden by the user's per-tool policy: a configuration, not a mode, so no permission mode lifts it.
+  const base = call?.deny
+    ? { decision: 'deny' as Decision, reason: call.deny }
+    : evaluateToolBase(effective, preview, policy, cwd, args)
   return {
     ...base,
     action: tool.name,
     resource: preview,
-    effect: effectOf(tool)
+    effect: effectOf(effective),
+    risk: effective.risk
   }
 }
 
@@ -108,6 +121,9 @@ function evaluateToolBase(
   // Explicit opt-in mode: the local harness itself imposes no decisions.
   // Provider-side refusals and operating-system permissions remain external.
   if (policy.mode === 'unrestricted') {
+    // The one exception: a tool the user (or its server) marked "always ask" still asks, like Claude Code's
+    // `anthropic/requiresUserInteraction` does in bypass mode.
+    if (tool.approval === 'ask') return { decision: 'ask', reason: 'a ferramenta está configurada para sempre pedir aprovação' }
     return { decision: 'allow', reason: 'modo ultrarrrestrito: sem bloqueios do harness' }
   }
   // Not a rule: it cannot be overridden by an allow rule, a hook or any mode.
@@ -128,6 +144,12 @@ function evaluateToolBase(
   if (ruled) {
     const verb = ruled.decision === 'deny' ? 'negado' : ruled.decision === 'ask' ? 'pede confirmação' : 'permitido'
     return { decision: ruled.decision, reason: `${verb} pela regra ${ruled.rule}` }
+  }
+
+  // Per-tool choice from the MCP settings: below explicit rules, above the permission mode.
+  if (tool.approval === 'ask') return { decision: 'ask', reason: 'ferramenta configurada para pedir aprovação' }
+  if (tool.approval === 'allow' && policy.mode !== 'readonly') {
+    return { decision: 'allow', reason: 'permitida pela política da ferramenta' }
   }
 
   if (policy.mode === 'readonly') return { decision: 'allow', reason: 'modo somente leitura' }
@@ -159,7 +181,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'fetch_url', 'web_search', 'browser_open', 'browser_navigate', 'browser_snapshot',
     'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'code_intelligence', 'quality_discover',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot'
   ],
   plan: [
@@ -167,7 +190,8 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'fetch_url', 'web_search', 'browser_open', 'browser_navigate', 'browser_snapshot',
     'browser_read', 'browser_screenshot', 'browser_console',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'code_intelligence', 'quality_discover',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot', 'task', 'agent', 'list_agents'
   ],
   code: [
@@ -178,11 +202,12 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'code_intelligence', 'quality_discover', 'quality_run',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
-    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
+    'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window', 'computer_secondary_action'
   ],
   debug: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob',
@@ -192,18 +217,20 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'code_intelligence', 'quality_discover', 'quality_run',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
-    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action'
+    'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window', 'computer_secondary_action'
   ],
   review: [
     'read_file', 'list_dir', 'grep', 'glob', 'git_status', 'git_diff', 'git_log',
     'fetch_url', 'web_search', 'browser_open', 'browser_snapshot', 'browser_read',
-    'browser_screenshot', 'computer_list_apps', 'computer_list_windows', 'computer_get_window',
+    'browser_screenshot', 'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window',
     'computer_cursor_position', 'computer_snapshot', 'computer_screenshot',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'task', 'agent', 'list_agents'
+    , 'code_intelligence', 'quality_discover'
   ],
   computer: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
@@ -212,12 +239,13 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'fetch_url', 'web_search', 'download_file',
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
-    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_secondary_action',
+    'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window', 'computer_secondary_action',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents'
+    , 'code_intelligence', 'quality_discover', 'quality_run'
   ],
   web: [
     'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob',
@@ -225,8 +253,9 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents',
+    'code_intelligence', 'quality_discover', 'quality_run',
     'run_command', 'read_process_output', 'list_processes',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot'
   ],
   autonomous: [
@@ -237,11 +266,12 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
     'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
     'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'computer_list_apps', 'computer_list_windows', 'computer_get_window', 'computer_cursor_position',
+    'code_intelligence', 'quality_discover', 'quality_run',
+    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot', 'computer_click',
     'computer_mouse_move', 'computer_mouse_button',
     'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
-    'computer_drag', 'computer_launch', 'computer_activate', 'computer_wait', 'computer_wait_for',
+    'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window',
     'computer_secondary_action'
   ]
 }
@@ -252,11 +282,24 @@ for (const tools of Object.values(MODE_TOOLS)) {
   for (const name of ['memory_brief', 'memory_page', 'memory_handoff', 'memory_recall']) {
     if (!tools.includes(name)) tools.push(name)
   }
+  if (!tools.includes('document_extract')) tools.push('document_extract')
+  for (const name of ['media_transcribe', 'media_ingest', 'media_view']) {
+    if (!tools.includes(name)) tools.push(name)
+  }
+  if (!tools.includes('image_inspect')) tools.push('image_inspect')
+  if (!tools.includes('image_generate')) tools.push('image_generate')
+  if (!tools.includes('image_ocr')) tools.push('image_ocr')
   if (!tools.includes('web_research')) tools.push('web_research')
+  // Reporting a harness limitation must work in every mode, including read-only.
+  if (!tools.includes('report_limitation')) tools.push('report_limitation')
+  // Asking the user for context is also mode-independent.
+  if (!tools.includes('ask_user')) tools.push('ask_user')
   for (const name of ['browser_tabs', 'browser_new_tab', 'browser_claim_tab', 'browser_switch_tab', 'browser_close_tab']) {
     if (!tools.includes(name)) tools.push(name)
   }
-  for (const name of ['mcp_search', 'mcp_servers', 'mcp_install']) {
+  // Inspecting the page's traffic is read-only; every mode that can open the browser can read it.
+  if (tools.includes('browser_open') && !tools.includes('browser_network')) tools.push('browser_network')
+  for (const name of ['mcp_search', 'mcp_servers', 'mcp_install', 'mcp_resource', 'mcp_prompt', 'mcp_read_resource', 'mcp_get_prompt', 'mcp_reload']) {
     if (!tools.includes(name)) tools.push(name)
   }
 }
@@ -264,6 +307,12 @@ for (const tools of Object.values(MODE_TOOLS)) {
 // Surgical edits are available wherever files can be written.
 for (const mode of ['code', 'debug', 'web', 'autonomous'] as const) {
   if (!MODE_TOOLS[mode].includes('patch_file')) MODE_TOOLS[mode].push('patch_file')
+  if (!MODE_TOOLS[mode].includes('image_edit')) MODE_TOOLS[mode].push('image_edit')
+}
+
+// Reading and changing the page's cookies goes with the interactive browser (clicking, typing), not read-only modes.
+for (const mode of ['code', 'debug', 'web', 'autonomous', 'computer'] as const) {
+  if (!MODE_TOOLS[mode].includes('browser_cookies')) MODE_TOOLS[mode].push('browser_cookies')
 }
 
 // Growing the roster is a coding/autonomous capability, never a read-only one.

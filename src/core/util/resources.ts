@@ -6,7 +6,8 @@ import path from 'node:path'
  * from the user's global Python, PATH or caches):
  *
  *   resources/
- *     runtime/python/   embedded Python + site-packages (speech recognition)
+ *     runtime/python/   embedded Python + site-packages (speech recognition, document libraries)
+ *     office/           document tools: openclod-python / openclod-office commands, openclod_office builders (pylib)
  *     models/whisper/   speech models (CTranslate2 format), one folder per size
  *     bin/              native helpers (ripgrep, open-computer-use, ...)
  *     MANIFEST.json     what was bundled, versions, sizes, licenses

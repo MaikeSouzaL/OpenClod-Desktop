@@ -1,0 +1,199 @@
+{
+  "label": "beamfree-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-current-mvqu4yua",
+  "startedAt": "2026-10-27T15:43:23.332Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "tool_load",
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 19439,
+      "cachedTokens": 8256,
+      "uncachedTokens": 11183,
+      "perCall": [
+        {
+          "input": 6401,
+          "cached": 896,
+          "output": 88
+        },
+        {
+          "input": 6493,
+          "cached": 896,
+          "output": 25
+        },
+        {
+          "input": 6545,
+          "cached": 6464,
+          "output": 32
+        }
+      ],
+      "ms": 8124,
+      "final": "Aparecem 0 servidores MCP configurados.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvquuy77_5m8j criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 13412,
+      "cachedTokens": 10432,
+      "uncachedTokens": 2980,
+      "perCall": [
+        {
+          "input": 6581,
+          "cached": 4416,
+          "output": 126
+        },
+        {
+          "input": 6831,
+          "cached": 6016,
+          "output": 43
+        }
+      ],
+      "ms": 6078,
+      "final": "Handoff criado: `ho_mvquuy77_5m8j`.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_load",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 21430,
+      "cachedTokens": 17408,
+      "uncachedTokens": 4022,
+      "perCall": [
+        {
+          "input": 6784,
+          "cached": 6080,
+          "output": 63
+        },
+        {
+          "input": 6915,
+          "cached": 4416,
+          "output": 33
+        },
+        {
+          "input": 7731,
+          "cached": 6912,
+          "output": 247
+        }
+      ],
+      "ms": 10082,
+      "final": "A busca \"pdf\" retornou 4 skills, mas nenhuma tem \"pdf\" no nome — todas foram casadas porque mencionam PDF nas descrições como algo que **não** cobrem:\n\n- `docx` (cria/edita documentos Word; \"Não use para PDF\")\n- `pptx` (cria/edita apresenta",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 15855,
+      "cachedTokens": 10880,
+      "uncachedTokens": 4975,
+      "perCall": [
+        {
+          "input": 7797,
+          "cached": 6080,
+          "output": 138
+        },
+        {
+          "input": 8058,
+          "cached": 4800,
+          "output": 101
+        }
+      ],
+      "ms": 6071,
+      "final": "O agente que revisa segurança é: **svg-verifier** (revisor independente de SVG/ícones — valida segurança, viewBox, contraste etc.).",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/beam-free"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/beam-free",
+  "totals": {
+    "modelCalls": 10,
+    "inputTokens": 70136,
+    "uncachedTokens": 23160,
+    "allTargetsOk": true
+  }
+}

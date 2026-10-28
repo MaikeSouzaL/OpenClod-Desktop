@@ -18,8 +18,9 @@
  *    Python, and every file is copied from the dist's RECORD (hash-verified). Because
  *    onnxruntime and onnxruntime-gpu share one package directory in the source install,
  *    only the files of the CPU "onnxruntime" RECORD are copied; a RECORD hash mismatch
- *    (= file overwritten by the other wheel) aborts the build. CUDA / TensorRT provider
- *    DLLs are therefore never shipped.
+ *    (= file overwritten by the other wheel) aborts the build. onnxruntime CUDA /
+ *    TensorRT providers are therefore never shipped. The separate Whisper CUDA pack
+ *    (cuBLAS/cuDNN) already present in the runtime is preserved across rebuilds.
  *  - A few declared-but-unused dependencies are skipped (UNUSED_AT_RUNTIME below); pass
  *    --full-closure to ship them anyway. The post-build check and the e2e test prove
  *    nothing imports them.
@@ -177,6 +178,27 @@ function sha256Text(text) {
 
 function rmrf(target) {
   fs.rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+}
+
+/** The CUDA/cuDNN pack is not part of the source Python; keep it across a rebuild. */
+function backupCuda(runtimeDir, backupDir) {
+  const dir = path.join(runtimeDir, 'Lib', 'site-packages', 'ctranslate2')
+  if (!fs.existsSync(dir)) return false
+  const names = fs
+    .readdirSync(dir)
+    .filter((name) => /^(cublas|cudnn|cudart).*\.dll$/i.test(name))
+  if (!names.length) return false
+  fs.mkdirSync(backupDir, { recursive: true })
+  for (const name of names) fs.renameSync(path.join(dir, name), path.join(backupDir, name))
+  return true
+}
+
+function restoreCuda(backupDir, runtimeDir) {
+  const target = path.join(runtimeDir, 'Lib', 'site-packages', 'ctranslate2')
+  if (!fs.existsSync(backupDir)) return
+  fs.mkdirSync(target, { recursive: true })
+  for (const name of fs.readdirSync(backupDir)) fs.renameSync(path.join(backupDir, name), path.join(target, name))
+  rmrf(backupDir)
 }
 
 function copyTree(src, dst, filter) {
@@ -846,11 +868,15 @@ function main() {
     built = stamp.built
   } else {
     const stage = path.join(runtimeParent, `.python-staging-${process.pid}`)
+    const cudaBackup = path.join(runtimeParent, `.cuda-backup-${process.pid}`)
     rmrf(stage)
+    const savedCuda = backupCuda(runtimeDir, cudaBackup)
+    if (savedCuda) log('runtime       : preserving the embedded CUDA/cuDNN pack across the rebuild')
     log('runtime       : building (stdlib + DLLs + site-packages + byte-compile)...')
     built = buildRuntime(opts, plan, stage)
     rmrf(runtimeDir)
     fs.renameSync(stage, runtimeDir)
+    if (savedCuda) restoreCuda(cudaBackup, runtimeDir)
     fs.writeFileSync(
       stampFile,
       JSON.stringify({ signature, builtAt: new Date().toISOString(), python: plan.python.version, built }, null, 2) + '\n'
@@ -938,6 +964,20 @@ function main() {
       sha256: sha256File(sidecar),
       files: 1,
       size: fs.statSync(sidecar).size,
+      license: 'MIT'
+    })
+  }
+  // The media ingestion engine (audio/video -> transcript, frames, contact sheets) runs on this same runtime.
+  const mediaEngine = path.join(RESOURCES, 'media', 'forja_media.py')
+  if (fs.existsSync(mediaEngine)) {
+    entries.push({
+      name: 'forja_media.py',
+      kind: 'script',
+      version: '1',
+      source: 'resources/media/forja_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)',
+      sha256: sha256File(mediaEngine),
+      files: 1,
+      size: fs.statSync(mediaEngine).size,
       license: 'MIT'
     })
   }

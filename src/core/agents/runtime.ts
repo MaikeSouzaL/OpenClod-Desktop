@@ -12,6 +12,9 @@ import type {
   Usage
 } from '../../shared/types.js'
 import { SessionRunner, type RunnerDeps } from '../agent/runner.js'
+import type { FallbackCandidate } from '../providers/chain.js'
+import type { ProviderHealth } from '../providers/health.js'
+import type { DescribeCandidate } from '../vision/relay.js'
 import { BrowserLayer } from '../browser/layer.js'
 import { modeAllowsWrite } from '../security/permissions.js'
 import { FileTracker } from '../session/tracker.js'
@@ -65,6 +68,15 @@ export interface AgentRuntimeEnv {
   caps?: Partial<AgentCaps>
   /** Passed to the children's runners (stream retry delay). */
   retryBaseMs?: number
+  /**
+   * The app's reserve: a child whose provider runs out of balance moves to the next one that works, like the user's session,
+   * and a child on a model that cannot read images gets them described.
+   */
+  reserve?: {
+    chainFor(config: ProviderConfig): FallbackCandidate[]
+    health: ProviderHealth
+    visionCandidates(): DescribeCandidate[]
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,6 +183,11 @@ export function resolveChildTools(input: ToolsetInput): { tools: string[]; ignor
   if (input.canDelegate) {
     const wanted = ['agent', 'list_agents', ...(def.canCall === '*' ? ['task'] : [])]
     for (const tool of wanted) if (available.includes(tool) && !pool.includes(tool)) pool.push(tool)
+  }
+  // Children receive the same on-demand loader, so a specialist that names
+  // browser_* or computer_* does not carry every schema in its first request.
+  for (const tool of ['tool_search', 'tool_load']) {
+    if (available.includes(tool) && !pool.includes(tool)) pool.push(tool)
   }
   if (def.disallowedTools?.length) pool = pool.filter((tool) => !named(def.disallowedTools, tool))
   let ignored: string[] = []
@@ -373,6 +390,7 @@ export async function spawnAgent(
     emit: (event) => {
       switch (event.type) {
         case 'tool_start':
+        case 'tool_progress':
         case 'tool_end':
           // Prefixed so ids from different children (or the session itself) can never collide in the UI.
           env.emit({ ...event, sessionId: root, toolCallId: `${childId}:${event.toolCallId}`, agentId: childId })
@@ -399,7 +417,10 @@ export async function spawnAgent(
     depth,
     parentSignal: caller.signal,
     toolOutputDir: env.toolOutputDir ? path.join(env.toolOutputDir, root) : undefined,
-    retryBaseMs: env.retryBaseMs
+    retryBaseMs: env.retryBaseMs,
+    fallback: env.reserve?.chainFor(providerConfig),
+    health: env.reserve?.health,
+    vision: env.reserve ? { candidates: () => (env.reserve as NonNullable<AgentRuntimeEnv['reserve']>).visionCandidates() } : undefined
   }
 
   let state: RunState = 'error'

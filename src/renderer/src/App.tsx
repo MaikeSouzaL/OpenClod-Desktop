@@ -3,28 +3,37 @@ import type {
   AgentMode,
   AppSettings,
   ApprovalRequest,
+  BudgetInfo,
   CapabilityReport,
   FileChange,
   HarnessEvent,
   ImagePart,
   PermissionMode,
   Project,
+  QuestionAnswer,
+  QuestionRequest,
   ReasoningEffort,
   RunState,
   SessionState,
   SessionSummary,
   SessionSurface,
-  SkillInfo
+  SkillInfo,
+  Usage
 } from '../../shared/types'
+import { defaultAgentMode } from '../../shared/types'
 import type { AppVersions, ProviderPresetInfo } from '../../shared/api'
+import { billableTokens } from '../../shared/limits'
 import { Sidebar, type SidebarPage } from './components/Sidebar'
 import { ProjectsPage } from './components/ProjectsPage'
 import { ScheduledPage } from './components/ScheduledPage'
-import { CustomizePage } from './components/CustomizePage'
+import { CustomizePage, type CustomizeTab } from './components/CustomizePage'
 import type { SettingsTab } from './components/SettingsDialog'
 import { Transcript } from './components/Transcript'
-import { Composer, type QueuedMessage } from './components/Composer'
+import { Composer, type ProviderMenuState, type QueuedMessage } from './components/Composer'
+import { describeFailure } from '../../core/providers/health'
 import { ApprovalDock } from './components/ApprovalDock'
+import { QuestionDock } from './components/QuestionDock'
+import { BudgetDock } from './components/BudgetDock'
 import { SessionPanel, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, type PanelLayout } from './components/SessionPanel'
 import { PlanDock } from './components/PlanDock'
 import { reduceActivity, type ActivityState } from './lib/activity'
@@ -36,16 +45,16 @@ import { CoworkView } from './components/CoworkView'
 import { MemoryPage } from './components/MemoryPage'
 import { ArtifactsPage, DesignPage, DispatchPage, MorePage } from './components/MorePages'
 import { OpenclodMark, MenuPopover, Titlebar, type MenuItem, type PanelTab } from './components/Chrome'
+import { WorktreeDialog } from './components/WorktreeDialog'
+import { RewindDialog } from './components/RewindDialog'
+import { ActivityPage } from './components/ActivityPage'
 import { Icon } from './components/Icons'
 import { errorMessage, unwrap } from './lib/api'
-import { shortPath } from './lib/format'
+import { cancelDictation } from './lib/dictation-store'
+import { lastRequestTokens, shortPath } from './lib/format'
 import type { LiveTool, LogEntry } from './lib/types'
 
 const BUSY_STATES: RunState[] = ['thinking', 'streaming', 'tool', 'waiting_approval']
-
-function samePath(a: string, b: string): boolean {
-  return a.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() === b.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-}
 
 function normalizeState(state: RunState): RunState {
   return BUSY_STATES.includes(state) ? 'idle' : state
@@ -114,10 +123,17 @@ export default function App(): ReactElement {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [session, setSession] = useState<SessionState | null>(null)
   const [runState, setRunState] = useState<RunState>('idle')
+  /** Latest run state for callbacks that must not close over a stale one. */
+  const runStateRef = useRef<RunState>('idle')
+  runStateRef.current = runState
   const [streaming, setStreaming] = useState<Record<string, string>>({})
   const [reasoning, setReasoning] = useState<Record<string, string>>({})
   const [tools, setTools] = useState<Record<string, LiveTool>>({})
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
+  const [question, setQuestion] = useState<QuestionRequest | null>(null)
+  const [budget, setBudget] = useState<{ sessionId: string; info: BudgetInfo } | null>(null)
+  const [turnUsage, setTurnUsage] = useState<Usage | null>(null)
+  const [turnLimit, setTurnLimit] = useState(0)
   const [changes, setChanges] = useState<FileChange[]>([])
   const [logs, setLogs] = useState<LogEntry[]>([])
   /** What each session's agents are doing (commands, sub-agents); kept for every session while the app runs. */
@@ -129,18 +145,19 @@ export default function App(): ReactElement {
 
   /* ------------------------------- ui ------------------------------- */
   const [surface, setSurface] = useState<SessionSurface>('chat')
-  const [composerSeed, setComposerSeed] = useState<{ id: string; text: string } | undefined>(undefined)
-  const [dictationInsert, setDictationInsert] = useState<{ id: string; text: string } | undefined>(undefined)
+  const [composerSeed, setComposerSeed] = useState<{ id: string; text: string; sessionId: string | null } | undefined>(undefined)
+  const [dictationInsert, setDictationInsert] = useState<{ id: string; text: string; sessionId: string | null } | undefined>(undefined)
 
   useEffect(
     () =>
       window.forja.dictation.onComposerInsert((text) => {
-        setDictationInsert({ id: logId(), text })
+        setDictationInsert({ id: logId(), text, sessionId: activeSessionRef.current })
       }),
     []
   )
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panelTab, setPanelTab] = useState<PanelTab | null>(null)
+  const [planFocus, setPlanFocus] = useState<string | null>(null)
   const [panelLayout, setPanelLayout] = useState<PanelLayout>(loadLayout)
   /** Depth used by new sessions; each session keeps its own once created. */
   const [defaultEffort, setDefaultEffort] = useState<ReasoningEffort | null>(loadEffort)
@@ -148,9 +165,18 @@ export default function App(): ReactElement {
   defaultEffortRef.current = defaultEffort
   const [page, setPage] = useState<SidebarPage | null>(null)
   const [memoryGraphRequest, setMemoryGraphRequest] = useState(0)
+  /** A page the Activity screen asked the Memory screen to open (a review report). */
+  const [memoryOpen, setMemoryOpen] = useState<{ id: number; projectId: string; slug: string } | null>(null)
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined)
+  /** A tab of Personalização that another screen asked for ("Abrir Conectores" in Configurações → MCP). */
+  const [customizeOpenTab, setCustomizeOpenTab] = useState<{ tab: CustomizeTab; nonce: number } | null>(null)
+  useEffect(() => {
+    if (page !== 'customize') setCustomizeOpenTab(null)
+  }, [page])
   const [keepAwake, setKeepAwake] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [worktreeProject, setWorktreeProject] = useState<Project | null>(null)
+  const [rewindOpen, setRewindOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [titleMenuOpen, setTitleMenuOpen] = useState(false)
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -161,10 +187,13 @@ export default function App(): ReactElement {
   const [toast, setToast] = useState<{ level: 'info' | 'warn' | 'error'; text: string } | null>(null)
 
   const activeSessionRef = useRef<string | null>(null)
+  /** Invalidates an older sessions.get/create response that resolves late. */
+  const sessionEpoch = useRef(0)
   const projectsRef = useRef<Project[]>([])
   const sessionsRef = useRef<SessionSummary[]>([])
   const historyRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: -1 })
   const queuedRef = useRef<QueuedMessage[]>([])
+  const queueSessionRef = useRef<string | null>(null)
   const drainingRef = useRef(false)
   const importRef = useRef<HTMLInputElement>(null)
   const [canBack, setCanBack] = useState(false)
@@ -223,45 +252,10 @@ export default function App(): ReactElement {
     }
   }, [])
 
-  const applySession = useCallback((state: SessionState): void => {
-    activeSessionRef.current = state.meta.id
-    setActiveSessionId(state.meta.id)
-    setSession(state)
-    setRunState(normalizeState(state.state))
-    setStreaming({})
-    setReasoning({})
-    setTools({})
-    setApprovals([])
-    setError('')
-    setChanges(state.changes)
-    setSurface(state.meta.surface ?? 'code')
-    const project = projectsRef.current.find((item) => samePath(item.path, state.meta.cwd))
-    if (project) setActiveProjectId(project.id)
-  }, [])
-
-  const openSession = useCallback(
-    async (sessionId: string, options?: { record?: boolean }): Promise<SessionState | null> => {
-      try {
-        const state = await unwrap(window.forja.sessions.get(sessionId))
-        applySession(state)
-        if (options?.record !== false) rememberSession(sessionId)
-        return state
-      } catch (err) {
-        setError(errorMessage(err))
-        return null
-      }
-    },
-    [applySession, rememberSession]
-  )
-
-  const selectSession = useCallback(
-    async (sessionId: string): Promise<void> => {
-      await openSession(sessionId)
-    },
-    [openSession]
-  )
-
   const clearSession = useCallback((): void => {
+    // Also invalidates any request that is still in flight for the session
+    // that is being left behind.
+    sessionEpoch.current += 1
     activeSessionRef.current = null
     setActiveSessionId(null)
     setSession(null)
@@ -274,10 +268,66 @@ export default function App(): ReactElement {
     setPanelTab(null)
   }, [])
 
+  const applySession = useCallback((state: SessionState): void => {
+    activeSessionRef.current = state.meta.id
+    setActiveSessionId(state.meta.id)
+    setSession(state)
+    setRunState(normalizeState(state.state))
+    setStreaming({})
+    setReasoning({})
+    setTools({})
+    // Approvals still waiting in this session come back with it (they are no longer lost on a switch).
+    setApprovals(state.approvals ?? [])
+    setError('')
+    setChanges(state.changes)
+    setSurface(state.meta.surface ?? 'code')
+    // The session carries its project id; matching by cwd fails for worktrees
+    // and could leave the sidebar on project A while showing project B's chat.
+    const project = projectsRef.current.find((item) => item.id === state.meta.projectId)
+    if (project) setActiveProjectId(project.id)
+  }, [])
+
+  const openSession = useCallback(
+    async (sessionId: string, options?: { record?: boolean }): Promise<SessionState | null> => {
+      // Blank the transcript immediately: while the file is loading, the old
+      // project's messages must not be visible or accept input.
+      clearSession()
+      const epoch = ++sessionEpoch.current
+      try {
+        const state = await unwrap(window.forja.sessions.get(sessionId))
+        // A slower request for the previous project must never replace the
+        // session the user is looking at now.
+        if (epoch !== sessionEpoch.current) return state
+        applySession(state)
+        if (options?.record !== false) rememberSession(sessionId)
+        return state
+      } catch (err) {
+        if (epoch === sessionEpoch.current) setError(errorMessage(err))
+        return null
+      }
+    },
+    [applySession, rememberSession, clearSession]
+  )
+
+  const selectSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      const summary = sessionsRef.current.find((item) => item.meta.id === sessionId)
+      if (summary) setActiveProjectId(summary.meta.projectId)
+      await openSession(sessionId)
+    },
+    [openSession]
+  )
+
   const createSession = useCallback(
-    async (project: Project, targetSurface: SessionSurface = surface): Promise<SessionState | null> => {
+    async (project: Project, targetSurface: SessionSurface = surface, sessionCwd = project.path): Promise<SessionState | null> => {
       if (!settings) return null
-      const preferred = settings.lastModel
+      // Never keep project A's transcript visible while project B's session is
+      // being created: the user could send A's text into B (or vice versa).
+      if (!session || session.meta.projectId !== project.id) clearSession()
+      const epoch = sessionEpoch.current
+      // Each project remembers its own LLM. The global last model is only a
+      // fallback for projects that never chose one.
+      const preferred = project.model ?? settings.lastModel
       const provider =
         settings.providers.find((item) => item.id === preferred?.providerId) ??
         settings.providers.find((item) => item.id === settings.defaultProviderId) ??
@@ -292,26 +342,50 @@ export default function App(): ReactElement {
         const meta = await unwrap(
           window.forja.sessions.create({
             projectId: project.id,
-            cwd: project.path,
-            mode: targetSurface === 'chat' ? 'ask' : targetSurface === 'cowork' ? 'autonomous' : 'code',
+            cwd: sessionCwd,
+            mode: defaultAgentMode(targetSurface),
             surface: targetSurface,
             providerId: provider.id,
             model
           })
         )
-        if (defaultEffortRef.current) {
-          await unwrap(window.forja.sessions.setEffort(meta.id, defaultEffortRef.current))
+        // Provider/model default first; the global choice is only a fallback.
+        const initialEffort = provider.defaultEffort ?? defaultEffortRef.current
+        if (initialEffort) {
+          await unwrap(window.forja.sessions.setEffort(meta.id, initialEffort))
+        }
+        // A project that never chose a model adopts the one used by its first
+        // session, so a later choice in another project cannot change it.
+        if (!project.model) {
+          try {
+            const updated = await unwrap(window.forja.projects.setModel(project.id, provider.id, model))
+            setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+          } catch {
+            /* the session still works with its own model */
+          }
         }
         await refreshSessions()
-        setActiveProjectId(project.id)
-        rememberSession(meta.id)
-        return await openSession(meta.id, { record: false })
+        // The user switched project/session while this request was in flight:
+        // keep the created session for the send that requested it, but do not
+        // pull it into the screen that now belongs to another project.
+        if (epoch !== sessionEpoch.current) {
+          return {
+            meta,
+            messages: [],
+            plan: [],
+            changes: [],
+            approvals: [],
+            usage: { input: 0, output: 0 },
+            state: 'idle'
+          }
+        }
+        return await openSession(meta.id)
       } catch (err) {
-        setError(errorMessage(err))
+        if (epoch === sessionEpoch.current) setError(errorMessage(err))
         return null
       }
     },
-    [settings, surface, refreshSessions, rememberSession, openSession]
+    [settings, surface, refreshSessions, openSession, clearSession, session?.meta.projectId]
   )
 
   /* --------------------------- initial load --------------------------- */
@@ -377,6 +451,23 @@ export default function App(): ReactElement {
           else next.delete(event.sessionId)
           return next
         })
+        if (event.type === 'turn_start' && event.sessionId === activeSessionRef.current) {
+          setTurnUsage(null)
+          setBudget((current) => (current?.sessionId === event.sessionId ? null : current))
+        }
+      }
+      // A model that ran out of balance/limit was replaced: the session (and so the model picker in the composer, the
+      // context meter and the sidebar) shows the model that is answering now, not the one that failed.
+      if (event.type === 'model_switch') {
+        const follow = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, providerId: event.to.providerId, model: event.to.model })
+        setSessions((current) => current.map((item) => (item.meta.id === event.sessionId ? { ...item, meta: follow(item.meta) } : item)))
+        if (event.sessionId === activeSessionRef.current) {
+          setSession((current) => (current && current.meta.id === event.sessionId ? { ...current, meta: follow(current.meta) } : current))
+        }
+        // The provider that failed now shows why in Settings → Provedores.
+        void window.forja.app.capabilities().then((result) => {
+          if (result.ok) setCapabilities(result.value)
+        })
       }
       // The first time an agent is called in a session, show the tasks panel (as Claude Desktop does).
       if (event.type === 'subagent' && event.sessionId === activeSessionRef.current && !tasksAutoOpened.current.has(event.sessionId)) {
@@ -429,9 +520,26 @@ export default function App(): ReactElement {
               id: event.toolCallId,
               name: event.name,
               args: event.args,
-              running: true
+              running: true,
+              startedAt: Date.now()
             }
           }))
+          break
+        case 'tool_progress':
+          setTools((current) => {
+            const previous = current[event.toolCallId]
+            if (!previous) return current
+            return {
+              ...current,
+              [event.toolCallId]: {
+                ...previous,
+                progress: event.text || previous.progress,
+                text: event.text || previous.text,
+                updatedAt: Date.now(),
+                data: { ...(previous.data ?? {}), ...(event.data ?? {}) }
+              }
+            }
+          })
           break
         case 'tool_end':
           setTools((current) => ({
@@ -445,7 +553,10 @@ export default function App(): ReactElement {
               text: event.text,
               files: event.files,
               data: event.data,
-              running: false
+              running: false,
+              startedAt: current[event.toolCallId]?.startedAt,
+              progress: current[event.toolCallId]?.progress,
+              updatedAt: current[event.toolCallId]?.updatedAt
             }
           }))
           break
@@ -461,6 +572,13 @@ export default function App(): ReactElement {
           break
         case 'usage':
           setSession((current) => (current ? { ...current, usage: event.total } : current))
+          if (event.sessionId === activeSessionRef.current) {
+            if (event.turn) setTurnUsage(event.turn)
+            if (event.limit !== undefined) setTurnLimit(event.limit)
+          }
+          break
+        case 'budget':
+          setBudget({ sessionId: event.sessionId, info: event.info })
           break
         case 'approval_request':
           setApprovals((current) => [...current.filter((item) => item.id !== event.request.id), event.request])
@@ -471,6 +589,18 @@ export default function App(): ReactElement {
         case 'approval_resolved':
           setApprovals((current) => current.filter((item) => item.id !== event.id))
           break
+        case 'question_request':
+          setQuestion(event.request)
+          if (document.hidden) {
+            void window.forja.app.notify(
+              'Openclod Desktop - pergunta',
+              'O agente precisa de mais contexto para continuar.'
+            )
+          }
+          break
+        case 'question_resolved':
+          setQuestion((current) => (current?.id === event.id ? null : current))
+          break
         case 'audit':
           pushLog(event.level === 'blocked' ? 'blocked' : event.level, event.message)
           break
@@ -480,6 +610,7 @@ export default function App(): ReactElement {
           break
         case 'turn_end':
           setRunState(event.stopReason === 'error' ? 'error' : 'done')
+          setQuestion(null)
           void refreshSessions()
           if (document.hidden) {
             const title = sessionsRef.current.find((item) => item.meta.id === event.sessionId)?.meta.title ?? 'Openclod Desktop'
@@ -511,6 +642,13 @@ export default function App(): ReactElement {
       /* storage unavailable */
     }
   }, [panelLayout.side, panelLayout.width])
+
+  useEffect(() => {
+    setPlanFocus(null)
+    setTurnUsage(null)
+    setTurnLimit(0)
+    setBudget(null)
+  }, [session?.meta.id])
 
   useEffect(() => {
     void window.forja.power.state().then((result) => result.ok && setKeepAwake(result.value))
@@ -642,13 +780,13 @@ export default function App(): ReactElement {
   const selectProject = useCallback(
     async (project: Project): Promise<void> => {
       setActiveProjectId(project.id)
+      // Clear first so a late response from the previous project cannot be
+      // applied on top of this one.
+      clearSession()
       const latest = sessionsRef.current.find(
-        (item) => samePath(item.meta.cwd, project.path) && (item.meta.surface ?? 'code') === surface
+        (item) => item.meta.projectId === project.id && (item.meta.surface ?? 'code') === surface
       )
       if (latest) await selectSession(latest.meta.id)
-      else {
-        clearSession()
-      }
     },
     [selectSession, clearSession, surface]
   )
@@ -663,7 +801,7 @@ export default function App(): ReactElement {
           const latest = project
             ? list.find(
                 (item) =>
-                  samePath(item.meta.cwd, project.path) && (item.meta.surface ?? 'code') === surface
+                  item.meta.projectId === project.id && (item.meta.surface ?? 'code') === surface
               )
             : undefined
           if (latest) await selectSession(latest.meta.id)
@@ -704,7 +842,7 @@ export default function App(): ReactElement {
             ? list.find(
                 (item) =>
                   !item.meta.archived &&
-                  samePath(item.meta.cwd, project.path) &&
+                  item.meta.projectId === project.id &&
                   (item.meta.surface ?? 'code') === surface
               )
             : undefined
@@ -779,17 +917,28 @@ export default function App(): ReactElement {
         target = created.meta.id
       }
       setError('')
+      // Show "working" at once: the main process may need a few seconds to get the turn going (loading the session,
+      // project memory...) and the user must see that the message was taken.
+      const previousState = runStateRef.current
+      setRunState('thinking')
+      const slow = setTimeout(
+        () => setToast({ level: 'info', text: 'Preparando a sessão… só demora assim na primeira mensagem depois de abrir o app.' }),
+        4_000
+      )
       try {
         const result = await window.forja.sessions.send(target, text, images)
         if (!result.ok) {
+          setRunState(previousState)
           setError(result.error)
           return false
         }
-        setRunState('thinking')
         return true
       } catch (err) {
+        setRunState(previousState)
         setError(errorMessage(err))
         return false
+      } finally {
+        clearTimeout(slow)
       }
     },
     [activeProjectId, createSession, surface]
@@ -826,17 +975,46 @@ export default function App(): ReactElement {
     if (sessionId) void window.forja.inbox.remove(sessionId, id).catch(() => undefined)
   }, [])
 
+  /** Sends a queued prompt right away: inject as steer while busy, or start a turn. */
+  const sendQueuedNow = useCallback(
+    async (id: string): Promise<void> => {
+      const item = queuedRef.current.find((entry) => entry.id === id)
+      const sessionId = activeSessionRef.current
+      if (!item || !sessionId || queueSessionRef.current !== sessionId) return
+      const steer = BUSY_STATES.includes(runState)
+      setQueued((current) => current.filter((entry) => entry.id !== id))
+      try {
+        await window.forja.inbox.remove(sessionId, id).catch(() => undefined)
+        const result = await window.forja.sessions.send(sessionId, item.text, item.images, steer ? 'steer' : 'auto')
+        if (!result.ok) throw new Error(result.error)
+        if (steer) setToast({ level: 'info', text: 'Mensagem enviada ao turno em execução.' })
+        else setRunState('thinking')
+      } catch (err) {
+        setQueued((current) =>
+          queueSessionRef.current === sessionId
+            ? [item, ...current.filter((entry) => entry.id !== item.id)]
+            : current
+        )
+        setError(errorMessage(err))
+      }
+    },
+    [runState]
+  )
+
   useEffect(() => {
     if (drainingRef.current) return
     if (!['done', 'idle', 'error', 'cancelled'].includes(runState)) return
     const next = queuedRef.current[0]
-    if (!next || !activeSessionRef.current) return
+    const sessionId = activeSessionRef.current
+    if (!next || !sessionId || queueSessionRef.current !== sessionId) return
     drainingRef.current = true
     setQueued((current) => current.filter((item) => item.id !== next.id))
-    void window.forja.inbox.remove(activeSessionRef.current, next.id).catch(() => undefined)
+    void window.forja.inbox.remove(sessionId, next.id).catch(() => undefined)
     void send(next.text, next.images)
       .then((ok) => {
-        if (!ok) setQueued((current) => [next, ...current])
+        if (!ok && queueSessionRef.current === sessionId) {
+          setQueued((current) => [next, ...current])
+        }
       })
       .finally(() => {
         drainingRef.current = false
@@ -846,17 +1024,28 @@ export default function App(): ReactElement {
   // Reinicia a fila da interface que sobreviveu a um fechamento do app.
   useEffect(() => {
     const sessionId = activeSessionId
+    queueSessionRef.current = sessionId
+    setQueued([])
+    queuedRef.current = []
     if (!sessionId) return
     void window.forja.inbox
       .list(sessionId)
       .then((result) => {
-        if (!result.ok) return
+        if (!result.ok || queueSessionRef.current !== sessionId) return
         const pending = result.value
           .filter((item) => item.origin === 'ui' && item.mode === 'queue')
           .map((item) => ({ id: item.id, text: item.text, images: item.images }))
         if (pending.length) setQueued(pending)
       })
       .catch(() => undefined)
+  }, [activeSessionId])
+
+  // Drafts, seeded text, dictation and queued prompts belong to one session.
+  // Never carry them into another project when the user switches.
+  useEffect(() => {
+    cancelDictation()
+    setComposerSeed(undefined)
+    setDictationInsert(undefined)
   }, [activeSessionId])
 
   const changeEnvironment = useCallback(async (environmentId: string): Promise<void> => {
@@ -889,12 +1078,19 @@ export default function App(): ReactElement {
 
   const changeModel = useCallback(async (providerId: string, model: string): Promise<void> => {
     const id = activeSessionRef.current
+    const projectId = session?.meta.projectId ?? activeProjectId
     try {
-      // Remember the choice for new sessions and for the next app start.
+      // Global fallback for projects that never chose a model.
       await unwrap(window.forja.app.rememberModel(providerId, model))
+      if (id) await unwrap(window.forja.sessions.setModel(id, providerId, model))
+      // The choice belongs to the project: switching to another project keeps
+      // that project's own LLM.
+      if (projectId) {
+        const updated = await unwrap(window.forja.projects.setModel(projectId, providerId, model))
+        setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      }
       setSettings((current) => (current ? { ...current, lastModel: { providerId, model } } : current))
       if (!id) return
-      await unwrap(window.forja.sessions.setModel(id, providerId, model))
       const patch = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, providerId, model })
       setSession((current) => (current ? { ...current, meta: patch(current.meta) } : current))
       setSessions((current) =>
@@ -903,7 +1099,7 @@ export default function App(): ReactElement {
     } catch (err) {
       setError(errorMessage(err))
     }
-  }, [])
+  }, [activeProjectId, session?.meta.projectId])
 
   const resolveApproval = useCallback(
     async (approvalId: string, approved: boolean, always: boolean, reason = ''): Promise<void> => {
@@ -917,6 +1113,24 @@ export default function App(): ReactElement {
     },
     [pushLog]
   )
+
+  const answerQuestion = useCallback(
+    async (questionId: string, answers: QuestionAnswer[]): Promise<void> => {
+      setQuestion((current) => (current?.id === questionId ? null : current))
+      try {
+        await unwrap(window.forja.questions.answer(questionId, answers))
+        pushLog('info', answers.length ? 'respostas enviadas ao agente' : 'perguntas puladas')
+      } catch (err) {
+        setError(errorMessage(err))
+      }
+    },
+    [pushLog]
+  )
+
+  const continueBudget = useCallback((): void => {
+    setBudget(null)
+    void send('continuar de onde parou', [])
+  }, [send])
 
   const changeEffort = useCallback(
     async (next: ReasoningEffort | null): Promise<void> => {
@@ -953,16 +1167,20 @@ export default function App(): ReactElement {
 
   const saveSettings = useCallback(
     async (patch: Partial<AppSettings>): Promise<void> => {
+      const before = session ? await unwrap(window.forja.app.settings()).catch(() => null) : null
       const next = await unwrap(window.forja.app.updateSettings(patch))
       setSettings(next)
       void refreshCapabilities()
 
       if (session && runState === 'idle') {
-        const provider =
-          next.providers.find((item) => item.id === session.meta.providerId) ??
-          next.providers.find((item) => item.id === next.defaultProviderId) ??
-          next.providers[0]
-        if (provider && (provider.id !== session.meta.providerId || provider.model !== session.meta.model)) {
+        const own = next.providers.find((item) => item.id === session.meta.providerId)
+        const provider = own ?? next.providers.find((item) => item.id === next.defaultProviderId) ?? next.providers[0]
+        // The session follows the model written in the provider's card only when the user just edited it (and the
+        // session was on it), or when its provider is gone. Saving anything else must not undo the model picked in the
+        // composer, nor the one a reserve switch moved the conversation to.
+        const was = before?.providers.find((item) => item.id === session.meta.providerId)?.model
+        const followsCard = !own || (was !== undefined && was !== provider?.model && session.meta.model === was)
+        if (provider && followsCard && (provider.id !== session.meta.providerId || provider.model !== session.meta.model)) {
           await unwrap(window.forja.sessions.setModel(session.meta.id, provider.id, provider.model))
           setSession((current) =>
             current
@@ -1003,6 +1221,40 @@ export default function App(): ReactElement {
       setError(errorMessage(err))
     }
   }, [])
+
+  const rewindConversation = useCallback(async (messageId: string, restoreFiles = false): Promise<boolean> => {
+    const active = session
+    if (!active) return false
+    try {
+      const state = await unwrap(window.forja.sessions.rewind(active.meta.id, messageId, restoreFiles))
+      applySession(state)
+      setSessions((current) => current.map((item) => item.meta.id === state.meta.id ? { ...item, meta: state.meta } : item))
+      setRewindOpen(false)
+      setToast({ level: 'info', text: restoreFiles ? 'Conversa e checkpoint Git restaurados. Um backup do estado anterior foi criado.' : 'Conversa restaurada. Os arquivos atuais foram mantidos.' })
+      return true
+    } catch (err) {
+      setError(errorMessage(err))
+      return false
+    }
+  }, [session, applySession])
+
+  const forkConversation = useCallback(async (messageId: string): Promise<boolean> => {
+    const active = session
+    if (!active) return false
+    try {
+      const state = await unwrap(window.forja.sessions.fork(active.meta.id, messageId))
+      await refreshSessions()
+      setActiveProjectId(state.meta.projectId)
+      rememberSession(state.meta.id)
+      await openSession(state.meta.id, { record: false })
+      setRewindOpen(false)
+      setToast({ level: 'info', text: 'Chat lateral criado com o contexto selecionado.' })
+      return true
+    } catch (err) {
+      setError(errorMessage(err))
+      return false
+    }
+  }, [session, refreshSessions, rememberSession, openSession])
 
   const runCommand = useCallback(
     (command: string): void => {
@@ -1089,6 +1341,13 @@ export default function App(): ReactElement {
     []
   )
 
+  /** Clicking a plan step opens the right panel focused on that step. */
+  const openPlanStep = useCallback((itemId: string): void => {
+    setPlanFocus(itemId)
+    setPanelTab('plan')
+    setPanelLayout((current) => (current.side === 'right' ? current : { ...current, side: 'right' }))
+  }, [])
+
   const commitRename = useCallback((): void => {
     if (renaming && renameDraft.trim()) void renameSession(renaming, renameDraft.trim())
     setRenaming(null)
@@ -1098,14 +1357,17 @@ export default function App(): ReactElement {
 
   const activeProject = projects.find((item) => item.id === activeProjectId) ?? null
   const selectedProviderId =
-    session?.meta.providerId ?? settings?.lastModel?.providerId ?? settings?.defaultProviderId
+    session?.meta.providerId ??
+    activeProject?.model?.providerId ??
+    settings?.lastModel?.providerId ??
+    settings?.defaultProviderId
   const provider =
     settings?.providers.find((item) => item.id === selectedProviderId) ??
     settings?.providers.find((item) => item.id === settings?.defaultProviderId) ??
     settings?.providers[0] ??
     null
   const providerConfigured = provider
-    ? Boolean(capabilities?.providers.find((item) => item.id === provider.id)?.configured) && provider.kind !== 'mock'
+    ? Boolean(capabilities?.providers.find((item) => item.id === provider.id)?.configured)
     : false
   const activeId = session?.meta.id ?? null
   const changeWork = useCallback(
@@ -1126,8 +1388,9 @@ export default function App(): ReactElement {
     return [...live].sort((a, b) => b.meta.updatedAt - a.meta.updatedAt)[0]?.meta.title
   }, [sessions])
 
+  const contextUsed = lastRequestTokens(session)
   const contextPercent = provider?.contextWindow
-    ? Math.min(100, Math.round(((session?.usage.input ?? 0) / provider.contextWindow) * 100))
+    ? Math.min(100, Math.round((contextUsed / provider.contextWindow) * 100))
     : 0
 
   const surfaceSessions = useMemo(
@@ -1139,19 +1402,47 @@ export default function App(): ReactElement {
     [sessions, surface]
   )
 
+  // Which providers can answer right now: the model menu offers the ones with a key, and says why one is being avoided.
+  const providerStates = useMemo((): Record<string, ProviderMenuState> | undefined => {
+    if (!settings || !capabilities) return undefined
+    const out: Record<string, ProviderMenuState> = {}
+    for (const item of settings.providers) {
+      const info = capabilities.providers.find((entry) => entry.id === item.id)
+      const local = /127\.0\.0\.1|localhost/.test(item.baseUrl)
+      out[item.id] = {
+        ready: local || Boolean(info?.configured),
+        failure: info?.unavailable ? describeFailure(info.unavailable.kind) : undefined
+      }
+    }
+    return out
+  }, [settings, capabilities])
+
   const composerNode = (
     <Composer
+      // A draft/attachments/dictation belongs to one session. Remounting on
+      // switch prevents project A's text from being sent to project B.
+      key={session?.meta.id ?? `home:${activeProjectId ?? 'none'}:${surface}`}
       session={session}
       providers={settings?.providers ?? []}
-      providerId={session?.meta.providerId ?? settings?.lastModel?.providerId ?? provider?.id ?? ''}
-      model={session?.meta.model ?? settings?.lastModel?.model ?? provider?.model ?? ''}
-      mode={session?.meta.mode ?? 'ask'}
+      providerStates={providerStates}
+      providerId={
+        session?.meta.providerId ??
+        activeProject?.model?.providerId ??
+        settings?.lastModel?.providerId ??
+        provider?.id ??
+        ''
+      }
+      model={session?.meta.model ?? activeProject?.model?.model ?? settings?.lastModel?.model ?? provider?.model ?? ''}
+      mode={session?.meta.mode ?? (surface === 'chat' ? defaultAgentMode('chat') : 'ask')}
       permissionMode={settings?.policy.mode ?? 'ask'}
       runState={runState}
       variant={session ? 'chat' : surface === 'cowork' ? 'cowork' : surface === 'chat' ? 'home' : 'chat'}
       queued={queued}
       skills={skills}
       contextPercent={contextPercent}
+      contextUsed={contextUsed}
+      turnTokens={turnUsage ? billableTokens(turnUsage) : 0}
+      turnLimit={turnLimit}
       effort={session ? (session.meta.effort ?? null) : defaultEffort}
       environments={settings?.environments ?? []}
       environmentId={session?.meta.environment ?? 'local'}
@@ -1160,6 +1451,7 @@ export default function App(): ReactElement {
       insert={dictationInsert}
       onSend={(text, images) => send(text, images, { fresh: !session })}
       onQueue={enqueue}
+      onSendQueued={(id) => void sendQueuedNow(id)}
       onRemoveQueued={removeQueued}
       onCommand={runCommand}
       onStop={() => void stop()}
@@ -1197,6 +1489,7 @@ export default function App(): ReactElement {
       ? ([
           { id: 'export', label: 'Exportar sessão', icon: 'download', shortcut: 'Ctrl+Shift+E', onSelect: () => void exportSession(session.meta.id) },
           { id: 'compact', label: 'Compactar contexto', icon: 'refresh', onSelect: () => void compactSession().catch((err) => setError(errorMessage(err))) },
+          { id: 'rewind', label: 'Voltar conversa a uma mensagem', icon: 'rotate', onSelect: () => setRewindOpen(true) },
           { id: 'archive', label: 'Arquivar sessão', icon: 'archive', onSelect: () => void archiveSession(session.meta.id, true) },
           { id: 'panel', label: 'Painel lateral da sessão', icon: 'panelRight', onSelect: () => togglePanel('context') },
           { id: 'sep-2', separator: true }
@@ -1217,6 +1510,7 @@ export default function App(): ReactElement {
             setRenameDraft(session.meta.title)
           }
         },
+        { id: 'rewind', label: 'Voltar ou ramificar conversa', icon: 'rotate', onSelect: () => setRewindOpen(true) },
         { id: 'export', label: 'Exportar JSON', icon: 'download', onSelect: () => void exportSession(session.meta.id) },
         { id: 'sep', separator: true },
         {
@@ -1234,6 +1528,7 @@ export default function App(): ReactElement {
   const optionItems: MenuItem[] = session
     ? [
         { id: 'tasks', label: 'Tarefas em segundo plano', icon: 'logs', checked: panelTab === 'tasks', onSelect: () => togglePanel('tasks') },
+        { id: 'rewind', label: 'Voltar conversa a uma mensagem', icon: 'rotate', onSelect: () => setRewindOpen(true) },
         {
           id: 'awake',
           label: keepAwake ? 'Manter computador ativo (ligado)' : 'Manter computador ativo',
@@ -1265,8 +1560,22 @@ export default function App(): ReactElement {
     setSettingsOpen(true)
   }
 
+  const openConnectors = (): void => {
+    setSettingsOpen(false)
+    setSettingsTab(undefined)
+    setCustomizeOpenTab({ tab: 'connectors', nonce: Date.now() })
+    setPage('customize')
+  }
+
   const pageNode: ReactNode =
-    page === 'projects' ? (
+    page === 'activity' ? (
+      <ActivityPage
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onOpenSession={(sessionId) => { setPage(null); void selectSession(sessionId) }}
+        onOpenMemory={(projectId, slug) => { setMemoryOpen({ id: Date.now(), projectId, slug }); setPage('memory') }}
+      />
+    ) : page === 'projects' ? (
       <ProjectsPage
         projects={projects}
         sessions={sessions}
@@ -1284,6 +1593,7 @@ export default function App(): ReactElement {
         onRemove={(project) => void removeProject(project)}
         onDelete={(project) => void deleteProject(project)}
         onOpenGraph={openMemoryGraph}
+        onWorktrees={(project) => setWorktreeProject(project)}
       />
     ) : page === 'memory' ? (
       <MemoryPage
@@ -1293,6 +1603,8 @@ export default function App(): ReactElement {
         onAddProject={() => void addProject()}
         onOpenSettings={() => openSettingsAt('memory')}
         graphRequest={memoryGraphRequest}
+        openRequest={memoryOpen}
+        onOpenHandled={() => setMemoryOpen(null)}
       />
     ) : page === 'artifacts' ? (
       <ArtifactsPage
@@ -1302,7 +1614,7 @@ export default function App(): ReactElement {
         onCreate={(prompt) => {
           setPage(null)
           setSurface('chat')
-          setComposerSeed({ id: logId(), text: prompt })
+          setComposerSeed({ id: logId(), text: prompt, sessionId: activeSessionRef.current })
         }}
       />
     ) : page === 'design' ? (
@@ -1310,7 +1622,7 @@ export default function App(): ReactElement {
         onCreate={(prompt) => {
           setPage(null)
           setSurface('chat')
-          setComposerSeed({ id: logId(), text: prompt })
+          setComposerSeed({ id: logId(), text: prompt, sessionId: activeSessionRef.current })
         }}
       />
     ) : page === 'dispatch' ? (
@@ -1347,9 +1659,7 @@ export default function App(): ReactElement {
           await window.forja.mcp.restart()
           await refreshCapabilities()
         }}
-        onSaveMcpServers={async (servers) => {
-          await saveSettings({ mcpServers: servers })
-        }}
+        openTab={customizeOpenTab}
       />
     ) : null
 
@@ -1390,13 +1700,14 @@ export default function App(): ReactElement {
         void selectSession(id)
       }}
       onClearActive={() => clearSession()}
-      onSuggestion={(text) => setComposerSeed({ id: logId(), text })}
+      onSuggestion={(text) => setComposerSeed({ id: logId(), text, sessionId: activeSessionRef.current })}
       onOpenSettings={() => setSettingsOpen(true)}
     />
   ) : session ? (
     <div className="chat-view">
       <div className="chat-scroll">
         <Transcript
+          sessionId={session.meta.id}
           messages={session.messages}
           streaming={streaming}
           reasoning={reasoning}
@@ -1407,8 +1718,18 @@ export default function App(): ReactElement {
         />
       </div>
 
+      <BudgetDock
+        info={budget && session && budget.sessionId === session.meta.id ? budget.info : null}
+        onContinue={continueBudget}
+        onClose={() => setBudget(null)}
+      />
+      <QuestionDock
+        request={question && question.sessionId === session.meta.id ? question : null}
+        onAnswer={(id, answers) => void answerQuestion(id, answers)}
+        onSkip={(id) => void answerQuestion(id, [])}
+      />
       <ApprovalDock approvals={approvals} onResolve={(id, approved, always, reason) => void resolveApproval(id, approved, always, reason)} />
-      <PlanDock plan={session.plan} running={BUSY_STATES.includes(runState)} />
+      <PlanDock plan={session.plan} running={BUSY_STATES.includes(runState)} onOpenStep={openPlanStep} />
       {composerNode}
     </div>
   ) : (
@@ -1524,6 +1845,7 @@ export default function App(): ReactElement {
             onRemoveProject={(project) => void removeProject(project)}
             onDeleteProject={(project) => void deleteProject(project)}
             onOpenGraph={openMemoryGraph}
+            onWorktrees={(project) => setWorktreeProject(project)}
             onDeleteSession={(id) => void deleteSession(id)}
             onRenameSession={(id, title) => void renameSession(id, title)}
             onArchiveSession={(id, archived) => void archiveSession(id, archived)}
@@ -1558,6 +1880,8 @@ export default function App(): ReactElement {
             capabilities={capabilities}
             settings={settings}
             tab={panelTab}
+            planFocus={planFocus}
+            onPlanFocus={setPlanFocus}
             work={work}
             onWorkChange={changeWork}
             onStopTurn={() => void stop()}
@@ -1639,10 +1963,23 @@ export default function App(): ReactElement {
             setSettingsTab(undefined)
           }}
           initialTab={settingsTab}
+          onOpenConnectors={openConnectors}
           memoryProjectId={session?.meta.projectId ?? activeProject?.id}
           onSave={saveSettings}
           onRefreshCapabilities={refreshCapabilities}
         />
+      ) : null}
+
+      {worktreeProject ? (
+        <WorktreeDialog
+          project={worktreeProject}
+          onClose={() => setWorktreeProject(null)}
+          onOpenSession={async (worktree) => Boolean(await createSession(worktreeProject, surface, worktree.path))}
+        />
+      ) : null}
+
+      {rewindOpen && session ? (
+        <RewindDialog session={session} onClose={() => setRewindOpen(false)} onRewind={rewindConversation} onFork={forkConversation} />
       ) : null}
 
       {toast ? (

@@ -1,0 +1,115 @@
+{
+  "label": "gemma-before",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-before-mvqp58d9",
+  "startedAt": "2026-10-27T13:36:57.656Z",
+  "samples": [
+    {
+      "firstInput": 8856,
+      "firstCached": 0,
+      "calls": 1,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2948
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 250
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "memory",
+            "label": "Memória e contexto do turno",
+            "tokens": 182
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 69
+          }
+        ],
+        "total": 10079,
+        "window": 32768,
+        "lastRequest": 8904
+      }
+    },
+    {
+      "firstInput": 7142,
+      "firstCached": 0,
+      "calls": 1,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2956
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 554
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 250
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 6075
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "memory",
+            "label": "Memória e contexto do turno",
+            "tokens": 287
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 468
+          }
+        ],
+        "total": 10591,
+        "window": 32768,
+        "lastRequest": 7486
+      }
+    }
+  ],
+  "firstInput": [
+    8856,
+    7142
+  ],
+  "breakdown": {
+    "system": 2956,
+    "instructions": 554,
+    "skills": 250,
+    "tools": 6075,
+    "mcp": 1,
+    "memory": 287,
+    "messages": 468
+  },
+  "errors": []
+}

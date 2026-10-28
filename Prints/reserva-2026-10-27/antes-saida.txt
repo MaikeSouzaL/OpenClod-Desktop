@@ -1,0 +1,22 @@
+OK   configuração dos provedores de teste gravada
+OK   402: o turno 1 é respondido pelo provedor A (ainda com saldo) -> ["fake-pro:ok, guardei."]
+FAIL 402: o turno terminou com resposta (não parou por falta de crédito) -> {"state":"error","failures":["HTTP 402: {\"error\":{\"message\":\"Insufficient Balance\",\"type\":\"unknown_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"]}
+FAIL 402: quem respondeu foi o LLM real da reserva -> ["fake-pro:ok, guardei."]
+FAIL 402: o contexto foi preservado (o modelo novo sabe a palavra-código) -> ok, guardei.
+OK   402: o provedor esgotado foi chamado só uma vez no turno -> 1
+FAIL 402: a conversa avisa a troca (linha na conversa, com os dois nomes e o motivo) -> []
+FAIL 402: a linha de aviso aparece na tela -> []
+FAIL 402: a sessão passou a usar o modelo que funciona -> {"providerId":"fake-a","model":"fake-pro"}
+FAIL 402: o seletor de modelo do compositor mostra o modelo novo -> {"model":"fake-pro","provider":"Provedor A (falso)","notices":[]}
+FAIL 402: o rodapé do compositor mostra o provedor novo -> {"model":"fake-pro","provider":"Provedor A (falso)","notices":[]}
+FAIL 402: o turno seguinte continua no modelo que funciona -> ["fake-pro:ok, guardei."]
+FAIL 402: o provedor esgotado NÃO é tentado de novo a cada turno -> 2
+FAIL 402: uma conversa nova pedida no provedor esgotado já começa no que funciona -> {"providerId":"fake-a","model":"fake-pro"}
+FAIL 402: depois de salvar as configurações a sessão continua no modelo que funciona -> {"meta":{"providerId":"fake-a","model":"fake-pro"},"text":"ok, guardei."}
+FAIL 402: nem salvar as configurações fez o esgotado ser chamado de novo -> 3
+ERRO locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('.side-session').filter({ hasText: 'Reserva 402' }).first()[22m
+
+    at Object.openSession (C:\Users\Administrator\Desktop\Openclaudedescktop\scripts\lib\e2e.cjs:130:67)
+    at async main (C:\Users\Administrator\Desktop\Openclaudedescktop\scripts\ui-fallback.cjs:167:7)

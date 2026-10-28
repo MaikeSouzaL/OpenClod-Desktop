@@ -1,0 +1,112 @@
+{
+  "label": "baseline-lazy",
+  "startedAt": "2026-10-27T12:18:01.313Z",
+  "modelA": "deepseek-flash",
+  "modelB": "deepseek-v4-pro",
+  "lazyA": true,
+  "sessionA": {
+    "session": {
+      "sessionId": "ses_01ae68e4-2402-4b00-9209-ab1e8562c84b",
+      "projectId": "prj_f0fbdab1-52c7-4f09-ab69-2e9112224c36",
+      "provider": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "seconds": 44,
+    "timedOut": false,
+    "asked": [],
+    "calls": 6,
+    "input": 91429,
+    "cached": 51456,
+    "output": 6881,
+    "firstInput": 10834,
+    "tools": [
+      "list_dir",
+      "update_plan",
+      "write_file",
+      "write_file",
+      "write_file",
+      "write_file",
+      "run_command",
+      "update_plan"
+    ],
+    "usedMemory": [],
+    "askedUser": false,
+    "models": [
+      "deepseek-flash"
+    ],
+    "finalText": "Parado onde você pediu: passos 1 e 2 prontos, passo 3 não iniciado.\n\n## Arquivos criados\n\n- `package.json` — `\"type\": \"module\"`, sem dependências, `npm test` → `node --test`\n- `src/index.js` — `lerLinhas`, `validarLinha` (só essas duas exportações públicas; `exportarCsv` ainda não existe)\n- `test/lerLinhas.test.js` — 11 testes\n- `test/validarLinha.test.js` — 7 testes\n\n## Comportamento implementado",
+    "state": "done"
+  },
+  "afterA": {
+    "files": [
+      "CLAUDE.md",
+      "package.json",
+      "src/index.js",
+      "test/lerLinhas.test.js",
+      "test/validarLinha.test.js"
+    ],
+    "hidden": {
+      "passo 1: lerLinhas converte o valor e usa o cabeçalho": true,
+      "passo 2: validarLinha recusa valor negativo com a mensagem exata": true,
+      "passo 3: exportarCsv usa ; CRLF, vírgula decimal com duas casas": false,
+      "passo 3: exportarCsv termina com o rodapé de total": false
+    }
+  },
+  "sessionB": {
+    "session": {
+      "sessionId": "ses_84f46d7d-d932-4cf0-9cee-7b9304d81e5e",
+      "projectId": "prj_f0fbdab1-52c7-4f09-ab69-2e9112224c36",
+      "provider": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "seconds": 80,
+    "timedOut": false,
+    "asked": [],
+    "calls": 8,
+    "input": 153248,
+    "cached": 81408,
+    "output": 5231,
+    "firstInput": 11261,
+    "tools": [
+      "memory_page",
+      "list_dir",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "update_plan",
+      "edit_file",
+      "write_file",
+      "run_command",
+      "edit_file",
+      "run_command",
+      "update_plan"
+    ],
+    "usedMemory": [
+      "memory_page"
+    ],
+    "askedUser": false,
+    "models": [
+      "deepseek-v4-pro"
+    ],
+    "finalText": "Passo 3 concluído. A biblioteca `relatorio` está completa.\n\n## O que mudou\n- `src/index.js` — adicionadas `formatarDinheiro(valor)` (interna) e `exportarCsv(linhas)` (pública). Agora as três funções públicas (`lerLinhas`, `validarLinha`, `exportarCsv`) saem de `src/index.js`.\n- `test/exportarCsv.test.js` — novo arquivo com 7 testes.\n\n## Comportamento de `exportarCsv(linhas)`\n- Cabeçalho `nome;valo",
+    "state": "done"
+  },
+  "afterB": {
+    "files": [
+      "CLAUDE.md",
+      "package.json",
+      "src/index.js",
+      "test/exportarCsv.test.js",
+      "test/lerLinhas.test.js",
+      "test/validarLinha.test.js"
+    ],
+    "hidden": {
+      "passo 1: lerLinhas converte o valor e usa o cabeçalho": true,
+      "passo 2: validarLinha recusa valor negativo com a mensagem exata": true,
+      "passo 3: exportarCsv usa ; CRLF, vírgula decimal com duas casas": true,
+      "passo 3: exportarCsv termina com o rodapé de total": true
+    }
+  },
+  "errors": []
+}

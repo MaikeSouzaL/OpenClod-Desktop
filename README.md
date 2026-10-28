@@ -151,21 +151,24 @@ que a UI finja uma ação que o núcleo não executou.
 
 ### Voz (Whisper local, fluxo Wispr Flow)
 
-- **Atalho global** configurável (padrão `Control+Alt+Space`). Pressione uma
-  vez para ouvir e outra para inserir; `Esc` cancela enquanto ouve.
-- **Botão de microfone** do compositor usa exatamente o mesmo motor: abre a
-  pílula flutuante, mostra o nível e o texto parcial, e insere no campo em foco
-  ao parar. Não há dois caminhos diferentes de ditado.
-- **Pílula flutuante** always-on-top, separada da janela principal, com estado
-  (carregando/ouvindo/inserindo/erro), medidor e partial text.
+- **Botão de microfone** do compositor: clicar inicia o ditado, o texto parcial
+  aparece no próprio campo e o texto final é inserido ao parar. `Esc` cancela.
+- **Atalho global opcional**, desligado por padrão; pode ser configurado em
+  Configurações → Voz.
+- **Pílula flutuante opcional** (desligada por padrão), com estado, medidor e
+  partial text, para quem prefere o estilo Wispr Flow.
 - **Inserção**: no compositor do Openclod, no cursor; em outro aplicativo, via
   clipboard + `Ctrl+V` (configurável em Configurações → Voz).
 - **Polish opcional**: corrige pontuação/vícios com uma chamada curta ao
   provedor padrão antes de inserir; desligado por padrão, porque envia o texto
   ao provedor.
-- **100% local por padrão**: Python 3.10 embutido + faster-whisper (CTranslate2)
-  + Silero VAD; modelos `tiny`, `base` e `small` em `resources/models/whisper`.
-  Nenhum áudio sai da máquina.
+- **100% local**: Python 3.10 embutido + faster-whisper (CTranslate2) + Silero
+  VAD; modelos `tiny`, `base` e `small` em `resources/models/whisper`. Nenhum
+  áudio sai da máquina.
+- **GPU NVIDIA sempre que disponível**: as DLLs de CUDA 12 / cuBLAS / cuDNN 9
+  vão embutidas e o motor tenta CUDA automaticamente, caindo para CPU se não
+  houver GPU ou driver compatível. A aceleração é o que mantém o modelo
+  `small` em tempo real.
 
 ### Interface
 
@@ -185,8 +188,15 @@ que a UI finja uma ação que o núcleo não executou.
 - Painel lateral redimensionável, maximizável e movível para a esquerda.
 - **Tarefas em segundo plano** do agente e **Manter computador ativo**.
 - Páginas **Projetos**, **Agendados** (tarefas recorrentes que abrem uma
-  sessão no horário, enquanto o app está aberto) e **Personalização** (skills,
+  sessão Cowork ou Code, à sua escolha, no horário, enquanto o app está aberto)
+  e **Personalização** (skills,
   conectores MCP com preset do REA, hooks).
+- **Revisão de melhorias** (Atividades): conta limitações recorrentes, falhas por
+  ferramenta, aprovações recusadas, uso por provedor e a memória do projeto, e
+  salva um relatório com evidências como página de memória e nota em Atividades.
+  Botão manual e opção semanal em Agendados; um analista de IA opcional (sem
+  ferramentas, somente leitura) comenta as evidências. Nada é aplicado sozinho.
+  Detalhes e limites: [`docs/IMPROVEMENT-REVIEW.md`](docs/IMPROVEMENT-REVIEW.md).
 - Abertura de arquivo/pasta no Explorer, limitada às raízes autorizadas.
 - Captura de tela nativa sob demanda.
 - Uso de tokens por sessão e orçamento de custo configurável (o bloqueio por
@@ -199,10 +209,31 @@ que a UI finja uma ação que o núcleo não executou.
 ### Integrações
 
 - Provedores OpenAI-compatíveis e Anthropic, com presets e campos editáveis.
-- Servidores **MCP por stdio**, com ferramentas expostas como
-  `mcp__servidor__ferramenta`.
-- Skills em markdown (`SKILL.md`) carregadas sob demanda.
+- **Google Colab (GPU) como servidor de LLM**: Configurações → Provedores → *Abrir o Google Colab* grava um notebook (mostrado
+  no cartão como um arquivo que você **arrasta para dentro do Colab**) que lê a GPU do Colab (T4 → A100/H100), **lista todos os
+  modelos abertos que cabem nela** (agentes, código, raciocínio, visão e **sem censura**) e **para numa caixa de seleção** com o
+  botão *Usar este modelo* (2 minutos; sem escolha, roda sozinho o melhor com visão e ferramentas; também dá para escolher pelo
+  número ou pelo tipo nas Opções), só depois baixa o modelo, sobe um servidor protegido por chave com túnel e mostra um **código de
+  conexão**; colado no app, vira um provedor comum (seletor de modelo e reserva automática). **O Google pode encerrar esse uso
+  sem aviso**: limites, termos, segurança e o que foi (e não foi) provado em [`docs/COLAB.md`](docs/COLAB.md).
+- Servidores **MCP por stdio e remotos (HTTP/SSE)**, com ferramentas expostas como
+  `mcp__servidor__ferramenta`. **Diretório de 900 conectores** (o do Claude + o catálogo próprio) em
+  Personalização → Conectores: login OAuth de 1 clique, chave de API ou app OAuth próprio, permissão por ferramenta e
+  segredos no cofre do sistema. Detalhes e o que foi testado em [`docs/CONECTORES.md`](docs/CONECTORES.md).
+- Skills em markdown (`SKILL.md`) carregadas sob demanda, com sugestão automática das que casam com o pedido.
+- **Memória em grafo e economia de tokens**: prompt do sistema estável (o cache do provedor sobrevive entre turnos), busca
+  automática de memória por pedido (páginas ranqueadas + vizinhos por links), cápsula de continuidade para outro modelo
+  assumir o trabalho, skills/agentes/ferramentas sugeridos só quando servem e nove ferramentas pouco usadas fora da lista de
+  toda chamada (o piso de uma sessão nova caiu de 12% a 15%, medido com modelos DeepSeek reais: 9 401 → 8 274 e 10 553 → 8 974 tokens). Medições reais em
+  [`docs/MEMORIA-E-TOKENS.md`](docs/MEMORIA-E-TOKENS.md).
+- **Áudio e vídeo anexados são processados sozinhos** (sem interface): transcrição com tempos, frames por mudança de cena
+  sem repetições, folhas de contato e texto da tela (OCR) vão para a memória do projeto, e qualquer modelo usa isso como
+  contexto, inclusive em outra sessão. Lógica do claude-real-video (MIT) portada para o runtime embutido (PyAV, numpy,
+  faster-whisper; sem ffmpeg nem Pillow). Medições e limites em [`docs/MIDIA.md`](docs/MIDIA.md).
 - Navegador Playwright usando Chrome/Edge instalados ou Chromium do Playwright.
+- **Extensão própria para o Chrome** (v0.2.0): opera o seu Chrome já aberto, mostra "Openclod está controlando esta aba"
+  com botão Parar e tem popup de status. Instalação guiada e `.zip` para distribuir em
+  [`docs/CHROME-EXTENSION.md`](docs/CHROME-EXTENSION.md) (`npm run pack:chrome-extension`).
 - Computer Use via `open-computer-use` (opcional) + captura GDI nativa.
 
 ## 3. O que não existe nesta versão
@@ -246,9 +277,9 @@ Para evitar expectativas erradas:
 | Sistema | Windows 10 ou Windows 11, **x64** |
 | Node.js | **22.12 ou superior** (22 LTS recomendado) — ver nota abaixo |
 | npm | 10 ou superior (acompanha o Node 22) |
-| Espaço em disco | algumas centenas de MB para `node_modules` + Electron |
+| Espaço em disco | ~3 GB para o aplicativo completo (Electron, Python, modelos Whisper e CUDA) |
 | Rede | necessária apenas para provedores remotos, web e instalação de dependências |
-| Opcional | Microfone e ~1 GB de espaço para o Python + modelos Whisper embutidos (ditado) |
+| Opcional | Microfone para ditado; GPU NVIDIA com driver compatível com CUDA 12 para transcrição em tempo real (sem ela, CPU) |
 | Opcional | Git no `PATH` (ferramentas de git) |
 | Opcional | Google Chrome ou Microsoft Edge (navegador) |
 | Opcional | `@opensymph/open-computer-use` (Computer Use por UI Automation) |
@@ -284,6 +315,9 @@ npm run dist
 
 # 7. Build sem instalador (release/win-unpacked)
 npm run dist:dir
+
+# 8. E2E em app real, ex.: Provedores → Google Colab (GPU) (dublê local do Colab + modelo real; docs/COLAB.md)
+node scripts/ui-colab.cjs
 ```
 
 - `npm run build` executa `typecheck` antes do bundle. Se o typecheck falhar, o
@@ -531,6 +565,26 @@ Requisitos:
    (`Permitir controle real de mouse e teclado`). Sem isso, o agente pode listar
    janelas, ler a árvore de acessibilidade e capturar tela, mas não clicar/digitar.
 
+**Onde ele está liberado:** o **Chat (Início)** abre as conversas novas em Computer Use, com arquivos, terminal e
+controle do Windows: um pedido como "crie uma pasta na minha área de trabalho" é feito, e não só explicado. A
+política de permissões continua valendo (o que pede aprovação ainda pede). O modo somente leitura (`Conversar`, no
+menu do compositor) segue disponível; conversas antigas do Chat ficam no modo em que foram criadas.
+
+**Como ele aponta com o mouse:**
+- `computer_screenshot` captura **um monitor por vez** (o principal por padrão; `monitor=2` para o outro; `monitor=0`
+  junta todos, com menos detalhe). O resultado lista os monitores e diz para capturar o outro quando o que se procura
+  não está na imagem, ou usar a tela que o usuário indicar. Antes, dois monitores de 1920 px viravam uma imagem de
+  1600 px (1 px da imagem = 2,4 px reais).
+- O resultado também diz **em que coordenadas apontar**: pixels da imagem para a maioria dos modelos, e **relativas de 0
+  a 1000** para a família Qwen3-VL (Qwen3.5/3.6/3.8, inclusive o do Colab) e UI-TARS, que são treinados assim. Lidas
+  como pixels, as coordenadas desses modelos caíam longe do alvo.
+- Depois de `computer_mouse_move` ou de um clique por coordenada, o modelo recebe um **recorte 1:1 de 220x220 px ao redor
+  do ponteiro com uma cruz vermelha**, para conferir se parou sobre o alvo antes de clicar.
+- Uma ferramenta do modo chamada pelo nome sem `tool_load` (ex.: `computer_screenshot`) é carregada e executada na hora,
+  em vez de devolver "não está carregada" (ferramentas de MCP continuam pedindo `tool_load`).
+- Provas: `tests/computer-pointer-grid.test.ts`, `node scripts/ui-chat-computer.cjs --mouse` (janela-alvo
+  `scripts/lib/click-target.ps1`; mexe no mouse de verdade) e, com o modelo do Colab, `--real --provider colab`.
+
 Ordem de percepção instruída ao agente (prompt + descrições das ferramentas):
 
 1. `computer_list_windows` para descobrir app/janela;
@@ -725,6 +779,8 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 - Matriz de dependências e compatibilidade: [`docs/DEPENDENCY_MATRIX.md`](docs/DEPENDENCY_MATRIX.md).
 - Análise do Wispr Flow (REA) e decisão de implementação: [`docs/research/WISPR_FLOW.md`](docs/research/WISPR_FLOW.md).
 - Estudo do ai-memory e da memória por projeto: [`docs/research/AI_MEMORY.md`](docs/research/AI_MEMORY.md).
+- Auditoria completa do harness (testes reais, requisitos × código, telas × Claude Desktop, 670 capacidades do Claude Code):
+  [`docs/AUDITORIA-HARNESS-2026-10-27.md`](docs/AUDITORIA-HARNESS-2026-10-27.md) e [`docs/audit/`](docs/audit/).
 - Avisos de terceiros: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## 16. Privacidade

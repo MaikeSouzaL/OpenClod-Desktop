@@ -1,0 +1,394 @@
+{
+  "generatedAt": "2026-10-25T03:50:51.0741989-03:00",
+  "total": 55,
+  "cloned": 0,
+  "existing": 55,
+  "failed": 0,
+  "items": [
+    {
+      "category": "agents",
+      "url": "https://github.com/anomalyco/opencode",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\opencode",
+      "state": "existing",
+      "commit": "0749dec67568a5a4dcc8ce42b2db5da8fe4ce6fa"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/All-Hands-AI/OpenHands",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\All-Hands-AI--OpenHands",
+      "state": "existing",
+      "commit": "b185939d3dec3b203b0651c675f175ee5b4ed43e"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/Aider-AI/aider",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\Aider-AI--aider",
+      "state": "existing",
+      "commit": "5dc9490bb35f9729ef2c95d00a19ccd30c26339c"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/openai/codex",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\openai--codex",
+      "state": "existing",
+      "commit": "970111f6cb62cc02fe36a82ea7d71b37a2889c97"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/cline/cline",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\cline--cline",
+      "state": "existing",
+      "commit": "40c5d99031fe1128189c5b52e40638d2b7787754"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/block/goose",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\block--goose",
+      "state": "existing",
+      "commit": "2b17adc33a7176e701c2fef9578a5fc5834ea89a"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/SWE-agent/SWE-agent",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\SWE-agent--SWE-agent",
+      "state": "existing",
+      "commit": "3ea751c087f32b16e039a2233dd6eefecef325d5"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/OpenInterpreter/open-interpreter",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\OpenInterpreter--open-interpreter",
+      "state": "existing",
+      "commit": "ac1fcc8fe57aba51fcc3c79afd57a0883237fe87"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/QwenLM/qwen-code",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\QwenLM--qwen-code",
+      "state": "existing",
+      "commit": "b3783a36aae503a13b3d7dad3614f3ff78249413"
+    },
+    {
+      "category": "agents",
+      "url": "https://github.com/Kilo-Org/kilocode",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\agents\\Kilo-Org--kilocode",
+      "state": "existing",
+      "commit": "9723be621429771ea47a2614b0ac433448023cec"
+    },
+    {
+      "category": "orchestration",
+      "url": "https://github.com/langchain-ai/langgraph",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\orchestration\\langchain-ai--langgraph",
+      "state": "existing",
+      "commit": "4c52e129eb1ab69a3da58b799f67929f77d81149"
+    },
+    {
+      "category": "orchestration",
+      "url": "https://github.com/crewAIInc/crewAI",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\orchestration\\crewAIInc--crewAI",
+      "state": "existing",
+      "commit": "38db11e3324fa0e23beb5eecd0d87e8e31ca2bb0"
+    },
+    {
+      "category": "orchestration",
+      "url": "https://github.com/pydantic/pydantic-ai",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\orchestration\\pydantic--pydantic-ai",
+      "state": "existing",
+      "commit": "4ee11516b5be6b767654304ec8fe346b81369597"
+    },
+    {
+      "category": "orchestration",
+      "url": "https://github.com/agno-agi/agno",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\orchestration\\agno-agi--agno",
+      "state": "existing",
+      "commit": "6d5af04a72f7b152f433394b1bd4ab740fde8aed"
+    },
+    {
+      "category": "orchestration",
+      "url": "https://github.com/microsoft/autogen",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\orchestration\\microsoft--autogen",
+      "state": "existing",
+      "commit": "004749e6b7102c8fd317b9b1499ce5807223c278"
+    },
+    {
+      "category": "mcp",
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\mcp\\modelcontextprotocol--servers",
+      "state": "existing",
+      "commit": "ef9808f71090d0db3eda99e2af2ba78f1086f4fb"
+    },
+    {
+      "category": "mcp",
+      "url": "https://github.com/modelcontextprotocol/typescript-sdk",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\mcp\\modelcontextprotocol--typescript-sdk",
+      "state": "existing",
+      "commit": "951fe5603a7ec0b2dcb6a0b95d92cd86f93ad9e5"
+    },
+    {
+      "category": "mcp",
+      "url": "https://github.com/modelcontextprotocol/python-sdk",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\mcp\\modelcontextprotocol--python-sdk",
+      "state": "existing",
+      "commit": "a525a3d9bece967d91534b746a6c842931b7b4ec"
+    },
+    {
+      "category": "mcp",
+      "url": "https://github.com/modelcontextprotocol/modelcontextprotocol",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\mcp\\modelcontextprotocol--modelcontextprotocol",
+      "state": "existing",
+      "commit": "dae694f61a31f7a3ec2af3aff709e11f70f61e48"
+    },
+    {
+      "category": "mcp",
+      "url": "https://github.com/BrethofAI/awesome-mcp-servers",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\mcp\\BrethofAI--awesome-mcp-servers",
+      "state": "existing",
+      "commit": "4222d89c05f1099050c4dd3ac0cfca31808d6994"
+    },
+    {
+      "category": "computer-use",
+      "url": "https://github.com/CarlosShao/win-computer-use",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\computer-use\\CarlosShao--win-computer-use",
+      "state": "existing",
+      "commit": "e4b15d56dfc5b01ca19fac79116b90c71f0979f7"
+    },
+    {
+      "category": "computer-use",
+      "url": "https://github.com/dutuanan96/desktop-use",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\computer-use\\dutuanan96--desktop-use",
+      "state": "existing",
+      "commit": "522d4488cd1ade31e5f08fb0bdf7222f62c1d150"
+    },
+    {
+      "category": "computer-use",
+      "url": "https://github.com/asweigart/pyautogui",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\computer-use\\asweigart--pyautogui",
+      "state": "existing",
+      "commit": "b4255d0be42c377154c7d92337d7f8515fc63234"
+    },
+    {
+      "category": "browser",
+      "url": "https://github.com/browser-use/browser-use",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\browser\\browser-use--browser-use",
+      "state": "existing",
+      "commit": "3df5806a0d097a1546d92c49bcf1b28c9972c3bd"
+    },
+    {
+      "category": "browser",
+      "url": "https://github.com/microsoft/playwright",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\browser\\microsoft--playwright",
+      "state": "existing",
+      "commit": "91a765d1681cb3eeb0d0fb89fefec3cf0d21bd9b"
+    },
+    {
+      "category": "browser",
+      "url": "https://github.com/puppeteer/puppeteer",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\browser\\puppeteer--puppeteer",
+      "state": "existing",
+      "commit": "08e7b1aebe60462b6f7834e9dfe0f6c70464247c"
+    },
+    {
+      "category": "browser",
+      "url": "https://github.com/browserbase/stagehand",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\browser\\browserbase--stagehand",
+      "state": "existing",
+      "commit": "8023f34161d650c196dc343d2c232fb5e129a826"
+    },
+    {
+      "category": "models",
+      "url": "https://github.com/BerriAI/litellm",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\models\\BerriAI--litellm",
+      "state": "existing",
+      "commit": "dddbaa803d6e9fcc862ea7a5412f771cb1ae040e"
+    },
+    {
+      "category": "models",
+      "url": "https://github.com/ollama/ollama",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\models\\ollama--ollama",
+      "state": "existing",
+      "commit": "d44c2581904a98430e348d89cc2af1529b1808a0"
+    },
+    {
+      "category": "models",
+      "url": "https://github.com/ggml-org/llama.cpp",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\models\\ggml-org--llama.cpp",
+      "state": "existing",
+      "commit": "b3fa69955ea81c3b60e77e3c1e2224c4a826ffb9"
+    },
+    {
+      "category": "models",
+      "url": "https://github.com/vercel/ai",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\models\\vercel--ai",
+      "state": "existing",
+      "commit": "682e2dd71456f14f9da33a1b983d1998c3a1184c"
+    },
+    {
+      "category": "models",
+      "url": "https://github.com/OpenRouterTeam/typescript-sdk",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\models\\OpenRouterTeam--typescript-sdk",
+      "state": "existing",
+      "commit": "f8f0d83627c78dbce6b95a78cace5473ba9ac17b"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/BurntSushi/ripgrep",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\BurntSushi--ripgrep",
+      "state": "existing",
+      "commit": "6892bc2b7efe5909cbbeec8f757ed2c4c76b1d30"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/tree-sitter/tree-sitter",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\tree-sitter--tree-sitter",
+      "state": "existing",
+      "commit": "dfe770858e3cfd8e8b29a79ea17da390a6f60319"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/ast-grep/ast-grep",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\ast-grep--ast-grep",
+      "state": "existing",
+      "commit": "aaa80f08698dee907402f844da06850c435c431e"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/universal-ctags/ctags",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\universal-ctags--ctags",
+      "state": "existing",
+      "commit": "82494361bb3e7d4f7cf1d2bdc0d0e9001c926e45"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/sourcegraph/scip",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\sourcegraph--scip",
+      "state": "existing",
+      "commit": "d556dd3c24b3c1787e0b62cd31f25188300e3098"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/eclipse-jdtls/eclipse.jdt.ls",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\eclipse-jdtls--eclipse.jdt.ls",
+      "state": "existing",
+      "commit": "6d1e57a2b1752adff9bfa767668cf4e78809b625"
+    },
+    {
+      "category": "code-analysis",
+      "url": "https://github.com/microsoft/language-server-protocol",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\code-analysis\\microsoft--language-server-protocol",
+      "state": "existing",
+      "commit": "baf2db31b5fb314a8f358f9a839d3c66e9d98734"
+    },
+    {
+      "category": "memory",
+      "url": "https://github.com/mem0ai/mem0",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\memory\\mem0ai--mem0",
+      "state": "existing",
+      "commit": "2c81af3bbe27d9bccb09c772d583df9e9be72ee5"
+    },
+    {
+      "category": "memory",
+      "url": "https://github.com/chroma-core/chroma",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\memory\\chroma-core--chroma",
+      "state": "existing",
+      "commit": "52ce8448cb38a498f1660d55ea80df25b78f000a"
+    },
+    {
+      "category": "memory",
+      "url": "https://github.com/qdrant/qdrant",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\memory\\qdrant--qdrant",
+      "state": "existing",
+      "commit": "222b2e44ab1c3f17e8246396ead6558e45041df7"
+    },
+    {
+      "category": "memory",
+      "url": "https://github.com/asg017/sqlite-vec",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\memory\\asg017--sqlite-vec",
+      "state": "existing",
+      "commit": "04d28bd21773981e2d266bbf6aa4efbd011eb4f6"
+    },
+    {
+      "category": "memory",
+      "url": "https://github.com/run-llama/llama_index",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\memory\\run-llama--llama_index",
+      "state": "existing",
+      "commit": "619d74664e8404612038bc15a1a40c686037277c"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/electron/electron",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\electron--electron",
+      "state": "existing",
+      "commit": "96a2dc1f28a4e4a32fdc19d54ba0af36c7f2c536"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/tauri-apps/tauri",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\tauri-apps--tauri",
+      "state": "existing",
+      "commit": "1fc6d9c85c7d9c79f44afc408853e4b5d3ac1e42"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/xtermjs/xterm.js",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\xtermjs--xterm.js",
+      "state": "existing",
+      "commit": "991857a1b1cacf06f9531ba74a6e927a7a6398bb"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/microsoft/monaco-editor",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\microsoft--monaco-editor",
+      "state": "existing",
+      "commit": "dbf1945df2ff7e46512d2f548cc5c0977a3eadd8"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/codemirror/dev",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\codemirror--dev",
+      "state": "existing",
+      "commit": "c010426d06689a7115aa9df08425126b6d3ead2f"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/zed-industries/zed",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\zed-industries--zed",
+      "state": "existing",
+      "commit": "347f171a3fd00a3b672382d78348b37bd969d17c"
+    },
+    {
+      "category": "desktop-ui",
+      "url": "https://github.com/crynta/terax-ai",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\desktop-ui\\crynta--terax-ai",
+      "state": "existing",
+      "commit": "bf7e03df0922dd6a707b916471c3eeedd962a373"
+    },
+    {
+      "category": "testing",
+      "url": "https://github.com/promptfoo/promptfoo",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\testing\\promptfoo--promptfoo",
+      "state": "existing",
+      "commit": "d7473995939fea50459ac4ec89d4411a8530a07c"
+    },
+    {
+      "category": "testing",
+      "url": "https://github.com/confident-ai/deepeval",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\testing\\confident-ai--deepeval",
+      "state": "existing",
+      "commit": "5410e3822dda5f889d5f35de3325a3738004aeb1"
+    },
+    {
+      "category": "testing",
+      "url": "https://github.com/langfuse/langfuse",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\testing\\langfuse--langfuse",
+      "state": "existing",
+      "commit": "602cbfdfa8d90be214332a049537e6cb75a50cf3"
+    },
+    {
+      "category": "testing",
+      "url": "https://github.com/open-telemetry/opentelemetry-js",
+      "path": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\repositorios\\_research\\testing\\open-telemetry--opentelemetry-js",
+      "state": "existing",
+      "commit": "44be44c2ed8a1e0fb0fd06a2142fca49c0ebbec3"
+    }
+  ]
+}

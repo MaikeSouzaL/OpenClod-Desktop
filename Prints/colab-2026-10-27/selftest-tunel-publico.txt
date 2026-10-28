@@ -1,0 +1,15 @@
+# O módulo do notebook atrás de um túnel Cloudflare REAL (cloudflared 2026.10.5), autoteste pelo endereço público https, 2026-10-27
+# (o nome do túnel é descartável e já não existe)
+
+parse_tunnel_url (do módulo, no log real do cloudflared): https://depends-accent-quad-bloggers.trycloudflare.com
+endereço público respondendo /healthz: true
+   [ok] Lista de modelos com a chave: modelo qwen3.5:4b listado
+   [ok] Chave errada é recusada: HTTP 401
+   [ok] Texto: respondeu 'pong'
+   [ok] Streaming (SSE): 28 pedaços, o 1º em 0.6 s, total 6.9 s
+   [ok] Imagem (azul): respondeu 'azul'
+   [ok] Imagem (verde): respondeu 'verde'
+   [ok] Chamada de ferramenta (stream): somar_numeros({"a":17,"b":25})
+
+autoteste pelo túnel público levou 25 s
+EXIT=0

@@ -19,6 +19,21 @@ function normalize(p: string): string {
   return WINDOWS ? resolved.toLowerCase() : resolved
 }
 
+/** Folders a Windows-style `%NAME%` prefix may stand for in a path (the shell expands them; the file tools did not). */
+const PATH_ENV_VARS = new Set(['TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PUBLIC', 'PROGRAMDATA', 'ONEDRIVE', 'HOME'])
+
+/**
+ * `%TEMP%\\script.py` -> the real temporary folder. Cowork tells the model to keep helper files in %TEMP%, and a file tool
+ * given that literally used to create a folder named "%TEMP%" inside the user's own folder. Only a leading, known folder
+ * variable is expanded; the result still goes through the same containment checks as any other path.
+ */
+export function expandLeadingEnv(input: string): string {
+  const match = /^%([A-Za-z]+)%(?=[\\/]|$)/.exec(input)
+  if (!match || !PATH_ENV_VARS.has(match[1].toUpperCase())) return input
+  const value = process.env[match[1]] ?? process.env[match[1].toUpperCase()]
+  return value ? value + input.slice(match[0].length) : input
+}
+
 /** Prevents path traversal and writes outside the declared project roots. */
 export class WorkspaceGuard {
   private readonly roots: string[]
@@ -52,19 +67,41 @@ export class WorkspaceGuard {
    * Resolves a possibly-relative path and rejects anything that escapes the
    * roots after symlink resolution of the deepest existing ancestor.
    */
-  resolve(input: string, base?: string): string {
-    if (!input || typeof input !== 'string') throw new SecurityError('caminho vazio', 'invalid')
+  resolve(rawInput: string, base?: string): string {
+    if (!rawInput || typeof rawInput !== 'string') throw new SecurityError('caminho vazio', 'invalid')
+    const input = expandLeadingEnv(rawInput)
     const absolute = path.isAbsolute(input) ? input : path.resolve(base ?? this.roots[0] ?? process.cwd(), input)
 
     // Personal workstation mode: the agent may work anywhere the user can,
     // which is what Computer Use needs for real files outside the project.
     if (this.unrestricted) return absolute
 
+    // Walk to the deepest existing ancestor, following links on the way. A symlink whose target does not exist
+    // yet (dangling) looks "missing" to existsSync, so the old walk skipped it and a later write created the file
+    // wherever the link pointed, outside the roots.
     let probe = absolute
-    while (!fs.existsSync(probe)) {
-      const parent = path.dirname(probe)
-      if (parent === probe) break
-      probe = parent
+    for (let hops = 0; hops < 32; hops++) {
+      let stat: fs.Stats | undefined
+      try {
+        stat = fs.lstatSync(probe)
+      } catch {
+        stat = undefined
+      }
+      if (!stat) {
+        const parent = path.dirname(probe)
+        if (parent === probe) break
+        probe = parent
+        continue
+      }
+      if (stat.isSymbolicLink()) {
+        try {
+          probe = path.resolve(path.dirname(probe), fs.readlinkSync(probe))
+          continue
+        } catch {
+          break
+        }
+      }
+      break
     }
     let real = probe
     try {

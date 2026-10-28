@@ -1,0 +1,110 @@
+{
+  "label": "gemma-after",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-after2-mvqq79hu",
+  "startedAt": "2026-10-27T13:39:50.241Z",
+  "samples": [
+    {
+      "firstInput": 6055,
+      "firstCached": 0,
+      "calls": 1,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2994
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 586
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 250
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 4548
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 335
+          }
+        ],
+        "total": 8714,
+        "window": 32768,
+        "lastRequest": 6302
+      }
+    },
+    {
+      "firstInput": 6331,
+      "firstCached": 0,
+      "calls": 1,
+      "meter": {
+        "items": [
+          {
+            "id": "system",
+            "label": "Instruções do sistema",
+            "tokens": 2994
+          },
+          {
+            "id": "instructions",
+            "label": "Instruções do projeto (CLAUDE.md)",
+            "tokens": 586
+          },
+          {
+            "id": "skills",
+            "label": "Skills (índice)",
+            "tokens": 250
+          },
+          {
+            "id": "tools",
+            "label": "Ferramentas (schemas)",
+            "tokens": 4548
+          },
+          {
+            "id": "mcp",
+            "label": "Ferramentas MCP (schemas)",
+            "tokens": 1
+          },
+          {
+            "id": "memory",
+            "label": "Memória e contexto do turno",
+            "tokens": 320
+          },
+          {
+            "id": "messages",
+            "label": "Mensagens",
+            "tokens": 486
+          }
+        ],
+        "total": 9185,
+        "window": 32768,
+        "lastRequest": 6685
+      }
+    }
+  ],
+  "firstInput": [
+    6055,
+    6331
+  ],
+  "breakdown": {
+    "system": 2994,
+    "instructions": 586,
+    "skills": 250,
+    "tools": 4548,
+    "mcp": 1,
+    "memory": 320,
+    "messages": 486
+  },
+  "errors": []
+}

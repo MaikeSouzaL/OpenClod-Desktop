@@ -1,0 +1,53 @@
+{
+  "label": "modelos",
+  "startedAt": "2026-10-27T19:27:54.910Z",
+  "scenarios": {
+    "modelos": {
+      "t": {
+        "seconds": 15,
+        "timedOut": false,
+        "state": "done",
+        "meta": {
+          "providerId": "ollama-real",
+          "model": "qwen3.5:4b"
+        },
+        "notes": [
+          "Provedor A (falso)/fake-pro falhou (quota: sem saldo ou cota); continuando com Provedor B (falso)/fake-b-1. A conversa, o plano e a memória do projeto foram preservados.",
+          "Provedor B (falso)/fake-b-1 falhou (rate_limit: limite de uso atingido); continuando com Provedor B (falso)/fake-b-2. A conversa, o plano e a memória do projeto foram preservados.",
+          "Provedor B (falso)/fake-b-2 falhou (rate_limit: limite de uso atingido); continuando com Ollama (modelo real)/qwen3.5:4b. A conversa, o plano e a memória do projeto foram preservados."
+        ],
+        "answeredBy": [
+          "qwen3.5:4b:pronto"
+        ],
+        "lastModel": "qwen3.5:4b",
+        "lastText": "pronto",
+        "failures": [],
+        "count": 5
+      },
+      "hits": {
+        "a": 1,
+        "b1": 1,
+        "b2": 1,
+        "b3": 0
+      }
+    }
+  },
+  "shotModelos": "Prints\\reserva-2026-10-27\\modelos-modelos-da-reserva.png",
+  "fakeHits": "402,429,429",
+  "proxyRequests": 1,
+  "errors": [],
+  "checks": {
+    "configuração dos provedores de teste gravada": "ok",
+    "modelos: o item do provedor ainda não mostra a lista de modelos (começa fechado)": "ok",
+    "modelos: ao abrir, lista os modelos do provedor com uma caixa por modelo": "ok",
+    "modelos: sem mexer, só o modelo principal está marcado": "ok",
+    "modelos: \"Selecionar todos\" marca todos": "ok",
+    "modelos: desmarcar um deixa os outros": "ok",
+    "modelos: a linha do provedor resume \"2 modelos\"": "ok",
+    "modelos: \"Salvar alterações\" grava só os modelos marcados": "ok",
+    "modelos: depois dos dois modelos marcados falharem, o LLM real respondeu": "ok",
+    "modelos: foram tentados nesta ordem: o esgotado, o 1º marcado, o 2º marcado": "ok",
+    "modelos: o modelo que NÃO foi marcado nunca foi chamado": "ok",
+    "modelos: a conversa avisou as três trocas": "ok"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "scenario": "connector",
+  "permission": "auto",
+  "team": false,
+  "startedAt": "2026-10-27T13:21:18.994Z",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-cowork-mvqpf9wf",
+  "detail": {
+    "connected": {
+      "ok": true,
+      "state": {
+        "id": "microsoft-learn",
+        "serverName": "microsoft-learn",
+        "status": "connected",
+        "detail": "3 ferramentas",
+        "toolCount": 3
+      }
+    },
+    "tools": [
+      "microsoft_docs_search",
+      "microsoft_code_sample_search",
+      "microsoft_docs_fetch"
+    ],
+    "ferramentas": {
+      "mcp__microsoft-learn__microsoft_docs_search": 1,
+      "list_dir": 1,
+      "write_file": 1,
+      "read_file": 1
+    },
+    "approvals": [],
+    "resumo": "# Azure Blob Storage lifecycle management overview\n\nURL: https://learn.microsoft.com/azure/storage/blobs/lifecycle-management-overview\n\nUma política de ciclo de vida é um documento JSON de regras que automatizam a movimentação entre camadas de acesso (por exemplo, hot → cool) e a expiração/exclusão de blobs, otimizando custo.\nCada regra combina condições (Creation Time, Last Modified Time e Last Accessed Time, se o rastreamento de acesso estiver ativo), ações (defina ao menos uma) e filtros por prefixos de caminho e blob tags, combinados com lógica AND; filtros não excluem blobs.\nÉ suportada para block blobs e append blobs em contas general-purpose v2, premium block blob e Blob Storage, e nã",
+    "finalText": "Pronto.\n\n**O que mudou:** criei `resumo-blob.md` na raiz do projeto — título da página, URL e 5 linhas de resumo (o resumo propriamente dito tem 5 linhas, dentro do limite de 6).\n\n**O que foi verificado:** a fonte é o conector `microsoft-learn` (`microsoft_docs_search`, consulta \"Azure Blob Storage lifecycle management policy overview\"), que retornou chunks da página *Azure Blob Storage lifecycle management overview* e das páginas relacionadas (`lifecycle-management-policy-structure`, `lifecycle"
+  },
+  "seconds": 26,
+  "checks": {
+    "conector-conecta-pelo-diretorio": "ok",
+    "conector-lista-ferramentas": "ok",
+    "sessao-cowork": "ok",
+    "modelo-usou-a-ferramenta-do-conector": "ok",
+    "chamada-ao-conector-deu-certo": "ok",
+    "resumo-entregue-na-pasta": "ok",
+    "resumo-cita-a-url-do-conector": "ok"
+  },
+  "errors": [],
+  "ok": true
+}

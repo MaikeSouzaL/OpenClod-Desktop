@@ -44,7 +44,21 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     id: 'atlassian',
     name: 'Atlassian (Jira + Confluence, oficial)',
     description:
-      'Servidor oficial Rovo MCP v2 por HTTP. Busca e cria issues no Jira, lê e edita páginas do Confluence, sprints, boards e Bitbucket. Use um API token pessoal (Basic) ou um token de service account.',
+      'Servidor oficial Rovo MCP v2 por HTTP, com login OAuth 2.1 no navegador. Busca e cria issues no Jira, lê e edita páginas do Confluence, sprints, boards e Bitbucket sem expor API token ao modelo.',
+    category: 'atlassian',
+    transport: 'http',
+    url: 'https://mcp.atlassian.com/v2/mcp',
+    oauth: true,
+    docs: 'https://www.atlassian.com/platform/remote-mcp-server',
+    notes:
+      'O primeiro acesso abre o login do Atlassian no navegador e guarda o token OAuth localmente. Se a organização bloquear OAuth, use "Atlassian (API token)" ou a variante local "Jira/Confluence (mcp-atlassian)".',
+    approvalTools: ['*delete*', '*transition*', '*create*', '*update*', '*edit*', '*comment*']
+  },
+  {
+    id: 'atlassian-token',
+    name: 'Atlassian (API token)',
+    description:
+      'Mesmo servidor oficial Rovo MCP v2, autenticado por e-mail + API token (Basic). Use quando a organização não permitir OAuth ou quando você já tiver um token de service account.',
     category: 'atlassian',
     transport: 'http',
     url: 'https://mcp.atlassian.com/v2/mcp',
@@ -55,7 +69,7 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     ],
     docs: 'https://support.atlassian.com/atlassian-ai-gateway/docs/configure-authentication-via-api-token/',
     notes:
-      'Se a organização não habilitou autenticação por API token no Rovo MCP, use a variante local "Jira/Confluence (mcp-atlassian)".',
+      'API token no Rovo MCP exige que um administrador da organização habilite esse método. Se não estiver habilitado, use a variante OAuth ou o mcp-atlassian local.',
     approvalTools: ['*delete*', '*transition*', '*create*', '*update*', '*edit*', '*comment*']
   },
   {
@@ -200,7 +214,9 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
     category: 'database',
     transport: 'stdio',
     command: 'uvx',
-    args: ['mcp-server-sqlite', '--db-path', '${DB_PATH}'],
+    // `mcp-server-sqlite` asks for `mcp>=1.6.0` and broke with mcp 2.x (AttributeError: 'Server' object has no attribute
+    // 'list_resources'); `mcp~=1.6` (the 1.x line, no `<` because cmd.exe would read it as a redirect) keeps it working.
+    args: ['--with', 'mcp~=1.6', 'mcp-server-sqlite', '--db-path', '${DB_PATH}'],
     env: [{ key: 'DB_PATH', label: 'Arquivo SQLite', required: true, example: 'C:\\dados\\app.db' }],
     docs: 'https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite'
   },

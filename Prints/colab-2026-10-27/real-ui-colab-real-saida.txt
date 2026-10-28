@@ -1,0 +1,31 @@
+OK   o cartão "Google Colab (GPU)" está na aba Provedores, com a área do código
+OK   o código REAL do Colab (feito pelo notebook rodando na GPU) é aceito e mostra a confirmação
+OK   a confirmação mostra o servidor, o modelo, a GPU, visão, ferramentas, contexto e a versão do notebook -> Confira antes de conectarServidor[endereço do túnel] túnel do ColabModeloqwen3.5:9b-q8_0GPUTesla T4 (15 GB)Imagenssim, o modelo lê imagensFerramentassimContexto65.536 tokensNotebookv1.0.0 · ollama 0.40.11 · original · gerado há 8 minAs conv
+OK   o endereço é um túnel do Colab (*.trycloudflare.com): a confirmação diz isso e não avisa de nada
+OK   o notebook do Colab é reconhecido como o original desta versão do Openclod (mesmo hash do servidor) -> sh d5b7aebf5b21
+OK   a confirmação avisa que a conversa e os arquivos passam por esse servidor
+OK   a chave não aparece em lugar nenhum da tela
+OK   a caixa do código fica mascarada por padrão (o código contém a chave) -> disc
+OK   conferir não grava nada: o settings.json segue sem o provedor do Colab
+OK   conectado: o provedor "colab" existe, com visão, ferramentas e a janela de contexto que o SERVIDOR informou -> {"vision":true,"tools":true,"ctx":65536,"model":"qwen3.5:9b-q8_0"}
+OK   a chave foi para o cofre: o settings.json guarda só "secret:colab" -> secret:colab
+OK   a chave não está em NENHUM arquivo do perfil (configurações, logs, dados), nem em UTF-8 nem em UTF-16 -> []
+OK   o código de conexão inteiro também não está em nenhum arquivo do perfil
+OK   o cartão passa a mostrar o servidor, o modelo, a GPU, "lê imagens" e o contexto -> [endereço do túnel]qwen3.5:9b-q8_0 · Tesla T4 (15 GB) · lê imagens · 65.536 tokensnotebook original v1.0.0 · conectado agora há pouco · resposta em 271 ms Testar agoraAjustes do provedorColar código novo Desconectar
+OK   depois de conectar a caixa do código some (não sobra a chave na tela)
+OK   o cartão do provedor Colab: endereço travado, sem campo de chave, sem "remover"
+OK   o seletor de modelo do compositor lista "Google Colab (GPU)" com o modelo, sem reiniciar o app -> ["Anthropic","OpenAI","DeepSeek","Kimi / Moonshot","Qwen (DashScope)","OpenRouter","OpenCode Go","OpenCode Zen","Ollama (local)","LM Studio (local)","Google Colab (GPU)"]
+OK   o compositor mostra o modelo do Colab na sessão
+OK   sessão real pela GPU do Colab: o modelo VIU a imagem (a cor certa foi escrita no arquivo) -> {"color":"verde","attempts":1,"final":"Criei o arquivo cor.txt com apenas a palavra \"verde\", pois é a cor predominante do quadrado na imagem."}
+OK   ...e CHAMOU a ferramenta write_file (chamada de ferramenta em stream pelo servidor do Colab) -> {"calls":["write_file"],"attempts":1}
+OK   o servidor do Colab contou os pedidos deste app, ao menos uma imagem e os tokens (e nenhum erro) -> {"requests":2,"images":2,"promptTokens":25042,"completionTokens":124,"errors":0}
+OK   a sessão terminou no Colab (a reserva não precisou entrar) -> {"providerId":"colab"}
+
+>>> Ao vivo no Colab. (o runtime foi parado pelo navegador e o arquivo de sinal criado)
+OK   o sinal de "runtime do Colab parado" chegou
+FAIL o runtime do Colab parou de verdade e a reserva assumiu sozinha no meio do turno: a sessão agora está no Ollama -> {"providerId":"colab"}
+FAIL a conversa avisa a troca, citando o Colab e o motivo "sem conexão" -> []
+OK   o histórico seguiu: o modelo da reserva respondeu sobre o arquivo criado antes -> Criei o arquivo **cor.txt** contendo apenas **"verde"** em minúsculas.
+ERRO page.waitForSelector: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('.transcript-notice') to be visible

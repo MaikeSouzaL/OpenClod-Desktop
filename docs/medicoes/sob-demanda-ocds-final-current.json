@@ -1,0 +1,197 @@
+{
+  "label": "ocds-final-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-or-current-mvqwvjvf",
+  "startedAt": "2026-10-27T16:40:18.655Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 16130,
+      "cachedTokens": 0,
+      "uncachedTokens": 16130,
+      "perCall": [
+        {
+          "input": 8038,
+          "cached": 0,
+          "output": 26
+        },
+        {
+          "input": 8092,
+          "cached": 0,
+          "output": 29
+        }
+      ],
+      "ms": 8111,
+      "timedOut": false,
+      "final": "Nenhum servidor MCP aparece configurado — a ferramenta retornou \"nenhum MCP configurado\".",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqww8cr_2vy8 criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 16961,
+      "cachedTokens": 0,
+      "uncachedTokens": 16961,
+      "perCall": [
+        {
+          "input": 8419,
+          "cached": 0,
+          "output": 114
+        },
+        {
+          "input": 8542,
+          "cached": 0,
+          "output": 73
+        }
+      ],
+      "ms": 12122,
+      "timedOut": false,
+      "final": "Handoff criado.\n\n- **id:** `ho_mvqww8cr_2vy8`\n- **resumo:** piso de tokens medido\n- **próximo passo:** rodar a suíte de testes\n\nA próxima sessão precisa chamar `memory_handoff accept` com esse id para assumir.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "list_skills",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 28424,
+      "cachedTokens": 18304,
+      "uncachedTokens": 10120,
+      "perCall": [
+        {
+          "input": 8509,
+          "cached": 4096,
+          "output": 39
+        },
+        {
+          "input": 9336,
+          "cached": 8448,
+          "output": 81
+        },
+        {
+          "input": 10579,
+          "cached": 5760,
+          "output": 190
+        }
+      ],
+      "ms": 10131,
+      "timedOut": false,
+      "final": "Nenhuma skill casa com \"pdf\".\n\nA busca retornou 4 itens, mas todos só mencionam PDF para **excluir** o uso:\n- `docx` — \"Não use para PDF...\"\n- `pptx` — \"Não use para ... PDF...\"\n- `qa-total` — \"PDF fora de QA (pdf)\" não é o caso\n- `svg-mast",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 18972,
+      "cachedTokens": 12288,
+      "uncachedTokens": 6684,
+      "perCall": [
+        {
+          "input": 9405,
+          "cached": 6144,
+          "output": 41
+        },
+        {
+          "input": 9567,
+          "cached": 6144,
+          "output": 285
+        }
+      ],
+      "ms": 8109,
+      "timedOut": false,
+      "final": "Busca feita com `list_agents` (query \"segurança\"): retornou **1 agente**.\n\n- **svg-verifier** — revisor independente de SVG/ícones (somente leitura); valida XML, **segurança** de SVG, viewBox, ids, legibilidade em vários tamanhos e contrast",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "totals": {
+    "modelCalls": 9,
+    "inputTokens": 80487,
+    "uncachedTokens": 49895,
+    "allTargetsOk": true
+  }
+}

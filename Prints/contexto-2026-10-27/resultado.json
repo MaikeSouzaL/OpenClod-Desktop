@@ -1,0 +1,69 @@
+{
+  "checks": {
+    "antes do primeiro turno o painel diz que é estimativa": "ok",
+    "sem turno, a medição ainda não existe": "ok",
+    "depois do turno o painel mostra a medição, sem o aviso de estimativa": "ok",
+    "a linha \"Instruções do sistema\" aparece": "ok",
+    "a linha \"Instruções do projeto (CLAUDE.md)\" aparece": "ok",
+    "a linha \"Skills (índice)\" aparece": "ok",
+    "a linha \"Ferramentas (schemas)\" aparece": "ok",
+    "o sistema real passa de 1 500 tokens (o número fixo antigo era 1 100)": "ok",
+    "os schemas das ferramentas são contados (o painel antigo não os mostrava)": "ok",
+    "as instruções do projeto são o tamanho do CLAUDE.md": "ok",
+    "o total medido está perto do que o provedor cobrou na última chamada (±25%)": "ok",
+    "sem erros de página": "ok"
+  },
+  "measured": {
+    "items": [
+      {
+        "id": "system",
+        "label": "Instruções do sistema",
+        "tokens": 2948
+      },
+      {
+        "id": "instructions",
+        "label": "Instruções do projeto (CLAUDE.md)",
+        "tokens": 453
+      },
+      {
+        "id": "skills",
+        "label": "Skills (índice)",
+        "tokens": 250
+      },
+      {
+        "id": "tools",
+        "label": "Ferramentas (schemas)",
+        "tokens": 6075
+      },
+      {
+        "id": "mcp",
+        "label": "Ferramentas MCP (schemas)",
+        "tokens": 1
+      },
+      {
+        "id": "messages",
+        "label": "Mensagens",
+        "tokens": 556
+      },
+      {
+        "id": "results",
+        "label": "Resultados de ferramentas",
+        "tokens": 15
+      },
+      {
+        "id": "calls",
+        "label": "Chamadas de ferramentas",
+        "tokens": 7
+      }
+    ],
+    "total": 10305,
+    "window": 1048576,
+    "lastRequest": 11055
+  },
+  "usage": {
+    "input": 21155,
+    "output": 592,
+    "cachedInput": 11264,
+    "costUsd": 0.0037452839999999998
+  }
+}

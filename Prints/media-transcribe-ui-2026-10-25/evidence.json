@@ -1,0 +1,24 @@
+{
+  "model": "deepseek/deepseek-flash",
+  "seconds": 14,
+  "checks": {
+    "turno-terminou-sem-erro": "ok",
+    "modelo-chamou-media_transcribe": "ok",
+    "argumentos-path-model-language": "ok",
+    "resultado-ok": "ok",
+    "resultado-tem-idioma-pt": "ok",
+    "resultado-tem-timestamps": "ok",
+    "resultado-tem-a-transcricao": "ok",
+    "sem-erros-de-console-ou-pagina": "ok"
+  },
+  "usage": {
+    "input": 64560,
+    "output": 446,
+    "cachedInput": 45696,
+    "costUsd": 0.006468576
+  },
+  "errors": [],
+  "ok": true,
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\media-transcribe-ui-2026-10-25\\01-media-transcribe.png",
+  "source": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\media-transcribe-ui-2026-10-25\\recado.wav"
+}

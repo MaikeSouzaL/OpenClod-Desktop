@@ -1,0 +1,647 @@
+/* Configurações → Provedores: a marca de cada provedor, a grade de provedores e o cartão do Google Colab (GPU).
+   Superfícies neutras e uma cor só de destaque; a cor mora na marca e no estado (ponto), não em caixas tingidas. */
+
+/* ------------------------------------------------------------------ marca */
+
+.pv-logo {
+  --pv-size: 36px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--pv-size);
+  height: var(--pv-size);
+  border-radius: calc(var(--pv-size) * 0.28);
+  background: color-mix(in srgb, var(--text) 6%, var(--elevated));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+}
+
+.pv-logo svg {
+  display: block;
+  width: 54%;
+  height: 54%;
+  fill: var(--pv-logo, currentColor);
+}
+
+.pv-initials {
+  font-size: calc(var(--pv-size) * 0.36);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--text-2);
+}
+
+/* ------------------------------------------------------------------ grade */
+
+.pv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.pv-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--elevated);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.pv-tile:hover {
+  border-color: color-mix(in srgb, var(--text) 20%, var(--border-soft));
+  background: color-mix(in srgb, var(--text) 3%, var(--elevated));
+}
+
+.pv-tile:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.pv-tile.is-default {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-soft));
+}
+
+.pv-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-status::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.pv-status[data-tone='ok'] {
+  color: var(--green);
+}
+
+.pv-status[data-tone='ok']::before,
+.pv-status[data-tone='bad']::before {
+  background: currentColor;
+}
+
+.pv-status[data-tone='bad'] {
+  color: var(--red);
+}
+
+.pv-tile-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pv-tile-name {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-tile-model {
+  overflow: hidden;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-tile-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-tile-foot > span {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ cartão do Colab */
+
+.colab-card {
+  display: grid;
+  gap: 16px;
+  margin: 14px 0 18px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--elevated);
+}
+
+.colab-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.colab-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.colab-title strong {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.colab-title span {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.colab-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.colab-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.colab-status.ok {
+  color: var(--green);
+}
+
+.colab-status.warn {
+  color: var(--amber);
+}
+
+.colab-status.bad {
+  color: var(--red);
+}
+
+.colab-lead {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.colab-lead strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.colab-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.colab-warning svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--amber);
+}
+
+.colab-warning p {
+  margin: 0;
+}
+
+.colab-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.colab-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* O servidor conectado */
+.colab-summary {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.colab-host {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colab-specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.colab-specs > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.colab-specs dt {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.colab-specs dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.colab-meta {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.colab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.colab-actions .colab-disconnect {
+  margin-left: auto;
+}
+
+/* Avisos de erro (túnel que caiu, código inválido...) */
+.colab-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--red) 28%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--red) 7%, transparent);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.colab-alert svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--red);
+}
+
+.colab-alert[data-tone='warn'] {
+  border-color: color-mix(in srgb, var(--amber) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--amber) 7%, transparent);
+}
+
+.colab-alert[data-tone='warn'] svg {
+  color: var(--amber);
+}
+
+.colab-open-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.colab-help {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* O notebook gravado: o arquivo para arrastar e os passos */
+.colab-steps {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  font-size: 12.5px;
+}
+
+.colab-file-row {
+  display: grid;
+  gap: 8px;
+}
+
+.colab-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--elevated);
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.colab-file:hover {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--text) 24%, var(--border));
+  background: color-mix(in srgb, var(--text) 3%, var(--elevated));
+}
+
+.colab-file:active {
+  cursor: grabbing;
+}
+
+.colab-file-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text-2);
+}
+
+.colab-file-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.colab-file-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.colab-file-text small {
+  color: var(--text-3);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.colab-file-grab {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.colab-steps ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: colab-step;
+  color: var(--text-2);
+}
+
+.colab-steps li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  line-height: 1.55;
+  counter-increment: colab-step;
+}
+
+.colab-steps li::before {
+  content: counter(colab-step);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Colar o código de conexão */
+.colab-paste {
+  display: grid;
+  gap: 10px;
+}
+
+.colab-paste .colab-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.colab-label small {
+  margin-left: 8px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.colab-code {
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono, ui-monospace, 'Cascadia Mono', Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.colab-code:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.colab-code.is-masked {
+  -webkit-text-security: disc;
+}
+
+.colab-preview {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.colab-preview > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.colab-preview dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.colab-preview dt {
+  color: var(--text-3);
+}
+
+.colab-preview dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.colab-preview code {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.colab-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+
+.colab-tag.ok {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--border));
+  color: var(--green);
+}
+
+.colab-tag.warn {
+  border-color: color-mix(in srgb, var(--amber) 35%, var(--border));
+  color: var(--amber);
+}
+
+/* Limites e termos */
+.colab-limits {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.colab-limits summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+}
+
+.colab-limits summary::-webkit-details-marker {
+  display: none;
+}
+
+.colab-limits summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.colab-limits[open] summary::before {
+  transform: rotate(45deg);
+}
+
+.colab-limits ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding-left: 18px;
+  line-height: 1.55;
+}
+
+.colab-limits p {
+  margin: 0;
+}
+
+.colab-limits a {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+  text-underline-offset: 2px;
+}

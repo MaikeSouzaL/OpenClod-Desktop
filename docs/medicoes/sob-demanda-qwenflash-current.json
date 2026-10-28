@@ -1,0 +1,217 @@
+{
+  "label": "qwenflash-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-current-mvqu4yua",
+  "startedAt": "2026-10-27T15:36:30.315Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "tool_load",
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 20236,
+      "cachedTokens": 0,
+      "uncachedTokens": 20236,
+      "perCall": [
+        {
+          "input": 6722,
+          "cached": 0,
+          "output": 67
+        },
+        {
+          "input": 6757,
+          "cached": 0,
+          "output": 43
+        },
+        {
+          "input": 6757,
+          "cached": 0,
+          "output": 44
+        }
+      ],
+      "ms": 10112,
+      "final": "Nenhum servidor MCP aparece configurado (0) — a ferramenta respondeu \"nenhum MCP configurado; use mcp_search e mcp_install\".",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqum7n0_739i criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 2,
+      "inputTokens": 14034,
+      "cachedTokens": 0,
+      "uncachedTokens": 14034,
+      "perCall": [
+        {
+          "input": 6911,
+          "cached": 0,
+          "output": 224
+        },
+        {
+          "input": 7123,
+          "cached": 0,
+          "output": 96
+        }
+      ],
+      "ms": 12104,
+      "final": "Handoff registrado.\n\n- **id:** `ho_mvqum7n0_739i`\n- Resumo: \"piso de tokens medido\"\n- Próximo passo: \"rodar a suíte de testes\"\n\nQuem retomar precisa chamar `memory_handoff accept` com esse id.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_load",
+        "list_skills",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 28729,
+      "cachedTokens": 0,
+      "uncachedTokens": 28729,
+      "perCall": [
+        {
+          "input": 7111,
+          "cached": 0,
+          "output": 107
+        },
+        {
+          "input": 7206,
+          "cached": 0,
+          "output": 39
+        },
+        {
+          "input": 7206,
+          "cached": 0,
+          "output": 180
+        },
+        {
+          "input": 7206,
+          "cached": 0,
+          "output": 393
+        }
+      ],
+      "ms": 20105,
+      "final": "**Nenhuma skill de PDF está instalada.**\n\nA busca `list_skills(query=\"pdf\")` devolveu 4 itens, mas todos por casamento de palavra no texto das descrições, não por capacidade real de lidar com PDF — e na maioria dos casos a menção é exatamen",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "tool_load",
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 4,
+      "inputTokens": 32356,
+      "cachedTokens": 0,
+      "uncachedTokens": 32356,
+      "perCall": [
+        {
+          "input": 8017,
+          "cached": 0,
+          "output": 88
+        },
+        {
+          "input": 8113,
+          "cached": 0,
+          "output": 42
+        },
+        {
+          "input": 8113,
+          "cached": 0,
+          "output": 88
+        },
+        {
+          "input": 8113,
+          "cached": 0,
+          "output": 218
+        }
+      ],
+      "ms": 16115,
+      "final": "Busca feita no catálogo de agentes:\n\n- `list_agents(query=\"segurança\")` → apenas **svg-verifier** (que menciona \"segurança\" só no sentido de validar SVG/XML).\n- Refazendo em inglês (`security review vulnerability`) → aparece o agente certo:",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/qwen3.8-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/qwen3.8-flash",
+  "totals": {
+    "modelCalls": 13,
+    "inputTokens": 95355,
+    "uncachedTokens": 95355,
+    "allTargetsOk": true
+  }
+}

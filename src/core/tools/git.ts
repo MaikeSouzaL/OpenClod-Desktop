@@ -20,6 +20,10 @@ function git(cwd: string, args: string[], timeout = 60_000): Promise<GitResult> 
   })
 }
 
+/** Files that `git_commit add_all` leaves out: they hold secrets far more often than source. */
+const SECRET_PATHSPECS = ['**/.env', '**/.env.*', '**/*.pem', '**/*.key', '**/*.pfx', '**/*.p12', '**/id_rsa*', '**/id_ed25519*', '**/*.keystore', '**/.npmrc']
+const SECRET_FILE = /(^|\/)(\.env(\..+)?|.*\.(pem|key|pfx|p12|keystore)|id_rsa.*|id_ed25519.*|\.npmrc)$/i
+
 export async function isGitRepo(cwd: string): Promise<boolean> {
   const result = await git(cwd, ['rev-parse', '--is-inside-work-tree'], 10_000)
   return result.code === 0 && result.stdout.trim() === 'true'
@@ -43,7 +47,8 @@ export const gitStatusTool: ToolDef = {
     return { title: 'git status', detail: 'estado do repositório' }
   },
   async execute(_raw, ctx) {
-    const result = await git(ctx.cwd, ['status', '--short', '--branch'])
+    // --untracked-files=all lists new files one per line (the default collapses a new folder into 'src/').
+    const result = await git(ctx.cwd, ['status', '--short', '--branch', '--untracked-files=all'])
     return {
       ...format(result),
       summary: result.stdout.trim().split('\n')[0] ?? 'git status'
@@ -110,7 +115,7 @@ export const gitCommitTool: ToolDef = {
   parallelSafe: false,
   schema: z.object({
     message: z.string().min(3),
-    add_all: z.boolean().optional().describe('Executar git add -A antes')
+    add_all: z.boolean().optional().describe('Executar git add -A antes (deixa de fora .env, chaves e certificados; para versioná-los de propósito use git add manualmente)')
   }),
   describe(a) {
     const args = a as { message: string }
@@ -126,13 +131,24 @@ export const gitCommitTool: ToolDef = {
       preview: args.message
     })
     if (!approved) return { ok: false, text: 'commit cancelado pelo usuário' }
+    let leftOut: string[] = []
     if (args.add_all) {
-      const add = await git(ctx.cwd, ['add', '-A'])
+      // Credentials never ride along with "add everything": .env files, private keys and certificates stay out
+      // (a file that is already tracked is untouched). They are listed below so the model can tell the user.
+      const add = await git(ctx.cwd, ['add', '-A', '--', '.', ...SECRET_PATHSPECS.map((spec) => `:(exclude,glob)${spec}`)])
       if (add.code !== 0) return format(add)
+      const untracked = await git(ctx.cwd, ['ls-files', '--others', '--exclude-standard', '-z'])
+      leftOut = untracked.stdout.split('\0').filter((file) => file && SECRET_FILE.test(file)).slice(0, 20)
     }
     const result = await git(ctx.cwd, ['commit', '-m', args.message])
     ctx.emit({ type: 'diff', sessionId: ctx.sessionId, files: ctx.tracker.changes() })
-    return { ...format(result), summary: result.code === 0 ? 'commit criado' : 'falha ao commitar' }
+    const base = format(result)
+    return {
+      ...base,
+      ...(leftOut.length ? { text: `${base.text}
+Não incluí (parecem credenciais): ${leftOut.join(', ')}. Adicione com git add se for mesmo para versionar.` } : {}),
+      summary: result.code === 0 ? 'commit criado' : 'falha ao commitar'
+    }
   }
 }
 
@@ -151,6 +167,11 @@ export const gitCheckoutTool: ToolDef = {
   },
   async execute(raw, ctx) {
     const args = this.schema.parse(raw) as { branch: string; create?: boolean }
+    // A branch name must never be read as an option (`-f`) or a path (`a.txt`): both used to
+    // reach `git checkout` and could throw away uncommitted work.
+    if (!/^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._\/@+-]{1,200}$/.test(args.branch) || args.branch.endsWith('/') || args.branch.endsWith('.lock')) {
+      return { ok: false, text: `nome de branch inválido: "${args.branch}". Use letras, números e . _ - / @ +, sem começar por "-" e sem "..".` }
+    }
     const approved = await ctx.approve({
       tool: 'git_checkout',
       title: args.create ? 'Criar branch' : 'Trocar de branch',
@@ -159,7 +180,8 @@ export const gitCheckoutTool: ToolDef = {
       preview: args.branch
     })
     if (!approved) return { ok: false, text: 'operação cancelada' }
-    const result = await git(ctx.cwd, args.create ? ['checkout', '-b', args.branch] : ['checkout', args.branch])
+    // `switch` only handles branches and refuses to overwrite local changes (no path restore, no force).
+    const result = await git(ctx.cwd, args.create ? ['switch', '-c', args.branch] : ['switch', args.branch])
     return { ...format(result), summary: `branch ${args.branch}` }
   }
 }

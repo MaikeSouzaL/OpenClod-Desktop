@@ -1,0 +1,106 @@
+EXECUÇÃO REAL NO GOOGLE COLAB (2026-10-27)
+=========================================
+Quem rodou: o notebook openclod-servidor-llm.ipynb (v1.0.0, servidor sha d5b7aebf5b21), enviado pelo navegador Chrome do usuário (já logado),
+com "Ambiente de execução > Executar tudo" uma única vez. Runtime: GPU T4 do Colab.
+
+O que está aqui são os textos que as células imprimiram, copiados da tela. Foram retirados: a chave de acesso, o código de conexão e o
+endereço do túnel (aparece como [endereço do túnel]). Onde o texto original é longo, ficou só um trecho (a tabela completa do modelo por GPU
+está na captura real-colab-01-gpu-e-modelo.png).
+
+Plano e custo (painel "Recursos" do Colab, lido na tela)
+  Conta sem assinatura, com unidades de computação pagas. Com a T4 conectada o Colab mostrou "Taxa de uso: aproximadamente 1.07 por hora".
+  Gasto desta execução inteira: cerca de 0,26 unidade (do clique em Executar tudo até excluir o runtime, ~16 min).
+
+Linha do tempo (relógio do Colab)
+  14:56  Executar tudo (conecta na T4)
+  ~15:05 autoteste completo e código de conexão na tela (≈ 9 a 10 minutos depois)
+  ~15:12 "Desconectar e excluir o ambiente de execução"
+
+------------------------------------------------------------------------------------------------------------------------
+1 · Conferir a GPU (0 s)
+------------------------------------------------------------------------------------------------------------------------
+Openclod: servidor de LLM no Google Colab, notebook 1.0.0
+GPU encontrada: Tesla T4 | memória 15 GB (livre 14,6 GB) | driver 580.82.07 | compute 7.5
+{'name': 'Tesla T4', 'total_mib': 15360, 'free_mib': 14913, 'driver': '580.82.07', 'cc': '7.5'}
+
+------------------------------------------------------------------------------------------------------------------------
+2 · Escolher o modelo para esta GPU (0 s) [trecho]
+------------------------------------------------------------------------------------------------------------------------
+Escolha para GPU de 16 GB (T4):
+  Qwen3.5-9B em Q8_0 (10 GB) com 64k de contexto: visão e ferramentas; a T4 não tem bf16, mas o GGUF roda em fp16.
+  -> qwen3.5:9b-q8_0 | contexto 65536 tokens | cache KV f16 | pensamento desligado
+     qwen3.5:9b-q4_K_M | contexto 131072 tokens | cache KV f16 | pensamento desligado
+     qwen3.5:9b-q4_K_M | contexto 65536 tokens | cache KV f16 | pensamento desligado
+     qwen3.5:4b-q8_0 | contexto 65536 tokens | cache KV f16 | pensamento desligado
+  (as opções seguintes só entram se a anterior não couber 100% na GPU)
+  Fontes: https://ollama.com/library/qwen3.5  https://huggingface.co/Qwen/Qwen3.5-9B
+
+------------------------------------------------------------------------------------------------------------------------
+3 · Instalar o motor (Ollama) (39 s)
+------------------------------------------------------------------------------------------------------------------------
+Instalando o Ollama 0.40.11 (binário oficial, ~1,5 GB; leva de 1 a 3 minutos)...
+   Ollama baixado: 1.4 GB.
+   Verificado (o SHA-256 confere). Extraindo...
+Ollama pronto: Warning: could not connect to a running Ollama instance      <- defeito de texto, corrigido (engine_version_text):
+'/content/openclod/ollama/bin/ollama'                                          a linha deveria trazer a versão
+
+------------------------------------------------------------------------------------------------------------------------
+4 · Baixar o modelo e carregar na GPU (3 min)
+------------------------------------------------------------------------------------------------------------------------
+Tentativa 1 de 4: qwen3.5:9b-q8_0, contexto 65536 tokens
+   modelo baixado.   (9,7 GB a ~150 MB/s)
+   carregando na GPU (pode levar um minuto)...
+   VRAM em uso: 11,7 de 15 GB | 100% do modelo na GPU | contexto efetivo 65536
+
+Modelo no ar: qwen3.5:9b-q8_0 | visão: sim | ferramentas: sim | pensamento: sim
+{'tag': 'qwen3.5:9b-q8_0', 'ctx': 65536, 'kv': 'f16', 'parallel': 1, 'thinking': 'off', 'weights_gb': 10}
+
+------------------------------------------------------------------------------------------------------------------------
+5 · Subir o servidor (0 s)
+------------------------------------------------------------------------------------------------------------------------
+Servidor local no ar na porta 8000; exige chave de acesso (gerada agora, vale só nesta execução).
+
+------------------------------------------------------------------------------------------------------------------------
+6 · Abrir o túnel público (35 s)
+------------------------------------------------------------------------------------------------------------------------
+   cloudflared baixado: 38.4 MB.
+Abrindo o túnel (protocolo auto)...
+   endereço: https://[endereço do túnel] (aguardando a rede resolver o nome novo...)
+   túnel respondendo.
+
+------------------------------------------------------------------------------------------------------------------------
+7 · Autoteste, código de conexão e painel
+------------------------------------------------------------------------------------------------------------------------
+Autoteste pelo endereço público (https://[endereço do túnel]):
+   [ok] Lista de modelos com a chave: modelo qwen3.5:9b-q8_0 listado
+   [ok] Chave errada é recusada: HTTP 401
+   [ok] Texto: respondeu 'pong'
+   [ok] Streaming (SSE): 28 pedaços, o 1º em 0.4 s, total 1.9 s
+   [ok] Imagem (vermelho): respondeu 'Vermelho'
+   [ok] Imagem (verde): respondeu 'Verde'
+   [ok] Chamada de ferramenta (stream): somar_numeros({"a":17,"b":25})
+
+Autoteste completo: tudo funcionou pelo endereço público.
+
+CÓDIGO DE CONEXÃO: [retirado: contém a chave de acesso]
+
+Painel de status (depois de o app de teste conversar com o servidor; captura real-colab-04-painel-depois-do-app.png):
+   GPU ........ Tesla T4 (15 GB)
+   Modelo ..... qwen3.5:9b-q8_0
+   Contexto ... 65.536 tokens
+   Visão ...... sim     Ferramentas ... sim
+   Endereço ... [endereço do túnel]
+   No ar há ... 00:10:50
+   Pedidos .... 7 (em andamento: 0, com erro: 0)
+   Tokens ..... 25511 lidos / 211 gerados     Imagens recebidas: 4
+   Último ..... há 35 s
+   (antes do app de teste o painel marcava 5 pedidos, 469 lidos / 87 gerados, 2 imagens: o app de teste somou 2 pedidos, 2 imagens,
+    25.042 tokens lidos e 124 gerados, sem nenhum erro, exatamente o que o roteiro mediu do lado dele)
+
+------------------------------------------------------------------------------------------------------------------------
+Depois de "Desconectar e excluir o ambiente de execução"
+------------------------------------------------------------------------------------------------------------------------
+Ver real-colab-tunel-depois-de-excluir-o-runtime.txt.
+
+Estado final do notebook no Drive do usuário: saídas limpas e salvas (conferido recarregando o arquivo: nenhuma célula tem saída e o
+código de conexão não aparece em lugar nenhum da página).

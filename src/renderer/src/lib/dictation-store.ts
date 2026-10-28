@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * One dictation engine for the whole window. The global shortcut and the
- * microphone button both go through `toggleDictation()`, so the floating pill,
- * the button state and the insertion target are always the same.
+ * One dictation engine for the whole window. The microphone button (and an
+ * optional global shortcut) both go through `toggleDictation()`, so the
+ * floating pill, the button state and the insertion target are always the
+ * same.
  */
 
 export type DictationPhase = 'idle' | 'loading' | 'listening' | 'stopping'
@@ -22,6 +23,7 @@ let snapshot: DictationSnapshot = { phase: 'idle', level: 0, text: '', error: ''
 const listeners = new Set<() => void>()
 let toggleHandler: (() => void) | null = null
 let stopHandler: (() => void) | null = null
+let cancelHandler: (() => void) | null = null
 
 export function dictationSnapshot(): DictationSnapshot {
   return snapshot
@@ -40,12 +42,14 @@ export function updateDictation(patch: Partial<DictationSnapshot>): void {
 }
 
 /** Called by DictationHost once; the button and the shortcut share these handlers. */
-export function registerDictationHandlers(handlers: { toggle(): void; stop(): void }): () => void {
+export function registerDictationHandlers(handlers: { toggle(): void; stop(): void; cancel(): void }): () => void {
   toggleHandler = handlers.toggle
   stopHandler = handlers.stop
+  cancelHandler = handlers.cancel
   return () => {
     if (toggleHandler === handlers.toggle) toggleHandler = null
     if (stopHandler === handlers.stop) stopHandler = null
+    if (cancelHandler === handlers.cancel) cancelHandler = null
   }
 }
 
@@ -55,6 +59,11 @@ export function toggleDictation(): void {
 
 export function stopDictation(): void {
   stopHandler?.()
+}
+
+/** Stops and discards the current dictation (used when switching projects). */
+export function cancelDictation(): void {
+  cancelHandler?.()
 }
 
 export function useDictationSnapshot(): DictationSnapshot {

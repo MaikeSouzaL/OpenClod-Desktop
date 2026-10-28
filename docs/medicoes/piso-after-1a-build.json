@@ -1,0 +1,18 @@
+{
+  "label": "after-1a-build",
+  "nota": "Reconstruído da saída do console. O arquivo original desta execução foi sobrescrito por uma execução posterior, em que o DeepSeek respondeu HTTP 402 (Insufficient Balance), antes de o script passar a se recusar a gravar execuções sem resposta do modelo. Os valores abaixo são exatamente os que o console mostrou; quantos tokens da amostra 1 vieram do cache não foi preservado.",
+  "provider": "deepseek/deepseek-flash",
+  "build": "primeiro build 'depois': 22 ferramentas essenciais, antes do auto-carregamento por chamada direta, dos apelidos de busca, da persistência das carregadas e das últimas frases do prompt",
+  "firstInput": [8974, 9321],
+  "firstCached": [null, 8960],
+  "observacao": "A amostra 2 inclui a cápsula de continuidade da amostra 1 (cerca de 350 tokens).",
+  "breakdown": {
+    "system": 2958,
+    "instructions": 586,
+    "skills": 250,
+    "tools": 4548,
+    "mcp": 1,
+    "memory": 331,
+    "messages": 208
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "model": "deepseek/deepseek-flash",
+  "seconds": 10,
+  "checks": {
+    "turno-terminou-sem-erro": "ok",
+    "modelo-chamou-document_extract": "ok",
+    "argumentos-path-e-query": "ok",
+    "resultado-ok": "ok",
+    "resultado-cita-brief.docx#1": "ok",
+    "resultado-traz-o-texto-extraido": "ok",
+    "resumo-1-trecho-em-1-documento": "ok",
+    "sem-erros-de-console-ou-pagina": "ok"
+  },
+  "usage": {
+    "input": 31534,
+    "output": 520,
+    "cachedInput": 21248,
+    "costUsd": 0.0038372880000000003
+  },
+  "errors": [],
+  "ok": true,
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\documents-2026-10-25\\01-document-tool.png"
+}

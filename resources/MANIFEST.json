@@ -251,6 +251,28 @@
       "group": "stt"
     },
     {
+      "name": "edge-neural-tts-bundle",
+      "kind": "python-package",
+      "version": "edge-tts 7.3.1; aiohttp 3.14.5",
+      "source": "pip binary wheels installed into resources/runtime/python/Lib/site-packages",
+      "files": 304,
+      "size": 3815600,
+      "license": "LGPL-3.0 (edge-tts); dependencies under Apache-2.0/MIT/BSD",
+      "licensePath": "licenses/python/edge-tts/LICENSE.txt",
+      "group": "tts"
+    },
+    {
+      "name": "edge_tts_bridge.py",
+      "kind": "script",
+      "version": "1",
+      "source": "resources/tts/edge_tts_bridge.py",
+      "sha256": "23F8551128B32416C29D0FB87EAF4227A43C7E35A85C20B8FA11C8DC85142C99",
+      "files": 1,
+      "size": 2537,
+      "license": "MIT",
+      "group": "tts"
+    },
+    {
       "name": "whisper-tiny",
       "kind": "model",
       "version": "d90ca5fe260221311c53c58e660288d3deb8d356",
@@ -284,6 +306,16 @@
       "group": "stt"
     },
     {
+      "name": "cuda-runtime",
+      "kind": "runtime",
+      "version": "CUDA 12 / cuBLAS 12 / cuDNN 9",
+      "source": "NVIDIA runtime DLLs copied from the local CTranslate2 4.7.1 environment (cublas64_12, cublasLt64_12, cudart64_12 and the cuDNN 9 kernels needed by Whisper).",
+      "files": 8,
+      "size": 1497544240,
+      "license": "NVIDIA CUDA Toolkit EULA / cuDNN SLA",
+      "group": "stt"
+    },
+    {
       "name": "forja_stt.py",
       "kind": "script",
       "version": "1",
@@ -293,6 +325,134 @@
       "size": 30609,
       "license": "MIT",
       "group": "stt"
+    },
+    {
+      "name": "forja_media.py",
+      "kind": "script",
+      "version": "1",
+      "source": "resources/media/forja_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)",
+      "sha256": "038114a9f784c7cd7c87f07550f6f4f0594c489368b28b7ae40fbe74f1ebfd25",
+      "files": 1,
+      "size": 43233,
+      "license": "MIT",
+      "group": "stt"
+    },
+    {
+      "name": "python-docx",
+      "kind": "python-package",
+      "version": "1.2.0",
+      "source": "PyPI wheel python_docx-1.2.0-py3-none-any.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+      "files": 121,
+      "size": 1540972,
+      "license": "MIT",
+      "licensePath": "licenses/office/python-docx",
+      "group": "office"
+    },
+    {
+      "name": "openpyxl",
+      "kind": "python-package",
+      "version": "3.1.5",
+      "source": "PyPI wheel openpyxl-3.1.5-py2.py3-none-any.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+      "files": 192,
+      "size": 847195,
+      "license": "MIT",
+      "licensePath": "licenses/office/openpyxl",
+      "group": "office"
+    },
+    {
+      "name": "python-pptx",
+      "kind": "python-package",
+      "version": "1.0.2",
+      "source": "PyPI wheel python_pptx-1.0.2-py3-none-any.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+      "files": 112,
+      "size": 1278036,
+      "license": "MIT",
+      "licensePath": "licenses/office/python-pptx",
+      "group": "office"
+    },
+    {
+      "name": "xlsxwriter",
+      "kind": "python-package",
+      "version": "3.3.0",
+      "source": "PyPI wheel xlsxwriter-3.3.0-py3-none-any.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "5f04772d43281da5109af66f39b65153359a203e896847c416476e709b024469",
+      "files": 44,
+      "size": 868086,
+      "license": "BSD-2-Clause",
+      "licensePath": "licenses/office/xlsxwriter",
+      "group": "office"
+    },
+    {
+      "name": "et-xmlfile",
+      "kind": "python-package",
+      "version": "2.0.0",
+      "source": "PyPI wheel et_xmlfile-2.0.0-py3-none-any.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+      "files": 7,
+      "size": 58260,
+      "license": "MIT",
+      "licensePath": "licenses/office/et-xmlfile",
+      "group": "office"
+    },
+    {
+      "name": "lxml",
+      "kind": "python-package",
+      "version": "6.1.1",
+      "source": "PyPI wheel lxml-6.1.1-cp310-cp310-win_amd64.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "3abf332af33a74288675d936fe861fd4344da0dd6622193fbc4f2bfbb35536b5",
+      "files": 48,
+      "size": 7188428,
+      "license": "BSD-3-Clause",
+      "licensePath": "licenses/office/lxml",
+      "group": "office"
+    },
+    {
+      "name": "pillow",
+      "kind": "python-package",
+      "version": "12.3.0",
+      "source": "PyPI wheel pillow-12.3.0-cp310-cp310-win_amd64.whl (sha256 pinned in scripts/embed-office.mjs), unpacked into the embedded site-packages",
+      "sha256": "300557495eb45ebb8aec96c2da9c4be642fbf7cd937278b4013ba894ea8eb0eb",
+      "files": 108,
+      "size": 14721021,
+      "license": "MIT-CMU (bundled: FreeType FTL, HarfBuzz, LCMS2, libjpeg-turbo, libavif, brotli... see the license file)",
+      "licensePath": "licenses/office/pillow",
+      "group": "office"
+    },
+    {
+      "name": "forja_office.py",
+      "kind": "script",
+      "version": "1",
+      "source": "resources/office/forja_office.py (openclod-office: check / inspect / pdf / recalc)",
+      "sha256": "f7abae04183ee6ae2c803a6a40a7538357497e12cfa8544891d0b1d3837168bf",
+      "files": 1,
+      "size": 23831,
+      "license": "MIT",
+      "group": "office"
+    },
+    {
+      "name": "openclod_office",
+      "kind": "python-package",
+      "version": "1",
+      "source": "resources/office/pylib/openclod_office: builders for .docx/.xlsx/.pptx; on the interpreter path through python310._pth (not copied)",
+      "sha256": "0d81fa8a201af45a20924f0e6ad2f8ede9c21742ecd1dec0a8818be842ea61a3",
+      "files": 7,
+      "size": 58679,
+      "license": "MIT",
+      "group": "office"
+    },
+    {
+      "name": "openclod-office-commands",
+      "kind": "script",
+      "version": "1",
+      "source": "resources/office/bin (openclod-python, openclod-office) and bin-fallback (python, python3 for a computer with no Python): cmd shims that the run_command tool puts on PATH",
+      "sha256": "bb3d479e96a93bcf0c4b7f14e92dc535a23b0efcbe972ed35eca9a54db13a0f8",
+      "files": 4,
+      "size": 1705,
+      "license": "MIT",
+      "group": "office"
     }
   ]
 }

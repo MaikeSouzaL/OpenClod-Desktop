@@ -1,0 +1,145 @@
+{
+  "label": "ocds-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-current-mvqu4yua",
+  "startedAt": "2026-10-27T15:26:07.524Z",
+  "turns": [
+    {
+      "ms": 48319,
+      "count": 10,
+      "tools": [
+        "read_file",
+        "read_file",
+        "memory_page"
+      ],
+      "run": "done",
+      "final": "Li os 8 arquivos de `src` por completo, incluindo o fim de `core/memory/project.ts` (linhas 911-1360: handoffs, serialização/parsing de frontmatter, tags, confl"
+    },
+    {
+      "ms": 347980,
+      "count": 13,
+      "tools": [
+        "update_plan"
+      ],
+      "run": "done",
+      "final": "Plano concluído — 3/3.\n\n| Linhas | Arquivo |\n|---:|---|\n| 231 | `src/core/agent/compaction.ts` |\n| 380 | `src/core/agent/context.ts` |\n| 120 | `src/core/memory/"
+    },
+    {
+      "ms": 14097,
+      "count": 16,
+      "tools": [],
+      "run": "done",
+      "final": "O arquivo com mais linhas era `src/core/memory/project.ts`, com 1359 linhas."
+    }
+  ],
+  "baseInputTokens": 7723,
+  "baseCalls": 1,
+  "calls": [
+    {
+      "turn": -1,
+      "position": "other",
+      "input": 23508,
+      "cached": 22784,
+      "output": 293
+    },
+    {
+      "turn": -1,
+      "position": "afterPlan",
+      "input": 23651,
+      "cached": 16512,
+      "output": 485
+    },
+    {
+      "turn": -1,
+      "position": "other",
+      "input": 24162,
+      "cached": 23424,
+      "output": 121
+    },
+    {
+      "turn": -1,
+      "position": "afterPlan",
+      "input": 24306,
+      "cached": 17408,
+      "output": 333
+    },
+    {
+      "turn": -1,
+      "position": "other",
+      "input": 10782,
+      "cached": 6144,
+      "output": 142
+    },
+    {
+      "turn": -1,
+      "position": "afterPlan",
+      "input": 10934,
+      "cached": 10752,
+      "output": 413
+    },
+    {
+      "turn": 0,
+      "position": "first",
+      "input": 11746,
+      "cached": 10880,
+      "output": 25
+    }
+  ],
+  "byPosition": {
+    "first": {
+      "calls": 1,
+      "meanInput": 11746,
+      "meanUncached": 866,
+      "cachedShare": 93,
+      "uncachedTotal": 866
+    },
+    "afterPlan": {
+      "calls": 3,
+      "meanInput": 19630,
+      "meanUncached": 4740,
+      "cachedShare": 76,
+      "uncachedTotal": 14219
+    },
+    "other": {
+      "calls": 3,
+      "meanInput": 19484,
+      "meanUncached": 2033,
+      "cachedShare": 90,
+      "uncachedTotal": 6100
+    }
+  },
+  "total": {
+    "calls": 7,
+    "meanInput": 18441,
+    "meanUncached": 3026,
+    "cachedShare": 84,
+    "uncachedTotal": 21185
+  },
+  "byTurn": [
+    {
+      "turn": 1,
+      "calls": 1,
+      "meanInput": 11746,
+      "meanUncached": 866,
+      "cachedShare": 93,
+      "uncachedTotal": 866
+    },
+    {
+      "turn": 2,
+      "calls": 0
+    },
+    {
+      "turn": 3,
+      "calls": 0
+    }
+  ],
+  "firstCallOfTurn": [
+    {
+      "turn": 1,
+      "input": 11746,
+      "cached": 10880,
+      "cachedShare": 93
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash"
+}

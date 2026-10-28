@@ -1,0 +1,223 @@
+{
+  "label": "ocds-current",
+  "root": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\openclod-snap-ab-current-mvqu4yua",
+  "startedAt": "2026-10-27T15:23:37.225Z",
+  "scenarios": [
+    {
+      "name": "mcp-state",
+      "target": "mcp_servers",
+      "sequence": [
+        "tool_load",
+        "mcp_servers"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "nenhum MCP configurado; use mcp_search e mcp_install",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 24243,
+      "cachedTokens": 4096,
+      "uncachedTokens": 20147,
+      "perCall": [
+        {
+          "input": 7981,
+          "cached": 0,
+          "output": 88
+        },
+        {
+          "input": 8103,
+          "cached": 0,
+          "output": 25
+        },
+        {
+          "input": 8159,
+          "cached": 4096,
+          "output": 36
+        }
+      ],
+      "ms": 8150,
+      "final": "A ferramenta `mcp_servers` retornou: **nenhum servidor MCP configurado** — portanto, zero servidores aparecem.",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "handoff",
+      "target": "memory_handoff",
+      "sequence": [
+        "tool_search",
+        "tool_load",
+        "memory_handoff",
+        "memory_handoff"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "handoff ho_mvqu5mw7_bm9y criado. Quem retomar deve chamar memory_handoff accept.",
+      "usedToolLoad": true,
+      "usedToolSearch": true,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 5,
+      "inputTokens": 42732,
+      "cachedTokens": 33280,
+      "uncachedTokens": 9452,
+      "perCall": [
+        {
+          "input": 8187,
+          "cached": 7680,
+          "output": 205
+        },
+        {
+          "input": 8322,
+          "cached": 768,
+          "output": 43
+        },
+        {
+          "input": 8626,
+          "cached": 7552,
+          "output": 83
+        },
+        {
+          "input": 8750,
+          "cached": 8576,
+          "output": 72
+        },
+        {
+          "input": 8847,
+          "cached": 8704,
+          "output": 78
+        }
+      ],
+      "ms": 14127,
+      "final": "Handoff criado e confirmado na lista.\n\n- **id:** `ho_mvqu5mw7_bm9y`\n- resumo: \"piso de tokens medido\" · próximo passo: \"rodar a suíte de testes\"\n- status: aberto (a próxima sessão precisa chamar `memory_handoff accept` para assumir)",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "skills",
+      "target": "list_skills",
+      "sequence": [
+        "tool_load",
+        "list_skills"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "- docx (usuario): Cria e edita documentos Word (.docx) de verdade, no Python embutido do Openclod (python-docx): relatórios, propostas, atas, ofícios, cartas, memorandos, manuais, contratos e currícul",
+      "usedToolLoad": true,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 26389,
+      "cachedTokens": 4992,
+      "uncachedTokens": 21397,
+      "perCall": [
+        {
+          "input": 8412,
+          "cached": 896,
+          "output": 43
+        },
+        {
+          "input": 8575,
+          "cached": 0,
+          "output": 40
+        },
+        {
+          "input": 9402,
+          "cached": 4096,
+          "output": 181
+        }
+      ],
+      "ms": 14114,
+      "final": "Nenhuma skill de PDF está instalada. A busca \"pdf\" retornou 4 skills, mas todas apenas citam PDF para **excluir** esse formato do escopo:\n\n- `docx` — \"Não use para PDF…\"\n- `pptx` — \"Não use para … PDF…\"\n- `qa-total` — só aceita \"PDF de prov",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    },
+    {
+      "name": "agents",
+      "target": "list_agents",
+      "sequence": [
+        "list_agents",
+        "list_agents"
+      ],
+      "targetRan": true,
+      "targetOk": true,
+      "targetText": "Você está no nível 0 de 3 de delegação.\n- svg-verifier: Revisor independente de SVG e ícones (somente leitura). Valida XML, segurança, viewBox, ids, área segura, legibilidade em 16/24/32/48/128/256 px",
+      "usedToolLoad": false,
+      "usedToolSearch": false,
+      "refusedFirst": false,
+      "refused": [],
+      "modelCalls": 3,
+      "inputTokens": 30245,
+      "cachedTokens": 10240,
+      "uncachedTokens": 20005,
+      "perCall": [
+        {
+          "input": 9320,
+          "cached": 4096,
+          "output": 79
+        },
+        {
+          "input": 9609,
+          "cached": 0,
+          "output": 95
+        },
+        {
+          "input": 11316,
+          "cached": 6144,
+          "output": 254
+        }
+      ],
+      "ms": 14092,
+      "final": "A busca literal por \"segurança\" retornou apenas **`svg-verifier`** (menciona \"segurança\" só no sentido de validar XML de SVG) — não é o que você quer.\n\nO agente que realmente revisa segurança de código é o **`security-auditor`**: auditor de",
+      "model": {
+        "ok": true,
+        "expected": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        },
+        "actual": {
+          "providerId": "ollama",
+          "model": "opencode-go/deepseek-v4.1-flash"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "model": "ollama/opencode-go/deepseek-v4.1-flash",
+  "totals": {
+    "modelCalls": 14,
+    "inputTokens": 123609,
+    "uncachedTokens": 71001,
+    "allTargetsOk": true
+  }
+}

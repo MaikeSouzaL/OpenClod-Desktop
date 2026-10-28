@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "feed": "http://127.0.0.1:61282/latest.json",
+  "hasVersion": true,
+  "hasChecksum": true,
+  "downloadButton": true,
+  "bridge": "function",
+  "screenshot": "C:\\Users\\Administrator\\Desktop\\Openclaudedescktop\\Prints\\updater-2026-10-25\\01-updater.png",
+  "errors": []
+}

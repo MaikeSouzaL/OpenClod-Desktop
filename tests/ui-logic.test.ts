@@ -30,6 +30,15 @@ describe('activity reducer', () => {
     expect(formatDuration(elapsed(state[0], 70_000))).toBe('1 min 05 s')
   })
 
+  it('shows live output from a running command before it ends', () => {
+    const state = run([
+      [{ type: 'tool_start', sessionId: S, toolCallId: 'c1', name: 'run_command', args: { command: 'npm test' } }, 100],
+      [{ type: 'tool_progress', sessionId: S, toolCallId: 'c1', name: 'run_command', text: 'RUN  v5.0.5\n...' }, 900]
+    ])
+    expect(state[0]).toMatchObject({ status: 'running', output: 'RUN  v5.0.5\n...' })
+    expect(state[0].startedAt).toBe(100)
+  })
+
   it('marks failures and keeps the first start time on duplicate starts', () => {
     const state = run([
       [{ type: 'tool_start', sessionId: S, toolCallId: 'c1', name: 'run_command', args: {} }, 100],
@@ -187,6 +196,56 @@ describe('assistant blocks', () => {
   it('starts a new block when narration appears or an error interrupts', () => {
     const blocks = buildAssistantBlocks([assistant('a1', '', ['c1']), assistant('a2', 'Agora a segunda parte', ['c2']), assistant('a3', '', ['c3'], { error: 'falhou' })])
     expect(blocks).toHaveLength(3)
+  })
+
+  it('keeps a harness limitation card as its own block', () => {
+    const limitation: Message = {
+      id: 'lim',
+      role: 'assistant',
+      ts: 2,
+      parts: [
+        {
+          type: 'limitation',
+          report: {
+            title: 'Turno interrompido',
+            goal: 'continuar a tarefa',
+            error: 'HTTP 400',
+            difficulty: 'o provedor recusou a requisição',
+            suggestion: 'remover mensagens vazias',
+            severity: 'blocked',
+            automatic: true
+          }
+        }
+      ]
+    }
+    const blocks = buildAssistantBlocks([assistant('a1', 'trabalhando', []), limitation])
+    expect(blocks).toHaveLength(2)
+    const last = blocks[1] as { limitations: Array<{ report: { title: string } }> }
+    expect(last.limitations[0].report.title).toBe('Turno interrompido')
+  })
+
+  it('folds the reasoning of merged tool iterations into the block', () => {
+    const thinking = (id: string, callId: string, text: string): Message => ({
+      id,
+      role: 'assistant',
+      ts: 1,
+      parts: [
+        { type: 'reasoning', text },
+        { type: 'tool_call', id: callId, name: 'run_command', args: {} }
+      ]
+    })
+    const blocks = buildAssistantBlocks([
+      userMsg,
+      thinking('a1', 'c1', 'primeiro eu listo os arquivos'),
+      toolMsg('t1', 'c1'),
+      thinking('a2', 'c2', 'agora leio o arquivo principal'),
+      toolMsg('t2', 'c2'),
+      assistant('a3', 'Terminei.', [])
+    ])
+    const [, work, final] = blocks as Array<{ reasoning: string; calls: Array<{ id: string }> }>
+    expect(work.calls.map((call) => call.id)).toEqual(['c1', 'c2'])
+    expect(work.reasoning).toBe('primeiro eu listo os arquivos\n\nagora leio o arquivo principal')
+    expect(final.reasoning).toBe('')
   })
 })
 

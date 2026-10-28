@@ -1,0 +1,17 @@
+OK   antes: o OpenRouter está na lista de provedores, sem chave (como no perfil do usuário) -> {"exists":true,"ref":"env","models":0,"configured":false}
+OK   o cartão do OpenRouter diz "sem chave" antes de salvar a chave
+OK   Salvar chave: a tela confirma e o selo "credencial ok" aparece na hora -> chave salva no cofre do Windows
+OK   Salvar chave: o settings.json guarda só a referência ao cofre (secret:openrouter), nunca a chave -> secret:openrouter
+OK   Salvar chave: o cofre foi gravado (secrets.bin existe e mudou)
+OK   Detectar modelos: lista os modelos do servidor e diz "Salve para aplicar" -> ok: 40 modelo(s) detectado(s) (openai). Salve para aplicar.
+OK   Detectar modelos ainda NÃO grava: o settings.json segue sem os modelos até "Salvar alterações" -> 0
+OK   o que foi detectado não some se outra coisa das configurações é atualizada com a janela aberta
+OK   Salvar alterações: grava os 40 modelos e quais leem imagens -> {"models":40,"vision":10}
+OK   Salvar alterações: grava o endereço e a referência ao cofre -> {"ref":"secret:openrouter"}
+OK   seletor de modelo: o provedor novo aparece com os modelos detectados, sem reiniciar o app -> {"count":41,"headings":["OpenRouter"]}
+OK   seletor de modelo: provedor sem chave aparece como "sem chave — configurar", sem modelos que falhariam -> ["Anthropic · sem chave — configurar","OpenAI · sem chave — configurar","Kimi / Moonshot · sem chave — configurar","Qwen (DashScope) · sem chave — configurar","OpenCode Go · sem chave — configurar","OpenCode Zen · sem chave — configurar"]
+OK   escolher o modelo novo no seletor muda a sessão (e o compositor mostra) -> {"ui":"fake/modelo-01","meta":{"id":"ses_6bfcfda7-aa96-401f-b0b2-aeb4f4de6861","title":"Provedor novo","projectId":"prj_0293c835-e164-443d-b2dd-840d37c3ec06","cwd":"C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-add-NI67KF\\projeto","mode":"code","surface":"code","providerId":"openrouter",
+OK   nova conversa: o seletor da tela inicial também lista o provedor novo -> 41
+OK   depois de fechar e abrir o app: provedor, chave (cofre) e modelos continuam -> {"models":40,"configured":true,"ref":"secret:openrouter"}
+
+15/15 verificações ok -> Prints\reserva-2026-10-27\depois-provedor-novo.json

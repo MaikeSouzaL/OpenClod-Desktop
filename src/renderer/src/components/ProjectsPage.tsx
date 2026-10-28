@@ -4,10 +4,6 @@ import { Icon } from './Icons'
 import { MenuPopover, type MenuItem } from './Chrome'
 import { relativeTime, shortPath } from '../lib/format'
 
-function normalize(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-}
-
 interface ProjectsPageProps {
   projects: Project[]
   sessions: SessionSummary[]
@@ -18,9 +14,10 @@ interface ProjectsPageProps {
   onRemove(project: Project): void
   onDelete(project: Project): void
   onOpenGraph(project: Project): void
+  onWorktrees(project: Project): void
 }
 
-export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove, onDelete, onOpenGraph }: ProjectsPageProps): ReactElement {
+export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, onReveal, onRemove, onDelete, onOpenGraph, onWorktrees }: ProjectsPageProps): ReactElement {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'recent' | 'name'>('recent')
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -28,7 +25,7 @@ export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, 
   const stats = useMemo(() => {
     const map = new Map<string, { count: number; last: number }>()
     for (const project of projects) {
-      const own = sessions.filter((session) => normalize(session.meta.cwd) === normalize(project.path))
+      const own = sessions.filter((session) => session.meta.projectId === project.id)
       map.set(project.id, {
         count: own.length,
         last: Math.max(project.lastOpenedAt, ...own.map((session) => session.meta.updatedAt))
@@ -49,6 +46,7 @@ export function ProjectsPage({ projects, sessions, onOpen, onNewSession, onAdd, 
   const items: MenuItem[] = menuProject
     ? [
         { id: 'new', label: 'Nova sessão', icon: 'plus', onSelect: () => onNewSession(menuProject) },
+        { id: 'worktree', label: 'Worktrees e sessão isolada', icon: 'gitBranch', onSelect: () => onWorktrees(menuProject) },
         { id: 'reveal', label: 'Abrir no Explorer', icon: 'external', onSelect: () => onReveal(menuProject.path) },
         { id: 'graph', label: 'Ver grafo da memória', icon: 'share', onSelect: () => onOpenGraph(menuProject) },
         { id: 'sep', separator: true },

@@ -83,6 +83,19 @@ describe('estimateContextTokens', () => {
     const result = estimateContextTokens('', [toolCallMessage('a', 'c1'), toolResultMessage('t', 'c1')])
     expect(result).toBeGreaterThan(call)
   })
+
+  it('accounts for the tool schemas sent on every request', () => {
+    const tools = [
+      {
+        name: 'huge_tool',
+        description: 'x'.repeat(40_000),
+        parameters: { type: 'object', properties: {} }
+      }
+    ]
+    expect(estimateContextTokens('', [], tools)).toBeGreaterThan(
+      estimateContextTokens('', []) + 10_000
+    )
+  })
 })
 
 describe('compactIfNeeded', () => {
@@ -142,6 +155,58 @@ describe('compactIfNeeded', () => {
     expect(provider.requests[0].maxTokens).toBe(200) // min(1500, floor(4000 * 0.05))
   })
 
+  it('summarises a very long history in chunks so the newest old messages are not left out', async () => {
+    const provider = fakeProvider('RESUMO PARCIAL')
+    const messages: Message[] = []
+    // 200 old messages at ~1.2k characters each (the per-message cap) is ~240k characters of transcript.
+    for (let i = 0; i < 200; i++) {
+      const marker = i === 190 ? 'DECISAO-FINAL-NO-FIM ' : `bloco-${i} `
+      messages.push(textMessage(`m${i}`, i % 2 === 0 ? 'user' : 'assistant', marker + 'z'.repeat(1500)))
+    }
+    const result = await compactIfNeeded({
+      system: 'sistema',
+      messages,
+      provider,
+      contextWindow: 4000,
+      keepRecent: 2,
+      force: true
+    })
+    expect(result.compacted).toBe(true)
+    // ~200k characters of old messages cannot fit one 50k request: several chained requests carry all of it.
+    expect(provider.requests.length).toBeGreaterThan(2)
+    const sent = provider.requests.map((request) => JSON.stringify(request.messages))
+    expect(sent.some((text) => text.includes('DECISAO-FINAL-NO-FIM'))).toBe(true)
+    // Later requests carry the summary built so far, so the chain accumulates instead of restarting.
+    expect(sent.slice(1).every((text) => text.includes('RESUMO PARCIAL'))).toBe(true)
+    expect(sent[0]).not.toContain('RESUMO PARCIAL')
+    for (const request of provider.requests) {
+      const first = request.messages[0].parts[0]
+      expect(first.type === 'text' ? first.text.length : 0).toBeLessThan(60_000)
+    }
+    expect(result.note).toBe('resumo gerado')
+  })
+
+  it('keeps the earlier summary when a later chunk fails to summarise', async () => {
+    let calls = 0
+    const provider: Provider & { requests: ModelRequest[] } = {
+      ...fakeProvider('x'),
+      async *stream(req: ModelRequest): AsyncGenerator<ProviderEvent> {
+        calls++
+        ;(provider.requests as ModelRequest[]).push(req)
+        if (calls === 1) {
+          yield { type: 'text_delta', text: 'PRIMEIRO RESUMO' }
+          yield { type: 'end', stopReason: 'stop', toolCalls: [] }
+        } else {
+          yield { type: 'end', stopReason: 'error', toolCalls: [], error: 'caiu' }
+        }
+      }
+    }
+    const messages: Message[] = Array.from({ length: 120 }, (_, i) => textMessage(`m${i}`, i % 2 === 0 ? 'user' : 'assistant', 'w'.repeat(1500)))
+    const result = await compactIfNeeded({ system: 's', messages, provider, contextWindow: 4000, keepRecent: 2, force: true })
+    const header = result.messages[0].parts[0]
+    expect(header.type === 'text' ? header.text : '').toContain('PRIMEIRO RESUMO')
+  })
+
   it('falls back deterministically when the summarizer fails, and still compacts', async () => {
     const provider = fakeProvider(undefined)
     const messages: Message[] = []
@@ -173,6 +238,22 @@ describe('compactIfNeeded', () => {
     expect(result.compacted).toBe(false)
     expect(result.messages).toBe(messages)
     expect(provider.requests).toHaveLength(0)
+  })
+
+  it('trusts the actual prompt size reported by the provider', async () => {
+    const provider = fakeProvider('resumo')
+    const messages = Array.from({ length: 12 }, (_, index) =>
+      textMessage(`m${index}`, index % 2 === 0 ? 'user' : 'assistant', `msg ${index}`)
+    )
+    const result = await compactIfNeeded({
+      system: 'sistema curto',
+      messages,
+      provider,
+      contextWindow: 100_000,
+      usedTokens: 90_000,
+      keepRecent: 4
+    })
+    expect(result.compacted).toBe(true)
   })
 
   it('never separates a tool_call from its tool_result at the cut point', async () => {
