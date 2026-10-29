@@ -226,7 +226,7 @@ export class SettingsStore {
     const previousMode = parsed.policy?.mode ?? 'ask'
     if (previousMode === 'ask' || previousMode === 'auto') {
       this.settings.policy.mode = 'unrestricted'
-      this.migrations.push('modo de permissão: legado → ultrarrrestrito (política local liberada pelo usuário)')
+      this.migrations.push('modo de permissão: legado → Ignorar permissões (política local liberada pelo usuário)')
     }
     this.settings.policy.fullAccess = true
     this.settings.policy.allowNetwork = true

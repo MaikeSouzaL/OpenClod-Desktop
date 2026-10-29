@@ -32,6 +32,19 @@ import {
   type ConnectResult,
   type ToolPolicy
 } from './mcp-connectors.js'
+import type {
+  LlamaCppLogInfo,
+  LlamaCppProfile,
+  LlamaCppStatusInfo,
+  LlamaBuildDownloadInfo,
+  LlamaDownloadInfo,
+  LlamaHubFilesInfo,
+  LlamaHubListInfo,
+  LlamaLocalModel,
+  LlamaMachineInfo,
+  LlamaModelInfo,
+  LlamaOptionsInfo
+} from './llamacpp.js'
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
@@ -87,7 +100,8 @@ export interface CustomCommandInfo {
   name: string
   description: string
   argumentHint?: string
-  source: 'projeto' | 'usuario'
+  /** `app`: shipped with Openclod (resources/commands); a user or project command with the same name replaces it. */
+  source: 'projeto' | 'usuario' | 'app'
 }
 
 /* ------------------------------------------------------------------ */
@@ -724,6 +738,8 @@ export interface MemoryPageInfo {
   pinned: boolean
   updated: string
   summary: string
+  /** Words of the whole page (normalized, no accents) the wiki indexes: the screen's search looks at them too. */
+  terms?: string[]
   /** `wiki` (native markdown) or `ai-memory` (indexed page). */
   source?: 'wiki' | 'ai-memory'
   /** AI-Memory page path when `source` is `ai-memory`. */
@@ -744,13 +760,49 @@ export interface MemoryStatsInfo {
   pinned: number
   openHandoffs: number
   updatedAt?: string
-  /** Pages currently returned by the AI-Memory index (native + transcripts). */
+  /** Pages the AI-Memory index holds for the project (wiki pages, turns and media). */
   indexed?: number
   /** Whether the AI-Memory sidecar answered. */
   aiRunning?: boolean
+  /** The wiki being copied into the index: pages copied so far, of how many, and whether a pass is running. */
+  indexSync?: { done: number; total: number; running: boolean }
+  /** Files kept in the memory, by kind (imagem, pdf, documento, planilha, apresentacao, texto, codigo, audio, video, arquivo). */
+  files?: Record<string, number>
   conflicts?: number
   superseded?: number
   invalidated?: number
+}
+
+/** A file kept in the project memory (Memória → Arquivos; the agent's memory_file). */
+export interface MemoryFileInfo {
+  slug: string
+  /** imagem, pdf, documento, planilha, apresentacao, texto, codigo, audio, video, arquivo */
+  kind: string
+  name: string
+  bytes: number
+  added: string
+  description?: string
+  describedBy?: string
+  width?: number
+  height?: number
+  pages?: number
+  textChars: number
+  tags: string[]
+  links: string[]
+  /** It has a thumbnail (memory.fileThumb). */
+  thumb: boolean
+}
+
+/** Saving files into the memory in the background (Memória → Adicionar arquivos/pasta). */
+export interface MemoryAddJobInfo {
+  active: boolean
+  done: number
+  total: number
+  current: string
+  added: number
+  cached: number
+  described: number
+  failed: string[]
 }
 
 export interface MemoryPageContent {
@@ -858,6 +910,29 @@ export const CH = {
   colabDisconnect: 'colab:disconnect',
   colabReveal: 'colab:reveal',
   colabDragStart: 'colab:drag-start',
+  llamacppStatus: 'llamacpp:status',
+  llamacppSetProfile: 'llamacpp:set-profile',
+  llamacppPickModel: 'llamacpp:pick-model',
+  llamacppModels: 'llamacpp:models',
+  llamacppPickFolder: 'llamacpp:pick-folder',
+  llamacppHubList: 'llamacpp:hub-list',
+  llamacppHubRefresh: 'llamacpp:hub-refresh',
+  llamacppHubSearch: 'llamacpp:hub-search',
+  llamacppHubFiles: 'llamacpp:hub-files',
+  llamacppDownload: 'llamacpp:download',
+  llamacppDownloadStatus: 'llamacpp:download-status',
+  llamacppDownloadCancel: 'llamacpp:download-cancel',
+  llamacppOptions: 'llamacpp:options',
+  llamacppProfileAction: 'llamacpp:profile-action',
+  llamacppMachine: 'llamacpp:machine',
+  llamacppBuildInstall: 'llamacpp:build-install',
+  llamacppBuildStatus: 'llamacpp:build-status',
+  llamacppBuildCancel: 'llamacpp:build-cancel',
+  llamacppBuildSelect: 'llamacpp:build-select',
+  llamacppBuildRemove: 'llamacpp:build-remove',
+  llamacppStart: 'llamacpp:start',
+  llamacppStop: 'llamacpp:stop',
+  llamacppLog: 'llamacpp:log',
   appRememberModel: 'app:rememberModel',
   appMcpPresets: 'app:mcpPresets',
   appMcpCatalog: 'app:mcpCatalog',
@@ -918,6 +993,8 @@ export const CH = {
   sessionsRename: 'sessions:rename',
   sessionsSend: 'sessions:send',
   sessionsAbort: 'sessions:abort',
+  sessionsResumePlan: 'sessions:resumePlan',
+  sessionsDiscardPlan: 'sessions:discardPlan',
   sessionsSetMode: 'sessions:setMode',
   sessionsSetModel: 'sessions:setModel',
   sessionsSetEffort: 'sessions:setEffort',
@@ -961,16 +1038,16 @@ export const CH = {
   sttPreload: 'stt:preload',
   sttStop: 'stt:stop',
   sttAudio: 'stt:audio',
-  sttEvent: 'forja:stt',
+  sttEvent: 'openclod:stt',
   ttsVoices: 'tts:voices',
   ttsStatus: 'tts:status',
   ttsSpeak: 'tts:speak',
   ttsStop: 'tts:stop',
-  ttsEvent: 'forja:tts',
-  dictationToggle: 'forja:dictation:toggle',
+  ttsEvent: 'openclod:tts',
+  dictationToggle: 'openclod:dictation:toggle',
   dictationState: 'dictation:state',
   dictationInsert: 'dictation:insert',
-  dictationComposer: 'forja:dictation:composer',
+  dictationComposer: 'openclod:dictation:composer',
   memoryStatus: 'memory:status',
   memoryList: 'memory:list',
   memoryRead: 'memory:read',
@@ -983,6 +1060,11 @@ export const CH = {
   memoryRecall: 'memory:recall',
   memoryAiStatus: 'memory:aiStatus',
   memoryGraph: 'memory:graph',
+  memoryFiles: 'memory:files',
+  memoryFileThumb: 'memory:fileThumb',
+  memoryOpenFile: 'memory:openFile',
+  memoryAddFiles: 'memory:addFiles',
+  memoryAddStatus: 'memory:addStatus',
   powerState: 'power:state',
 
   schedulesList: 'schedules:list',
@@ -992,6 +1074,8 @@ export const CH = {
   schedulesRunNow: 'schedules:runNow',
 
   approvalsResolve: 'approvals:resolve',
+  approvalsSaved: 'approvals:saved',
+  approvalsRevoke: 'approvals:revoke',
   questionsAnswer: 'questions:answer',
   mcpRestart: 'mcp:restart',
 
@@ -1002,14 +1086,14 @@ export const CH = {
   terminalKill: 'terminal:kill',
   terminalWrite: 'terminal:write',
   terminalResize: 'terminal:resize',
-  terminalEvent: 'forja:terminal',
+  terminalEvent: 'openclod:terminal',
 
   winMinimize: 'win:minimize',
   winMaximize: 'win:maximize',
   winClose: 'win:close',
   winIsMaximized: 'win:isMaximized',
 
-  event: 'forja:event'
+  event: 'openclod:event'
 } as const
 
 export interface OpenclodApi {
@@ -1063,6 +1147,47 @@ export interface OpenclodApi {
      * allows it while the page's `dragstart` is running, and the main process, not the page, decides which file it is.
      */
     colabStartDrag(): void
+    /** The embedded llama.cpp: build, server state, model and the options of the next run. */
+    llamacppStatus(): Promise<IpcResult<LlamaCppStatusInfo>>
+    /**
+     * Saves options of the next run; a new model is read (and refused when it is not a chat GGUF) and option values are
+     * checked against the build's help right away. `extraText` = the extra arguments as typed (split without a shell).
+     */
+    llamacppSetProfile(patch: Partial<LlamaCppProfile> & { extraText?: string }): Promise<IpcResult<LlamaCppStatusInfo>>
+    /** Windows file picker for a .gguf; null when cancelled. The model is not saved: call llamacppSetProfile with it. */
+    llamacppPickModel(): Promise<IpcResult<LlamaModelInfo | null>>
+    /** The GGUFs on this computer (Ollama, LM Studio, Hugging Face cache, downloads, added folders). */
+    llamacppModels(): Promise<IpcResult<LlamaLocalModel[]>>
+    /** Windows folder picker for the model search; null when cancelled. The folder is not saved: add it to `folders`. */
+    llamacppPickFolder(): Promise<IpcResult<string | null>>
+    /** Hugging Face models for this computer (the list is cached for 12 h and fetched again in the background). */
+    llamacppHubList(): Promise<IpcResult<LlamaHubListInfo>>
+    llamacppHubRefresh(): Promise<IpcResult<LlamaHubListInfo>>
+    /** Free-text search on Hugging Face, for what the list does not have. */
+    llamacppHubSearch(query: string): Promise<IpcResult<LlamaHubListInfo>>
+    /** The repository's real files, with exact sizes and the suggested one. */
+    llamacppHubFiles(repo: string): Promise<IpcResult<LlamaHubFilesInfo>>
+    /** Downloads the file (and the repository's vision projector) in the background; the profile then uses it. */
+    llamacppDownload(repo: string, name: string): Promise<IpcResult<LlamaDownloadInfo>>
+    llamacppDownloadStatus(): Promise<IpcResult<LlamaDownloadInfo>>
+    llamacppDownloadCancel(): Promise<IpcResult<LlamaDownloadInfo>>
+    /** Every option of the running build (from its --help), grouped, and the next command line. */
+    llamacppOptions(): Promise<IpcResult<LlamaOptionsInfo>>
+    /** Perfis: select, create (copy of the current), rename (`to`) or delete. */
+    llamacppProfileAction(action: { kind: 'select' | 'create' | 'rename' | 'delete'; name: string; to?: string }): Promise<IpcResult<LlamaCppStatusInfo>>
+    /** Versões: the NVIDIA cards, the CUDA their driver runs and the build to suggest. */
+    llamacppMachine(): Promise<IpcResult<LlamaMachineInfo>>
+    /** Downloads an official build from GitHub (`tag` = "newest" for the newest one that has it). */
+    llamacppBuildInstall(kind: string, tag: string): Promise<IpcResult<LlamaBuildDownloadInfo>>
+    llamacppBuildStatus(): Promise<IpcResult<LlamaBuildDownloadInfo>>
+    llamacppBuildCancel(): Promise<IpcResult<LlamaBuildDownloadInfo>>
+    llamacppBuildSelect(id: string): Promise<IpcResult<LlamaCppStatusInfo>>
+    llamacppBuildRemove(id: string): Promise<IpcResult<LlamaCppStatusInfo>>
+    /** Starts llama-server with the saved model; it becomes the `llamacpp` provider once it answers. */
+    llamacppStart(): Promise<IpcResult<LlamaCppStatusInfo>>
+    llamacppStop(): Promise<IpcResult<LlamaCppStatusInfo>>
+    /** Server log lines after `since` (the `seq` of the last read). */
+    llamacppLog(since?: number): Promise<IpcResult<LlamaCppLogInfo>>
     /** Remembers the last picked provider/model for new sessions and restarts. */
     rememberModel(providerId: string, model: string): Promise<IpcResult<boolean>>
     mcpPresets(): Promise<IpcResult<McpPresetEntry[]>>
@@ -1162,6 +1287,10 @@ export interface OpenclodApi {
     rename(sessionId: string, title: string): Promise<IpcResult<SessionState>>
     send(sessionId: string, text: string, images?: ImagePart[], mode?: 'steer' | 'queue' | 'auto'): Promise<IpcResult<boolean>>
     abort(sessionId: string): Promise<IpcResult<boolean>>
+    /** ▶ on a plan step after the turn stopped: reopens that step and starts a turn that continues from it. */
+    resumePlan(sessionId: string, itemId: string): Promise<IpcResult<boolean>>
+    /** 🗑 on the plan dock: stops the turn, empties the queue, clears the plan and forgets the session's continuity capsule. No undo. */
+    discardPlan(sessionId: string): Promise<IpcResult<{ capsules: number }>>
     setMode(sessionId: string, mode: AgentMode): Promise<IpcResult<boolean>>
     setModel(sessionId: string, providerId: string, model: string): Promise<IpcResult<boolean>>
     /** null restores the model's own default depth. */
@@ -1265,6 +1394,15 @@ export interface OpenclodApi {
     importMarkdown(projectId: string): Promise<IpcResult<number>>
     /** Imports Markdown files from a Claude-style ZIP without extracting outside a temp folder. */
     importZip(projectId: string): Promise<IpcResult<number>>
+    /** Files kept in the memory (pictures with their description, PDFs, documents...). */
+    files(projectId: string): Promise<IpcResult<MemoryFileInfo[]>>
+    /** A file's thumbnail as a data URL; null when it has none. */
+    fileThumb(projectId: string, slug: string): Promise<IpcResult<string | null>>
+    /** Opens the copy kept in the memory with the default program. */
+    openFile(projectId: string, slug: string): Promise<IpcResult<boolean>>
+    /** Windows picker (files, or one folder with its subfolders); saves them in the background. Null when cancelled. */
+    addFiles(projectId: string, pick: 'files' | 'folder'): Promise<IpcResult<MemoryAddJobInfo | null>>
+    addStatus(projectId: string): Promise<IpcResult<MemoryAddJobInfo | null>>
   }
   power: {
     keepAwake(enabled: boolean): Promise<IpcResult<boolean>>
@@ -1278,7 +1416,12 @@ export interface OpenclodApi {
     runNow(taskId: string): Promise<IpcResult<ScheduledTaskInfo>>
   }
   approvals: {
+    /** `always` with approved = "Permitir sempre"; with approved false = "Negar sempre" (saved for the project). */
     resolve(approvalId: string, approved: boolean, always?: boolean, reason?: string): Promise<IpcResult<boolean>>
+    /** The "Permitir sempre" / "Negar sempre" choices saved per project. */
+    saved(): Promise<IpcResult<Array<{ projectId: string; projectName: string; allow: string[]; deny: string[] }>>>
+    /** Takes back one saved choice; false when it was not there. */
+    revoke(projectId: string, rule: string, effect: 'allow' | 'deny'): Promise<IpcResult<boolean>>
   }
   questions: {
     /** Answers a pending ask_user request; false when it expired or belongs to another session. */

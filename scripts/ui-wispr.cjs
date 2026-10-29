@@ -10,7 +10,7 @@ const { chromium } = require('playwright-core')
 
 const ROOT = path.join(__dirname, '..')
 const PORT = 9337
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-wispr-'))
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-wispr-'))
 const profile = path.join(work, 'profile')
 const appData = path.join(work, 'appdata')
 const localAppData = path.join(work, 'localappdata')
@@ -83,7 +83,7 @@ async function main() {
   await page.waitForTimeout(1200)
 
   const update = await page.evaluate(async () => {
-    return await window.forja.app.updateSettings({
+    return await window.openclod.app.updateSettings({
       voice: { model: 'tiny', language: 'pt', shortcut: 'Control+Alt+J', mode: 'toggle', polish: false, insert: 'composer' }
     })
   })

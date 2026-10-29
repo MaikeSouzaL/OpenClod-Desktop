@@ -74,7 +74,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
   const refresh = useCallback(
     async (fresh: boolean): Promise<void> => {
       try {
-        const next = await unwrap(window.forja.app.colabStatus(fresh))
+        const next = await unwrap(window.openclod.app.colabStatus(fresh))
         setStatus(next)
         // The reserve learned something (a dead server is skipped): let the tiles and the reserve list show it.
         if (lastState.current && lastState.current !== next.state) await onChanged()
@@ -101,7 +101,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
     setPreparing(true)
     setPrepareError('')
     try {
-      setPrepared(await unwrap(window.forja.app.colabPrepare()))
+      setPrepared(await unwrap(window.openclod.app.colabPrepare()))
     } catch (err) {
       setPrepareError(`Não consegui preparar o notebook: ${errorMessage(err)}`)
     } finally {
@@ -111,7 +111,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
 
   const revealNotebook = async (): Promise<void> => {
     try {
-      const shown = await unwrap(window.forja.app.colabRevealNotebook())
+      const shown = await unwrap(window.openclod.app.colabRevealNotebook())
       if (!shown) setPrepareError('O arquivo do notebook não está mais na pasta: clique em “Abrir o Google Colab” de novo.')
     } catch (err) {
       setPrepareError(`Não consegui mostrar a pasta: ${errorMessage(err)}`)
@@ -138,7 +138,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
       return
     }
     try {
-      setInspected(await unwrap(window.forja.app.colabInspect(value)))
+      setInspected(await unwrap(window.openclod.app.colabInspect(value)))
     } catch (err) {
       setInspected({ ok: false, error: errorMessage(err) })
     }
@@ -148,7 +148,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
     setConnecting(true)
     setConnectError('')
     try {
-      const result = await unwrap(window.forja.app.colabConnect(code))
+      const result = await unwrap(window.openclod.app.colabConnect(code))
       if (!result.ok) {
         setConnectError(result.error ?? 'Não consegui conectar.')
         if (result.status) setStatus(result.status)
@@ -175,7 +175,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
     }
     setConfirmingRemoval(false)
     try {
-      setStatus(await unwrap(window.forja.app.colabDisconnect()))
+      setStatus(await unwrap(window.openclod.app.colabDisconnect()))
       lastState.current = ''
       await onChanged()
     } catch (err) {
@@ -303,7 +303,7 @@ export function ColabCard({ provider, onChanged, onOpenProvider }: ColabCardProp
               onDragStart={(event) => {
                 // Arrastar para dentro do Colab é opcional e instável (app→navegador); o jeito garantido é o caminho colado.
                 event.preventDefault()
-                window.forja.app.colabStartDrag()
+                window.openclod.app.colabStartDrag()
               }}
             >
               <span className="colab-file-icon" aria-hidden>

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactElement } from 'react'
 import type { Project } from '../../../shared/types'
-import type { MemoryPageContent, MemoryPageInfo, MemoryStatsInfo } from '../../../shared/api'
+import type { MemoryAddJobInfo, MemoryFileInfo, MemoryPageContent, MemoryPageInfo, MemoryStatsInfo } from '../../../shared/api'
 import { errorMessage, unwrap } from '../lib/api'
 import { Icon } from './Icons'
 import { Markdown } from './Markdown'
 import { MemoryGraph } from './MemoryGraph'
+import { MEMORY_KINDS, MemoryAddBanner, MemoryFileCard, MemoryKindBar, MemoryThumb, type MemoryFilter } from './MemoryFiles'
 import { EMPTY_SELECTION, deletionText, masterState, prune, selectAll, selectRange, toggle, type Selection } from '../lib/memory-selection'
 import './memory-select.css'
 
@@ -68,6 +69,10 @@ export function MemoryPage({
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
   const [confirmingBulk, setConfirmingBulk] = useState(false)
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
+  // Files kept in the memory (pictures, PDFs, documents...), the kind the grid shows, and a save in progress.
+  const [files, setFiles] = useState<MemoryFileInfo[]>([])
+  const [filter, setFilter] = useState<MemoryFilter>('tudo')
+  const [job, setJob] = useState<MemoryAddJobInfo | null>(null)
 
   const project = useMemo(
     () => projects.find((item) => item.id === projectId) ?? null,
@@ -90,13 +95,17 @@ export function MemoryPage({
     setLoading(true)
     setError('')
     try {
-      const [list, status, ai] = await Promise.all([
-        unwrap(window.forja.memory.list(projectId)),
-        unwrap(window.forja.memory.status(projectId)),
-        window.forja.memory.aiStatus().catch(() => null)
+      const [list, status, ai, kept, saving] = await Promise.all([
+        unwrap(window.openclod.memory.list(projectId)),
+        unwrap(window.openclod.memory.status(projectId)),
+        window.openclod.memory.aiStatus().catch(() => null),
+        unwrap(window.openclod.memory.files(projectId)).catch(() => [] as MemoryFileInfo[]),
+        unwrap(window.openclod.memory.addStatus(projectId)).catch(() => null)
       ])
       setPages(list)
       setStats(status)
+      setFiles(kept)
+      setJob(saving)
       setAiStatus(ai?.ok ? ai.value : null)
       setSelected((current) => (current && list.some((page) => page.slug === current.slug) ? current : null))
     } catch (err) {
@@ -115,10 +124,53 @@ export function MemoryPage({
     setView('graph')
   }, [graphRequest])
 
+  // Files being saved: follow the job, then reload pages, files and counters once.
+  useEffect(() => {
+    if (!projectId || !job?.active) return
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await unwrap(window.openclod.memory.addStatus(projectId))
+        setJob(next)
+        if (next && !next.active) void load()
+      } catch {
+        /* next tick */
+      }
+    }, 1_000)
+    return () => window.clearInterval(timer)
+  }, [projectId, job?.active, load])
+
+  // The index catches up in the background: refresh the counter while it does.
+  useEffect(() => {
+    if (!projectId || !stats?.indexSync?.running) return
+    const timer = window.setTimeout(async () => {
+      try {
+        setStats(await unwrap(window.openclod.memory.status(projectId)))
+      } catch {
+        /* next load */
+      }
+    }, 5_000)
+    return () => window.clearTimeout(timer)
+  }, [projectId, stats])
+
+  const addFiles = async (pick: 'files' | 'folder'): Promise<void> => {
+    if (!projectId) return
+    setError('')
+    try {
+      const started = await unwrap(window.openclod.memory.addFiles(projectId, pick))
+      if (started) setJob(started)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  /** Files by the slug of their page (and of their text parts). */
+  const fileBySlug = useMemo(() => new Map(files.map((file) => [file.slug, file])), [files])
+  const fileOf = (slug: string): MemoryFileInfo | undefined => fileBySlug.get(slug.replace(/-parte-\d+$/, ''))
+
   const openPage = async (slug: string, forProject = projectId): Promise<void> => {
     if (!forProject) return
     try {
-      const content = await unwrap(window.forja.memory.read(forProject, slug))
+      const content = await unwrap(window.openclod.memory.read(forProject, slug))
       setSelected(content)
     } catch (err) {
       setError(errorMessage(err))
@@ -139,7 +191,7 @@ export function MemoryPage({
     setRecalling(true)
     setError('')
     try {
-      const result = await unwrap(window.forja.memory.recall(projectId, query.trim(), 10))
+      const result = await unwrap(window.openclod.memory.recall(projectId, query.trim(), 10))
       setRecallText(result.text || 'Nada encontrado no índice deste projeto.')
     } catch (err) {
       setError(errorMessage(err))
@@ -159,7 +211,7 @@ export function MemoryPage({
 
   const removePage = async (slug: string): Promise<void> => {    if (!projectId || !window.confirm('Apagar esta página da memória do projeto? Não pode ser desfeito.')) return
     try {
-      await unwrap(window.forja.memory.delete(projectId, slug))
+      await unwrap(window.openclod.memory.delete(projectId, slug))
       setSelected(null)
       await load()
     } catch (err) {
@@ -167,16 +219,36 @@ export function MemoryPage({
     }
   }
 
+  const fileKinds = useMemo(() => new Set(MEMORY_KINDS.map((item) => item.kind)), [])
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return pages
-    return pages.filter(
+    // "Páginas" hides the pages of the files (their own cards are under each kind); a kind shows the media pages of it.
+    const shown =
+      filter === 'paginas'
+        ? pages.filter((page) => !page.tags.includes('arquivo'))
+        : filter === 'audio' || filter === 'video'
+          ? pages.filter((page) => page.tags.includes('midia') && page.tags.includes(filter) && !page.tags.includes('arquivo'))
+          : fileKinds.has(filter)
+            ? []
+            : pages
+    if (!q) return shown
+    // The wiki's own words of the whole page (the text read in a picture, a PDF's text) count too, every word of the search.
+    const words = q.normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9_]+/).filter((word) => word.length >= 3)
+    return shown.filter(
       (page) =>
         page.title.toLowerCase().includes(q) ||
         page.summary.toLowerCase().includes(q) ||
-        page.tags.some((tag) => tag.toLowerCase().includes(q))
+        page.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        (words.length > 0 && words.every((word) => page.terms?.some((term) => term.includes(word))))
     )
-  }, [pages, query])
+  }, [pages, query, filter, fileKinds])
+
+  /** Under a kind: the files of that kind (matching the search by name, description or tag). */
+  const kindFiles = useMemo(() => {
+    if (!fileKinds.has(filter)) return []
+    const q = query.trim().toLowerCase()
+    return files.filter((file) => file.kind === filter && (!q || `${file.name} ${file.description ?? ''} ${file.tags.join(' ')}`.toLowerCase().includes(q)))
+  }, [files, filter, query, fileKinds])
 
   const selectedPages = useMemo(() => filtered.filter((page) => selection.slugs.has(page.slug)), [filtered, selection])
   const master = masterState(selectedPages.length, filtered.length)
@@ -228,7 +300,7 @@ export function MemoryPage({
     const failed: string[] = []
     for (const [index, page] of targets.entries()) {
       try {
-        if (!(await unwrap(window.forja.memory.delete(projectId, page.slug)))) failed.push(page.title)
+        if (!(await unwrap(window.openclod.memory.delete(projectId, page.slug)))) failed.push(page.title)
       } catch {
         failed.push(page.title)
       }
@@ -271,8 +343,20 @@ export function MemoryPage({
           </button>
           <button
             type="button"
+            className="btn ghost small memory-add-files"
+            onClick={() => void addFiles('files')}
+            disabled={!projectId || Boolean(job?.active)}
+            title="Imagens (com descrição), PDFs, documentos, planilhas, áudio, vídeo: cada um vira uma página ligada e indexada"
+          >
+            <Icon name="plus" size={13} /> Guardar arquivos
+          </button>
+          <button type="button" className="btn ghost small memory-add-folder" onClick={() => void addFiles('folder')} disabled={!projectId || Boolean(job?.active)}>
+            <Icon name="folder" size={13} /> Guardar pasta
+          </button>
+          <button
+            type="button"
             className="btn ghost small"
-            onClick={() => projectId && void window.forja.memory.open(projectId)}
+            onClick={() => projectId && void window.openclod.memory.open(projectId)}
             disabled={!project}
           >
             <Icon name="folderOpen" size={13} /> Abrir pasta
@@ -284,7 +368,7 @@ export function MemoryPage({
             onClick={async () => {
               if (!projectId) return
               try {
-                const saved = await unwrap(window.forja.memory.exportMarkdown(projectId))
+                const saved = await unwrap(window.openclod.memory.exportMarkdown(projectId))
                 if (saved) setNotice(`Memória exportada para ${saved}`)
               } catch (err) {
                 setError(errorMessage(err))
@@ -300,7 +384,7 @@ export function MemoryPage({
             onClick={async () => {
               if (!projectId) return
               try {
-                const count = await unwrap(window.forja.memory.importMarkdown(projectId))
+                const count = await unwrap(window.openclod.memory.importMarkdown(projectId))
                 setNotice(count ? `${count} página(s) importada(s).` : 'Nenhum arquivo .md encontrado.')
                 await load()
               } catch (err) {
@@ -317,7 +401,7 @@ export function MemoryPage({
             onClick={async () => {
               if (!projectId) return
               try {
-                const count = await unwrap(window.forja.memory.importZip(projectId))
+                const count = await unwrap(window.openclod.memory.importZip(projectId))
                 setNotice(count ? `${count} página(s) importada(s) do ZIP.` : 'Nenhum arquivo .md encontrado no ZIP.')
                 await load()
               } catch (err) {
@@ -405,15 +489,23 @@ export function MemoryPage({
               <span className="memory-stat-value">{stats?.openHandoffs ?? 0}</span>
               <span className="memory-stat-label">handoffs abertos</span>
             </div>
-            <div className="memory-stat">
-              <span className="memory-stat-value">{stats?.indexed ?? 0}</span>
-              <span className="memory-stat-label">no índice AI-Memory</span>
+            <div className="memory-stat" title="Páginas que o índice AI-Memory (busca full-text, entidades e links) tem deste projeto">
+              <span className="memory-stat-value">
+                {stats?.indexed ?? 0}
+                {pages.length && (stats?.indexed ?? 0) < pages.length ? <span className="memory-stat-of">de {pages.length}</span> : null}
+              </span>
+              <span className="memory-stat-label">
+                {stats?.indexSync?.running ? `no índice · copiando (${stats.indexSync.done} de ${stats.indexSync.total})` : 'no índice AI-Memory'}
+              </span>
             </div>
             <div className="memory-stat path">
               <span className="memory-stat-value small">{project.name}</span>
               <span className="memory-stat-label">{project.path}</span>
             </div>
           </div>
+
+          <MemoryKindBar counts={stats?.files ?? {}} filter={filter} onFilter={setFilter} />
+          {job && (job.active || job.done) ? <MemoryAddBanner job={job} /> : null}
 
           {selected ? (
             <div className="memory-detail">
@@ -439,6 +531,16 @@ export function MemoryPage({
               </div>
               <article className="memory-detail-body">
                 <h2>{selected.title}</h2>
+                {fileOf(selected.slug) && projectId ? (
+                  <>
+                    {fileOf(selected.slug)?.thumb ? <MemoryThumb projectId={projectId} slug={fileOf(selected.slug)!.slug} large /> : null}
+                    <div className="memory-file-actions">
+                      <button type="button" className="btn ghost small" onClick={() => void window.openclod.memory.openFile(projectId, fileOf(selected.slug)!.slug)}>
+                        <Icon name="external" size={13} /> Abrir o arquivo
+                      </button>
+                    </div>
+                  </>
+                ) : null}
                 <div onClick={onMemoryBodyClick}>
                   <Markdown text={memoryBody(selected.body)} />
                 </div>
@@ -460,7 +562,9 @@ export function MemoryPage({
                 <button type="button" className="btn ghost small" onClick={() => void recall()} disabled={!query.trim() || recalling}>
                   <Icon name="search" size={13} /> {recalling ? 'Buscando…' : 'Buscar no índice'}
                 </button>
-                <span className="muted">{filtered.length} página(s)</span>
+                <span className="muted">
+                  {fileKinds.has(filter) ? `${kindFiles.length} arquivo(s)${filtered.length ? ` · ${filtered.length} página(s)` : ''}` : `${filtered.length} página(s)`}
+                </span>
               </div>
 
               {recallText ? (
@@ -530,22 +634,29 @@ export function MemoryPage({
               ) : null}
 
               {loading && !pages.length ? <div className="page-empty compact">Carregando memória…</div> : null}
-              {!loading && !filtered.length ? (
+              {!loading && !filtered.length && !kindFiles.length ? (
                 <div className="page-empty">
                   <Icon name="archive" size={28} />
                   <p>
-                    {pages.length
-                      ? 'Nenhuma página corresponde à busca.'
-                      : 'A memória deste projeto ainda está vazia. Peça ao agente para salvar uma descoberta ou um handoff; ele grava aqui automaticamente.'}
+                    {fileKinds.has(filter)
+                      ? 'Nenhum arquivo deste tipo na memória com essa busca.'
+                      : pages.length
+                        ? 'Nenhuma página corresponde à busca.'
+                        : 'A memória deste projeto ainda está vazia. Peça ao agente para salvar uma descoberta ou um handoff; ele grava aqui automaticamente.'}
                   </p>
                 </div>
               ) : (
                 <div className="memory-grid">
+                  {projectId
+                    ? kindFiles.map((file) => <MemoryFileCard key={file.slug} projectId={projectId} file={file} onOpen={(slug) => void openPage(slug)} />)
+                    : null}
                   {filtered.map((page) => {
                     const marked = selection.slugs.has(page.slug)
+                    const file = page.tags.includes('arquivo') && !page.tags.includes('parte') ? fileOf(page.slug) : undefined
                     return (
                       <div key={page.slug} className={`memory-card${marked ? ' is-selected' : ''}`} data-slug={page.slug}>
                         <button type="button" className="memory-card-open" onClick={() => void openPage(page.slug)}>
+                          {file?.thumb && projectId ? <MemoryThumb projectId={projectId} slug={file.slug} /> : null}
                           <div className="memory-card-head">
                             <Icon name={page.pinned ? 'bookmark' : 'file'} size={14} />
                             <strong>{page.title}</strong>

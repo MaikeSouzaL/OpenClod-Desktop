@@ -131,7 +131,7 @@ do `SKILL.md` §2 passa a ter impressão conferida pelo `validar`.
 ### Mudado
 
 - **Trava do aprendizado:** lista branca de verbos no `--faca`; tópicos novos (versionamento, sessão,
-  banco, efeito, evidência forjada, governança, credencial do `.env`, destino `main`/`develop`/tronco) e a
+  banco, efeito, evidência falsificada, governança, credencial do `.env`, destino `main`/`develop`/tronco) e a
   classe `producao-escrita`; `--origem` com formato fechado; corpus de 156 para 233 recusas e de 112 para
   133 legítimas (`MINIMO_CORPUS_RECUSA = 233`).
 - **Destino `perfil`:** só o `.qa/PERFIL.md` do projeto (nome, primeira linha e fora da skill;

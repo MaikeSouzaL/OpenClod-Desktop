@@ -78,7 +78,7 @@ function isFile(candidate: string | undefined): candidate is string {
 /**
  * Locates the open-computer-use helper. Order:
  *  1. the explicit constructor path (`null` disables the backend);
- *  2. env `FORJA_OCU` (legacy aliases `FORJA_OCU_BIN`, `OCU_BIN` count as the same step);
+ *  2. env `OPENCLOD_OCU` (legacy aliases `OPENCLOD_OCU_BIN`, `OCU_BIN` count as the same step);
  *  3. the copy bundled with the app, `resources/bin/open-computer-use.exe`;
  *  4. last resort, a copy installed by the user: the npm global package, then PATH.
  */
@@ -86,7 +86,7 @@ export function resolveOcu(explicit?: string | null): { path: string; source: Oc
   if (explicit === null) return null
   if (isFile(explicit)) return { path: explicit, source: 'explicit' }
 
-  for (const name of ['FORJA_OCU', 'FORJA_OCU_BIN', 'OCU_BIN']) {
+  for (const name of ['OPENCLOD_OCU', 'OPENCLOD_OCU_BIN', 'OCU_BIN']) {
     const value = process.env[name]
     if (isFile(value)) return { path: value, source: 'env' }
   }
@@ -244,7 +244,7 @@ export class ComputerLayer {
         available: false,
         backend: 'native',
         detail:
-          'open-computer-use não encontrado (esperado em resources/bin/open-computer-use.exe; rode "npm run embed:bin" ou defina FORJA_OCU). Captura de tela nativa continua disponível.',
+          'open-computer-use não encontrado (esperado em resources/bin/open-computer-use.exe; rode "npm run embed:bin" ou defina OPENCLOD_OCU). Captura de tela nativa continua disponível.',
         platform: this.platform
       }
     }
@@ -885,7 +885,7 @@ export class ComputerLayer {
     shown: number
   }> {
     if (process.platform !== 'win32') throw new Error('captura nativa implementada para Windows')
-    const dir = path.join(os.tmpdir(), 'forja-shots')
+    const dir = path.join(os.tmpdir(), 'openclod-shots')
     await fs.promises.mkdir(dir, { recursive: true })
     const file = path.join(dir, `shot-${Date.now()}.png`)
     const escaped = file.replace(/'/g, "''")
@@ -973,7 +973,7 @@ export class ComputerLayer {
    */
   async captureAround(point: { x: number; y: number }, half = 110): Promise<ImagePart | null> {
     if (process.platform !== 'win32') return null
-    const dir = path.join(os.tmpdir(), 'forja-shots')
+    const dir = path.join(os.tmpdir(), 'openclod-shots')
     await fs.promises.mkdir(dir, { recursive: true })
     const file = path.join(dir, `pointer-${Date.now()}.png`)
     const size = half * 2

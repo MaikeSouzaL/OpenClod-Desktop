@@ -37,7 +37,7 @@ export async function transcribeMedia(file: string, options: TranscribeOptions =
   if (stat.size > 2 * 1024 * 1024 * 1024) throw new Error('mídia maior que 2 GB')
   if (!MEDIA_EXTENSIONS.has(path.extname(resolved).toLowerCase())) throw new Error('formato de áudio/vídeo não suportado')
   const python = resourcePath('runtime', 'python', process.platform === 'win32' ? 'python.exe' : 'python3')
-  const script = resourcePath('stt', 'forja_stt.py')
+  const script = resourcePath('stt', 'openclod_stt.py')
   const models = resourcePath('models', 'whisper')
   if (!python || !script || !models) throw new Error('runtime Whisper embutido indisponível')
   const model = typeof options.model === 'string' && /^[A-Za-z0-9._-]+$/.test(options.model) ? options.model : 'base'
@@ -52,9 +52,9 @@ export async function transcribeMedia(file: string, options: TranscribeOptions =
         cwd: path.dirname(script),
         env: {
           ...sanitizedEnv(),
-          FORJA_STT_MODELS: models,
-          FORJA_STT_MODEL: model,
-          FORJA_STT_LANGUAGE: language,
+          OPENCLOD_STT_MODELS: models,
+          OPENCLOD_STT_MODEL: model,
+          OPENCLOD_STT_LANGUAGE: language,
           HF_HUB_OFFLINE: '1',
           TRANSFORMERS_OFFLINE: '1',
           HF_HUB_DISABLE_TELEMETRY: '1',

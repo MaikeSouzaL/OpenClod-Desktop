@@ -436,9 +436,32 @@ export class AiMemoryService {
     return []
   }
 
-  async recent(projectId: string, limit = 40): Promise<AiMemoryHit[]> {    const hits = await this.request<Array<{ path: string; title: string; snippet: string; updated_at?: string }>>(
-      `/admin/recent?workspace=${encodeURIComponent(AI_MEMORY_WORKSPACE)}&project=${encodeURIComponent(scope(projectId))}&limit=${Math.min(100, Math.max(1, limit))}`
-    )
+  private counts = new Map<string, { at: number; pages: number }>()
+
+  /** Pages the index holds for one project (`/admin/projects`); kept for 20 s, the call takes seconds on a big index. */
+  async pageCount(projectId: string): Promise<number> {
+    const key = scope(projectId)
+    const cached = this.counts.get(key)
+    if (cached && Date.now() - cached.at < 20_000) return cached.pages
+    const result = await this.request<{ projects?: Array<{ workspace_name?: string; project_name?: string; page_count?: number }> }>('/admin/projects')
+    const row = (result.projects ?? []).find((item) => item.workspace_name === AI_MEMORY_WORKSPACE && item.project_name === key)
+    const pages = Number(row?.page_count) || 0
+    this.counts.set(key, { at: Date.now(), pages })
+    return pages
+  }
+
+  async recent(projectId: string, limit = 40): Promise<AiMemoryHit[]> {
+    let hits: Array<{ path: string; title: string; snippet: string; updated_at?: string }>
+    try {
+      hits = await this.request<Array<{ path: string; title: string; snippet: string; updated_at?: string }>>(
+        `/admin/recent?workspace=${encodeURIComponent(AI_MEMORY_WORKSPACE)}&project=${encodeURIComponent(scope(projectId))}&limit=${Math.min(100, Math.max(1, limit))}`
+      )
+    } catch (err) {
+      // A project the index has never seen does not exist there yet (the first page written creates it): it is empty, not
+      // broken. Treating it as an error kept new projects out of the index for good.
+      if (/ai-memory 404: .*not found/i.test((err as Error).message)) return []
+      throw err
+    }
     return hits.map((hit) => ({
       path: hit.path,
       title: hit.title,

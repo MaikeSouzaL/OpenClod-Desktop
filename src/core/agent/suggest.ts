@@ -55,7 +55,9 @@ const SYNONYM_GROUPS: Array<[string[], string[]]> = [
   [['implante', 'implantar'], ['deploy', 'devops']],
   [['refatore', 'refatorar'], ['refactor', 'refactoring']],
   [['planeje', 'planejar'], ['plan', 'planner', 'architect']],
-  [['desenhe', 'desenhar'], ['draw', 'design', 'svg']]
+  [['desenhe', 'desenhar'], ['draw', 'design', 'svg']],
+  [['memoria', 'memorias'], ['memory']],
+  [['arquivo', 'arquivos'], ['file', 'files']]
 ]
 const SYNONYMS = new Map<string, string[]>()
 for (const [portuguese, english] of SYNONYM_GROUPS) {

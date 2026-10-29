@@ -176,7 +176,7 @@ export class OpenAICompatibleProvider implements Provider {
     const headers: Record<string, string> = {
       authorization: `Bearer ${apiKey || 'local'}`,
       ...(this.config.baseUrl.includes('openrouter.ai')
-        ? { 'http-referer': 'https://forja.local', 'x-title': 'Openclod' }
+        ? { 'http-referer': 'https://openclod.local', 'x-title': 'Openclod' }
         : {}),
       ...(this.config.baseUrl.includes('/inference/go/')
         ? { 'x-opencode-session': this.opencodeSession }

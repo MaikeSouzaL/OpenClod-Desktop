@@ -84,7 +84,7 @@ export interface CreateWorktreeOptions {
   baseRef?: string
   /**
    * Where to create the worktree. Relative paths resolve against the main
-   * worktree. Defaults to `<repoRoot>/.forja/worktrees/<safe-branch-name>`.
+   * worktree. Defaults to `<repoRoot>/.openclod/worktrees/<safe-branch-name>`.
    */
   dir?: string
 }

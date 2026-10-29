@@ -47,7 +47,7 @@ async function ask(app, session, title, text, expectedMessagesBefore) {
   await e2e.send(page, text)
   const settled = await e2e.waitSettled(page, session.sessionId, { timeoutMs: 480000, sinceCount: expectedMessagesBefore })
   const report = await e2e.turnReport(page, session.sessionId, expectedMessagesBefore)
-  const messages = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages, session.sessionId)
+  const messages = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages, session.sessionId)
   return { settled, report, messages, seconds: Math.round((Date.now() - started) / 1000) }
 }
 
@@ -127,7 +127,7 @@ async function main() {
       const manifest = dirC ? JSON.parse(fs.readFileSync(path.join(mediaDirs, dirC, 'manifest.json'), 'utf8')) : null
       check('vídeo: frames e folhas de contato em disco (JPEG)', Boolean(manifest) && manifest.frames.length >= 10 && manifest.sheets.length >= 2 && fs.readFileSync(path.join(mediaDirs, dirC, manifest.sheets[0].file)).subarray(0, 2).toString('hex') === 'ffd8', manifest && manifest.stats)
       // The sheets only reach a model the settings say can see images.
-      const vision = await page.evaluate(async (id) => ((await window.forja.app.settings()).value.providers.find((item) => item.id === id) || {}).supportsVision === true, c.provider)
+      const vision = await page.evaluate(async (id) => ((await window.openclod.app.settings()).value.providers.find((item) => item.id === id) || {}).supportsVision === true, c.provider)
       const withImages = turnC.messages.some((m) => m.hidden && m.parts.some((p) => p.type === 'image'))
       check(`vídeo: as folhas só vão como imagem para modelo com visão (visão=${vision})`, withImages === vision, { vision, withImages })
       await page.screenshot({ path: path.join(OUT, '03-video-anexado.png'), fullPage: true })

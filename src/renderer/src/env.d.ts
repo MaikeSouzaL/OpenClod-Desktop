@@ -3,7 +3,7 @@ import type { OpenclodApi } from '../../shared/api'
 
 declare global {
   interface Window {
-    forja: OpenclodApi
+    openclod: OpenclodApi
   }
 }
 

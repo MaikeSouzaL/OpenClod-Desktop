@@ -35,7 +35,7 @@ async function main() {
     await page.waitForSelector('.context-top', { timeout: 15000 })
     const before = await panelText()
     check('antes do primeiro turno o painel diz que é estimativa', /estimativa/.test(before), before.slice(0, 160))
-    check('sem turno, a medição ainda não existe', (await page.evaluate(async (id) => (await window.forja.sessions.contextBreakdown(id)).value, session.sessionId)) === null)
+    check('sem turno, a medição ainda não existe', (await page.evaluate(async (id) => (await window.openclod.sessions.contextBreakdown(id)).value, session.sessionId)) === null)
 
     await e2e.send(page, 'ola')
     await e2e.waitSettled(page, session.sessionId, { timeoutMs: 180000 })
@@ -46,7 +46,7 @@ async function main() {
       check(`a linha "${label}" aparece`, after.includes(label))
     }
 
-    const measured = await page.evaluate(async (id) => (await window.forja.sessions.contextBreakdown(id)).value, session.sessionId)
+    const measured = await page.evaluate(async (id) => (await window.openclod.sessions.contextBreakdown(id)).value, session.sessionId)
     const by = Object.fromEntries((measured?.items ?? []).map((item) => [item.id, item.tokens]))
     result.measured = measured
     check('o sistema real passa de 1 500 tokens (o número fixo antigo era 1 100)', by.system > 1500, by.system)

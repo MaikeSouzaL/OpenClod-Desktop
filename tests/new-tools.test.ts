@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 function temp(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-new-tools-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-new-tools-'))
   dirs.push(dir)
   return dir
 }
@@ -208,7 +208,7 @@ describe('CLAUDE.md', () => {
     const created = ensureProjectInstructions(dir, 'Meu Projeto')
     expect(created).toBe(path.join(dir, 'CLAUDE.md'))
     const first = fs.readFileSync(created as string, 'utf8')
-    expect(first).toContain('forja:generated')
+    expect(first).toContain('openclod:generated')
     expect(first).toContain('Meu Projeto')
     expect(first).toContain('Regras para o agente')
 
@@ -221,11 +221,11 @@ describe('CLAUDE.md', () => {
     const dir = temp()
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'regras do claude\n', 'utf8')
     fs.writeFileSync(path.join(dir, 'AGENTS.md'), 'regras do claude\n', 'utf8')
-    fs.writeFileSync(path.join(dir, 'FORJA.md'), 'regras do forja\n', 'utf8')
+    fs.writeFileSync(path.join(dir, 'OPENCLOD.md'), 'regras do openclod\n', 'utf8')
     const text = loadProjectInstructions(dir) ?? ''
-    expect(text.indexOf('CLAUDE.md')).toBeLessThan(text.indexOf('FORJA.md'))
+    expect(text.indexOf('CLAUDE.md')).toBeLessThan(text.indexOf('OPENCLOD.md'))
     expect(text.match(/regras do claude/g)).toHaveLength(1)
-    expect(text).toContain('regras do forja')
+    expect(text).toContain('regras do openclod')
   })
 })
 

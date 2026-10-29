@@ -14,7 +14,7 @@ describe('SessionStore', () => {
   let store: SessionStore
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-sessions-')
+    dir = await makeTempDir('openclod-sessions-')
     store = new SessionStore(dir)
     await store.init()
   })
@@ -206,7 +206,7 @@ describe('SessionStore', () => {
     const exported = await store.exportSession(meta.id)
     expect(exported).not.toBeNull()
     const parsed = JSON.parse(exported!)
-    expect(parsed.format).toBe('forja.session.v1')
+    expect(parsed.format).toBe('openclod.session.v1')
     expect(parsed.state.meta.id).toBe(meta.id)
 
     const imported = await store.importSession(exported!)
@@ -227,7 +227,7 @@ describe('SessionStore', () => {
   it('rejects malformed import payloads', async () => {
     await expect(store.importSession('{}')).rejects.toThrow(/inválido/)
     await expect(
-      store.importSession(JSON.stringify({ format: 'forja.session.v1', state: {} }))
+      store.importSession(JSON.stringify({ format: 'openclod.session.v1', state: {} }))
     ).rejects.toThrow(/inválido/)
     await expect(store.importSession('não é json')).rejects.toThrow()
     await expect(store.exportSession('ses_missing')).resolves.toBeNull()

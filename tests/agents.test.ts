@@ -54,7 +54,7 @@ import { makeTempDir, policy, removeTempDir } from './helpers'
 let root: string
 
 beforeEach(async () => {
-  root = await makeTempDir('forja-agents-')
+  root = await makeTempDir('openclod-agents-')
 })
 
 afterEach(async () => {
@@ -202,8 +202,8 @@ describe('agent folders', () => {
     const cwd = path.join(root, 'project')
     write(path.join(userDir, 'explorer.md'), agentFile('explorer', '', 'USER explorer'))
     write(path.join(userDir, 'shared.md'), agentFile('shared', '', 'USER shared'))
-    write(path.join(cwd, '.forja', 'agents', 'shared.md'), agentFile('shared', '', 'PROJECT shared'))
-    write(path.join(cwd, '.forja', 'agents', 'only-project.md'), agentFile('only-project'))
+    write(path.join(cwd, '.openclod', 'agents', 'shared.md'), agentFile('shared', '', 'PROJECT shared'))
+    write(path.join(cwd, '.openclod', 'agents', 'only-project.md'), agentFile('only-project'))
 
     const { agents } = loadAgents({ userDir, cwd })
     const byName = new Map(agents.map((a) => [a.name, a]))
@@ -223,22 +223,22 @@ describe('agent folders', () => {
     write(path.join(homeDir, '.claude', 'agents', 'clash.md'), agentFile('clash', '', 'HOME claude'))
     write(path.join(cwd, '.claude', 'agents', 'clash.md'), agentFile('clash', '', 'PROJECT claude'))
     write(path.join(cwd, '.claude', 'agents', 'native-clash.md'), agentFile('native-clash', '', 'PROJECT claude'))
-    write(path.join(cwd, '.forja', 'agents', 'native-clash.md'), agentFile('native-clash', '', 'PROJECT forja'))
-    write(path.join(userDir, 'home-agent.md'), agentFile('home-agent', '', 'USER forja'))
+    write(path.join(cwd, '.openclod', 'agents', 'native-clash.md'), agentFile('native-clash', '', 'PROJECT openclod'))
+    write(path.join(userDir, 'home-agent.md'), agentFile('home-agent', '', 'USER openclod'))
     write(path.join(cwd, '.claude', 'agents', 'broken.md'), 'nothing here')
 
     const off = loadAgents({ userDir, cwd, homeDir, importClaude: false })
     expect(off.agents.map((a) => a.name)).not.toContain('clash')
-    expect(off.agents.find((a) => a.name === 'home-agent')).toMatchObject({ systemPrompt: 'USER forja', source: 'user' })
+    expect(off.agents.find((a) => a.name === 'home-agent')).toMatchObject({ systemPrompt: 'USER openclod', source: 'user' })
     expect(off.warnings).toEqual([])
 
     const on = loadAgents({ userDir, cwd, homeDir, importClaude: true })
     const byName = new Map(on.agents.map((a) => [a.name, a]))
     expect(byName.get('clash')).toMatchObject({ systemPrompt: 'PROJECT claude', source: 'project', imported: true })
     // Openclod's own files beat the imported ones at the same level; project beats user.
-    expect(byName.get('native-clash')).toMatchObject({ systemPrompt: 'PROJECT forja' })
+    expect(byName.get('native-clash')).toMatchObject({ systemPrompt: 'PROJECT openclod' })
     expect(byName.get('native-clash')?.imported).toBeUndefined()
-    expect(byName.get('home-agent')).toMatchObject({ systemPrompt: 'USER forja' })
+    expect(byName.get('home-agent')).toMatchObject({ systemPrompt: 'USER openclod' })
     expect(on.warnings.map((w) => path.basename(w.file))).toEqual(['broken.md'])
   })
 

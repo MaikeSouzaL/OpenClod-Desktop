@@ -126,18 +126,18 @@ async function launch({ port: wanted, profile, work, env = {}, viewport = { widt
 /** Registers the project and opens a session on a real provider; returns its id. */
 async function newSession(page, { folder, title, projectName = 'Projeto E2E', mode = 'code', providerId }) {
   const created = await page.evaluate(async ({ folder, title, projectName, mode, providerId }) => {
-    const settings = (await window.forja.app.settings()).value
+    const settings = (await window.openclod.app.settings()).value
     const provider =
       settings.providers.find((item) => item.id === (providerId || settings.defaultProviderId)) || settings.providers[0]
     if (!provider) return { error: 'nenhum provedor configurado' }
-    const projects = (await window.forja.projects.list()).value
+    const projects = (await window.openclod.projects.list()).value
     let project = projects.find((item) => item.path === folder)
     if (!project) {
-      const added = await window.forja.projects.add(folder, projectName)
+      const added = await window.openclod.projects.add(folder, projectName)
       if (!added.ok) return { error: added.error }
       project = added.value
     }
-    const session = await window.forja.sessions.create({ projectId: project.id, cwd: project.path, mode, surface: 'code', providerId: provider.id, model: provider.model, title })
+    const session = await window.openclod.sessions.create({ projectId: project.id, cwd: project.path, mode, surface: 'code', providerId: provider.id, model: provider.model, title })
     return session.ok ? { sessionId: session.value.id, projectId: project.id, provider: provider.id, model: provider.model } : { error: session.error }
   }, { folder, title, projectName, mode, providerId })
   if (created.error) throw new Error(created.error)
@@ -168,7 +168,7 @@ async function waitSettled(page, sessionId, { timeoutMs = 300000, sinceCount = 0
   while (Date.now() - started < timeoutMs) {
     await page.waitForTimeout(2000)
     const state = await page.evaluate(async (id) => {
-      const value = (await window.forja.sessions.get(id)).value
+      const value = (await window.openclod.sessions.get(id)).value
       const last = value.messages[value.messages.length - 1]
       // A turn that blocked a plan step ends with the harness's own limitation card, which has no text: still an answer.
       const answered = Boolean(last && last.role === 'assistant' && !last.parts.some((p) => p.type === 'tool_call') && (last.parts.some((p) => p.type === 'text' && p.text.trim()) || (last.parts.length && last.parts.every((p) => p.type === 'limitation'))))
@@ -186,7 +186,7 @@ async function waitSettled(page, sessionId, { timeoutMs = 300000, sinceCount = 0
 /** Tool names and failures used by the model, plus its last answer, after message index `from`. */
 async function turnReport(page, sessionId, from = 0) {
   return page.evaluate(async ({ id, from }) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const added = value.messages.slice(from)
     const calls = added.flatMap((m) => m.parts.filter((p) => p.type === 'tool_call').map((p) => p.name))
     const results = added.flatMap((m) => m.parts.filter((p) => p.type === 'tool_result').map((p) => ({ name: p.name, ok: p.ok, text: String(p.text).slice(0, 240) })))
@@ -198,7 +198,7 @@ async function turnReport(page, sessionId, from = 0) {
 /** Every tool call (with its args) and tool result (full text) after message index `from`; for structural checks. */
 async function toolActivity(page, sessionId, from = 0) {
   return page.evaluate(async ({ id, from }) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const added = value.messages.slice(from)
     const parts = added.flatMap((m) => m.parts)
     return {
@@ -215,7 +215,7 @@ async function toolActivity(page, sessionId, from = 0) {
  */
 async function failureOf(page, sessionId) {
   return page.evaluate(async (id) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const card = value.messages.flatMap((m) => m.parts).find((p) => p.type === 'limitation')
     return card ? String(card.report.error).slice(0, 300) : `estado ${value.state}`
   }, sessionId)
@@ -227,7 +227,7 @@ async function failureOf(page, sessionId) {
  */
 async function checkModel(page, session) {
   const actual = await page.evaluate(async (id) => {
-    const meta = (await window.forja.sessions.get(id)).value.meta
+    const meta = (await window.openclod.sessions.get(id)).value.meta
     return { providerId: meta.providerId, model: meta.model }
   }, session.sessionId)
   return { ok: actual.providerId === session.provider && actual.model === session.model, expected: { providerId: session.provider, model: session.model }, actual }
@@ -235,7 +235,7 @@ async function checkModel(page, session) {
 
 /** Rough cost line of a session (tokens and USD when the provider reports it). */
 async function usageOf(page, sessionId) {
-  return page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.usage, sessionId)
+  return page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.usage, sessionId)
 }
 
 /** Output folder: `--out dir`, or the first positional argument (the old convention), or `fallback`. */

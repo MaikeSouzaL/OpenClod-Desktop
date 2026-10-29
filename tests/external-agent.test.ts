@@ -168,7 +168,7 @@ let project: string
 let script: string
 let bins: Record<ExternalAgentName, string>
 const savedEnv: Record<string, string | undefined> = {}
-const ENV_KEYS = ['FORJA_CLAUDE_BIN', 'FORJA_CODEX_BIN', 'FORJA_OPENCODE_BIN', 'PATH', 'FAKE_API_KEY']
+const ENV_KEYS = ['OPENCLOD_CLAUDE_BIN', 'OPENCLOD_CODEX_BIN', 'OPENCLOD_OPENCODE_BIN', 'PATH', 'FAKE_API_KEY']
 
 function writeWrapper(file: string): string {
   if (process.platform === 'win32') {
@@ -182,7 +182,7 @@ function writeWrapper(file: string): string {
 
 beforeEach(async () => {
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
-  dir = await makeTempDir('forja ext agent ')
+  dir = await makeTempDir('openclod ext agent ')
   project = path.join(dir, 'proj ect')
   fs.mkdirSync(project)
   script = path.join(dir, 'fake-cli.cjs')
@@ -575,24 +575,24 @@ describe('external_agent: abort, timeout, missing CLI, policy', () => {
     const emptyBin = path.join(dir, 'empty-bin')
     fs.mkdirSync(emptyBin)
     process.env.PATH = emptyBin
-    delete process.env.FORJA_CLAUDE_BIN
-    delete process.env.FORJA_CODEX_BIN
+    delete process.env.OPENCLOD_CLAUDE_BIN
+    delete process.env.OPENCLOD_CODEX_BIN
     const { ctx } = harness('ask')
 
     const claude = await externalAgentTool.execute({ agent: 'claude', prompt: 'x' }, ctx)
     expect(claude.ok).toBe(false)
     expect(claude.text).toContain('Claude Code não está instalado')
-    expect(claude.text).toContain('FORJA_CLAUDE_BIN')
+    expect(claude.text).toContain('OPENCLOD_CLAUDE_BIN')
 
     const codex = await externalAgentTool.execute({ agent: 'codex', prompt: 'x' }, ctx)
     expect(codex.ok).toBe(false)
     expect(codex.text).toContain('Codex não está instalado')
-    expect(codex.text).toContain('FORJA_CODEX_BIN')
+    expect(codex.text).toContain('OPENCLOD_CODEX_BIN')
   })
 
-  it('honours FORJA_CLAUDE_BIN / FORJA_CODEX_BIN and reports a bad path', async () => {
+  it('honours OPENCLOD_CLAUDE_BIN / OPENCLOD_CODEX_BIN and reports a bad path', async () => {
     const log = path.join(dir, 'env-bin.json')
-    process.env.FORJA_CLAUDE_BIN = bins.claude
+    process.env.OPENCLOD_CLAUDE_BIN = bins.claude
     const { ctx } = harness('ask')
     // The default tool reads the env at call time; FAKE_* reaches the child through the sanitized env copy.
     process.env.FAKE_SCENARIO = 'ok'
@@ -606,10 +606,10 @@ describe('external_agent: abort, timeout, missing CLI, policy', () => {
       delete process.env.FAKE_LOG
     }
 
-    process.env.FORJA_CODEX_BIN = path.join(dir, 'does-not-exist')
+    process.env.OPENCLOD_CODEX_BIN = path.join(dir, 'does-not-exist')
     const missing = await externalAgentTool.execute({ agent: 'codex', prompt: 'x' }, ctx)
     expect(missing.ok).toBe(false)
-    expect(missing.text).toContain('FORJA_CODEX_BIN aponta para um arquivo que não existe')
+    expect(missing.text).toContain('OPENCLOD_CODEX_BIN aponta para um arquivo que não existe')
   })
 
   it('refuses a cwd outside the workspace and a cwd that does not exist', async () => {

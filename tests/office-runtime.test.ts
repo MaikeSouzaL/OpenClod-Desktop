@@ -34,7 +34,7 @@ function fakeResources(withLibraries = true): string {
   fs.writeFileSync(path.join(resources, 'runtime', 'python', 'python.exe'), '')
   fs.mkdirSync(path.join(resources, 'office', 'bin'), { recursive: true })
   fs.mkdirSync(path.join(resources, 'office', 'bin-fallback'), { recursive: true })
-  fs.writeFileSync(path.join(resources, 'office', 'forja_office.py'), '')
+  fs.writeFileSync(path.join(resources, 'office', 'openclod_office_cli.py'), '')
   if (withLibraries) {
     for (const [dir, info] of [['docx', 'python_docx-1.2.0'], ['openpyxl', 'openpyxl-3.1.5'], ['pptx', 'python_pptx-1.0.2'], ['PIL', 'pillow-12.3.0'], ['xlsxwriter', 'xlsxwriter-3.3.0']]) {
       fs.mkdirSync(path.join(site, dir), { recursive: true })
@@ -54,13 +54,13 @@ function fakePythonDir(output: string | null): string {
 
 beforeEach(async () => {
   root = await makeTempDir('openclod-office-rt-')
-  previousResources = process.env.FORJA_RESOURCES
+  previousResources = process.env.OPENCLOD_RESOURCES
   resetOfficeRuntimeCache()
 })
 
 afterEach(async () => {
-  if (previousResources === undefined) delete process.env.FORJA_RESOURCES
-  else process.env.FORJA_RESOURCES = previousResources
+  if (previousResources === undefined) delete process.env.OPENCLOD_RESOURCES
+  else process.env.OPENCLOD_RESOURCES = previousResources
   resetResourcesCache()
   resetOfficeRuntimeCache()
   await removeTempDir(root)
@@ -97,7 +97,7 @@ describe('what the model is told about a missing document module', () => {
 
   run('with the embedded runtime present', () => {
     beforeEach(() => {
-      process.env.FORJA_RESOURCES = fakeResources()
+      process.env.OPENCLOD_RESOURCES = fakeResources()
       resetResourcesCache()
     })
 
@@ -122,7 +122,7 @@ describe('what the model is told about a missing document module', () => {
       // a resources folder with no runtime (the real one would be found as the fallback of a folder without MANIFEST.json)
       fs.mkdirSync(path.join(root, 'vazio'), { recursive: true })
       fs.writeFileSync(path.join(root, 'vazio', 'MANIFEST.json'), '{}')
-      process.env.FORJA_RESOURCES = path.join(root, 'vazio')
+      process.env.OPENCLOD_RESOURCES = path.join(root, 'vazio')
       resetResourcesCache()
       expect(officeRuntime()).toBeNull()
       expect(officeInstallRefusal('pip install python-docx')).toBeNull()
@@ -135,11 +135,11 @@ describe('what the model is told about a missing document module', () => {
 
 run('the embedded runtime on a command PATH', () => {
   it('is found only when the libraries are installed, and reports their versions', () => {
-    process.env.FORJA_RESOURCES = fakeResources(false)
+    process.env.OPENCLOD_RESOURCES = fakeResources(false)
     resetResourcesCache()
     expect(officeRuntime()).toBeNull()
     fs.rmSync(path.join(root, 'resources'), { recursive: true, force: true })
-    process.env.FORJA_RESOURCES = fakeResources(true)
+    process.env.OPENCLOD_RESOURCES = fakeResources(true)
     resetResourcesCache()
     const runtime = officeRuntime()
     expect(runtime).not.toBeNull()
@@ -148,7 +148,7 @@ run('the embedded runtime on a command PATH', () => {
 
   it('adds openclod-python and openclod-office, keeps `python` alone while the machine has its own, and sets OPENCLOD_PYTHON', async () => {
     const resources = fakeResources()
-    process.env.FORJA_RESOURCES = resources
+    process.env.OPENCLOD_RESOURCES = resources
     resetResourcesCache()
     const env = { Path: `${fakePythonDir('3.10.0 0 0 0')};C:\\Windows\\System32`, SystemRoot: 'C:\\Windows' }
     const learned = await probeSystemPython(env)
@@ -166,7 +166,7 @@ run('the embedded runtime on a command PATH', () => {
 
   it('also redirects python and python3 when the machine has no working Python', async () => {
     const resources = fakeResources()
-    process.env.FORJA_RESOURCES = resources
+    process.env.OPENCLOD_RESOURCES = resources
     resetResourcesCache()
     const env = { PATH: `${fakePythonDir(null)};C:\\Windows\\System32`, SystemRoot: 'C:\\Windows' }
     expect(await probeSystemPython(env)).toEqual({ found: false, hasOfficeLibs: false })
@@ -176,7 +176,7 @@ run('the embedded runtime on a command PATH', () => {
 
   it('does not redirect python when it already has the libraries', async () => {
     const resources = fakeResources()
-    process.env.FORJA_RESOURCES = resources
+    process.env.OPENCLOD_RESOURCES = resources
     resetResourcesCache()
     const env = { PATH: `${fakePythonDir('3.11.2 1 1 1')};C:\\Windows\\System32`, SystemRoot: 'C:\\Windows' }
     expect((await probeSystemPython(env)).hasOfficeLibs).toBe(true)
@@ -185,7 +185,7 @@ run('the embedded runtime on a command PATH', () => {
 
   it('does not guess before the probe ran: only the openclod commands are added', () => {
     const resources = fakeResources()
-    process.env.FORJA_RESOURCES = resources
+    process.env.OPENCLOD_RESOURCES = resources
     resetResourcesCache()
     const parts = String(officeEnvPatch({ PATH: 'C:\\Windows' }).PATH).split(path.delimiter)
     expect(parts).toEqual([path.join(resources, 'office', 'bin'), 'C:\\Windows'])

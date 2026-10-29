@@ -29,6 +29,39 @@ liga o arquivo de destino ao commit de origem, à licença e às alterações fe
 - **Testes**: `tests/computer-settle.test.ts` (6 casos: sem reação, rajada,
   reação tardia, loop infinito, sem linha de base, primeira amostra diferente).
 
+## `resources/harvested/` — arquivo de assets
+
+- **Origem**: 56 repositórios de estudo (ver `resources/harvested/manifest.json`).
+- **Licenças**: MIT e Apache-2.0; textos em `resources/harvested/LICENSES/`.
+- **Conteúdo**: 387 skills, 21 agentes, 23 comandos, 168 prompts e 25 fontes de
+  ferramentas, copiados por `scripts/harvest-research-assets.mjs`.
+- **Alterações**: os assets são cópias fiéis; a curadoria de runtime adiciona
+  `source`, `origin` e `license` ao frontmatter.
+- **Runtime**: apenas `resources/skills` e `resources/agents` são carregados.
+
+### Skills curadas para runtime
+
+| Skill | Origem | Licença |
+|---|---|---|
+| `agent-delegation` | `QwenLM--qwen-code/packages/core/src/skills/bundled/agent-delegation` | Apache-2.0 |
+| `structured-debugging` | `QwenLM--qwen-code/.qwen/skills/structured-debugging` | Apache-2.0 |
+| `e2e-testing` | `All-Hands-AI--OpenHands/.agents/skills/e2e-testing` | MIT |
+| `create-pull-request` | `cline--cline/.agents/skills/create-pull-request` | Apache-2.0 |
+| `harness-eval` | `openharness/.claude/skills/harness-eval` | MIT |
+
+### Agentes empacotados
+
+| Agente | Origem | Licença |
+|---|---|---|
+| `test-engineer` | `QwenLM--qwen-code/.qwen/agents/test-engineer.md` | Apache-2.0 |
+| `css-specialist` | `opencode/packages/console/app/.opencode/agent/css.md` | MIT |
+| `playwright-test-generator` | `playwright/packages/playwright/src/agents/playwright-test-generator.agent.md` | Apache-2.0 |
+| `playwright-test-healer` | `playwright/packages/playwright/src/agents/playwright-test-healer.agent.md` | Apache-2.0 |
+| `playwright-test-planner` | `playwright/packages/playwright/src/agents/playwright-test-planner.agent.md` | Apache-2.0 |
+
+Os agentes foram adaptados para as ferramentas do Openclod (`browser_*`,
+`read_file`, `edit_file`, `run_command`) e para as regras de trabalho do harness.
+
 ## `src/core/agents/definitions.ts`
 
 - **Origem**: `opencode` — prompts de agente.

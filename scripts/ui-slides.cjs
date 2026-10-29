@@ -57,7 +57,7 @@ async function main() {
 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('.app-shell', { timeout: 30_000 })
-  const added = await page.evaluate((folder) => window.forja.projects.add(folder, 'Projeto de slides E2E'), project)
+  const added = await page.evaluate((folder) => window.openclod.projects.add(folder, 'Projeto de slides E2E'), project)
   if (!added.ok) throw new Error(added.error)
   await page.reload()
   await page.waitForSelector('.app-shell', { timeout: 30_000 })

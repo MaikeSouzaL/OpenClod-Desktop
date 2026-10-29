@@ -32,7 +32,7 @@ function NewSkillForm({ onCreated, onCancel }: { onCreated(skill: SkillInfo): vo
     setSaving(true)
     setError('')
     try {
-      onCreated(await unwrap(window.forja.app.createSkill(name.trim(), description.trim(), body)))
+      onCreated(await unwrap(window.openclod.app.createSkill(name.trim(), description.trim(), body)))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -93,7 +93,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
 
   const loadSkills = useCallback(async (): Promise<void> => {
     try {
-      setSkills(await unwrap(window.forja.app.skills()))
+      setSkills(await unwrap(window.openclod.app.skills()))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -114,12 +114,12 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
   }, [])
 
   const loadCatalog = useCallback(async (): Promise<void> => {
-    const result = await window.forja.app.mcpCatalog()
+    const result = await window.openclod.app.mcpCatalog()
     if (result.ok) setCatalog(result.value)
   }, [])
 
   const loadPlugins = useCallback(async (): Promise<void> => {
-    const result = await window.forja.app.plugins()
+    const result = await window.openclod.app.plugins()
     if (result.ok) setInstalledPlugins(result.value)
   }, [])
 
@@ -129,10 +129,10 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
   }, [loadCatalog, loadPlugins])
 
   useEffect(() => {
-    void window.forja.app.agents().then((result) => {
+    void window.openclod.app.agents().then((result) => {
       if (result.ok) setAgents(result.value.agents)
     })
-    void window.forja.app.pluginCatalog().then((result) => {
+    void window.openclod.app.pluginCatalog().then((result) => {
       if (result.ok) setPlugins(result.value)
     })
   }, [])
@@ -158,7 +158,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             className="btn ghost small"
             onClick={async () => {
               try {
-                const status = await unwrap(window.forja.app.claudeStatus())
+                const status = await unwrap(window.openclod.app.claudeStatus())
                 setNotice(
                   status.loggedIn
                     ? `Claude Code conectado${status.method ? ` (${status.method})` : ''}.`
@@ -176,7 +176,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             className="btn ghost small"
             onClick={async () => {
               try {
-                await unwrap(window.forja.app.claudeLogin())
+                await unwrap(window.openclod.app.claudeLogin())
                 setNotice('Terminal aberto: conclua o login do Claude Code no navegador e volte ao Openclod.')
               } catch (err) {
                 setError(errorMessage(err))
@@ -190,7 +190,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
             className="btn ghost small"
             onClick={async () => {
               try {
-                const result = await unwrap(window.forja.app.importClaude())
+                const result = await unwrap(window.openclod.app.importClaude())
                 setNotice(
                   `Claude importado: ${result.skills} skills, ${result.agents} agentes, ${result.imported} MCPs (${result.plugins} plugins no catálogo).`
                 )
@@ -256,7 +256,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                 <option value="usuario">Minhas</option>
               </select>
             </label>
-            <button type="button" className="btn subtle" onClick={() => void window.forja.app.openSkillsFolder()}>
+            <button type="button" className="btn subtle" onClick={() => void window.openclod.app.openSkillsFolder()}>
               <Icon name="folderOpen" size={13} /> Pasta
             </button>
             <button type="button" className="btn primary" onClick={() => setCreating(true)}>
@@ -314,7 +314,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
               onClick={async () => {
                 setError('')
                 try {
-                  const installed = await unwrap(window.forja.app.installLocalPlugin())
+                  const installed = await unwrap(window.openclod.app.installLocalPlugin())
                   if (installed) {
                     setNotice(`Plugin ${installed.name} ${installed.version} instalado. Ative-o para registrar as ferramentas.`)
                     await loadPlugins()
@@ -344,7 +344,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                       className={`btn small ${plugin.enabled ? 'subtle' : 'primary'}`}
                       onClick={async () => {
                         try {
-                          await unwrap(window.forja.app.setPluginEnabled(plugin.id, !plugin.enabled))
+                          await unwrap(window.openclod.app.setPluginEnabled(plugin.id, !plugin.enabled))
                           await loadPlugins()
                         } catch (err) {
                           setError(errorMessage(err))
@@ -360,7 +360,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
                       onClick={async () => {
                         if (!window.confirm(`Remover ${plugin.name}? A pasta data do plugin será preservada.`)) return
                         try {
-                          await unwrap(window.forja.app.removePlugin(plugin.id))
+                          await unwrap(window.openclod.app.removePlugin(plugin.id))
                           await loadPlugins()
                         } catch (err) {
                           setError(errorMessage(err))
@@ -522,7 +522,7 @@ export function CustomizePage({ settings, capabilities, onOpenSettings, onRestar
           <p className="page-lead">
             Hooks rodam comandos seus (ou chamam uma URL com <code>{'"type": "http"'}</code>) em eventos do agente, no formato do Claude Code: código de saída 2
             bloqueia; JSON com <code>permissionDecision</code>, <code>updatedInput</code> e <code>additionalContext</code>. Também são lidos de{' '}
-            <code>.forja/settings.json</code> do projeto.
+            <code>.openclod/settings.json</code> do projeto.
           </p>
           <div className="page-tools">
             <span className="page-tools-spacer" />

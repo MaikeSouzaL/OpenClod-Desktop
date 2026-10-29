@@ -41,6 +41,8 @@
     "src/renderer/src/lib/provider-logos.ts",
     "src/renderer/src/lib/provider-initials.ts",
     "src/renderer/src/lib/memory-selection.ts",
+    "src/renderer/src/lib/seen-images.ts",
+    "src/renderer/src/lib/protections.ts",
     "scripts/lib/mcp-connectors-test-core.ts",
     "scripts/lib/mcp-connectors-test-report.ts",
     "electron.vite.config.ts",

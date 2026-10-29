@@ -97,20 +97,22 @@ A tabela escolhe pela **VRAM lida** (`nvidia-smi`), não pelo nome da GPU (o Col
 
 #### O catálogo: todos os modelos abertos que cabem na GPU
 
-O módulo traz um **catálogo de 161 modelos abertos (306 etiquetas, 61 famílias)** do registro do Ollama, e a etapa 2 imprime os que cabem na GPU detectada, numerados e agrupados:
+O módulo traz um **catálogo de 180 modelos abertos (341 etiquetas, 72 famílias)** do registro do Ollama, e a etapa 2 imprime os que cabem na GPU detectada, numerados e agrupados:
 
 | GPU (VRAM livre ≈ total − 450 MiB) | Cabem | Com contexto de agente (≥ 32k) | Dos quais sem censura |
 |---|---|---|---|
-| 6 GB | 43 | 21 | 14 |
-| 8 GB | 60 | 36 | 23 |
-| 12 GB | 84 | 67 | 34 |
-| **T4 (15 GB)** | **97** | 75 | 39 |
-| L4 (24 GB) | 123 | 104 | 50 |
-| A100 40 GB | 146 | 131 | 62 |
-| A100 / H100 80 GB | 160 | 143 | 67 |
-| 96 GB | 161 | 145 | 68 |
+| 6 GB | 46 | 21 | 14 |
+| 8 GB | 66 | 39 | 23 |
+| 12 GB | 95 | 74 | 34 |
+| **T4 (15 GB)** | **108** | 83 | 39 |
+| L4 (24 GB) | 155 | 120 | 56 |
+| A100 40 GB | 162 | 143 | 62 |
+| A100 / H100 80 GB | 178 | 157 | 67 |
+| 96 GB | 180 | 160 | 68 |
 
-(contagens do catálogo de 2026-10-27; `python openclod_llm_server.py catalog --vram 15360` imprime a lista de qualquer GPU sem baixar nada.)
+(contagens do catálogo de 2026-10-28; `python openclod_llm_server.py catalog --vram 15360` imprime a lista de qualquer GPU sem baixar nada.)
+
+Em 2026-10-28 o catálogo ganhou **11 famílias mainstream** (Llama 4, Qwen3-Next, Nemotron 3 Super, Gemma 3n, Command R, Command R7B, Aya Expanse, EXAONE 3.5, Falcon 3, LFM2 e LFM2.5), +35 etiquetas, cobrindo de ~1,6 GB a ~87 GB. **Nenhuma família sem censura foi acrescentada**: a coluna "sem censura" é idêntica à de antes (ex.: T4 segue com 39, 96 GB com 68); só os grupos mainstream cresceram.
 
 **Grupos** (cada modelo aparece em um só): agentes com visão e ferramentas; agentes só texto; código; raciocínio; visão sem ferramentas; só conversa; **sem censura**. Os modelos **sem censura** (*uncensored* / *abliterated*) são os da biblioteca oficial do Ollama (`dolphin3`, `dolphin-llama3`, `dolphin-mistral`, `dolphin-mixtral`, `dolphincoder`, `llama2-uncensored`, `wizard-vicuna-uncensored`, `wizardlm-uncensored`) e, da comunidade, os "abliterated" da publicação [`huihui_ai`](https://ollama.com/huihui_ai) (a mais baixada do Ollama: Qwen3.8, 3.6, 3.5, 3, Qwen3-VL, Gemma 4 e 3, gpt-oss, Qwen2.5-Coder, Devstral, Mistral Small, Llama 3.3, DeepSeek-R1, Dolphin 3, Phi-4 mini) e o `orcarouter/Qwen3.8-27B-Uncensored`. **A lista de famílias é a única coisa curada** (em `FAMILIES`, em `scripts/colab-catalog.mjs`); qualquer outra etiqueta do Ollama, ou `hf.co/...`, vai em `modelo_manual`.
 

@@ -189,7 +189,7 @@ function TaskDialog({
         retryDelayMs: form.retryDelaySec * 1000,
         ...(form.action ? { action: form.action, actionOptions: form.actionOptions ?? {} } : { surface: form.surface })
       }
-      const task = form.id ? await unwrap(window.forja.schedules.update(form.id, input)) : await unwrap(window.forja.schedules.create(input))
+      const task = form.id ? await unwrap(window.openclod.schedules.update(form.id, input)) : await unwrap(window.openclod.schedules.create(input))
       onSaved(task)
     } catch (err) {
       setError(errorMessage(err))
@@ -354,7 +354,7 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
 
   const load = useCallback(async (): Promise<void> => {
     try {
-      setTasks(await unwrap(window.forja.schedules.list()))
+      setTasks(await unwrap(window.openclod.schedules.list()))
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -390,13 +390,13 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
   const menuTask = rowMenu ? tasks.find((task) => task.id === rowMenu.id) : null
   const rowItems: MenuItem[] = menuTask
     ? [
-        { id: 'run', label: 'Executar agora', icon: 'play', onSelect: () => void act(() => unwrap(window.forja.schedules.runNow(menuTask.id))) },
+        { id: 'run', label: 'Executar agora', icon: 'play', onSelect: () => void act(() => unwrap(window.openclod.schedules.runNow(menuTask.id))) },
         { id: 'edit', label: 'Editar', icon: 'pencil', onSelect: () => setDraft(draftFrom(defaultProject, menuTask)) },
         {
           id: 'toggle',
           label: menuTask.enabled ? 'Pausar' : 'Ativar',
           icon: menuTask.enabled ? 'pause' : 'play',
-          onSelect: () => void act(() => unwrap(window.forja.schedules.update(menuTask.id, { enabled: !menuTask.enabled })))
+          onSelect: () => void act(() => unwrap(window.openclod.schedules.update(menuTask.id, { enabled: !menuTask.enabled })))
         },
         ...(menuTask.lastSessionId ? [{ id: 'open', label: 'Abrir última execução', icon: 'message' as const, onSelect: () => onOpenSession(menuTask.lastSessionId!) }] : []),
         { id: 'sep', separator: true },
@@ -406,7 +406,7 @@ export function ScheduledPage({ projects, activeProjectId, onOpenSession, onAddP
           icon: 'trash',
           danger: true,
           onSelect: () => {
-            if (window.confirm(`Apagar a tarefa "${menuTask.name}"?`)) void act(() => unwrap(window.forja.schedules.remove(menuTask.id)))
+            if (window.confirm(`Apagar a tarefa "${menuTask.name}"?`)) void act(() => unwrap(window.openclod.schedules.remove(menuTask.id)))
           }
         }
       ]

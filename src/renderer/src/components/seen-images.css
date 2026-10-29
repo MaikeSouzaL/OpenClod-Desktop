@@ -1,0 +1,92 @@
+/* Pictures the agent looked at, with a seal saying whether the model really saw each one (Transcript.tsx). */
+
+.chat-shot.is-multi .chat-shot-images {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.chat-shot-item,
+.message-image {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-shot-label {
+  color: var(--text-3);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-seal {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.image-seal-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--seal) 35%, transparent);
+  background: color-mix(in srgb, var(--seal) 12%, transparent);
+  color: var(--seal);
+}
+
+.image-seal-text svg {
+  flex: none;
+}
+
+.image-seal.is-seen {
+  --seal: var(--green);
+}
+
+.image-seal.is-described {
+  --seal: var(--violet);
+}
+
+.image-seal.is-waiting {
+  --seal: var(--amber);
+}
+
+.image-seal.is-unseen {
+  --seal: var(--red);
+}
+
+.image-seal.is-text {
+  --seal: var(--blue);
+}
+
+.image-seal-description summary {
+  width: fit-content;
+  color: var(--text-3);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.image-seal-description summary:hover {
+  color: var(--text-2);
+}
+
+.image-seal-description p {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  max-height: 220px;
+  overflow: auto;
+  border-left: 2px solid color-mix(in srgb, var(--violet) 50%, transparent);
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+/* The pictures of a hidden context message (an attached video's contact sheets) stand alone, without the bubble. */
+.message.seen-context .chat-shot {
+  margin-top: 0;
+}

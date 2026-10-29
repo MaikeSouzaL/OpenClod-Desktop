@@ -250,8 +250,8 @@ async function main() {
 
     /* ---- 4. a real session: image + tool through the Colab GPU ---- */
     const ask = async (text, images = []) => {
-      const before = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages.length, session.sessionId)
-      await page.evaluate(({ id, text, images }) => window.forja.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
+      const before = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages.length, session.sessionId)
+      await page.evaluate(({ id, text, images }) => window.openclod.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
       const state = await e2e.waitSettled(page, session.sessionId, { timeoutMs: 900000, sinceCount: before })
       return { before, state, report: await e2e.turnReport(page, session.sessionId, before) }
     }
@@ -281,7 +281,7 @@ async function main() {
     const delta = (name) => (live[name] || 0) - (baseline[name] || 0)
     report.serverDelta = { requests: delta('requests'), images: delta('images'), promptTokens: delta('prompt_tokens'), completionTokens: delta('completion_tokens'), errors: delta('errors') }
     check('o servidor do Colab contou os pedidos deste app, ao menos uma imagem e os tokens (e nenhum erro)', report.serverDelta.requests >= 2 && report.serverDelta.images >= 1 && report.serverDelta.promptTokens > 0 && report.serverDelta.completionTokens > 0 && report.serverDelta.errors === 0, report.serverDelta)
-    const meta = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.meta, session.sessionId)
+    const meta = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.meta, session.sessionId)
     check('a sessão terminou no Colab (a reserva não precisou entrar)', meta.providerId === 'colab' && meta.model === info.m, { providerId: meta.providerId })
     report.shotSession = await shot(page, '07-sessao-com-imagem-e-ferramenta', host)
 
@@ -289,9 +289,9 @@ async function main() {
     if (DROP_SIGNAL) {
       reserve = await startOllamaProxy()
       await page.evaluate(async ({ baseUrl }) => {
-        const settings = (await window.forja.app.settings()).value
+        const settings = (await window.openclod.app.settings()).value
         const providers = settings.providers.map((provider) => (provider.id === 'ollama' ? { ...provider, baseUrl, model: 'qwen3.5:4b', supportsVision: true, supportsTools: true, models: ['qwen3.5:4b'] } : provider))
-        await window.forja.app.updateSettings({ providers, useAllModels: true, fallbackOrder: ['ollama'], fallbackExclude: [] })
+        await window.openclod.app.updateSettings({ providers, useAllModels: true, fallbackOrder: ['ollama'], fallbackExclude: [] })
       }, { baseUrl: reserve.baseUrl })
       fs.rmSync(DROP_SIGNAL, { force: true })
       fs.writeFileSync(`${DROP_SIGNAL}.ready`, 'pronto')
@@ -305,7 +305,7 @@ async function main() {
       const second = await ask('Qual é o nome do arquivo que você criou antes e o que está escrito nele? Responda curto.')
       report.reserveSeconds = Math.round((Date.now() - t1) / 1000)
       const after2 = await page.evaluate(async (id) => {
-        const value = (await window.forja.sessions.get(id)).value
+        const value = (await window.openclod.sessions.get(id)).value
         return {
           meta: value.meta,
           notes: value.messages.filter((message) => message.role === 'system' && message.notice).map((message) => message.parts.map((part) => part.text || '').join(' '))
@@ -327,12 +327,12 @@ async function main() {
 
       const fresh = await e2e.newSession(page, { folder: ws.project, title: 'Nova com o Colab parado', projectName: 'Colab', providerId: 'colab' })
       await page.evaluate(async ({ id }) => {
-        await window.forja.sessions.send(id, 'Responda apenas: ok.', [], 'auto')
+        await window.openclod.sessions.send(id, 'Responda apenas: ok.', [], 'auto')
         return true
       }, { id: fresh.sessionId })
       const settledFresh = await e2e.waitSettled(page, fresh.sessionId, { timeoutMs: 900000, sinceCount: 0 })
       const freshState = await page.evaluate(async (id) => {
-        const value = (await window.forja.sessions.get(id)).value
+        const value = (await window.openclod.sessions.get(id)).value
         const last = [...value.messages].reverse().find((message) => message.role === 'assistant' && message.parts.some((part) => part.type === 'text'))
         return { providerId: value.meta.providerId, model: value.meta.model, answer: last ? last.parts.filter((part) => part.type === 'text').map((part) => part.text).join(' ') : '' }
       }, fresh.sessionId)
@@ -347,7 +347,7 @@ async function main() {
     await page.waitForFunction(() => !document.querySelector('.colab-summary'), null, { timeout: 15000 })
     const gone = readSettings(ws)
     check('desconectado: o provedor sai das configurações e da reserva', !gone.providers.some((provider) => provider.id === 'colab') && !(gone.fallbackOrder || []).includes('colab'))
-    check('desconectado: a chave foi apagada do cofre (o app não encontra mais credencial)', await page.evaluate(async () => !(await window.forja.app.capabilities()).value.providers.some((item) => item.id === 'colab' && item.configured)))
+    check('desconectado: a chave foi apagada do cofre (o app não encontra mais credencial)', await page.evaluate(async () => !(await window.openclod.app.capabilities()).value.providers.some((item) => item.id === 'colab' && item.configured)))
     report.shotDisconnected = await shot(page, '11-desconectado', host)
   } finally {
     report.errors = ((app && app.errors) || []).filter((line) => line.startsWith('pageerror'))

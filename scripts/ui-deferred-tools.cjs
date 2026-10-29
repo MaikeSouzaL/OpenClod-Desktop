@@ -60,12 +60,12 @@ async function runScenario(page, ws, scenario, index) {
   } catch {
     // A model that never finishes is a result (it got lost), not a reason to throw away the other scenarios.
     timedOut = true
-    await page.evaluate((id) => window.forja.sessions.abort(id), session.sessionId).catch(() => undefined)
+    await page.evaluate((id) => window.openclod.sessions.abort(id), session.sessionId).catch(() => undefined)
     await page.waitForTimeout(3000)
   }
   const report = await e2e.turnReport(page, session.sessionId, 0)
   const activity = await e2e.toolActivity(page, session.sessionId, 0)
-  const messages = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages, session.sessionId)
+  const messages = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages, session.sessionId)
   const calls = usageCalls(messages)
   const input = calls.reduce((sum, call) => sum + call.input, 0)
   const cached = calls.reduce((sum, call) => sum + call.cached, 0)

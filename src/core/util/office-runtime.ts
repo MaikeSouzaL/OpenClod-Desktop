@@ -11,7 +11,7 @@ import { resourcePath } from './resources.js'
  * `run_command` puts on PATH (resources/office/bin):
  *
  *   openclod-python   the embedded interpreter
- *   openclod-office   check / inspect / pdf / recalc (resources/office/forja_office.py)
+ *   openclod-office   check / inspect / pdf / recalc (resources/office/openclod_office_cli.py)
  *
  * `python` and `python3` are only redirected when the computer has no working Python at all (resources/office/bin-fallback):
  * a developer's `python` must keep meaning their own Python.
@@ -42,7 +42,7 @@ export function officeRuntime(): OfficeRuntime | null {
   const python = resourcePath('runtime', 'python', 'python.exe')
   const binDir = resourcePath('office', 'bin')
   const fallbackDir = resourcePath('office', 'bin-fallback')
-  const engine = resourcePath('office', 'forja_office.py')
+  const engine = resourcePath('office', 'openclod_office_cli.py')
   const sitePackages = resourcePath('runtime', 'python', 'Lib', 'site-packages')
   if (!python || !binDir || !fallbackDir || !engine || !sitePackages) return null
   if (!REQUIRED_MODULES.every((module) => fs.existsSync(path.join(sitePackages, module)))) return null

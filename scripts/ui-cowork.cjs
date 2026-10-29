@@ -112,7 +112,7 @@ async function hook(page) {
     // `tools` / `toolEnds` are the session's own tool calls as they happen: a long run is compacted, and the transcript read
     // afterwards no longer holds the early calls (which skill was loaded, which commands ran).
     window.__cw = { questions: [], answered: new Set(), tools: [], toolEnds: {} }
-    window.forja.events.on((event) => {
+    window.openclod.events.on((event) => {
       if (event.type === 'question_request') window.__cw.questions.push({ id: event.request.id, sessionId: event.sessionId, questions: event.request.questions })
       if (event.type === 'tool_start' && !event.agentId) window.__cw.tools.push({ sessionId: event.sessionId, id: event.toolCallId, name: event.name, args: event.args })
       if (event.type === 'tool_end' && !event.agentId) window.__cw.toolEnds[event.toolCallId] = { ok: event.ok, text: String(event.text || event.summary || '').slice(0, 600) }
@@ -123,9 +123,9 @@ async function hook(page) {
 /** Home → Cowork switch → the folder in the Cowork screen's own selector. Returns the page ready to type the task. */
 async function openCowork(page, { folder, projectName, permission }) {
   await page.evaluate(async ({ folder, projectName }) => {
-    const projects = (await window.forja.projects.list()).value
+    const projects = (await window.openclod.projects.list()).value
     if (!projects.find((project) => project.path === folder)) {
-      const added = await window.forja.projects.add(folder, projectName)
+      const added = await window.openclod.projects.add(folder, projectName)
       if (!added.ok) throw new Error(added.error)
     }
   }, { folder, projectName })
@@ -143,7 +143,7 @@ async function openCowork(page, { folder, projectName, permission }) {
 async function coworkSessions(page, folder) {
   const leaf = path.basename(folder).toLowerCase()
   return page.evaluate(async (leaf) => {
-    const list = (await window.forja.sessions.list()).value
+    const list = (await window.openclod.sessions.list()).value
     const leafOf = (cwd) => String(cwd).split(/[\\/]/).filter(Boolean).pop().toLowerCase()
     return list.filter((item) => item.meta.surface === 'cowork' && leafOf(item.meta.cwd) === leaf).sort((a, b) => b.meta.createdAt - a.meta.createdAt).map((item) => ({ id: item.meta.id, title: item.meta.title, mode: item.meta.mode, createdAt: item.meta.createdAt }))
   }, leaf)
@@ -158,7 +158,7 @@ async function type(page, text) {
 
 async function snapshotState(page, id) {
   return page.evaluate(async (id) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const last = value.messages[value.messages.length - 1]
     const answered = Boolean(last && last.role === 'assistant' && !last.parts.some((p) => p.type === 'tool_call') && (last.parts.some((p) => p.type === 'text' && p.text.trim()) || (last.parts.length && last.parts.every((p) => p.type === 'limitation'))))
     return { run: value.state, count: value.messages.length, approvals: value.approvals, plan: value.plan, answered, meta: value.meta }
@@ -187,14 +187,14 @@ async function drive(page, id, { timeoutMs = 15 * MINUTE, sinceCount = 0, approv
         log.shotApproval = true
         await page.screenshot({ path: path.join(OUT, `${shots}-aprovacao.png`) }).catch(() => undefined)
       }
-      await page.evaluate(({ approvalId, ok }) => window.forja.approvals.resolve(approvalId, ok, false), { approvalId: approval.id, ok })
+      await page.evaluate(({ approvalId, ok }) => window.openclod.approvals.resolve(approvalId, ok, false), { approvalId: approval.id, ok })
     }
     const pending = await page.evaluate((id) => window.__cw.questions.filter((q) => q.sessionId === id && !window.__cw.answered.has(q.id)).map((q) => ({ id: q.id, questions: q.questions })), id)
     for (const question of pending) {
       await page.evaluate((qid) => window.__cw.answered.add(qid), question.id)
       log.questions.push(question.questions.map((item) => item.question).join(' | ').slice(0, 300))
       await page.evaluate(
-        ({ qid, answers }) => window.forja.questions.answer(qid, answers),
+        ({ qid, answers }) => window.openclod.questions.answer(qid, answers),
         { qid: question.id, answers: question.questions.map((item) => ({ header: item.header, answers: [typeof answer === 'function' ? answer(item) : answer] })) }
       )
     }
@@ -219,7 +219,7 @@ async function activity(page, id, from = 0) {
 
 async function activityOf(page, id, from) {
   return page.evaluate(async ({ id, from }) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const added = value.messages.slice(from)
     const parts = added.flatMap((message) => message.parts)
     const last = [...added].reverse().find((message) => message.role === 'assistant' && message.parts.some((part) => part.type === 'text' && part.text.trim()))
@@ -283,7 +283,7 @@ async function home(ws, app, c) {
   c.check('quatro-sugestoes', (await page.locator('.cowork-card').count()) === 4)
   await page.locator('.cowork-select select').nth(1).selectOption('ask')
   await page.waitForTimeout(600)
-  const policy = await page.evaluate(async () => (await window.forja.app.settings()).value.policy.mode)
+  const policy = await page.evaluate(async () => (await window.openclod.app.settings()).value.policy.mode)
   c.check('trocar-aprovacao-grava-a-politica', policy === 'ask', policy)
   await shot(page, '00-cowork-inicio.png')
   return { options, policy }
@@ -472,7 +472,7 @@ async function deliver(ws, app, c) {
     c.check('xlsx-tem-os-dados-das-36-linhas', xlsx.sheets.some((sheet) => sheet.cells >= 36 * 5), xlsx.sheets)
     c.check('xlsx-segue-a-instrucao-da-pasta', /Preparado pela Equipe Alfa/.test(xlsx.allText))
     // LibreOffice recalculates EVERY formula (the round trip below trusts the values cached in the file): wrong or stale ones show up here.
-    const recalc = spawnSync(path.join(e2e.ROOT, 'resources', 'runtime', 'python', 'python.exe'), ['-I', '-X', 'utf8', path.join(e2e.ROOT, 'resources', 'office', 'forja_office.py'), 'recalc', path.join(folder, xlsxName)], { encoding: 'utf8', timeout: 240000, windowsHide: true })
+    const recalc = spawnSync(path.join(e2e.ROOT, 'resources', 'runtime', 'python', 'python.exe'), ['-I', '-X', 'utf8', path.join(e2e.ROOT, 'resources', 'office', 'openclod_office_cli.py'), 'recalc', path.join(folder, xlsxName)], { encoding: 'utf8', timeout: 240000, windowsHide: true })
     evidence.xlsxRecalc = String(recalc.stdout || recalc.stderr || '').trim().slice(0, 600)
     c.check('xlsx-recalculado-pelo-LibreOffice-sem-erro-nem-valor-velho', recalc.status === 0 && /0 com erro, 0 com valor em cache diferente/.test(recalc.stdout || ''), evidence.xlsxRecalc)
     try {
@@ -543,12 +543,12 @@ async function longtask(ws, app, c) {
       // ...and starts a different task in another Cowork session in the same folder, which must not wait for the first.
       if (!second && queued && ['thinking', 'running', 'tool'].includes(state.run) && state.count >= 6) {
         const created = await page.evaluate(async (leaf) => {
-          const settings = (await window.forja.app.settings()).value
+          const settings = (await window.openclod.app.settings()).value
           const provider = settings.providers.find((item) => item.id === settings.defaultProviderId) || settings.providers[0]
-          const projects = (await window.forja.projects.list()).value
+          const projects = (await window.openclod.projects.list()).value
           const project = projects.find((item) => String(item.path).split(/[\\/]/).filter(Boolean).pop().toLowerCase() === leaf)
-          const made = await window.forja.sessions.create({ projectId: project.id, cwd: project.path, mode: 'autonomous', surface: 'cowork', providerId: provider.id, model: provider.model, title: 'Outra tarefa ao mesmo tempo' })
-          await window.forja.sessions.send(made.value.id, 'Quanto é 17 vezes 23? Responda só com o número.', [])
+          const made = await window.openclod.sessions.create({ projectId: project.id, cwd: project.path, mode: 'autonomous', surface: 'cowork', providerId: provider.id, model: provider.model, title: 'Outra tarefa ao mesmo tempo' })
+          await window.openclod.sessions.send(made.value.id, 'Quanto é 17 vezes 23? Responda só com o número.', [])
           return made.value.id
         }, path.basename(folder).toLowerCase())
         second = created
@@ -579,7 +579,7 @@ async function longtask(ws, app, c) {
   c.check('comparativo-tem-tabela', /\|\s*-{3,}/.test(text))
   c.check('comparativo-traz-precos-e-participacoes-dos-arquivos', research.competitors.every((item) => text.includes(item.price.replace('/mês', '')) || text.includes(item.price)) && research.competitors.every((item) => text.includes(item.share.replace('fatia de ', ''))), 'preços e fatias')
   c.check('comparativo-tem-recomendacao', /recomend/i.test(text))
-  c.check('mensagem-da-fila-foi-entregue-e-respondida', queued && (await page.evaluate(async ({ id, text }) => (await window.forja.sessions.get(id)).value.messages.some((m) => m.role === 'user' && JSON.stringify(m.parts).includes(text.slice(0, 30))), { id: session.id, text: QUEUED })), 'a mensagem enfileirada aparece no histórico')
+  c.check('mensagem-da-fila-foi-entregue-e-respondida', queued && (await page.evaluate(async ({ id, text }) => (await window.openclod.sessions.get(id)).value.messages.some((m) => m.role === 'user' && JSON.stringify(m.parts).includes(text.slice(0, 30))), { id: session.id, text: QUEUED })), 'a mensagem enfileirada aparece no histórico')
   c.check('segunda-tarefa-respondeu-com-a-primeira-ainda-rodando', Boolean(secondDone) && firstStillBusyWhenSecondAnswered === true, { respondeu: Boolean(secondDone), primeiraOcupada: firstStillBusyWhenSecondAnswered })
   return { tools, planReminders: act.planReminders, plan: done.plan.map((item) => `${item.status}: ${item.text}`), approvals: done.log.approvals, finalText: act.finalText.slice(0, 1500), comparativoHead: text.slice(0, 1800), usage: act.usage, deliveredCopy: copyOut(folder, 'c-pasta-final') }
 }
@@ -601,7 +601,7 @@ async function resume(ws, app, c) {
     timeoutMs: 15 * MINUTE,
     onTick: async (state) => {
       if (fs.existsSync(path.join(folder, '01-visao-geral.md')) && !fs.existsSync(path.join(folder, '03-plano-de-acao.md'))) {
-        await page.evaluate((id) => window.forja.sessions.abort(id), first.id)
+        await page.evaluate((id) => window.openclod.sessions.abort(id), first.id)
         await page.waitForTimeout(2500)
         return true
       }
@@ -622,7 +622,7 @@ async function resume(ws, app, c) {
   const app2 = await e2e.launch({ port: PORT + 1, profile: ws.profile, work: ws.work })
   page = app2.page
   await hook(page)
-  const sessionsAfterRestart = await page.evaluate(async () => (await window.forja.sessions.list()).value.map((item) => ({ id: item.meta.id, surface: item.meta.surface, count: item.messageCount })))
+  const sessionsAfterRestart = await page.evaluate(async () => (await window.openclod.sessions.list()).value.map((item) => ({ id: item.meta.id, surface: item.meta.surface, count: item.messageCount })))
   c.check('sessao-A-sobreviveu-ao-reinicio', sessionsAfterRestart.some((item) => item.id === first.id && item.count > 2), sessionsAfterRestart)
   await page.waitForSelector('.cowork-home, .home')
   await page.locator('.side-session', { hasText: stopped.meta.title }).first().click({ timeout: 8000 }).catch(() => undefined)
@@ -701,12 +701,12 @@ async function connector(ws, app, c) {
   const folder = path.join(ws.work, 'Pesquisa docs')
   fs.mkdirSync(folder, { recursive: true })
   const connected = await page.evaluate(async (id) => {
-    const r = await window.forja.app.connectConnector(id)
+    const r = await window.openclod.app.connectConnector(id)
     return { ok: r.ok, error: r.error, state: r.value && r.value.state }
   }, CONNECTOR)
   c.check('conector-conecta-pelo-diretorio', connected.ok && connected.state && connected.state.status === 'connected', JSON.stringify(connected).slice(0, 240))
   const serverName = connected.state && connected.state.serverName
-  const tools = serverName ? (await page.evaluate(async (name) => (await window.forja.app.connectorTools(name)).value, serverName)) || [] : []
+  const tools = serverName ? (await page.evaluate(async (name) => (await window.openclod.app.connectorTools(name)).value, serverName)) || [] : []
   c.check('conector-lista-ferramentas', tools.length > 0, `${tools.length} ferramentas`)
   await openCowork(page, { folder, projectName: 'Pesquisa docs', permission: PERMISSION })
   await type(page, `Use o conector "${CONNECTOR}" para pesquisar como funciona o gerenciamento do ciclo de vida do Azure Blob Storage e salve em resumo-blob.md um resumo de até 6 linhas, com o título e o endereço (URL) da página principal que você usou. Use o conector, não a internet em geral.`)
@@ -723,7 +723,7 @@ async function connector(ws, app, c) {
   const text = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : ''
   c.check('resumo-entregue-na-pasta', text.length > 80, { bytes: text.length, pasta: tree(folder) })
   c.check('resumo-cita-a-url-do-conector', /learn\.microsoft\.com/i.test(text))
-  await page.evaluate(async (id) => window.forja.app.disconnectConnector(id), CONNECTOR)
+  await page.evaluate(async (id) => window.openclod.app.disconnectConnector(id), CONNECTOR)
   return { connected, tools: tools.slice(0, 6).map((tool) => tool.name), ferramentas: names(act), approvals: done.log.approvals, resumo: text.slice(0, 700), finalText: act.finalText.slice(0, 500) }
 }
 
@@ -733,11 +733,11 @@ async function schedule(ws, app, c) {
   const folder = path.join(ws.work, 'Relatorios agendados')
   fx.write(folder, 'dados.txt', 'Vendas de hoje: 12 pedidos (R$ 3.480,00)\nVendas de ontem: 9 pedidos (R$ 2.610,00)\n')
   await openCowork(page, { folder, projectName: 'Relatorios agendados', permission: PERMISSION })
-  const projectId = await page.evaluate(async () => (await window.forja.projects.list()).value[0].id)
+  const projectId = await page.evaluate(async () => (await window.openclod.projects.list()).value[0].id)
   const soon = new Date(Date.now() + 50_000).toISOString()
   const created = await page.evaluate(async ({ projectId, soon }) => {
-    const once = await window.forja.schedules.create({ name: 'Resumo diário (automático)', prompt: 'Leia dados.txt e grave em resumo-agendado.md uma frase com o total de pedidos de hoje e de ontem.', projectId, surface: 'cowork', schedule: { kind: 'once', at: soon } })
-    const manual = await window.forja.schedules.create({ name: 'Resumo sob demanda', prompt: 'Leia dados.txt e grave em resumo-manual.md uma frase com o valor de hoje em reais.', projectId, surface: 'cowork', schedule: { kind: 'daily', time: '03:00' } })
+    const once = await window.openclod.schedules.create({ name: 'Resumo diário (automático)', prompt: 'Leia dados.txt e grave em resumo-agendado.md uma frase com o total de pedidos de hoje e de ontem.', projectId, surface: 'cowork', schedule: { kind: 'once', at: soon } })
+    const manual = await window.openclod.schedules.create({ name: 'Resumo sob demanda', prompt: 'Leia dados.txt e grave em resumo-manual.md uma frase com o valor de hoje em reais.', projectId, surface: 'cowork', schedule: { kind: 'daily', time: '03:00' } })
     return { once: once.ok ? once.value : { error: once.error }, manual: manual.ok ? manual.value : { error: manual.error } }
   }, { projectId, soon })
   c.check('agendamentos-criados', Boolean(created.once.id && created.manual.id), created)
@@ -747,14 +747,14 @@ async function schedule(ws, app, c) {
   c.check('tela-Agendados-lista-as-duas-tarefas', /Resumo diário \(automático\)/.test(pageText) && /Resumo sob demanda/.test(pageText))
   await shot(page, 'f-01-agendados.png')
   // Run now: the same prompt, on demand.
-  const ran = await page.evaluate(async (id) => (await window.forja.schedules.runNow(id)).ok, created.manual.id)
+  const ran = await page.evaluate(async (id) => (await window.openclod.schedules.runNow(id)).ok, created.manual.id)
   c.check('executar-agora-aceito', ran)
   // Wait for both: the manual run and the automatic one (the scheduler looks every ~30 s).
   const started = Date.now()
   let tasks = []
   while (Date.now() - started < 8 * MINUTE) {
     await page.waitForTimeout(5000)
-    tasks = await page.evaluate(async () => (await window.forja.schedules.list()).value)
+    tasks = await page.evaluate(async () => (await window.openclod.schedules.list()).value)
     const once = tasks.find((task) => task.id === created.once.id)
     const manual = tasks.find((task) => task.id === created.manual.id)
     if (once && once.lastStatus === 'ok' && manual && manual.lastStatus === 'ok') break
@@ -767,7 +767,7 @@ async function schedule(ws, app, c) {
   const manualFile = path.join(folder, 'resumo-manual.md')
   c.check('arquivo-da-tarefa-automatica', fs.existsSync(autoFile) && /12/.test(fs.readFileSync(autoFile, 'utf8')) && /9/.test(fs.readFileSync(autoFile, 'utf8')), fs.existsSync(autoFile) ? fs.readFileSync(autoFile, 'utf8').slice(0, 200) : 'não existe')
   c.check('arquivo-da-tarefa-manual', fs.existsSync(manualFile) && /3\.?480/.test(fs.readFileSync(manualFile, 'utf8')), fs.existsSync(manualFile) ? fs.readFileSync(manualFile, 'utf8').slice(0, 200) : 'não existe')
-  const sessions = await page.evaluate(async (ids) => (await window.forja.sessions.list()).value.filter((item) => ids.includes(item.meta.id)).map((item) => ({ title: item.meta.title, surface: item.meta.surface, mode: item.meta.mode, model: item.meta.model })), [once.lastSessionId, manual.lastSessionId].filter(Boolean))
+  const sessions = await page.evaluate(async (ids) => (await window.openclod.sessions.list()).value.filter((item) => ids.includes(item.meta.id)).map((item) => ({ title: item.meta.title, surface: item.meta.surface, mode: item.meta.mode, model: item.meta.model })), [once.lastSessionId, manual.lastSessionId].filter(Boolean))
   for (const item of sessions) if (item.model) USED_MODELS.add(item.model)
   c.check('sessao-agendada-aparece-no-Cowork', sessions.length > 0 && sessions.every((item) => item.surface === 'cowork' && item.mode === 'autonomous'), sessions)
   await shot(page, 'f-02-agendados-depois.png')
@@ -846,10 +846,10 @@ async function preview(ws, app, c) {
   c.check('arquivos-de-exemplo-copiados', delivered.length === 4, delivered)
   await openCowork(page, { folder, projectName: 'Entregas', permission: PERMISSION })
   const sessionId = await page.evaluate(async (leaf) => {
-    const settings = (await window.forja.app.settings()).value
+    const settings = (await window.openclod.app.settings()).value
     const provider = settings.providers.find((item) => item.id === settings.defaultProviderId) || settings.providers[0]
-    const project = (await window.forja.projects.list()).value.find((item) => String(item.path).split(/[\\/]/).filter(Boolean).pop().toLowerCase() === leaf)
-    const made = await window.forja.sessions.create({ projectId: project.id, cwd: project.path, mode: 'autonomous', surface: 'cowork', providerId: provider.id, model: provider.model, title: 'Ver entregas' })
+    const project = (await window.openclod.projects.list()).value.find((item) => String(item.path).split(/[\\/]/).filter(Boolean).pop().toLowerCase() === leaf)
+    const made = await window.openclod.sessions.create({ projectId: project.id, cwd: project.path, mode: 'autonomous', surface: 'cowork', providerId: provider.id, model: provider.model, title: 'Ver entregas' })
     return made.value.id
   }, path.basename(folder).toLowerCase())
   await page.reload()
@@ -887,7 +887,7 @@ async function scheduleUi(ws, app, c) {
   await page.locator('nav.side-nav .side-row', { hasText: 'Agendados' }).click()
   await page.waitForSelector('.page-head')
   const typeSelect = () => page.locator('.task-form label', { hasText: 'Tipo de sessão' }).locator('select')
-  const list = () => page.evaluate(async () => (await window.forja.schedules.list()).value)
+  const list = () => page.evaluate(async () => (await window.openclod.schedules.list()).value)
 
   // A blank new task.
   await page.getByRole('button', { name: /Nova tarefa/ }).click()
@@ -933,8 +933,8 @@ async function scheduleUi(ws, app, c) {
 
   // A task saved before the field existed (no `surface`) opens the form as Code and keeps running as Code.
   const legacy = await page.evaluate(async () => {
-    const projectId = (await window.forja.projects.list()).value[0].id
-    const made = await window.forja.schedules.create({ name: 'Antiga sem tipo', prompt: 'x', projectId, schedule: { kind: 'daily', time: '09:00' } })
+    const projectId = (await window.openclod.projects.list()).value[0].id
+    const made = await window.openclod.schedules.create({ name: 'Antiga sem tipo', prompt: 'x', projectId, schedule: { kind: 'daily', time: '09:00' } })
     return made.ok ? made.value : null
   })
   c.check('tarefa-sem-tipo-continua-sem-tipo', Boolean(legacy) && legacy.surface === undefined, legacy && legacy.surface)

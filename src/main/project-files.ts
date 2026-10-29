@@ -35,7 +35,7 @@ export async function writeProjectFile(root: string, relative: string, content: 
   } else if (!(await fs.promises.stat(path.dirname(target)).catch(() => null))?.isDirectory()) {
     throw new Error('a pasta de destino não existe')
   }
-  const temp = `${target}.forja-${process.pid}.tmp`
+  const temp = `${target}.openclod-${process.pid}.tmp`
   await fs.promises.writeFile(temp, content, 'utf8')
   await fs.promises.rename(temp, target)
   return { size: bytes }

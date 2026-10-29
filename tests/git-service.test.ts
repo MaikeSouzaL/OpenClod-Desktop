@@ -29,7 +29,7 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 const temps: string[] = []
 
 /** Non-ASCII prefix on purpose: every path below also exercises unicode handling. */
-async function tempDir(prefix = 'forja-git-ação-'): Promise<string> {
+async function tempDir(prefix = 'openclod-git-ação-'): Promise<string> {
   const dir = await makeTempDir(prefix)
   temps.push(dir)
   return dir
@@ -39,7 +39,7 @@ async function initRepo(): Promise<string> {
   const dir = await tempDir()
   await git(dir, 'init', '-q', '-b', 'main')
   await git(dir, 'config', 'user.name', 'Openclod Test')
-  await git(dir, 'config', 'user.email', 'forja@example.test')
+  await git(dir, 'config', 'user.email', 'openclod@example.test')
   await git(dir, 'config', 'commit.gpgsign', 'false')
   await git(dir, 'config', 'core.autocrlf', 'false')
   return dir
@@ -162,12 +162,12 @@ describe('git parsers', () => {
       'HEAD aaaa',
       'branch refs/heads/main',
       '',
-      'worktree C:/repo/.forja/worktrees/x',
+      'worktree C:/repo/.openclod/worktrees/x',
       'HEAD bbbb',
       'detached',
       'locked on a usb stick',
       '',
-      'worktree C:/repo/.forja/worktrees/gone',
+      'worktree C:/repo/.openclod/worktrees/gone',
       'HEAD cccc',
       'branch refs/heads/feat/gone',
       'prunable gitdir file points to non-existent location',
@@ -342,12 +342,12 @@ describe('gitStatus', () => {
 
   it('reports upstream, ahead and behind', async () => {
     const dir = await seededRepo()
-    const remote = await tempDir('forja-git-remote-')
+    const remote = await tempDir('openclod-git-remote-')
     await git(remote, 'init', '-q', '--bare', '-b', 'main')
     await git(dir, 'remote', 'add', 'origin', remote)
     await git(dir, 'push', '-q', '-u', 'origin', 'main')
 
-    const clone = await tempDir('forja-git-clone-')
+    const clone = await tempDir('openclod-git-clone-')
     await git(clone, 'clone', '-q', remote, 'copy')
     const copy = path.join(clone, 'copy')
     await git(copy, 'config', 'user.name', 'Other')
@@ -473,7 +473,7 @@ describe('gitFileDiff', () => {
 
   it('rejects paths that escape the repository', async () => {
     const dir = await seededRepo()
-    const outside = await tempDir('forja-git-outside-')
+    const outside = await tempDir('openclod-git-outside-')
     await write(outside, 'secret.txt', 'top secret\n')
 
     await expect(gitFileDiff(dir, '../secret.txt')).rejects.toThrow(/fora do repositório/)
@@ -486,7 +486,7 @@ describe('gitFileDiff', () => {
 
   it('rejects a path that goes out of the repository through a linked directory', async () => {
     const dir = await seededRepo()
-    const outside = await tempDir('forja-git-outside-')
+    const outside = await tempDir('openclod-git-outside-')
     await write(outside, 'secret.txt', 'top secret\n')
     const link = path.join(dir, 'linked')
     // A junction needs no privileges on Windows; on POSIX the type is ignored.
@@ -518,10 +518,10 @@ describe('gitFileDiff', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('worktrees', () => {
-  it('creates a branch in .forja/worktrees/<safe-name> and lists it', async () => {
+  it('creates a branch in .openclod/worktrees/<safe-name> and lists it', async () => {
     const dir = await seededRepo()
     const info = await createWorktree(dir, { branch: 'feature/login' })
-    expect(real(info.path)).toBe(path.join(real(dir), '.forja', 'worktrees', 'feature-login'))
+    expect(real(info.path)).toBe(path.join(real(dir), '.openclod', 'worktrees', 'feature-login'))
     expect(info).toMatchObject({ branch: 'feature/login', isMain: false, bare: false, detached: false, locked: false })
     expect(fs.existsSync(path.join(info.path, 'a.txt'))).toBe(true)
     expect((await git(info.path, 'rev-parse', '--abbrev-ref', 'HEAD')).trim()).toBe('feature/login')
@@ -534,20 +534,20 @@ describe('worktrees', () => {
     expect(list[1].head).toBe((await git(dir, 'rev-parse', 'HEAD')).trim())
   })
 
-  it('keeps .forja/ out of the main repository status', async () => {
+  it('keeps .openclod/ out of the main repository status', async () => {
     const dir = await seededRepo()
     await createWorktree(dir, { branch: 'iso' })
     expect(await gitStatus(dir)).toMatchObject({ isRepo: true, files: [] })
     // And a second worktree does not append the rule again.
     await createWorktree(dir, { branch: 'iso2' })
     const exclude = fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')
-    expect(exclude.split('/.forja/').length - 1).toBe(1)
+    expect(exclude.split('/.openclod/').length - 1).toBe(1)
   })
 
-  it('does not touch info/exclude when .forja is already ignored', async () => {
+  it('does not touch info/exclude when .openclod is already ignored', async () => {
     const dir = await seededRepo()
-    await write(dir, '.gitignore', '.forja/\n')
-    await commitAll(dir, 'ignore forja')
+    await write(dir, '.gitignore', '.openclod/\n')
+    await commitAll(dir, 'ignore openclod')
     const before = fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')
     await createWorktree(dir, { branch: 'iso' })
     expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toBe(before)
@@ -568,7 +568,7 @@ describe('worktrees', () => {
 
   it('uses a custom directory (absolute or relative to the main worktree)', async () => {
     const dir = await seededRepo()
-    const elsewhere = path.join(await tempDir('forja-git-wt-'), 'checkout')
+    const elsewhere = path.join(await tempDir('openclod-git-wt-'), 'checkout')
     const a = await createWorktree(dir, { branch: 'abs', dir: elsewhere })
     expect(real(a.path)).toBe(real(elsewhere))
 
@@ -578,7 +578,7 @@ describe('worktrees', () => {
 
   it('refuses a custom directory that is not empty', async () => {
     const dir = await seededRepo()
-    const busy = await tempDir('forja-git-busy-')
+    const busy = await tempDir('openclod-git-busy-')
     await write(busy, 'keep.txt', 'mine\n')
     await expect(createWorktree(dir, { branch: 'busy', dir: busy })).rejects.toThrow(/não está vazio/)
     expect(fs.existsSync(path.join(busy, 'keep.txt'))).toBe(true)
@@ -596,7 +596,7 @@ describe('worktrees', () => {
     const dir = await seededRepo()
     const first = await createWorktree(dir, { branch: 'first' })
     const second = await createWorktree(first.path, { branch: 'second' })
-    expect(real(second.path)).toBe(path.join(real(dir), '.forja', 'worktrees', 'second'))
+    expect(real(second.path)).toBe(path.join(real(dir), '.openclod', 'worktrees', 'second'))
     expect(await listWorktrees(first.path)).toHaveLength(3)
   })
 
@@ -653,7 +653,7 @@ describe('worktrees', () => {
 
   it('refuses a path that is not a registered worktree and deletes nothing', async () => {
     const dir = await seededRepo()
-    const stranger = await tempDir('forja-git-stranger-')
+    const stranger = await tempDir('openclod-git-stranger-')
     await write(stranger, 'keep.txt', 'mine\n')
     await expect(removeWorktree(dir, stranger)).rejects.toThrow(/não encontrado/)
     await expect(removeWorktree(dir, '')).rejects.toThrow(/inválido/)

@@ -35,7 +35,7 @@ export function WorktreeDialog({ project, onClose, onOpenSession }: WorktreeDial
   const refresh = async (): Promise<void> => {
     setLoading(true)
     try {
-      setWorktrees(await unwrap(window.forja.git.listWorktrees(project.path)))
+      setWorktrees(await unwrap(window.openclod.git.listWorktrees(project.path)))
       setError('')
     } catch (err) {
       setWorktrees([])
@@ -57,7 +57,7 @@ export function WorktreeDialog({ project, onClose, onOpenSession }: WorktreeDial
     setError('')
     try {
       const worktree = await unwrap(
-        window.forja.git.createWorktree(project.path, branch.trim(), baseRef.trim() || undefined)
+        window.openclod.git.createWorktree(project.path, branch.trim(), baseRef.trim() || undefined)
       )
       if (await onOpenSession(worktree)) onClose()
       else await refresh()
@@ -85,7 +85,7 @@ export function WorktreeDialog({ project, onClose, onOpenSession }: WorktreeDial
     setBusy(worktree.path)
     setError('')
     try {
-      await unwrap(window.forja.git.removeWorktree(project.path, worktree.path))
+      await unwrap(window.openclod.git.removeWorktree(project.path, worktree.path))
       await refresh()
     } catch (err) {
       setError(errorMessage(err))

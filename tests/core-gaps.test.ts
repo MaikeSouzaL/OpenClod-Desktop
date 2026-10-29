@@ -38,8 +38,8 @@ let cwd: string
 let scratch: string
 
 beforeEach(async () => {
-  cwd = await makeTempDir('forja-gaps-')
-  scratch = await makeTempDir('forja-gaps-out-')
+  cwd = await makeTempDir('openclod-gaps-')
+  scratch = await makeTempDir('openclod-gaps-out-')
 })
 
 afterEach(async () => {
@@ -110,7 +110,7 @@ function makeRunner(
 
 describe('sensitive credential locations', () => {
   // The fake home need not exist: followLinks is off for the pure path tests.
-  const home = path.join(os.tmpdir(), 'forja-fake-home')
+  const home = path.join(os.tmpdir(), 'openclod-fake-home')
   const project = path.join(home, 'projects', 'app')
   const base = { cwd: project, home, env: {}, caseInsensitive: false, followLinks: false }
   const matcher = createSensitiveMatcher(base)
@@ -224,7 +224,7 @@ describe('sensitive credential locations', () => {
 })
 
 describe('checkSensitiveAccess per tool', () => {
-  const home = path.join(os.tmpdir(), 'forja-fake-home')
+  const home = path.join(os.tmpdir(), 'openclod-fake-home')
   const project = path.join(home, 'projects', 'app')
   const ctx = { cwd: project, home, env: {}, caseInsensitive: false, followLinks: false }
   const check = (tool: string, args: Record<string, unknown>, preview = '') => checkSensitiveAccess(tool, preview, args, ctx)
@@ -528,17 +528,17 @@ describe('large tool output spill', () => {
     expect(shown).not.toContain('chars omitted')
   })
 
-  it('defaults to <tmpdir>/forja-tool-output/<sessionId>/<callId>.txt', async () => {
+  it('defaults to <tmpdir>/openclod-tool-output/<sessionId>/<callId>.txt', async () => {
     const sessionId = `ses_spill_${Date.now().toString(36)}`
     const provider = new ScriptedProvider([{ toolCalls: [{ id: 'abc', name: 'grep', args: {} }] }, { text: 'ok' }])
     const { runner } = makeRunner(provider, [bigTool('grep', [big])], { sessionId })
     try {
       await runner.send('liste')
-      const file = path.resolve(os.tmpdir(), 'forja-tool-output', sessionId, 'abc.txt')
+      const file = path.resolve(os.tmpdir(), 'openclod-tool-output', sessionId, 'abc.txt')
       expect(fs.readFileSync(file, 'utf8')).toBe(big)
       expect(toolMessages(runner)[0]).toContain(file)
     } finally {
-      await removeTempDir(path.join(os.tmpdir(), 'forja-tool-output', sessionId))
+      await removeTempDir(path.join(os.tmpdir(), 'openclod-tool-output', sessionId))
     }
   })
 
@@ -592,12 +592,12 @@ describe('large tool output spill', () => {
     expect(runner.state).toBe('done')
   })
 
-  it('only truncates read_file output: spilling would copy a file the model can already read', async () => {
+  it('saves a read_file output past its 60k cap too, instead of cutting the middle unseen', async () => {
     const provider = new ScriptedProvider([{ toolCalls: [{ id: 'c1', name: 'read_file', args: { path: 'a.txt' } }] }, { text: 'ok' }])
     const { runner } = makeRunner(provider, [bigTool('read_file', [big])], { toolOutputDir: scratch, sessionId: 'ses_spill' })
     await runner.send('leia')
-    expect(toolMessages(runner)[0]).toContain('chars omitted')
-    expect(fs.existsSync(path.join(scratch, 'ses_spill'))).toBe(false)
+    expect(toolMessages(runner)[0]).toContain('salva em arquivo')
+    expect(fs.readFileSync(path.join(scratch, 'ses_spill', 'c1.txt'), 'utf8')).toBe(big)
   })
 
   it('lets read_file open the spilled file afterwards, with offset and limit', async () => {
@@ -821,7 +821,7 @@ describe('http hooks', () => {
       cwd,
       hook_event_name: 'PreToolUse',
       tool_name: 'Bash',
-      forja_tool_name: 'run_command',
+      openclod_tool_name: 'run_command',
       tool_input: { command: 'npm test' }
     })
   })
@@ -942,13 +942,13 @@ describe('http hooks', () => {
   })
 
   it('never sends environment variables, and header values are literal (no $VAR expansion)', async () => {
-    saved.FORJA_HOOK_CANARY = process.env.FORJA_HOOK_CANARY
+    saved.OPENCLOD_HOOK_CANARY = process.env.OPENCLOD_HOOK_CANARY
     saved.OPENAI_API_KEY = process.env.OPENAI_API_KEY
-    process.env.FORJA_HOOK_CANARY = 'canary-7f3a91'
+    process.env.OPENCLOD_HOOK_CANARY = 'canary-7f3a91'
     process.env.OPENAI_API_KEY = 'sk-canary-should-never-leave'
     const server = await serve(json({}))
     const hooks = runner({
-      Stop: [{ hooks: [{ type: 'http', url: server.url, headers: { 'x-token': '$FORJA_HOOK_CANARY', authorization: 'Bearer literal-token' } }] }]
+      Stop: [{ hooks: [{ type: 'http', url: server.url, headers: { 'x-token': '$OPENCLOD_HOOK_CANARY', authorization: 'Bearer literal-token' } }] }]
     })
     await hooks.run('Stop', { last_assistant_message: 'pronto' })
 
@@ -956,15 +956,15 @@ describe('http hooks', () => {
     const wire = JSON.stringify(request)
     expect(wire).not.toContain('canary-7f3a91')
     expect(wire).not.toContain('sk-canary-should-never-leave')
-    expect(request.headers['x-token']).toBe('$FORJA_HOOK_CANARY')
+    expect(request.headers['x-token']).toBe('$OPENCLOD_HOOK_CANARY')
     expect(request.headers.authorization).toBe('Bearer literal-token')
   })
 
   it('lets a hook set headers but not override content-type', async () => {
     const server = await serve(json({}))
-    await runner({ Stop: [{ hooks: [{ type: 'http', url: server.url, headers: { 'Content-Type': 'text/plain', 'x-team': 'forja' } }] }] }).run('Stop', {})
+    await runner({ Stop: [{ hooks: [{ type: 'http', url: server.url, headers: { 'Content-Type': 'text/plain', 'x-team': 'openclod' } }] }] }).run('Stop', {})
     expect(server.requests[0].headers['content-type']).toBe('application/json')
-    expect(server.requests[0].headers['x-team']).toBe('forja')
+    expect(server.requests[0].headers['x-team']).toBe('openclod')
   })
 
   it('does not follow redirects, so the payload never reaches another host', async () => {

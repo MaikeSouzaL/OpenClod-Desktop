@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-10-29T18:53:04.314Z",
+  "model": "qwen3.5:4b",
+  "banner": "Prints\\memoria-arquivos-2026-10-29\\01-guardando.png",
+  "saveSeconds": 79.6,
+  "description": "A imagem é um documento ou texto isolado com fundo branco, contendo texto preto em negrito e fonte sem serifa. O conteúdo está organizado em duas linhas verticais, alinhadas à esquerda:\n- Primeira linha: PEDIDO 4821\n- Segunda linha: FATURAMENTO 29/10\n\nNão há elementos de interface, botões, menus, gráficos ou outros objetos visíveis além do texto.",
+  "counters": "Prints\\memoria-arquivos-2026-10-29\\02-contagens.png",
+  "cards": "Prints\\memoria-arquivos-2026-10-29\\03-imagens.png",
+  "detail": "Prints\\memoria-arquivos-2026-10-29\\04-pagina-da-imagem.png",
+  "checks": {
+    "o modelo local que lê imagens está pronto (llama.cpp)": "ok",
+    "Guardar pasta guarda os 4 arquivos (com as subpastas)": "ok",
+    "as 2 imagens saem descritas pelo modelo que enxerga": "ok",
+    "cada arquivo tem o seu tipo, a imagem tem miniatura e descrição": "ok",
+    "a página da imagem traz o texto lido nela (OCR) e a ficha": "ok",
+    "a Memória conta os arquivos por tipo (imagens, textos, planilhas)": "ok",
+    "o filtro \"imagens\" mostra os 2 cards com a miniatura": "ok",
+    "a página do arquivo mostra a imagem, a descrição e o botão de abrir": "ok",
+    "procurar \"4821\" acha a imagem pelo texto que há nela": "ok",
+    "as páginas dos arquivos entram no índice AI-Memory (número real, não a lista \"recentes\")": "ok",
+    "a imagem colada na conversa vira arquivo da memória, ligado ao turno e à sessão": "ok",
+    "sem erros no console da tela": "ok"
+  }
+}

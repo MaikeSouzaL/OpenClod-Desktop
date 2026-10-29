@@ -7,7 +7,7 @@ import { sanitizedEnv } from '../core/security/policy.js'
 import { resourcePath, resourcesRoot } from '../core/util/resources.js'
 
 /**
- * Supervisor for the embedded Whisper sidecar (`resources/stt/forja_stt.py`).
+ * Supervisor for the embedded Whisper sidecar (`resources/stt/openclod_stt.py`).
  *
  * The sidecar is a long-lived Python process that speaks one JSON object per
  * line on stdin/stdout. It owns the model and the VAD; this class only moves
@@ -61,7 +61,7 @@ export function discoverSttModels(dir: string | null = resourcePath('models', 'w
     if (!stat.isFile() || stat.size === 0) continue
     let id = entry.name
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(folder, 'forja-model.json'), 'utf8')) as { id?: unknown }
+      const meta = JSON.parse(fs.readFileSync(path.join(folder, 'openclod-model.json'), 'utf8')) as { id?: unknown }
       if (typeof meta.id === 'string' && meta.id) id = meta.id
     } catch {
       /* the folder name is enough */
@@ -85,8 +85,8 @@ export function sttAvailability(): SttAvailability {
   }
   const python = pythonPath()
   if (!python) return { available: false, reason: 'O Python embutido do reconhecimento de voz não foi encontrado.', models }
-  if (!resourcePath('stt', 'forja_stt.py')) {
-    return { available: false, reason: 'O motor de voz (forja_stt.py) não foi encontrado.', models }
+  if (!resourcePath('stt', 'openclod_stt.py')) {
+    return { available: false, reason: 'O motor de voz (openclod_stt.py) não foi encontrado.', models }
   }
   if (!models.length) {
     return { available: false, reason: 'Nenhum modelo Whisper foi encontrado em resources/models/whisper.', models }
@@ -139,7 +139,7 @@ export class SttService {
     if (!availability.available) throw new Error(availability.reason ?? 'o reconhecimento de voz não está disponível')
 
     const python = pythonPath()
-    const script = resourcePath('stt', 'forja_stt.py')
+    const script = resourcePath('stt', 'openclod_stt.py')
     const modelsDir = resourcePath('models', 'whisper')
     if (!python || !script || !modelsDir) throw new Error('os recursos de voz estão incompletos')
 

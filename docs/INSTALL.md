@@ -99,7 +99,7 @@ tem precedÃªncia sobre o bloco `build` do `package.json`.
 
 | Chave | Valor |
 |---|---|
-| `appId` | `com.forja.desktop` |
+| `appId` | `com.openclod.desktop` |
 | `productName` | `Openclod Desktop` |
 | `directories.output` | `release` |
 | `directories.buildResources` | `build` |

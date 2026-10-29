@@ -9,12 +9,12 @@
       "isMain": true
     },
     {
-      "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.forja\\worktrees\\openclod-e2e-mvq80mbl",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.openclod\\worktrees\\openclod-e2e-mvq80mbl",
       "branch": "openclod/e2e-mvq80mbl",
       "isMain": false
     },
     {
-      "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.forja\\worktrees\\openclod-ipc-probe-mvq80kx6",
+      "path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.openclod\\worktrees\\openclod-ipc-probe-mvq80kx6",
       "branch": "openclod/ipc-probe-mvq80kx6",
       "isMain": false
     }
@@ -22,11 +22,11 @@
   "session": {
     "id": "ses_33d5f804-6929-4c93-a9d9-12ccbc807a7f",
     "projectId": "prj_340fac81-4a4e-4fdb-953a-e3687b444db7",
-    "cwd": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.forja\\worktrees\\openclod-e2e-mvq80mbl",
+    "cwd": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.openclod\\worktrees\\openclod-e2e-mvq80mbl",
     "branch": "openclod/e2e-mvq80mbl",
     "providerId": "deepseek",
     "model": "deepseek-flash"
   },
-  "removed": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.forja\\worktrees\\openclod-e2e-mvq80mbl",
+  "removed": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-worktree-e2e-u8Z669\\projeto\\.openclod\\worktrees\\openclod-e2e-mvq80mbl",
   "errors": []
 }

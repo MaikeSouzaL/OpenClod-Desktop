@@ -16,7 +16,7 @@ const SENTENCE = 'Abra o arquivo readme ponto em dê e rode os testes do projeto
 const EXPECT = ['arquivo', 'testes', 'projeto']
 fs.mkdirSync(OUT, { recursive: true })
 
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-ui-voice-'))
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-ui-voice-'))
 const profile = path.join(work, 'profile')
 
 function synthesize(file) {
@@ -102,7 +102,7 @@ async function main() {
   await page.waitForSelector('.app-shell', { timeout: 30000 })
   const shot = (name) => page.screenshot({ path: path.join(OUT, `${name}.png`) })
 
-  results.status = await page.evaluate(async () => (await window.forja.stt.status()).value ?? null)
+  results.status = await page.evaluate(async () => (await window.openclod.stt.status()).value ?? null)
 
   const input = page.locator('textarea[aria-label="Mensagem"]')
   await input.fill('Antes do ditado:')
@@ -141,7 +141,7 @@ async function main() {
     const devices = await navigator.mediaDevices.enumerateDevices()
     return devices.filter((d) => d.kind === 'audioinput').length
   })
-  results.sttRunningAfterStop = await page.evaluate(async () => (await window.forja.stt.status()).value?.running)
+  results.sttRunningAfterStop = await page.evaluate(async () => (await window.openclod.stt.status()).value?.running)
   results.errors = errors
   console.log(JSON.stringify(results, null, 2))
   cleanup()

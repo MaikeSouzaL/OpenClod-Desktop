@@ -38,7 +38,7 @@ describe('Whisper model discovery', () => {
   })
 
   function fixture(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-stt-models-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-stt-models-'))
     dirs.push(dir)
     for (const [id, size, meta] of [
       ['base', 1024, { id: 'base' }],
@@ -47,7 +47,7 @@ describe('Whisper model discovery', () => {
     ] as const) {
       const folder = path.join(dir, id)
       fs.mkdirSync(folder)
-      if (meta) fs.writeFileSync(path.join(folder, 'forja-model.json'), JSON.stringify(meta))
+      if (meta) fs.writeFileSync(path.join(folder, 'openclod-model.json'), JSON.stringify(meta))
       if (size > 0) fs.writeFileSync(path.join(folder, 'model.bin'), Buffer.alloc(size))
     }
     fs.mkdirSync(path.join(dir, 'sem-pesos'))
@@ -61,7 +61,7 @@ describe('Whisper model discovery', () => {
   })
 
   it('returns an empty list for a missing directory', () => {
-    expect(discoverSttModels(path.join(os.tmpdir(), 'forja-nao-existe-123'))).toEqual([])
+    expect(discoverSttModels(path.join(os.tmpdir(), 'openclod-nao-existe-123'))).toEqual([])
     expect(discoverSttModels(null)).toEqual([])
   })
 })

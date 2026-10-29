@@ -57,7 +57,7 @@ function TerminalView({ info, active }: { info: TerminalInfo; active: boolean })
 
     let ready = false
     const early: string[] = []
-    const off = window.forja.terminal.onEvent((event: TerminalEvent) => {
+    const off = window.openclod.terminal.onEvent((event: TerminalEvent) => {
       if (event.type === 'created') return // tratado no nível do painel
       if (event.id !== info.id) return
       if (event.type === 'data') {
@@ -67,15 +67,15 @@ function TerminalView({ info, active }: { info: TerminalInfo; active: boolean })
         term.write(`\r\n\x1b[2m[processo encerrado com código ${event.exitCode}]\x1b[0m\r\n`)
       }
     })
-    void window.forja.terminal.snapshot(info.id).then((result) => {
+    void window.openclod.terminal.snapshot(info.id).then((result) => {
       // Events that arrived before the reply are already part of the snapshot.
       early.length = 0
       if (result.ok && result.value) term.write(result.value)
       ready = true
     })
 
-    const input = term.onData((data) => window.forja.terminal.write(info.id, data))
-    const resize = term.onResize(({ cols, rows }) => window.forja.terminal.resize(info.id, cols, rows))
+    const input = term.onData((data) => window.openclod.terminal.write(info.id, data))
+    const resize = term.onResize(({ cols, rows }) => window.openclod.terminal.resize(info.id, cols, rows))
     const observer = new ResizeObserver(() => {
       if (host.current && host.current.offsetWidth > 0) {
         try {
@@ -133,7 +133,7 @@ export function TerminalPane({ sessionId, cwd }: TerminalPaneProps): ReactElemen
       creating.current = true
       setError('')
       try {
-        const info = await unwrap(window.forja.terminal.create({ cwd, cols: 100, rows: 30, shell, sessionId }))
+        const info = await unwrap(window.openclod.terminal.create({ cwd, cols: 100, rows: 30, shell, sessionId }))
         setTerminals((list) => [...list, info])
         setActiveId(info.id)
       } catch (err) {
@@ -148,7 +148,7 @@ export function TerminalPane({ sessionId, cwd }: TerminalPaneProps): ReactElemen
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [list, available] = await Promise.all([window.forja.terminal.list(), window.forja.terminal.shells()])
+      const [list, available] = await Promise.all([window.openclod.terminal.list(), window.openclod.terminal.shells()])
       if (cancelled) return
       if (available.ok) setShells(available.value)
       const mine = list.ok ? list.value.filter((item) => item.sessionId === sessionId) : []
@@ -163,7 +163,7 @@ export function TerminalPane({ sessionId, cwd }: TerminalPaneProps): ReactElemen
 
   useEffect(
     () =>
-      window.forja.terminal.onEvent((event) => {
+      window.openclod.terminal.onEvent((event) => {
         if (event.type === 'created') {
           // O agente abriu um terminal desta sessão (run_in_terminal): mostra a aba e foca,
           // sem duplicar um que este painel já criou.
@@ -179,7 +179,7 @@ export function TerminalPane({ sessionId, cwd }: TerminalPaneProps): ReactElemen
   )
 
   const close = async (terminalId: string): Promise<void> => {
-    await window.forja.terminal.kill(terminalId)
+    await window.openclod.terminal.kill(terminalId)
     setTerminals((list) => {
       const next = list.filter((item) => item.id !== terminalId)
       if (activeId === terminalId) setActiveId(next.length ? next[next.length - 1].id : null)

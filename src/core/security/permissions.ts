@@ -1,6 +1,6 @@
 import type { AgentMode, Decision, PermissionEffect, PolicyConfig } from '../../shared/types.js'
 import type { ToolDef } from '../tools/types.js'
-import { evaluateRules } from './rules.js'
+import { evaluateRulesFor } from './rules.js'
 import { checkSensitiveAccess, sensitiveReason } from './sensitive.js'
 
 /** Tools whose effects can be irreversible or visible to third parties. */
@@ -124,7 +124,7 @@ function evaluateToolBase(
     // The one exception: a tool the user (or its server) marked "always ask" still asks, like Claude Code's
     // `anthropic/requiresUserInteraction` does in bypass mode.
     if (tool.approval === 'ask') return { decision: 'ask', reason: 'a ferramenta está configurada para sempre pedir aprovação' }
-    return { decision: 'allow', reason: 'modo ultrarrrestrito: sem bloqueios do harness' }
+    return { decision: 'allow', reason: 'modo Ignorar permissões: sem bloqueios do harness' }
   }
   // Not a rule: it cannot be overridden by an allow rule, a hook or any mode.
   const sensitive = checkSensitiveAccess(tool.name, preview, args, { cwd })
@@ -140,7 +140,8 @@ function evaluateToolBase(
     return { decision: 'deny', reason: 'acesso de rede desativado nas configurações' }
   }
 
-  const ruled = evaluateRules(policy.rules, tool.name, preview, cwd)
+  // Each command of a chain and each file of a patch is judged: allow needs all of them, deny or ask on one wins.
+  const ruled = evaluateRulesFor(policy.rules, tool.name, preview, cwd, args)
   if (ruled) {
     const verb = ruled.decision === 'deny' ? 'negado' : ruled.decision === 'ask' ? 'pede confirmação' : 'permitido'
     return { decision: ruled.decision, reason: `${verb} pela regra ${ruled.rule}` }
@@ -309,6 +310,7 @@ for (const tools of Object.values(MODE_TOOLS)) {
 // Surgical edits are available wherever files can be written.
 for (const mode of ['code', 'debug', 'web', 'autonomous'] as const) {
   if (!MODE_TOOLS[mode].includes('patch_file')) MODE_TOOLS[mode].push('patch_file')
+  if (!MODE_TOOLS[mode].includes('apply_patch')) MODE_TOOLS[mode].push('apply_patch')
   if (!MODE_TOOLS[mode].includes('image_edit')) MODE_TOOLS[mode].push('image_edit')
 }
 

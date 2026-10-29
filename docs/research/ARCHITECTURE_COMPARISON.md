@@ -46,7 +46,7 @@ processos, (d) empacotar dois runtimes no instalador. O ganho seria reutilizar
 ```
 ┌────────────────────────── Electron 45 (Windows) ──────────────────────────┐
 │  Renderer (React 19 + Vite)          Preload (contextBridge, mínimo)      │
-│  ├─ sessões, transcript, plano        └─ window.forja (IPC tipado)        │
+│  ├─ sessões, transcript, plano        └─ window.openclod (IPC tipado)        │
 │  ├─ diff, arquivos, terminal                                              │
 │  ├─ aprovações, screenshots                                               │
 │  └─ seleção de provedor/modelo                                            │

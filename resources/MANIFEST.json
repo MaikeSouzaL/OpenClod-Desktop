@@ -316,24 +316,24 @@
       "group": "stt"
     },
     {
-      "name": "forja_stt.py",
+      "name": "openclod_stt.py",
       "kind": "script",
       "version": "1",
-      "source": "resources/stt/forja_stt.py",
-      "sha256": "6b01e6edd22f5770b32c986885bb822beeb3fb8de8d6099f9ca209a24b1bb5fb",
+      "source": "resources/stt/openclod_stt.py",
+      "sha256": "68e6d849de5441be263e9834200b6d16d801cebc8d82ee296be040229a8c7a09",
       "files": 1,
-      "size": 30609,
+      "size": 34116,
       "license": "MIT",
       "group": "stt"
     },
     {
-      "name": "forja_media.py",
+      "name": "openclod_media.py",
       "kind": "script",
       "version": "1",
-      "source": "resources/media/forja_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)",
-      "sha256": "038114a9f784c7cd7c87f07550f6f4f0594c489368b28b7ae40fbe74f1ebfd25",
+      "source": "resources/media/openclod_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)",
+      "sha256": "e4971482b428fc76f96153e3c8f96715951857821ad7b879f437eb29fdf98aed",
       "files": 1,
-      "size": 43233,
+      "size": 43254,
       "license": "MIT",
       "group": "stt"
     },
@@ -422,10 +422,10 @@
       "group": "office"
     },
     {
-      "name": "forja_office.py",
+      "name": "openclod_office_cli.py",
       "kind": "script",
       "version": "1",
-      "source": "resources/office/forja_office.py (openclod-office: check / inspect / pdf / recalc)",
+      "source": "resources/office/openclod_office_cli.py (openclod-office: check / inspect / pdf / recalc)",
       "sha256": "f7abae04183ee6ae2c803a6a40a7538357497e12cfa8544891d0b1d3837168bf",
       "files": 1,
       "size": 23831,
@@ -448,11 +448,20 @@
       "kind": "script",
       "version": "1",
       "source": "resources/office/bin (openclod-python, openclod-office) and bin-fallback (python, python3 for a computer with no Python): cmd shims that the run_command tool puts on PATH",
-      "sha256": "bb3d479e96a93bcf0c4b7f14e92dc535a23b0efcbe972ed35eca9a54db13a0f8",
+      "sha256": "3e0178a2519a9c75e948feaefe6498dea8ed7c25e6b0d564036958e83dd95c64",
       "files": 4,
-      "size": 1705,
+      "size": 1712,
       "license": "MIT",
       "group": "office"
+    },
+    {
+      "name": "llama.cpp (llama-server)",
+      "version": "b11972-vulkan",
+      "source": "https://github.com/ggml-org/llama.cpp/releases/download/b11972/llama-b11972-bin-win-vulkan-x64.zip (sha256 5f3fa9b3ec948e6cb1af3c8f1063fa39c79f58bb5dc9bb9dfb2db890d098508d, server files only: 25 of the release)",
+      "size": 88183581,
+      "sha256": "5f3fa9b3ec948e6cb1af3c8f1063fa39c79f58bb5dc9bb9dfb2db890d098508d",
+      "license": "MIT (libomp: Apache-2.0 WITH LLVM-exception, see LICENSE-LLVM-OpenMP)",
+      "path": "llamacpp/b11972-vulkan"
     }
   ]
 }

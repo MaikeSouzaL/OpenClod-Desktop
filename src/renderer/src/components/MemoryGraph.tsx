@@ -122,7 +122,7 @@ export function MemoryGraph({ project }: MemoryGraphProps): ReactElement {
     setLoading(true)
     setError('')
     try {
-      const result = await unwrap(window.forja.memory.graph(project.id))
+      const result = await unwrap(window.openclod.memory.graph(project.id))
       setGraph(result)
       setPositions(initialPositions(result.nodes))
       frameRef.current = 0
@@ -175,7 +175,7 @@ export function MemoryGraph({ project }: MemoryGraphProps): ReactElement {
       const slug = node.path === node.id ? node.path : /^pages\/.+\.md$/i.test(node.path)
         ? `ai:${node.path}`
         : `ai:${node.path}`
-      const page = await unwrap(window.forja.memory.read(project.id, slug))
+      const page = await unwrap(window.openclod.memory.read(project.id, slug))
       setContent(page)
     } catch (err) {
       setError(errorMessage(err))

@@ -43,7 +43,7 @@ async function main() {
     }
   })
   console.log(JSON.stringify(info, null, 2))
-  await page.screenshot({ path: 'C:/Users/Administrator/AppData/Local/Temp/opencode/forja-cdp.png' })
+  await page.screenshot({ path: 'C:/Users/Administrator/AppData/Local/Temp/opencode/openclod-cdp.png' })
   process.exit(0)
 }
 

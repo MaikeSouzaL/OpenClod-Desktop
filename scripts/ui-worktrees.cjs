@@ -29,14 +29,14 @@ async function main() {
   const { page } = app
   try {
     const setup = await page.evaluate(async (folder) => {
-      const settingsResult = await window.forja.app.settings()
+      const settingsResult = await window.openclod.app.settings()
       if (!settingsResult.ok) return { error: settingsResult.error }
       const settings = settingsResult.value
       const provider = settings.providers.find((item) => item.id === settings.defaultProviderId) || settings.providers[0]
       if (!provider) return { error: 'nenhum provedor configurado' }
-      const projectResult = await window.forja.projects.add(folder, 'Projeto worktree E2E')
+      const projectResult = await window.openclod.projects.add(folder, 'Projeto worktree E2E')
       if (!projectResult.ok) return { error: projectResult.error }
-      const remembered = await window.forja.app.rememberModel(provider.id, provider.model)
+      const remembered = await window.openclod.app.rememberModel(provider.id, provider.model)
       if (!remembered.ok) return { error: remembered.error }
       return { projectId: projectResult.value.id, projectPath: projectResult.value.path, providerId: provider.id, model: provider.model }
     }, repo)
@@ -44,9 +44,9 @@ async function main() {
 
     const ipcProbe = await page.evaluate(async ({ folder, projectId, providerId, model }) => {
       const probeBranch = `openclod/ipc-probe-${Date.now().toString(36)}`
-      const created = await window.forja.git.createWorktree(folder, probeBranch)
+      const created = await window.openclod.git.createWorktree(folder, probeBranch)
       if (!created.ok) return { error: created.error, stage: 'create-worktree' }
-      const session = await window.forja.sessions.create({
+      const session = await window.openclod.sessions.create({
         projectId,
         cwd: created.value.path,
         mode: 'code',
@@ -59,7 +59,7 @@ async function main() {
         stage: session.ok ? 'ok' : 'create-session',
         error: session.ok ? undefined : session.error,
         worktree: created.value,
-        projects: (await window.forja.projects.list()).value.map((project) => ({ id: project.id, path: project.path })),
+        projects: (await window.openclod.projects.list()).value.map((project) => ({ id: project.id, path: project.path })),
         session: session.ok ? session.value : undefined
       }
     }, { folder: repo, projectId: setup.projectId, providerId: setup.providerId, model: setup.model })
@@ -91,9 +91,9 @@ async function main() {
     await page.waitForTimeout(1000)
 
     const result = await page.evaluate(async ({ projectId, branch }) => {
-      const listed = await window.forja.git.listWorktrees((await window.forja.projects.list()).value.find((project) => project.id === projectId).path)
+      const listed = await window.openclod.git.listWorktrees((await window.openclod.projects.list()).value.find((project) => project.id === projectId).path)
       if (!listed.ok) return { error: listed.error }
-      const sessions = await window.forja.sessions.list()
+      const sessions = await window.openclod.sessions.list()
       if (!sessions.ok) return { error: sessions.error }
       const session = sessions.value.find(
         (item) => item.meta.projectId === projectId && item.meta.cwd.toLowerCase().includes(branch.replaceAll('/', '-').toLowerCase())
@@ -107,7 +107,7 @@ async function main() {
     if (result.worktrees.length < 2 || !result.worktrees.some((item) => item.branch === branch && !item.isMain)) {
       throw new Error(`unexpected worktree list: ${JSON.stringify(result.worktrees)}`)
     }
-    if (!result.session || result.session.projectId !== setup.projectId || !result.session.cwd.toLowerCase().includes(`${path.sep}.forja${path.sep}worktrees${path.sep}`)) {
+    if (!result.session || result.session.projectId !== setup.projectId || !result.session.cwd.toLowerCase().includes(`${path.sep}.openclod${path.sep}worktrees${path.sep}`)) {
       throw new Error(`session did not inherit the worktree: ${JSON.stringify(result.session)}`)
     }
     if (result.session.providerId !== setup.providerId) {
@@ -115,8 +115,8 @@ async function main() {
     }
 
     const removed = await page.evaluate(async ({ projectId, target }) => {
-      const project = (await window.forja.projects.list()).value.find((item) => item.id === projectId)
-      return window.forja.git.removeWorktree(project.path, target)
+      const project = (await window.openclod.projects.list()).value.find((item) => item.id === projectId)
+      return window.openclod.git.removeWorktree(project.path, target)
     }, { projectId: setup.projectId, target: result.worktrees.find((item) => item.branch === branch).path })
     if (!removed.ok) throw new Error(`remove failed: ${removed.error}`)
 

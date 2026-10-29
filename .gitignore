@@ -10,7 +10,7 @@ release-installer/
 .DS_Store
 coverage/
 tmp/
-.forja/
+.openclod/
 *.tsbuildinfo
 # clones de estudo (cada um tem o próprio .git e a própria licença)
 repositorios/*/
@@ -19,3 +19,4 @@ repositorios/*/
 resources/runtime/
 resources/models/
 resources/bin/
+resources/llamacpp/

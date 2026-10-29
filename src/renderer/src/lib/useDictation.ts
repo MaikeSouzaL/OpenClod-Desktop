@@ -64,7 +64,7 @@ export function useDictation({ text, setText, config, onError }: UseDictationOpt
     mic.current?.stop()
     mic.current = null
     // Stopping flushes the recognizer, so a last "final" may still arrive; keep listening for it briefly.
-    void window.forja.stt.stop().finally(() => {
+    void window.openclod.stt.stop().finally(() => {
       setTimeout(() => {
         teardown()
         setPhase('idle')
@@ -76,12 +76,12 @@ export function useDictation({ text, setText, config, onError }: UseDictationOpt
     if (stateRef.current !== 'idle') return
     setPhase('loading')
     try {
-      const status = await window.forja.stt.status()
+      const status = await window.openclod.stt.status()
       if (!status.ok) throw new Error(status.error)
       if (!status.value.available) throw new Error(status.value.reason ?? 'O reconhecimento de voz não está disponível.')
 
       dictation.current = new Dictation(textRef.current)
-      unsubscribe.current = window.forja.stt.onEvent((event: SttEvent) => {
+      unsubscribe.current = window.openclod.stt.onEvent((event: SttEvent) => {
         const current = dictation.current
         if (event.type === 'level') return
         if (event.type === 'partial' && current) setTextRef.current(current.setPartial(event.text))
@@ -99,13 +99,13 @@ export function useDictation({ text, setText, config, onError }: UseDictationOpt
         }
       })
 
-      const ready = await window.forja.stt.start({ model: config?.model, language: config?.language })
+      const ready = await window.openclod.stt.start({ model: config?.model, language: config?.language })
       if (!ready.ok) throw new Error(ready.error)
       // The user may have pressed stop while the model was loading.
       if (phase() !== 'loading') return
 
       const capture = await startMic((chunk) => {
-        window.forja.stt.audio(chunk.pcm)
+        window.openclod.stt.audio(chunk.pcm)
         // Smooth a little so the meter does not flicker.
         setLevel((previous) => previous * 0.5 + Math.min(1, chunk.rms * 6) * 0.5)
       })
@@ -117,7 +117,7 @@ export function useDictation({ text, setText, config, onError }: UseDictationOpt
       setPhase('listening')
     } catch (err) {
       teardown()
-      void window.forja.stt.stop()
+      void window.openclod.stt.stop()
       setPhase('idle')
       errorRef.current(micErrorMessage(err))
     }
@@ -147,7 +147,7 @@ export function useDictation({ text, setText, config, onError }: UseDictationOpt
       if (stateRef.current !== 'idle') {
         mic.current?.stop()
         unsubscribe.current?.()
-        void window.forja.stt.stop()
+        void window.openclod.stt.stop()
       }
     },
     []

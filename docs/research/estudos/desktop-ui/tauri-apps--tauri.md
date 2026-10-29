@@ -233,7 +233,7 @@ Desenho concreto:
 
 1. **`src/shared/capabilities.ts`** exporta um mapa estático:
    `{ surface: 'main' | 'preview' | 'settings', commands: string[], origins: string[] }`.
-   Cada namespace do nosso `forja` (`terminal`, `files`, `git`, `browser`,
+   Cada namespace do nosso `openclod` (`terminal`, `files`, `git`, `browser`,
    `computer`) declara quais superfícies podem chamá-lo. O wrapper
    `handle()` (`src/main/index.ts:435-449`) consulta esse mapa antes do handler.
 2. **`src/main/security/origin.ts`**: `originOf(frame)` normaliza

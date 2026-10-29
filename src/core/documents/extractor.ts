@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { inflateSync } from 'node:zlib'
 import { strFromU8, unzipSync } from 'fflate'
+import type { ImagePart } from '../../shared/types.js'
+import { ocrPdf } from '../media/ocr.js'
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024
 const MAX_TEXT_CHARS = 3_000_000
@@ -52,19 +54,59 @@ export interface ExtractedDocument {
   truncated: boolean
   warnings: string[]
   metadata: Record<string, string | number | boolean>
+  /** Pages read by OCR kept as small pictures for the chat (ExtractOptions.previews); never part of the text. */
+  previews?: ImagePart[]
 }
 
-function formatOf(file: string): DocumentFormat {
-  const ext = path.extname(file).toLowerCase()
-  if (ext === '.pdf') return 'pdf'
-  if (ext === '.docx') return 'docx'
-  if (ext === '.xlsx') return 'xlsx'
-  if (ext === '.pptx') return 'pptx'
-  if (ext === '.md' || ext === '.mdx') return 'markdown'
-  if (ext === '.html' || ext === '.htm') return 'html'
-  if (ext === '.csv' || ext === '.tsv') return 'csv'
-  if (ext === '.json') return 'json'
-  return 'text'
+const BY_EXTENSION: Record<string, DocumentFormat> = {
+  '.pdf': 'pdf',
+  '.docx': 'docx',
+  '.xlsx': 'xlsx',
+  '.pptx': 'pptx',
+  '.md': 'markdown',
+  '.mdx': 'markdown',
+  '.html': 'html',
+  '.htm': 'html',
+  '.csv': 'csv',
+  '.tsv': 'csv',
+  '.json': 'json',
+  '.txt': 'text'
+}
+
+/**
+ * The format the first bytes give, for a file whose name says nothing: WhatsApp saves an attachment without an extension.
+ * An OOXML package names its parts in the local zip headers, from the first entries on.
+ */
+export function sniffFormat(head: Buffer): DocumentFormat | null {
+  if (head.subarray(0, 5).toString('latin1') === '%PDF-') return 'pdf'
+  if (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) {
+    const names = head.subarray(0, 65_536).toString('latin1')
+    if (names.includes('word/')) return 'docx'
+    if (names.includes('xl/')) return 'xlsx'
+    if (names.includes('ppt/')) return 'pptx'
+  }
+  return null
+}
+
+/** An image by its signature: a "document" image_ocr reads and this extractor does not. */
+export function sniffImage(head: Buffer): string | null {
+  const ascii = head.subarray(0, 12).toString('latin1')
+  if (head[0] === 0x89 && ascii.slice(1, 4) === 'PNG') return 'PNG'
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'JPEG'
+  if (ascii.startsWith('RIFF') && ascii.slice(8, 12) === 'WEBP') return 'WebP'
+  if (/^GIF8[79]a/.test(ascii)) return 'GIF'
+  if (/^(II\*\0|MM\0\*)/.test(ascii)) return 'TIFF'
+  if (ascii.startsWith('BM')) return 'BMP'
+  return null
+}
+
+/** A NUL in the first 8 KB: binary. Read as UTF-8 it would hand the model 100 KB of noise as if it were the content. */
+function looksBinary(buffer: Buffer): boolean {
+  return buffer.subarray(0, 8_192).includes(0)
+}
+
+function formatOf(file: string, head: Buffer): DocumentFormat {
+  return BY_EXTENSION[path.extname(file).toLowerCase()] ?? sniffFormat(head) ?? 'text'
 }
 
 export function decodeXmlEntities(text: string): string {
@@ -101,20 +143,35 @@ export function chunkDocument(
   return chunks
 }
 
-export async function extractDocument(
-  file: string,
-  options: { maxChars?: number; chunkSize?: number; overlap?: number } = {}
-): Promise<ExtractedDocument> {
+export interface ExtractOptions {
+  maxChars?: number
+  chunkSize?: number
+  overlap?: number
+  signal?: AbortSignal
+  /** OCR a PDF without readable text (scanned, or text in glyph ids). Default: on, where the OS provides it (Windows). */
+  ocr?: boolean
+  /** Pages OCR'd at most (default 40). */
+  maxOcrPages?: number
+  /** Pages rendered for OCR kept as small pictures for the chat (default none). */
+  previews?: number
+}
+
+export async function extractDocument(file: string, options: ExtractOptions = {}): Promise<ExtractedDocument> {
   const resolved = path.resolve(file)
   const stat = await fs.promises.stat(resolved)
   if (!stat.isFile()) throw new Error('documento não é um arquivo')
   if (stat.size > MAX_FILE_BYTES) throw new Error('documento maior que 100 MB')
-  const format = formatOf(resolved)
-  const maxChars = Math.max(1_000, Math.min(MAX_TEXT_CHARS, options.maxChars ?? MAX_TEXT_CHARS))
   const buffer = await fs.promises.readFile(resolved)
+  const format = formatOf(resolved, buffer)
+  if (format === 'text' && !(path.extname(resolved).toLowerCase() in BY_EXTENSION) && looksBinary(buffer)) {
+    const image = sniffImage(buffer)
+    throw new Error(image ? `é uma imagem ${image}, não um documento: use image_ocr para ler o texto dela` : 'arquivo binário num formato que este leitor não conhece')
+  }
+  const maxChars = Math.max(1_000, Math.min(MAX_TEXT_CHARS, options.maxChars ?? MAX_TEXT_CHARS))
   const warnings: string[] = []
   let pages: DocumentPage[] = []
   let metadata: Record<string, string | number | boolean> = {}
+  let previews: ImagePart[] = []
 
   if (format === 'docx') {
     const zip = unzipLimited(buffer, /^word\/document\.xml$/)
@@ -150,10 +207,42 @@ export async function extractDocument(
     }))
     metadata = { sheets: pages.length }
   } else if (format === 'pdf') {
-    const extracted = extractPdf(buffer)
-    pages = extracted.pages
-    metadata = extracted.metadata
-    warnings.push(...extracted.warnings)
+    let extracted: ReturnType<typeof extractPdf> | null = null
+    let unreadable = ''
+    try {
+      extracted = extractPdf(buffer)
+    } catch (error) {
+      const message = (error as Error).message
+      if (/senha/.test(message)) throw error
+      unreadable = message
+    }
+    let ocrNote = ''
+    if (!extracted?.pages.some((page) => page.text.trim()) && options.ocr !== false && process.platform === 'win32') {
+      // Only images (a scan, screenshots pasted into a PDF) or text stored as glyph ids: render the pages and read them.
+      try {
+        const ocr = await ocrPdf(resolved, { signal: options.signal, maxPages: options.maxOcrPages, previews: options.previews })
+        previews = ocr.previews
+        if (ocr.pages.some((page) => page.text.trim())) {
+          pages = ocr.pages.map((page) => ({ number: page.number, label: `página ${page.number}`, text: page.text }))
+          metadata = { pages: ocr.pageCount, ocr: true, ocrPages: ocr.pages.length }
+          warnings.push('texto obtido por OCR (o PDF não tem camada de texto legível): confira nomes, números e valores importantes')
+          if (ocr.pageCount > ocr.pages.length) warnings.push(`OCR feito nas primeiras ${ocr.pages.length} de ${ocr.pageCount} páginas; peça max_ocr_pages maior para ler o resto`)
+          warnings.push(...ocr.errors)
+          extracted = null
+          unreadable = ''
+        } else ocrNote = 'o OCR também não encontrou texto nas páginas'
+      } catch (error) {
+        if (options.signal?.aborted) throw error
+        ocrNote = `o OCR não pôde ser feito: ${(error as Error).message}`
+      }
+    }
+    if (unreadable) throw new Error(ocrNote ? `${unreadable} (${ocrNote})` : unreadable)
+    if (extracted) {
+      pages = extracted.pages
+      metadata = extracted.metadata
+      warnings.push(...extracted.warnings)
+      if (ocrNote) warnings.push(ocrNote)
+    }
   } else {
     const raw = buffer.toString('utf8').replace(/\u0000/g, '')
     const text = format === 'html' ? htmlToText(raw) : raw
@@ -176,7 +265,19 @@ export async function extractDocument(
     page: page.number,
     section: page.label
   }))
-  return { source: resolved, name: path.basename(resolved), format, bytes: stat.size, pages, chunks, text, truncated, warnings, metadata }
+  return {
+    source: resolved,
+    name: path.basename(resolved),
+    format,
+    bytes: stat.size,
+    pages,
+    chunks,
+    text,
+    truncated,
+    warnings,
+    metadata,
+    ...(previews.length ? { previews } : {})
+  }
 }
 
 export function searchDocumentChunks(chunks: DocumentChunk[], query: string, limit = 10): Array<DocumentChunk & { score: number }> {

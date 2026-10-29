@@ -55,7 +55,20 @@ export function ApprovalDock({ approvals, onResolve }: ApprovalDockProps): React
             >
               Negar
             </button>
-            <button type="button" className="btn subtle" onClick={() => onResolve(approval.id, true, true)}>
+            <button
+              type="button"
+              className="btn ghost"
+              title="Recusa este pedido e os iguais neste projeto, sem perguntar de novo (desfaça em Configurações → Permissões)"
+              onClick={() => onResolve(approval.id, false, true, reasons[approval.id] ?? '')}
+            >
+              Negar sempre
+            </button>
+            <button
+              type="button"
+              className="btn subtle"
+              title="Comandos ficam permitidos pela operação (ex.: git commit), não pelos argumentos; cada comando de uma cadeia (&&, |) vira uma regra"
+              onClick={() => onResolve(approval.id, true, true)}
+            >
               Permitir sempre
             </button>
             <button

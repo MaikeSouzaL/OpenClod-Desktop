@@ -38,6 +38,8 @@ import { errorMessage, unwrap } from '../lib/api'
 import { promptText } from '../lib/prompt'
 import { DiagnosticsPanel } from './DiagnosticsPanel'
 import { ColabCard } from './ColabCard'
+import { LlamaCppCard } from './LlamaCppCard'
+import { SavedApprovals } from './SavedApprovals'
 import { ProviderLogo } from './ProviderLogo'
 import { ProviderTile } from './ProviderTile'
 
@@ -73,7 +75,7 @@ const PERMISSION_CHOICES: Array<{ id: PermissionMode; title: string; detail: str
   },
   {
     id: 'unrestricted',
-    title: 'Ultrarrestrito',
+    title: 'Ignorar permissões',
     detail: 'Sem bloqueios do harness: comandos, confirmações, regras e restrições de diretório são removidos. Use com responsabilidade.',
     tone: 'warn'
   }
@@ -116,6 +118,7 @@ export function SettingsDialog({
   const [profileName, setProfileName] = useState(settings.profileName ?? '')
   const [policy, setPolicy] = useState<PolicyConfig>(settings.policy)
   const [autoAgents, setAutoAgents] = useState(Boolean(settings.autoAgents))
+  const [selfReview, setSelfReview] = useState(settings.selfReview !== false)
   const [useAllModels, setUseAllModels] = useState(settings.useAllModels !== false)
   const [fallbackOrder, setFallbackOrder] = useState<string[]>(settings.fallbackOrder ?? [])
   const [fallbackExclude, setFallbackExclude] = useState<string[]>(settings.fallbackExclude ?? [])
@@ -264,10 +267,10 @@ export function SettingsDialog({
       ttsRate: settings.voice?.ttsRate ?? 0,
       ttsVolume: settings.voice?.ttsVolume ?? 100
     })
-    void window.forja.stt.status().then((result) => setVoiceStatus(result.ok ? result.value : null))
-    void window.forja.app.providerUsage().then((result) => setProviderUsage(result.ok ? result.value : []))
-    void window.forja.tts.voices().then((result) => setTtsVoices(result.ok ? result.value : []))
-    void window.forja.app.chromeCompanion().then((result) => setBrowserCompanion(result.ok ? result.value : null))
+    void window.openclod.stt.status().then((result) => setVoiceStatus(result.ok ? result.value : null))
+    void window.openclod.app.providerUsage().then((result) => setProviderUsage(result.ok ? result.value : []))
+    void window.openclod.tts.voices().then((result) => setTtsVoices(result.ok ? result.value : []))
+    void window.openclod.app.chromeCompanion().then((result) => setBrowserCompanion(result.ok ? result.value : null))
     setKeyDrafts({})
     setKeyStatus({})
     setTestStatus({})
@@ -289,8 +292,8 @@ export function SettingsDialog({
     let cancelled = false
     void (async () => {
       const [status, list] = await Promise.all([
-        window.forja.memory.status(memoryProjectId),
-        window.forja.memory.list(memoryProjectId)
+        window.openclod.memory.status(memoryProjectId),
+        window.openclod.memory.list(memoryProjectId)
       ])
       if (cancelled) return
       setMemoryStats(status.ok ? status.value : null)
@@ -305,7 +308,7 @@ export function SettingsDialog({
   useEffect(() => {
     if (!open || tab !== 'mcp') return
     let cancelled = false
-    void window.forja.app.mcpBackups().then((result) => {
+    void window.openclod.app.mcpBackups().then((result) => {
       if (!cancelled) setMcpBackups(result.ok ? result.value : [])
     })
     return () => {
@@ -397,7 +400,7 @@ export function SettingsDialog({
   }
 
   const refreshUsage = async (): Promise<void> => {
-    const result = await window.forja.app.providerUsage()
+    const result = await window.openclod.app.providerUsage()
     setProviderUsage(result.ok ? result.value : [])
   }
 
@@ -458,7 +461,7 @@ export function SettingsDialog({
     if (!value) return
     setKeyStatus((current) => ({ ...current, [id]: 'salvando…' }))
     try {
-      await unwrap(window.forja.app.setSecret(id, value))
+      await unwrap(window.openclod.app.setSecret(id, value))
       setKeyDrafts((current) => ({ ...current, [id]: '' }))
       setProviders((current) =>
         current.map((provider) => (provider.id === id ? { ...provider, apiKeyRef: `secret:${id}` } : provider))
@@ -472,7 +475,7 @@ export function SettingsDialog({
 
   const clearKey = async (id: string): Promise<void> => {
     try {
-      await unwrap(window.forja.app.clearSecret(id))
+      await unwrap(window.openclod.app.clearSecret(id))
       setKeyStatus((current) => ({ ...current, [id]: 'chave removida' }))
       await onRefreshCapabilities()
     } catch (err) {
@@ -485,7 +488,7 @@ export function SettingsDialog({
     try {
       // The address/model in the form, even if not saved yet: the test says what the user is looking at.
       const draft = providers.find((item) => item.id === id)
-      const result = await unwrap(window.forja.app.testProvider(id, draft ? { baseUrl: draft.baseUrl, kind: draft.kind, model: draft.model } : undefined))
+      const result = await unwrap(window.openclod.app.testProvider(id, draft ? { baseUrl: draft.baseUrl, kind: draft.kind, model: draft.model } : undefined))
       setTestStatus((current) => ({ ...current, [id]: { state: result.ok ? 'ok' : 'erro', detail: result.detail } }))
       // The test teaches the harness which providers work (and forgets a failure that a recharge cured): show it.
       void onRefreshCapabilities()
@@ -500,7 +503,7 @@ export function SettingsDialog({
     try {
       // Ask the server typed in the form, even if the address is not saved yet.
       const draft = providers.find((item) => item.id === id)
-      const result = await unwrap(window.forja.app.discoverModels(id, draft ? { baseUrl: draft.baseUrl, kind: draft.kind } : undefined))
+      const result = await unwrap(window.openclod.app.discoverModels(id, draft ? { baseUrl: draft.baseUrl, kind: draft.kind } : undefined))
       if (result.error || !result.models.length) {
         setTestStatus((current) => ({ ...current, [id]: { state: 'erro', detail: result.error ?? 'o servidor não listou modelos' } }))
         return
@@ -573,6 +576,7 @@ export function SettingsDialog({
         profileName,
         policy: nextPolicy,
         autoAgents,
+        selfReview,
         useAllModels,
         fallbackOrder,
         fallbackExclude,
@@ -601,14 +605,14 @@ export function SettingsDialog({
   }
 
   const refreshMcpBackups = async (): Promise<void> => {
-    const result = await window.forja.app.mcpBackups()
+    const result = await window.openclod.app.mcpBackups()
     setMcpBackups(result.ok ? result.value : [])
   }
 
   const clearMcpBackups = async (): Promise<void> => {
     setMcpBackupBusy(true)
     try {
-      const { removed } = await unwrap(window.forja.app.clearMcpBackups())
+      const { removed } = await unwrap(window.openclod.app.clearMcpBackups())
       setNotice(`${removed} cópia(s) antiga(s) apagada(s).`)
       setTimeout(() => setNotice(''), 2500)
       await refreshMcpBackups()
@@ -622,8 +626,8 @@ export function SettingsDialog({
   const refreshMemoryView = async (): Promise<void> => {
     if (!memoryProjectId) return
     const [status, list] = await Promise.all([
-      window.forja.memory.status(memoryProjectId),
-      window.forja.memory.list(memoryProjectId)
+      window.openclod.memory.status(memoryProjectId),
+      window.openclod.memory.list(memoryProjectId)
     ])
     setMemoryStats(status.ok ? status.value : null)
     setMemoryPages(list.ok ? list.value : [])
@@ -899,6 +903,8 @@ export function SettingsDialog({
                   <Icon name="refresh" size={12} /> Atualizar
                 </button>
               </div>
+
+              {!selectedProvider ? <LlamaCppCard onChanged={onRefreshCapabilities} /> : null}
 
               {!selectedProvider ? (
                 <ColabCard
@@ -1479,7 +1485,7 @@ export function SettingsDialog({
                     setError('')
                     try {
                       ttsPreviewAudio.current?.pause()
-                      const result = await unwrap(window.forja.tts.speak({
+                      const result = await unwrap(window.openclod.tts.speak({
                         text: 'Olá! Esta é a voz selecionada no Openclod.',
                         provider: selectedTtsProvider,
                         voice: voice.ttsVoice,
@@ -1509,7 +1515,7 @@ export function SettingsDialog({
                   className="btn small ghost"
                   onClick={() => {
                     ttsPreviewAudio.current?.pause()
-                    void window.forja.tts.stop()
+                    void window.openclod.tts.stop()
                     setNotice('')
                   }}
                 >
@@ -1588,6 +1594,8 @@ export function SettingsDialog({
                 </p>
               </div>
 
+              <SavedApprovals />
+
               <h3>Navegador do agente</h3>
               <p className="field-help">
                 Use o Chrome que já está aberto e preserve a sessão, as abas e os logins. O Openclod cria um grupo de
@@ -1648,7 +1656,7 @@ export function SettingsDialog({
                     setBrowserBusy(true)
                     setError('')
                     try {
-                      const status = await unwrap(window.forja.app.installChromeCompanion())
+                      const status = await unwrap(window.openclod.app.installChromeCompanion())
                       setBrowserCompanion(status)
                       await onRefreshCapabilities()
                       setNotice('Host nativo instalado. Carregue a extensão em chrome://extensions uma vez.')
@@ -1669,7 +1677,7 @@ export function SettingsDialog({
                     setBrowserBusy(true)
                     setError('')
                     try {
-                      setBrowserCompanion(await unwrap(window.forja.app.chromeCompanion()))
+                      setBrowserCompanion(await unwrap(window.openclod.app.chromeCompanion()))
                       await onRefreshCapabilities()
                       setNotice('Status do Chrome atualizado.')
                     } catch (err) {
@@ -1689,7 +1697,7 @@ export function SettingsDialog({
                     setBrowserBusy(true)
                     setError('')
                     try {
-                      setBrowserCompanion(await unwrap(window.forja.app.openChromeExtensions()))
+                      setBrowserCompanion(await unwrap(window.openclod.app.openChromeExtensions()))
                     } catch (err) {
                       setError(errorMessage(err))
                     } finally {
@@ -1706,7 +1714,7 @@ export function SettingsDialog({
                   onClick={async () => {
                     setError('')
                     try {
-                      await unwrap(window.forja.app.revealChromeExtension())
+                      await unwrap(window.openclod.app.revealChromeExtension())
                     } catch (err) {
                       setError(errorMessage(err))
                     }
@@ -1738,7 +1746,7 @@ export function SettingsDialog({
                     setBrowserBusy(true)
                     setError('')
                     try {
-                      const packed = await unwrap(window.forja.app.exportChromeExtension())
+                      const packed = await unwrap(window.openclod.app.exportChromeExtension())
                       setNotice(`Extensão v${packed.version} exportada: ${packed.path}`)
                     } catch (err) {
                       setError(errorMessage(err))
@@ -1830,7 +1838,7 @@ export function SettingsDialog({
                         onClick={async () => {
                           setCheckingEnvironment(environment.id)
                           try {
-                            const result = await unwrap(window.forja.app.environmentCheck(environment.id))
+                            const result = await unwrap(window.openclod.app.environmentCheck(environment.id))
                             setEnvironmentChecks((current) => ({ ...current, [environment.id]: result }))
                           } catch (err) {
                             setEnvironmentChecks((current) => ({
@@ -1854,7 +1862,7 @@ export function SettingsDialog({
                 Formato do Claude Code (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>UserPromptSubmit</code>,{' '}
                 <code>Stop</code>, <code>SessionStart</code>, <code>PreCompact</code>, <code>Notification</code>). O
                 comando recebe o evento em JSON pela entrada padrão; código de saída 2 bloqueia. Hooks de projeto ficam
-                em <code>.forja/settings.json</code>.
+                em <code>.openclod/settings.json</code>.
               </p>
               <label className="field">
                 <span>Hooks do usuário (JSON)</span>
@@ -2013,7 +2021,7 @@ export function SettingsDialog({
                       className="btn ghost"
                       onClick={() => {
                         if (!memoryProjectId) return
-                        void window.forja.memory.open(memoryProjectId).then(() => setMemoryNotice('Pasta aberta no Explorer.'))
+                        void window.openclod.memory.open(memoryProjectId).then(() => setMemoryNotice('Pasta aberta no Explorer.'))
                       }}
                     >
                       <Icon name="folderOpen" size={14} /> Abrir pasta
@@ -2033,7 +2041,7 @@ export function SettingsDialog({
                             className="memory-title"
                             onClick={() => {
                               if (!memoryProjectId) return
-                              void window.forja.memory.read(memoryProjectId, page.slug).then((result) => {
+                              void window.openclod.memory.read(memoryProjectId, page.slug).then((result) => {
                                 if (result.ok) setMemoryPage(result.value)
                               })
                             }}
@@ -2062,11 +2070,11 @@ export function SettingsDialog({
                                   confirmLabel: 'Invalidar'
                                 })
                                 if (reason === null) return
-                                void window.forja.memory.invalidate(memoryProjectId, page.slug, reason).then(async (result) => {
+                                void window.openclod.memory.invalidate(memoryProjectId, page.slug, reason).then(async (result) => {
                                   if (result.ok && result.value) {
                                     setMemoryNotice(`Página "${page.title}" invalidada; o histórico foi preservado.`)
                                     if (memoryPage?.slug === page.slug) {
-                                      const refreshed = await window.forja.memory.read(memoryProjectId, page.slug)
+                                      const refreshed = await window.openclod.memory.read(memoryProjectId, page.slug)
                                       if (refreshed.ok) setMemoryPage(refreshed.value)
                                     }
                                     await refreshMemoryView()
@@ -2084,7 +2092,7 @@ export function SettingsDialog({
                             onClick={() => {
                               if (!memoryProjectId) return
                               if (!window.confirm(`Excluir a página "${page.title}"?`)) return
-                              void window.forja.memory.delete(memoryProjectId, page.slug).then(async (result) => {
+                              void window.openclod.memory.delete(memoryProjectId, page.slug).then(async (result) => {
                                 if (result.ok && result.value) {
                                   setMemoryNotice(`Página "${page.title}" excluída.`)
                                   if (memoryPage?.slug === page.slug) setMemoryPage(null)
@@ -2149,7 +2157,7 @@ export function SettingsDialog({
                     setNotice('')
                     setBackupRestoreInfo(null)
                     try {
-                      const result = await unwrap(window.forja.app.backupExport())
+                      const result = await unwrap(window.openclod.app.backupExport())
                       if (result) {
                         setBackupInfo(result)
                         setNotice(`Backup criado: ${result.stats.files} arquivo(s), ${formatBytes(result.stats.bytes)}.`)
@@ -2173,7 +2181,7 @@ export function SettingsDialog({
                     setNotice('')
                     setBackupRestoreInfo(null)
                     try {
-                      const result = await unwrap(window.forja.app.backupInspect())
+                      const result = await unwrap(window.openclod.app.backupInspect())
                       if (result) {
                         setBackupInfo(result)
                         setNotice('Backup válido: checksum, versão e tamanho conferem.')
@@ -2196,7 +2204,7 @@ export function SettingsDialog({
                     setError('')
                     setNotice('')
                     try {
-                      const result = await unwrap(window.forja.app.backupRestore())
+                      const result = await unwrap(window.openclod.app.backupRestore())
                       if (result) {
                         setBackupInfo(result)
                         setBackupRestoreInfo(result)
@@ -2254,7 +2262,7 @@ export function SettingsDialog({
                     setError('')
                     setNotice('')
                     try {
-                      const result = await unwrap(window.forja.app.exportConfiguration())
+                      const result = await unwrap(window.openclod.app.exportConfiguration())
                       if (result) {
                         setConfigExportInfo(result)
                         setNotice(`Configuração exportada${result.warnings.length ? ` com ${result.warnings.length} campo(s) sensível(is) omitido(s)` : ''}.`)
@@ -2277,7 +2285,7 @@ export function SettingsDialog({
                     setError('')
                     setNotice('')
                     try {
-                      const result = await unwrap(window.forja.app.importConfiguration())
+                      const result = await unwrap(window.openclod.app.importConfiguration())
                       if (result) {
                         setConfigImportInfo(result)
                         await onSave({})
@@ -2311,6 +2319,16 @@ export function SettingsDialog({
 
           {tab === 'harness' ? (
             <div className="appearance">
+              <h3>Revisão antes de terminar</h3>
+              <label className="check-line">
+                <input type="checkbox" checked={selfReview} onChange={(event) => setSelfReview(event.target.checked)} />
+                O agente revisa o próprio diff antes de dar por terminado
+              </label>
+              <p className="field-help">
+                Quando um turno alterou arquivos, o agente vê o diff do que mudou (uma vez por turno) e confere se faz o
+                que foi pedido, se sobrou depuração e se verificou com testes; se achar um problema, corrige. Custa uma
+                chamada a mais ao modelo nos turnos que mudam arquivos. Não vale no modo somente leitura nem no Chat.
+              </p>
               <h3>Auto-correção do harness</h3>
               <p className="field-help">
                 Quando uma ferramenta ou o próprio harness falha, o agente pode abrir uma sessão de engenharia no
@@ -2427,7 +2445,7 @@ export function SettingsDialog({
                     setError('')
                     setDownloadedUpdate(null)
                     try {
-                      const result = await unwrap(window.forja.app.checkForUpdates())
+                      const result = await unwrap(window.openclod.app.checkForUpdates())
                       setUpdateInfo(result)
                       setNotice(result.detail)
                     } catch (err) {
@@ -2448,7 +2466,7 @@ export function SettingsDialog({
                       setUpdateBusy(true)
                       setError('')
                       try {
-                        const result = await unwrap(window.forja.app.downloadUpdate())
+                        const result = await unwrap(window.openclod.app.downloadUpdate())
                         if (result) {
                           setDownloadedUpdate(result)
                           setNotice('Instalador baixado e verificado pelo SHA-256.')

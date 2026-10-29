@@ -104,7 +104,7 @@ async function main() {
     await e2e.openSession(page, 'Base', 'Projeto tokens')
     await e2e.send(page, 'ola')
     await e2e.waitSettled(page, hello.sessionId, { timeoutMs: 180000 })
-    const helloMessages = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages, hello.sessionId)
+    const helloMessages = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages, hello.sessionId)
     const helloCalls = calls(helloMessages)
     result.baseInputTokens = helloCalls[0] ? helloCalls[0].input : null
     result.baseCalls = helloCalls.length
@@ -126,7 +126,7 @@ async function main() {
       result.turns.push(turn)
       console.log(`turno ${result.turns.length}: ${Math.round(turn.ms / 1000)} s, ferramentas: ${turn.tools.join(',') || '(nenhuma)'}`)
     }
-    const messages = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages, session.sessionId)
+    const messages = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages, session.sessionId)
     const all = calls(messages)
     result.calls = all
     result.byPosition = { first: stat(all.filter((c) => c.position === 'first')), afterPlan: stat(all.filter((c) => c.position === 'afterPlan')), other: stat(all.filter((c) => c.position === 'other')) }

@@ -22,7 +22,7 @@ aprovação humana, Computer Use no Windows e navegação web via Playwright.
 
 ## Sumário
 
-1. [O que é o Openclod](#1-o-que-é-o-forja)
+1. [O que é o Openclod](#1-o-que-é-o-openclod)
 2. [Recursos que existem hoje](#2-recursos-que-existem-hoje)
 3. [O que não existe nesta versão](#3-o-que-não-existe-nesta-versão)
 4. [Requisitos](#4-requisitos)
@@ -118,7 +118,7 @@ que a UI finja uma ação que o núcleo não executou.
   paralelo. Se não houver especialista para o assunto, ele chama `agent-smith`,
   que estuda o caso, cria um agente permanente com `create_agent` em
   `%APPDATA%\Openclod\agents` e delega a tarefa.
-- **CLAUDE.md canônico:** o harness lê `CLAUDE.md` (e `AGENTS.md`/`FORJA.md`
+- **CLAUDE.md canônico:** o harness lê `CLAUDE.md` (e `AGENTS.md`/`OPENCLOD.md`
   como fallback) e cria automaticamente um `CLAUDE.md` na raiz de cada projeto
   quando ele não existe, sem sobrescrever o que já está lá.
 - **Edição cirúrgica:** `edit_file` (trecho exato) e `patch_file` (diff
@@ -181,7 +181,7 @@ que a UI finja uma ação que o núcleo não executou.
   janela em segundo plano (quando o sistema suporta).
 - **Terminal integrado** (PTY real, várias abas; PowerShell, cmd ou Git Bash).
 - **Navegador integrado** (abas, DevTools) com detecção de servidor de dev
-  (`package.json` e `.claude/launch.json`); a escolha fica em `.forja/launch.json`.
+  (`package.json` e `.claude/launch.json`); a escolha fica em `.openclod/launch.json`.
 - **Alterações via Git** (preparadas, alteradas, não rastreadas; lista ou
   árvore) e **editor de arquivos** CodeMirror com abas, Ctrl+S e salvamento
   automático opcional.
@@ -202,7 +202,7 @@ que a UI finja uma ação que o núcleo não executou.
 - Uso de tokens por sessão e orçamento de custo configurável (o bloqueio por
   custo só é efetivo quando custos por milhão de tokens estão definidos no
   provedor).
-- Exportação e importação de sessão em JSON (`forja.session.v1`).
+- Exportação e importação de sessão em JSON (`openclod.session.v1`).
 - Configurações de provedores, permissões, limites, MCP, aparência e diagnóstico de
   capacidades em **Configurações → Sobre**.
 
@@ -262,7 +262,7 @@ Para evitar expectativas erradas:
 - **A memória por projeto é local** (wiki markdown em `%APPDATA%`), sem sync
   entre máquinas. Para FTS5/vetores/sync, ligue o binário oficial `ai-memory`
   como MCP.
-- **`create_agent` grava em `%APPDATA%\Openclod\agents`** (ou `.forja/agents` com
+- **`create_agent` grava em `%APPDATA%\Openclod\agents`** (ou `.openclod/agents` com
   escopo de projeto). O agente criado passa pela mesma política de ferramentas;
   não há sandbox de SO para o que ele executar.
 - **O terminal integrado é o seu shell**: não passa pelas aprovações do agente.
@@ -374,6 +374,22 @@ Alternativas à chave no cofre:
 > Se a criptografia do sistema não estiver disponível, o Openclod **recusa** gravar a
 > chave em texto puro e orienta usar variável de ambiente.
 
+### llama.cpp (local) — o motor embutido
+
+O cartão **llama.cpp (local)**, no topo de Provedores, roda modelos GGUF neste
+computador com o servidor do próprio llama.cpp, que vem dentro do app (versão
+Vulkan: qualquer GPU e a CPU). Não precisa de Ollama nem de chave. O cartão faz:
+
+- acha os modelos que já estão no computador (Ollama, LM Studio, cache do Hugging
+  Face, Downloads e pastas suas);
+- lista os GGUF do Hugging Face com a quantização que cabe na sua GPU e baixa
+  conferindo o SHA-256;
+- mostra todas as opções do `llama-server`, com perfis;
+- baixa as versões CUDA oficiais para NVIDIA.
+
+Ligado, ele vira o provedor `llama.cpp (local)` no seletor de modelo. Uma conversa
+nele inicia o servidor sozinha. Detalhes: [`docs/LLAMACPP.md`](docs/LLAMACPP.md).
+
 ## 7. Modelo de segurança
 
 ### 7.1 Modos de permissão
@@ -418,7 +434,7 @@ Os nomes do Claude Code (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`,
 (`run_command`, `read_file`…) são aceitos. Fontes, todas somadas:
 
 - Configurações → Permissões (usuário);
-- `<projeto>/.forja/settings.json` e `settings.local.json`, no formato
+- `<projeto>/.openclod/settings.json` e `settings.local.json`, no formato
   `{ "permissions": { "allow": [], "ask": [], "deny": [] } }`;
 - `<projeto>/.claude/settings.json` e `settings.local.json`, só se "Ler também
   .claude/settings.json" estiver ligado;
@@ -510,7 +526,7 @@ Cada sessão tem uma trilha append-only em
 ### 7.8 Hooks
 
 Mesmo formato do Claude Code. Configure em Configurações → Permissões → Hooks
-(usuário) ou em `<projeto>/.forja/settings.json` (projeto):
+(usuário) ou em `<projeto>/.openclod/settings.json` (projeto):
 
 ```json
 {
@@ -531,7 +547,7 @@ Mesmo formato do Claude Code. Configure em Configurações → Permissões → H
   Code ou do Openclod); vazio vale para todas.
 - O comando recebe o evento em JSON pela entrada padrão (`session_id`, `cwd`,
   `hook_event_name`, `tool_name`, `tool_input` com `file_path`, `tool_response`,
-  `prompt`…) e as variáveis `FORJA_PROJECT_DIR` e `CLAUDE_PROJECT_DIR`.
+  `prompt`…) e as variáveis `OPENCLOD_PROJECT_DIR` e `CLAUDE_PROJECT_DIR`.
 - Código de saída **2** bloqueia: em `PreToolUse` a ferramenta não roda e o
   stderr vai para o modelo; em `UserPromptSubmit` a mensagem é recusada; em
   `Stop` o agente volta a trabalhar com o stderr como instrução (até 3 vezes).
@@ -558,7 +574,7 @@ Requisitos:
    ```
 
    O Openclod procura o executável em:
-   - `FORJA_OCU_BIN` (caminho explícito), depois `OCU_BIN`;
+   - `OPENCLOD_OCU_BIN` (caminho explícito), depois `OCU_BIN`;
    - `%APPDATA%\npm\node_modules\@opensymph\open-computer-use\dist\windows\amd64\open-computer-use.exe`.
 
 3. **Controle de mouse/teclado habilitado** em Configurações → Permissões
@@ -713,7 +729,7 @@ Tudo fica em `%APPDATA%\Openclod` (o `userData` do Electron):
 
 - `settings.json` **não contém chaves**.
 - Gravações de sessão/projetos são atômicas (arquivo temporário + rename).
-- Exportação de sessão gera JSON no formato `forja.session.v1`.
+- Exportação de sessão gera JSON no formato `openclod.session.v1`.
 - O código do projeto aberto não é copiado para `%APPDATA%`; só entram no histórico
   os trechos que passaram pelas ferramentas e as mensagens do modelo.
 
@@ -769,7 +785,7 @@ Detalhes e verificação de desinstalação limpa: [`docs/INSTALL.md`](docs/INST
 ## 15. Build e empacotamento
 
 - Build do código: `npm run build` → `out/main`, `out/preload`, `out/renderer`.
-- Empacotamento: `electron-builder.yml` (NSIS x64, `appId com.forja.desktop`,
+- Empacotamento: `electron-builder.yml` (NSIS x64, `appId com.openclod.desktop`,
   artefato `release/Openclod-<versão>-setup.exe`).
 - Ícones são opcionais: `build/icon.ico` (executável/instalador) e
   `build/icon.png` (janela). Sem eles, o build usa o ícone padrão do Electron.

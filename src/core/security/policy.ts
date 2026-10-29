@@ -176,7 +176,7 @@ const INJECTION_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /system prompt|prompt do sistema/i, label: 'referência ao prompt de sistema' },
   { re: /reveal (your|the) (system prompt|instructions|api key|token)/i, label: 'tentativa de exfiltração' },
   { re: /(execute|run) the following (command|script)/i, label: 'comando embutido' },
-  { re: /<\/?(system|assistant|tool)>/i, label: 'tags de papel forjadas' },
+  { re: /<\/?(system|assistant|tool)>/i, label: 'tags de papel falsificadas' },
   { re: /new instructions?:/i, label: 'novas instruções embutidas' },
   { re: /do not tell the user|não (avise|conte) ao usuário/i, label: 'instrução de ocultação' }
 ]
@@ -221,6 +221,35 @@ export function redactSecrets(text: string): string {
 }
 
 const SENSITIVE_ENV = /(API_KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE_KEY)/i
+
+/**
+ * What a third-party server process (an MCP server started over stdio) gets from Openclod's environment: only what
+ * programs need to run — the same idea as the MCP SDK's `getDefaultEnvironment` — plus proxy and certificate settings
+ * of corporate networks. Keys, tokens and everything else the app's environment holds stay out; the server's own
+ * `env` from its config is added on top by the caller.
+ */
+const CHILD_ENV_ALLOW = new Set(
+  [
+    'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'HOME', 'USERPROFILE',
+    'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432',
+    'COMMONPROGRAMFILES', 'COMMONPROGRAMFILES(X86)', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS', 'OS', 'USERNAME',
+    'USERDOMAIN', 'COMPUTERNAME', 'LOGNAME', 'USER', 'SHELL', 'TERM', 'LANG', 'LANGUAGE', 'TZ',
+    'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+    'REQUESTS_CA_BUNDLE', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR'
+  ].map((name) => name.toUpperCase())
+)
+
+/** `LC_ALL`, `LC_CTYPE`...: the locale, never a secret. */
+const CHILD_ENV_PREFIX = /^LC_/
+
+export function childProcessEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    const upper = key.toUpperCase()
+    if (value !== undefined && (CHILD_ENV_ALLOW.has(upper) || CHILD_ENV_PREFIX.test(upper))) env[key] = value
+  }
+  return { ...env, ...extra }
+}
 
 /** Environment for child processes: keeps PATH etc., drops provider secrets. */
 export function sanitizedEnv(): NodeJS.ProcessEnv {

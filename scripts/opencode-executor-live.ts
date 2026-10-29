@@ -33,13 +33,13 @@ async function main(): Promise<void> {
     const result = await createExternalAgentTool().execute({
       agent: 'opencode',
       prompt: 'Responda apenas a palavra PONG e nao use ferramentas.',
-      model: process.env.FORJA_OPENCODE_MODEL?.trim() || 'opencode/beam-free',
+      model: process.env.OPENCLOD_OPENCODE_MODEL?.trim() || 'opencode/beam-free',
       timeout_ms: 180_000
     }, ctx)
     if (!result.ok) throw new Error(result.text)
     console.log(JSON.stringify({
       ok: true,
-      model: process.env.FORJA_OPENCODE_MODEL?.trim() || 'opencode/beam-free',
+      model: process.env.OPENCLOD_OPENCODE_MODEL?.trim() || 'opencode/beam-free',
       answer: result.data?.answer ?? result.text.split('\n')[0],
       sessionId: result.data?.sessionId,
       usage: result.data?.usage,

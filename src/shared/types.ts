@@ -52,6 +52,11 @@ export interface ImagePart {
   description?: string
   /** `provider/model` that wrote `description`. */
   describedBy?: string
+  /**
+   * Where the picture went when it was stored, so the chat can say whether the model really saw it: `model` reads it,
+   * `relay` is described first by a model with vision (then `description` is set), `none` reaches no model. Display only.
+   */
+  delivery?: 'model' | 'relay' | 'none'
 }
 
 export interface ToolCallPart {
@@ -68,6 +73,8 @@ export interface ToolResultPart {
   ok: boolean
   text: string
   images?: ImagePart[]
+  /** ToolResult.preview: shown in the chat, never sent to a model. */
+  preview?: ImagePart[]
   detail?: string
   /**
    * Descriptions of `images` written by the vision relay. The pictures themselves are not stored with the session;
@@ -233,6 +240,11 @@ export interface ToolResult {
   /** Absolute paths touched, used by the UI and by file-lock tracking. */
   files?: string[]
   images?: ImagePart[]
+  /**
+   * Pictures for the chat only, never sent to any model: what a tool looked at when the model gets text instead (the
+   * PDF page an OCR read, the image file it read), so the user sees what was read. Keep them few and small.
+   */
+  preview?: ImagePart[]
   /** Short human-facing summary for the transcript card. */
   summary?: string
   /** Structured payload for the UI (diff, exit code, etc). */
@@ -792,6 +804,8 @@ export interface AppSettings {
   telemetry: false
   /** Team mode: split work across specialist agents (also on at max effort). */
   autoAgents?: boolean
+  /** Before a turn that changed files ends, the agent reviews its own diff once (on unless false). */
+  selfReview?: boolean
   /** Execution environments shown in the composer. */
   environments?: EnvironmentProfile[]
   /**
@@ -918,6 +932,11 @@ export interface McpServerSettings {
    * unset: sent when the total number of MCP tools is small, deferred otherwise (like Claude Code's `alwaysLoad`).
    */
   alwaysLoad?: boolean
+  /**
+   * stdio servers get only what a program needs from Openclod's environment (PATH, TEMP, the user folders, proxies)
+   * plus their own `env`. true passes the whole environment, for a server that reads a variable set on the system.
+   */
+  inheritEnv?: boolean
 }
 
 export interface ComputerStatus {

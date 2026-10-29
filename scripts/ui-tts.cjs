@@ -71,7 +71,7 @@ async function main() {
     // The voice engine reports what it is given (the first 160 characters) on its event channel.
     await page.evaluate(() => {
       window.__tts = []
-      window.forja.tts.onEvent((event) => window.__tts.push({ ...event, at: Date.now() }))
+      window.openclod.tts.onEvent((event) => window.__tts.push({ ...event, at: Date.now() }))
     })
     const events = () => page.evaluate(() => window.__tts)
 

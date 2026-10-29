@@ -30,7 +30,7 @@ let cwd: string
 const servers: http.Server[] = []
 
 beforeEach(async () => {
-  cwd = await makeTempDir('forja-harness-')
+  cwd = await makeTempDir('openclod-harness-')
 })
 
 afterEach(async () => {
@@ -494,7 +494,7 @@ describe('computer use backend', () => {
 })
 
 describe('open-computer-use binary resolution', () => {
-  const ENV_KEYS = ['FORJA_OCU', 'FORJA_OCU_BIN', 'OCU_BIN', 'FORJA_RESOURCES', 'APPDATA', 'USERPROFILE', 'PATH'] as const
+  const ENV_KEYS = ['OPENCLOD_OCU', 'OPENCLOD_OCU_BIN', 'OCU_BIN', 'OPENCLOD_RESOURCES', 'APPDATA', 'USERPROFILE', 'PATH'] as const
   const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
   const EXE = process.platform === 'win32' ? 'open-computer-use.exe' : 'open-computer-use'
   const NPM_RELATIVE = 'npm/node_modules/@opensymph/open-computer-use/dist/windows/amd64/open-computer-use.exe'
@@ -509,13 +509,13 @@ describe('open-computer-use binary resolution', () => {
 
   beforeEach(() => {
     sandbox = fs.mkdtempSync(path.join(cwd, 'ocu-'))
-    for (const key of ['FORJA_OCU', 'FORJA_OCU_BIN', 'OCU_BIN']) delete process.env[key]
-    process.env.FORJA_RESOURCES = path.join(sandbox, 'resources')
+    for (const key of ['OPENCLOD_OCU', 'OPENCLOD_OCU_BIN', 'OCU_BIN']) delete process.env[key]
+    process.env.OPENCLOD_RESOURCES = path.join(sandbox, 'resources')
     process.env.APPDATA = path.join(sandbox, 'appdata')
     process.env.USERPROFILE = path.join(sandbox, 'home')
     process.env.PATH = path.join(sandbox, 'pathdir')
-    fs.mkdirSync(process.env.FORJA_RESOURCES, { recursive: true })
-    fs.writeFileSync(path.join(process.env.FORJA_RESOURCES, 'MANIFEST.json'), '{"version":1,"entries":[]}')
+    fs.mkdirSync(process.env.OPENCLOD_RESOURCES, { recursive: true })
+    fs.writeFileSync(path.join(process.env.OPENCLOD_RESOURCES, 'MANIFEST.json'), '{"version":1,"entries":[]}')
     resetResourcesCache()
   })
 
@@ -527,18 +527,18 @@ describe('open-computer-use binary resolution', () => {
     resetResourcesCache()
   })
 
-  it('goes explicit path > FORJA_OCU > bundled > npm global > PATH, and null disables the backend', () => {
+  it('goes explicit path > OPENCLOD_OCU > bundled > npm global > PATH, and null disables the backend', () => {
     const explicit = touch('explicit', 'ocu.exe')
     const fromEnv = touch('env', 'ocu.exe')
     const bundled = touch('resources', 'bin', EXE)
     const npm = touch('appdata', NPM_RELATIVE)
     const onPath = touch('pathdir', EXE)
-    process.env.FORJA_OCU = fromEnv
+    process.env.OPENCLOD_OCU = fromEnv
 
     expect(resolveOcu(explicit)).toEqual({ path: explicit, source: 'explicit' })
     expect(resolveOcu()).toEqual({ path: fromEnv, source: 'env' })
 
-    delete process.env.FORJA_OCU
+    delete process.env.OPENCLOD_OCU
     expect(resolveOcu()).toEqual({ path: bundled, source: 'bundled' })
 
     fs.rmSync(bundled)
@@ -557,7 +557,7 @@ describe('open-computer-use binary resolution', () => {
 
   it('skips missing candidates: a stale explicit path or env var falls through to the next step', () => {
     const bundled = touch('resources', 'bin', EXE)
-    process.env.FORJA_OCU = path.join(sandbox, 'gone', 'ocu.exe')
+    process.env.OPENCLOD_OCU = path.join(sandbox, 'gone', 'ocu.exe')
     expect(resolveOcu(path.join(sandbox, 'also-gone.exe'))).toEqual({ path: bundled, source: 'bundled' })
     const legacy = touch('legacy', 'ocu.exe')
     process.env.OCU_BIN = legacy
@@ -585,7 +585,7 @@ describe('open-computer-use binary resolution', () => {
 
 describe('bundled open-computer-use.exe', () => {
   it.runIf(process.platform === 'win32')('matches MANIFEST.json, reports its version, and speaks MCP over stdio', async () => {
-    delete process.env.FORJA_RESOURCES
+    delete process.env.OPENCLOD_RESOURCES
     resetResourcesCache()
     const bundled = bundledBinary('open-computer-use')
     expect(bundled, 'run `npm run embed:bin` to bundle resources/bin/open-computer-use.exe').not.toBeNull()
@@ -602,7 +602,7 @@ describe('bundled open-computer-use.exe', () => {
     expect(version.stdout.trim()).toBe(entry!.version)
 
     // The harness resolves it without any env or PATH help.
-    for (const key of ['FORJA_OCU', 'FORJA_OCU_BIN', 'OCU_BIN']) delete process.env[key]
+    for (const key of ['OPENCLOD_OCU', 'OPENCLOD_OCU_BIN', 'OCU_BIN']) delete process.env[key]
     expect(resolveOcu()?.path.toLowerCase()).toBe(bundled!.toLowerCase())
 
     const client = new McpClient({ name: 'open-computer-use', command: bundled!, args: ['mcp'] })

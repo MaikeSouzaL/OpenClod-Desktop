@@ -351,8 +351,23 @@ function parseOpenAiModel(entry: unknown): DiscoveredModel | null {
   }
 }
 
+/**
+ * Where an OpenAI-compatible server lists its models. Almost always `<baseUrl>/models`, but OpenCode serves chat at
+ * `/inference/.../v1` while its catalog lives at `/zen/v1/models` (the chat base returns 404 for `/models`). Pointing
+ * detection there lets "Detectar modelos" pull OpenCode's live catalog instead of failing.
+ */
+export function openAiModelsUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl)
+    if (/(^|\.)opencode\.ai$/i.test(url.hostname)) return `${url.protocol}//${url.host}/zen/v1/models`
+  } catch {
+    /* not a parseable URL: fall through to the default */
+  }
+  return `${trimSlash(baseUrl)}/models`
+}
+
 async function discoverOpenAi(ctx: Context, baseUrl: string): Promise<DiscoveredModel[]> {
-  const url = `${trimSlash(baseUrl)}/models`
+  const url = openAiModelsUrl(baseUrl)
   const body = await requestJson(ctx, url, { headers: ctx.apiKey ? { authorization: `Bearer ${ctx.apiKey}` } : undefined })
   const record = asRecord(body)
   const list = Array.isArray(body) ? body : Array.isArray(record?.data) ? record.data : Array.isArray(record?.models) ? record.models : null

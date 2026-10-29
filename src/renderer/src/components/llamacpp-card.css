@@ -1,0 +1,750 @@
+/* Configurações → Provedores → llama.cpp (local). Same look as the Colab card; its own classes, so the Colab E2E
+   (scripts/ui-colab.cjs, which selects .colab-*) never matches this card. */
+.llama-card {
+  display: grid;
+  gap: 16px;
+  margin: 14px 0 18px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--elevated);
+}
+
+.llama-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.llama-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.llama-title span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.llama-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.llama-status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.llama-status.ok::before { background: var(--green); }
+.llama-status.busy::before { background: var(--amber); animation: llama-pulse 1.2s ease-in-out infinite; }
+.llama-status.bad::before { background: var(--red); }
+
+@keyframes llama-pulse {
+  50% { opacity: 0.35; }
+}
+
+.llama-lead {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.llama-model {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.llama-model-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.llama-model-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.llama-model-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.llama-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.llama-tags span {
+  padding: 2px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.llama-specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.llama-specs dt {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.llama-specs dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.llama-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.llama-fields label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.llama-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.llama-problem {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--red) 38%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--red) 6%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.llama-problem svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--red);
+}
+
+.llama-log summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.llama-log pre {
+  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 10.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.llama-meta {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.llama-found {
+  display: grid;
+  gap: 8px;
+}
+
+.llama-found-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.llama-found-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.llama-found-list {
+  display: grid;
+  max-height: 232px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  list-style: none;
+}
+
+.llama-found-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.llama-found-list li + li {
+  border-top: 1px solid var(--border-soft);
+}
+
+.llama-found-list li.current {
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+}
+
+.llama-found-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.llama-found-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.llama-found-current {
+  flex: 0 0 auto;
+  color: var(--green);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.llama-folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.llama-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.llama-folder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.llama-folder button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.llama-folder button:hover {
+  background: var(--border-soft);
+  color: var(--text);
+}
+
+/* Baixar modelos, Opções do servidor, Versões: collapsible sections */
+.llama-hub,
+.llama-section {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.llama-hub > summary,
+.llama-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.llama-hub > summary::-webkit-details-marker,
+.llama-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.llama-hub > summary::after,
+.llama-section > summary::after {
+  content: '▸';
+  margin-left: auto;
+  color: var(--text-3);
+  transition: transform 0.15s ease;
+}
+
+.llama-hub[open] > summary::after,
+.llama-section[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.llama-hub > .llama-meta,
+.llama-section > .llama-meta,
+.llama-hub-body,
+.llama-section-body {
+  padding: 0 14px 14px;
+}
+
+.llama-hub-body,
+.llama-section-body {
+  display: grid;
+  gap: 10px;
+}
+
+.llama-hub-body > p,
+.llama-section-body > p {
+  margin: 0;
+}
+
+.llama-hub-machine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.llama-hub-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.llama-hub-tools input[type='search'] {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.llama-hub-filter {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+}
+
+.llama-hub-filter button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.llama-hub-filter button.on {
+  background: var(--border-soft);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.llama-hub-download {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 35%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--green) 6%, transparent);
+  font-size: 12px;
+}
+
+.llama-hub-download.bad {
+  border-color: color-mix(in srgb, var(--red) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--red) 6%, transparent);
+}
+
+.llama-hub-download-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.llama-hub-bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-soft);
+}
+
+.llama-hub-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 0.4s ease;
+}
+
+.llama-hub-list {
+  display: grid;
+  max-height: 420px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.llama-hub-list > li + li {
+  border-top: 1px solid var(--border-soft);
+}
+
+.llama-hub-list > li.open {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.llama-hub-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+}
+
+.llama-hub-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.llama-hub-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.llama-fit {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.llama-fit.ok {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border-soft));
+  color: var(--green);
+}
+
+.llama-fit.busy {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--border-soft));
+  color: var(--amber);
+}
+
+.llama-fit.bad {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border-soft));
+  color: var(--red);
+}
+
+.llama-hub-files {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.llama-hub-files table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.llama-hub-files td {
+  padding: 4px 6px;
+  border-top: 1px solid var(--border-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.llama-hub-files td:last-child {
+  text-align: right;
+}
+
+.llama-hub-files tr.suggested td {
+  font-weight: 500;
+}
+
+.llama-hub-files em {
+  margin-left: 6px;
+  color: var(--green);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.llama-hub-files a {
+  color: var(--accent, var(--text));
+}
+
+.llama-count {
+  padding: 1px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Perfis */
+.llama-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.llama-profiles select,
+.llama-profile-form input {
+  min-width: 160px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.llama-profile-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Opções do servidor */
+.llama-search,
+.llama-extra input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.llama-option-groups {
+  display: grid;
+  gap: 6px;
+}
+
+.llama-option-group {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.llama-option-group > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.llama-option-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px 14px;
+  padding: 4px 12px 12px;
+}
+
+.llama-option {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.llama-option label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.llama-option-name {
+  font-weight: 500;
+}
+
+.llama-option code {
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+
+.llama-option select,
+.llama-option input[type='text'] {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.llama-option input[type='checkbox'] {
+  justify-self: start;
+}
+
+.llama-option.set .llama-option-name {
+  color: var(--green);
+}
+
+.llama-option.old {
+  opacity: 0.6;
+}
+
+.llama-option-tip {
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.llama-extra {
+  display: grid;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.llama-command pre {
+  max-height: 140px;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 10.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Versões */
+.llama-builds {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.llama-builds li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+.llama-builds li + li {
+  border-top: 1px solid var(--border-soft);
+}
+
+.llama-builds li.current {
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+}
+
+.llama-kinds {
+  display: grid;
+  gap: 6px;
+}
+
+.llama-kind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  font-size: 12.5px;
+}
+
+.llama-kind em {
+  margin-left: 6px;
+  color: var(--green);
+  font-size: 11px;
+  font-style: normal;
+}

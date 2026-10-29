@@ -14,7 +14,7 @@ import { makeTempDir, policy, removeTempDir } from './helpers'
 let cwd: string
 
 beforeEach(async () => {
-  cwd = await makeTempDir('forja-plan-limit-')
+  cwd = await makeTempDir('openclod-plan-limit-')
 })
 
 afterEach(async () => {

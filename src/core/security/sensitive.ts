@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { patchPaths } from '../patch/apply-patch.js'
 
 /**
  * Hard block for credential locations (SSH keys, cloud CLIs, DPAPI stores...).
@@ -388,7 +389,7 @@ function text(value: unknown): string | undefined {
 }
 
 /** Tools whose first path argument names the file they read, write or remove. */
-const FILE_TARGET_TOOLS = new Set(['read_file', 'write_file', 'edit_file', 'delete_path'])
+const FILE_TARGET_TOOLS = new Set(['read_file', 'write_file', 'edit_file', 'patch_file', 'delete_path'])
 const COMMAND_TOOLS = new Set(['run_command', 'start_process'])
 
 /**
@@ -417,6 +418,15 @@ export function checkSensitiveAccess(
   }
 
   switch (toolName) {
+    case 'apply_patch': {
+      // Every file the patch creates, changes, moves to or removes.
+      for (const file of patchPaths(text(a.patch) ?? '')) {
+        const hit = matcher.matchPath(file)
+        if (hit) return hit
+      }
+      return null
+    }
+
     case 'browser_open':
     case 'browser_navigate':
       // A file: URL would render the credential file in the page the model can then read.

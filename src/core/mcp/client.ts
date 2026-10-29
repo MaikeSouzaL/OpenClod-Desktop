@@ -14,6 +14,7 @@ import {
   type ResolvedToolPolicy
 } from './policy.js'
 import { SseParser, type SseEvent } from './sse.js'
+import { childProcessEnv } from '../security/policy.js'
 import { WARN_OUTPUT_TOKENS, approxTokens, limitMcpErrorText, limitMcpText, maxOutputChars } from './output.js'
 
 export {
@@ -165,6 +166,8 @@ export const MCP_ACCEPTED_NEWER_VERSIONS = ['2025-11-25'] as const
 const MAX_PAGES = 50
 /** Claude Code stops reading a remote response at 16 MiB; so do we. */
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+/** Times a request's dropped SSE stream is resumed with Last-Event-ID before the connection counts as lost. */
+const MAX_SSE_RESUMES = 3
 const CLIENT_INFO = { name: 'openclod', title: 'Openclod Desktop', version: '0.1.0' }
 
 /** Registry name of a server tool: `mcp__<server>__<tool>`, sanitized and capped at 60 chars. Kept for compatibility; see `assignMcpToolNames`. */
@@ -242,6 +245,7 @@ export function normalizeMcpServerSettings(raw: unknown): McpServerSettings {
   const maxOutputTokens = clampMs(server.maxOutputTokens, 1000, 400_000)
   if (maxOutputTokens !== undefined) out.maxOutputTokens = maxOutputTokens
   if (typeof server.alwaysLoad === 'boolean') out.alwaysLoad = server.alwaysLoad
+  if (server.inheritEnv === true) out.inheritEnv = true
   return out
 }
 
@@ -654,7 +658,9 @@ export class McpClient {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: this.config.cwd || undefined,
-      env: { ...process.env, ...(this.config.env ?? {}) },
+      // Only what a program needs to run, plus the server's own env: the app's keys and tokens are not the server's.
+      // `inheritEnv: true` in its config passes the whole environment again (for a server that reads a variable of the system).
+      env: this.config.inheritEnv ? { ...process.env, ...(this.config.env ?? {}) } : childProcessEnv(this.config.env ?? {}),
       // A process group lets stop() kill the server's children on POSIX; Windows uses taskkill /T.
       detached: process.platform !== 'win32'
     })
@@ -1407,7 +1413,9 @@ export class McpClient {
     }
     const contentType = response.headers.get('content-type') ?? ''
     if (contentType.includes('text/event-stream')) {
-      await this.consumeSse(response, controller)
+      const position = await this.consumeSse(response, controller)
+      // Dropped before the answer: the rest may still come from where it stopped.
+      if (this.pending.has(id) && !controller.signal.aborted && position.lastEventId) await this.resumeSse(id, position, controller)
       if (this.pending.has(id) && !controller.signal.aborted) {
         throw new McpConnectionLostError(`a conexão com ${this.name} foi encerrada antes da resposta de ${method}`)
       }
@@ -1443,12 +1451,23 @@ export class McpClient {
     return out + decoder.decode()
   }
 
-  /** Reads an SSE response to its end, routing every `message` event. */
-  private async consumeSse(response: Response, controller: AbortController, onEvent?: (event: SseEvent) => void): Promise<void> {
-    if (!response.body) return
+  /**
+   * Reads an SSE response to its end, routing every `message` event. Returns the stream's last event id and `retry:`,
+   * what resuming it needs (`Last-Event-ID`).
+   */
+  private async consumeSse(
+    response: Response,
+    controller: AbortController,
+    onEvent?: (event: SseEvent) => void
+  ): Promise<{ lastEventId?: string; retryMs?: number }> {
+    if (!response.body) return {}
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     const parser = new SseParser()
+    const position = (): { lastEventId?: string; retryMs?: number } => ({
+      ...(parser.lastEventId ? { lastEventId: parser.lastEventId } : {}),
+      ...(parser.retryMs !== undefined ? { retryMs: parser.retryMs } : {})
+    })
     let total = 0
     const handle = (events: SseEvent[]): void => {
       for (const event of events) {
@@ -1475,9 +1494,39 @@ export class McpClient {
       handle(parser.push(decoder.decode())) // flush a trailing partial character
       handle(parser.end())
     } catch (err) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted) return position()
+      // The stream dropped: the caller may resume it from the last event it got.
+      if (parser.lastEventId) return position()
       throw err
     }
+    return position()
+  }
+
+  /**
+   * The SSE stream of a request ended before its answer: ask the server for the rest with `Last-Event-ID` (Streamable
+   * HTTP resumability), a few times, waiting what its `retry:` asked. False when it cannot resume (no id, no stream).
+   */
+  private async resumeSse(id: number, from: { lastEventId?: string; retryMs?: number }, controller: AbortController): Promise<boolean> {
+    let position = from
+    for (let attempt = 0; attempt < MAX_SSE_RESUMES && position.lastEventId && this.pending.has(id); attempt++) {
+      if (controller.signal.aborted || !this.config.url) return false
+      await sleepMs(Math.min(Math.max(position.retryMs ?? 500, 100), 10_000), controller.signal)
+      const headers = this.remoteHeaders({ accept: 'text/event-stream', 'last-event-id': position.lastEventId })
+      delete headers['content-type']
+      let response: Response
+      try {
+        response = await fetch(this.config.url, { method: 'GET', headers, signal: controller.signal })
+      } catch {
+        continue
+      }
+      if (!response.ok || !(response.headers.get('content-type') ?? '').includes('text/event-stream')) {
+        await response.body?.cancel().catch(() => undefined)
+        return false
+      }
+      const next = await this.consumeSse(response, controller).catch(() => ({}) as { lastEventId?: string; retryMs?: number })
+      position = { lastEventId: next.lastEventId ?? position.lastEventId, retryMs: next.retryMs ?? position.retryMs }
+    }
+    return !this.pending.has(id)
   }
 
   /** Legacy HTTP+SSE: GET the stream, wait for the `endpoint` event, then POST messages there. */
@@ -1592,9 +1641,11 @@ export class McpClient {
     const url = this.config.url
     void (async () => {
       let failures = 0
+      // Where the stream was: a reconnection asks for what came after it, so no notification is lost.
+      let lastEventId: string | undefined
       while (!controller.signal.aborted && this.state === 'ready') {
         try {
-          const headers = this.remoteHeaders({ accept: 'text/event-stream' })
+          const headers = this.remoteHeaders({ accept: 'text/event-stream', ...(lastEventId ? { 'last-event-id': lastEventId } : {}) })
           delete headers['content-type']
           const response = await fetch(url, { method: 'GET', headers, signal: controller.signal })
           if (!response.ok || !(response.headers.get('content-type') ?? '').includes('text/event-stream')) {
@@ -1602,7 +1653,7 @@ export class McpClient {
             return // 405 and friends: the server offers no stream
           }
           failures = 0
-          await this.consumeSse(response, controller)
+          lastEventId = (await this.consumeSse(response, controller)).lastEventId ?? lastEventId
         } catch {
           if (controller.signal.aborted) return
           failures++

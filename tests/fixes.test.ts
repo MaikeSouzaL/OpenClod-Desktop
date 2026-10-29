@@ -17,7 +17,7 @@ import { makeTempDir, policy, removeTempDir } from './helpers'
 let dir: string
 
 beforeEach(async () => {
-  dir = await makeTempDir('forja-fixes-')
+  dir = await makeTempDir('openclod-fixes-')
 })
 
 afterEach(async () => {
@@ -354,19 +354,19 @@ describe('SettingsStore secrets and migration', () => {
 })
 
 describe('project settings and saved approvals', () => {
-  it('loads .forja permissions and hooks, and .claude only when enabled', () => {
-    fs.mkdirSync(path.join(dir, '.forja'))
+  it('loads .openclod permissions and hooks, and .claude only when enabled', () => {
+    fs.mkdirSync(path.join(dir, '.openclod'))
     fs.mkdirSync(path.join(dir, '.claude'))
     fs.writeFileSync(
-      path.join(dir, '.forja', 'settings.json'),
+      path.join(dir, '.openclod', 'settings.json'),
       JSON.stringify({ permissions: { allow: ['Bash(npm test:*)'] }, hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo ok' }] }] } })
     )
     fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { deny: ['Read(secret.txt)'] } }))
 
-    const forjaOnly = loadProjectSettings(dir)
-    expect(forjaOnly.rules.allow).toEqual(['Bash(npm test:*)'])
-    expect(forjaOnly.rules.deny).toEqual([])
-    expect(forjaOnly.hooks.Stop).toHaveLength(1)
+    const openclodOnly = loadProjectSettings(dir)
+    expect(openclodOnly.rules.allow).toEqual(['Bash(npm test:*)'])
+    expect(openclodOnly.rules.deny).toEqual([])
+    expect(openclodOnly.hooks.Stop).toHaveLength(1)
 
     const withClaude = loadProjectSettings(dir, { importClaude: true })
     expect(withClaude.rules.deny).toEqual(['Read(secret.txt)'])

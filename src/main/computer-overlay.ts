@@ -32,8 +32,8 @@ export class ComputerOverlay {
   private lastPoint: { x: number; y: number } | null = null
   private lastPointIsDip = true
 
-  /** Enable with FORJA_OVERLAY_CAPTURE=1 to record demos/screenshots of the overlay. */
-  private readonly protectFromCapture = process.env.FORJA_OVERLAY_CAPTURE !== '1'
+  /** Enable with OPENCLOD_OVERLAY_CAPTURE=1 to record demos/screenshots of the overlay. */
+  private readonly protectFromCapture = process.env.OPENCLOD_OVERLAY_CAPTURE !== '1'
 
   handle(event: HarnessEvent): void {
     if (this.disposed) return

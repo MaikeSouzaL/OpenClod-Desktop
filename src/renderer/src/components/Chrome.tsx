@@ -14,7 +14,7 @@ export function OpenclodMark({ size = 20, className = '' }: { size?: number; cla
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      className={`forja-mark ${className}`}
+      className={`openclod-mark ${className}`}
       aria-hidden="true"
     >
       <g stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

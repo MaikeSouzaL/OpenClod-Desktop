@@ -41,11 +41,11 @@ export function mergeHooks(...configs: Array<HooksConfig | undefined>): HooksCon
 /**
  * Project-level permissions and hooks, in the same JSON shape as Claude
  * Code's settings: `{ "permissions": {allow, ask, deny}, "hooks": {...} }`.
- * Reads `.forja/settings.json` and `.forja/settings.local.json`; with
+ * Reads `.openclod/settings.json` and `.openclod/settings.local.json`; with
  * `importClaude`, also `.claude/settings.json` and `.claude/settings.local.json`.
  */
 export function loadProjectSettings(cwd: string, options: { importClaude?: boolean } = {}): ProjectSettings {
-  const dirs = ['.forja', ...(options.importClaude ? ['.claude'] : [])]
+  const dirs = ['.openclod', ...(options.importClaude ? ['.claude'] : [])]
   const files = dirs.flatMap((dir) => [path.join(cwd, dir, 'settings.json'), path.join(cwd, dir, 'settings.local.json')])
   const rules: Array<Partial<PermissionRules> | undefined> = []
   const hooks: HooksConfig[] = []
@@ -60,7 +60,7 @@ export function loadProjectSettings(cwd: string, options: { importClaude?: boole
   return { rules: mergeRules(...rules), hooks: mergeHooks(...hooks), sources }
 }
 
-/** "Always allow" choices, persisted per project outside the repository. */
+/** "Always allow" and "always deny" choices, persisted per project outside the repository. */
 export class ApprovalStore {
   constructor(private readonly dir: string) {}
 
@@ -68,23 +68,54 @@ export class ApprovalStore {
     return path.join(this.dir, `${projectId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`)
   }
 
-  load(projectId: string): string[] {
+  /** Both lists. A file from before "always deny" existed has only `allow`. */
+  rules(projectId: string): { allow: string[]; deny: string[] } {
     try {
-      const parsed = JSON.parse(fs.readFileSync(this.file(projectId), 'utf8')) as { allow?: unknown }
-      return Array.isArray(parsed.allow) ? parsed.allow.filter((r): r is string => typeof r === 'string') : []
+      const parsed = JSON.parse(fs.readFileSync(this.file(projectId), 'utf8')) as { allow?: unknown; deny?: unknown }
+      const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter((r): r is string => typeof r === 'string') : [])
+      return { allow: list(parsed.allow), deny: list(parsed.deny) }
     } catch {
-      return []
+      return { allow: [], deny: [] }
     }
   }
 
-  add(projectId: string, rule: string): void {
-    const rules = this.load(projectId)
-    if (rules.includes(rule)) return
-    rules.push(rule)
+  load(projectId: string): string[] {
+    return this.rules(projectId).allow
+  }
+
+  private save(projectId: string, rules: { allow: string[]; deny: string[] }): void {
     fs.mkdirSync(this.dir, { recursive: true })
     const target = this.file(projectId)
-    fs.writeFileSync(`${target}.tmp`, JSON.stringify({ allow: rules }, null, 2), 'utf8')
+    fs.writeFileSync(`${target}.tmp`, JSON.stringify(rules, null, 2), 'utf8')
     fs.renameSync(`${target}.tmp`, target)
+  }
+
+  add(projectId: string, rule: string, effect: 'allow' | 'deny' = 'allow'): void {
+    const rules = this.rules(projectId)
+    if (rules[effect].includes(rule)) return
+    rules[effect].push(rule)
+    // One choice per rule: denying what was allowed before takes it off the allow list, and the other way round.
+    const other = effect === 'allow' ? 'deny' : 'allow'
+    rules[other] = rules[other].filter((item) => item !== rule)
+    this.save(projectId, rules)
+  }
+
+  /** Takes back one saved choice; true when it was there. */
+  remove(projectId: string, rule: string, effect: 'allow' | 'deny'): boolean {
+    const rules = this.rules(projectId)
+    if (!rules[effect].includes(rule)) return false
+    rules[effect] = rules[effect].filter((item) => item !== rule)
+    this.save(projectId, rules)
+    return true
+  }
+
+  /** Projects with saved choices, by id. */
+  projects(): string[] {
+    try {
+      return fs.readdirSync(this.dir).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5))
+    } catch {
+      return []
+    }
   }
 
   /** Removes every remembered "always allow" rule of a deleted project. */

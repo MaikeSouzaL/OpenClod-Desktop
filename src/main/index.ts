@@ -4,7 +4,6 @@ import { execFile, spawn } from 'node:child_process'
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeImage, Notification, powerSaveBlocker, session as electronSession, shell, Tray, type IpcMainInvokeEvent } from 'electron'
 import { Orchestrator } from './orchestrator.js'
 import type { ColabHost } from './colab.js'
-import { expandCommand, loadCustomCommands, matchCustomCommand } from '../core/commands/library.js'
 import { DictationController } from './dictation.js'
 import { SttService } from './stt.js'
 import { TtsService } from './tts.js'
@@ -18,6 +17,9 @@ import { backgroundProcessOutput, listBackgroundProcesses, stopBackgroundProcess
 import { createWorktree, gitFileDiff, gitStatus, listWorktrees, removeWorktree } from '../core/git/service.js'
 import { Scheduler, scheduledSession, type ScheduledTask } from '../core/scheduler/scheduler.js'
 import { CH, type AppVersions, type CreateSessionInput, type PluginCatalogEntry, type ProviderPresetInfo, type ProviderUsageInfo, type SttStartOptions } from '../shared/api.js'
+import type { LlamaCppProfile } from '../shared/llamacpp.js'
+import type { BuildKind } from '../core/llamacpp/builds.js'
+import { splitExtra } from '../core/llamacpp/options.js'
 import {
   AGENT_MODES,
   REASONING_EFFORTS,
@@ -52,29 +54,6 @@ import { checkForUpdate, downloadUpdate } from './updater.js'
 
 app.setName('Openclod Desktop')
 app.setAppUserModelId('com.openclod.desktop')
-
-/**
- * The app was previously branded Forja. Move the old profile (settings,
- * encrypted keys, sessions, project memory) to the new folder once, so a
- * rename never loses the user's work. A running old instance can lock the
- * folder; in that case copy instead of rename and leave the old copy intact.
- */
-function migrateLegacyProfile(): void {
-  try {
-    const appData = app.getPath('appData')
-    const legacy = path.join(appData, 'Forja')
-    const next = path.join(appData, 'Openclod Desktop')
-    if (fs.existsSync(next) || !fs.existsSync(legacy)) return
-    try {
-      fs.renameSync(legacy, next)
-    } catch {
-      fs.cpSync(legacy, next, { recursive: true })
-    }
-  } catch {
-    /* startup must continue even if the old profile cannot be moved */
-  }
-}
-migrateLegacyProfile()
 
 const isDev = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -122,7 +101,7 @@ let improvementService: ImprovementService | null = null
 /** Scheduled runs waiting for their turn_end, keyed by session id. */
 const scheduledTurns = new Map<string, (stopReason: string) => void>()
 /** Partition shared by every browser-pane <webview>; isolated from the app session. */
-const PREVIEW_PARTITION = 'persist:forja-preview'
+const PREVIEW_PARTITION = 'persist:openclod-preview'
 let cleanedUp = false
 
 /* ------------------------------------------------------------------ */
@@ -135,7 +114,7 @@ function logFile(): string {
     fs.mkdirSync(dir, { recursive: true })
     return path.join(dir, 'main.log')
   } catch {
-    return path.join(app.getPath('temp'), 'forja-main.log')
+    return path.join(app.getPath('temp'), 'openclod-main.log')
   }
 }
 
@@ -281,6 +260,35 @@ function providerDraft(raw: unknown): { baseUrl?: string; kind?: 'openai' | 'ant
   return Object.keys(draft).length ? draft : undefined
 }
 
+/** The options of the next llama.cpp run, as sent by the screen: only known fields, with types and sizes checked. */
+function llamaProfilePatch(raw: unknown): Partial<LlamaCppProfile> {
+  if (!raw || typeof raw !== 'object') return {}
+  const input = raw as Record<string, unknown>
+  const patch: Partial<LlamaCppProfile> = {}
+  const optionalPath = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() ? value.trim().slice(0, 1000) : undefined)
+  if ('model' in input) patch.model = optionalPath(input.model)
+  if ('mmproj' in input) patch.mmproj = optionalPath(input.mmproj)
+  if ('alias' in input) patch.alias = typeof input.alias === 'string' ? input.alias.trim().slice(0, 80) || undefined : undefined
+  if ('label' in input) patch.label = typeof input.label === 'string' ? input.label.trim().slice(0, 200) || undefined : undefined
+  if (Array.isArray(input.folders)) patch.folders = input.folders.filter((item): item is string => typeof item === 'string' && item.trim() !== '').slice(0, 20).map((item) => item.trim().slice(0, 1000))
+  if (typeof input.ctxSize === 'number') patch.ctxSize = input.ctxSize
+  if (typeof input.parallel === 'number') patch.parallel = input.parallel
+  if (typeof input.autostart === 'boolean') patch.autostart = input.autostart
+  if (input.values && typeof input.values === 'object' && !Array.isArray(input.values)) {
+    const values: Record<string, string | boolean | null> = {}
+    for (const [flag, value] of Object.entries(input.values as Record<string, unknown>).slice(0, 400)) {
+      if (!/^-{1,2}[\w-]{1,60}$/.test(flag)) continue
+      if (value === null || typeof value === 'boolean') values[flag] = value
+      else if (typeof value === 'string') values[flag] = value.slice(0, 1000)
+    }
+    patch.values = values
+  }
+  // The options screen sends the extra arguments as typed; they are split here, never by a shell.
+  if (typeof input.extraText === 'string') patch.extraArgs = splitExtra(input.extraText.slice(0, 4000)).slice(0, 100)
+  else if (Array.isArray(input.extraArgs)) patch.extraArgs = input.extraArgs.filter((item): item is string => typeof item === 'string').slice(0, 100).map((item) => item.slice(0, 1000))
+  return patch
+}
+
 function isPermissionMode(value: unknown): value is PermissionMode {
   return value === 'readonly' || value === 'ask' || value === 'accept-edits' || value === 'auto' || value === 'unrestricted'
 }
@@ -388,6 +396,7 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   if (input.theme === 'light' || input.theme === 'dark') patch.theme = input.theme
   if (typeof input.profileName === 'string') patch.profileName = input.profileName.trim().slice(0, 80)
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
+  if (typeof input.selfReview === 'boolean') patch.selfReview = input.selfReview
   if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
   const providerIds = (value: unknown): string[] =>
     Array.isArray(value) ? [...new Set(value.map((item) => String(item).slice(0, 60)).filter(Boolean))].slice(0, 60) : []
@@ -1053,15 +1062,6 @@ function createTray(): void {
   }
 }
 
-/** Custom slash commands visible from a folder: the user's own, then the project's `.claude/commands` and `.forja/commands`. */
-function customCommandsFor(cwd: string): ReturnType<typeof loadCustomCommands> {
-  return loadCustomCommands([
-    { dir: path.join(app.getPath('userData'), 'commands'), source: 'usuario' },
-    { dir: path.join(cwd, '.claude', 'commands'), source: 'projeto' },
-    { dir: path.join(cwd, '.forja', 'commands'), source: 'projeto' }
-  ])
-}
-
 let mainLoopWatch: ReturnType<typeof setInterval> | null = null
 
 /**
@@ -1164,8 +1164,8 @@ function createWindow(): void {
   })
   startMainLoopWatch()
 
-  mainWindow.on('maximize', () => mainWindow?.webContents.send('forja:window-state', true))
-  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('forja:window-state', false))
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('openclod:window-state', true))
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('openclod:window-state', false))
 
   mainWindow.on('close', (event) => {
     if (closing) return
@@ -1202,6 +1202,12 @@ async function cleanup(): Promise<void> {
   computerOverlay.dispose()
   scheduler?.stop()
   if (keepAwakeId !== null && powerSaveBlocker.isStarted(keepAwakeId)) powerSaveBlocker.stop(keepAwakeId)
+  try {
+    // The local llama-server goes with the app: nothing keeps the GPU busy after Openclod closes.
+    await orchestrator?.llamacpp.dispose()
+  } catch (err) {
+    log('cleanup.llamacpp', err)
+  }
   try {
     await orchestrator?.flushAll()
   } catch (err) {
@@ -1631,6 +1637,51 @@ function registerIpc(): void {
   handle(CH.colabStatus, async (fresh) => need().colab.status({ fresh: fresh === true }))
   handle(CH.colabDisconnect, async () => need().colab.disconnect())
   handle(CH.colabReveal, async () => need().colab.revealNotebook())
+  // llama.cpp embutido: o servidor do próprio llama.cpp, iniciado pelo app (sem Ollama).
+  handle(CH.llamacppStatus, async () => need().llamacpp.status())
+  handle(CH.llamacppSetProfile, async (patch) => need().llamacpp.setProfile(llamaProfilePatch(patch)))
+  handle(CH.llamacppPickModel, async () => {
+    const options: Electron.OpenDialogOptions = {
+      title: 'Escolher um modelo GGUF',
+      properties: ['openFile'],
+      filters: [{ name: 'Modelo GGUF', extensions: ['gguf'] }]
+    }
+    const chosen = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options)
+    if (chosen.canceled || !chosen.filePaths[0]) return null
+    return need().llamacpp.inspect(chosen.filePaths[0])
+  })
+  handle(CH.llamacppModels, async () => need().llamacpp.models())
+  handle(CH.llamacppPickFolder, async () => {
+    const options: Electron.OpenDialogOptions = { title: 'Pasta com modelos GGUF', properties: ['openDirectory'] }
+    const chosen = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options)
+    return chosen.canceled || !chosen.filePaths[0] ? null : chosen.filePaths[0]
+  })
+  handle(CH.llamacppHubList, async () => need().llamacpp.hub.list())
+  handle(CH.llamacppHubRefresh, async () => {
+    await need().llamacpp.hub.refresh()
+    return need().llamacpp.hub.list()
+  })
+  handle(CH.llamacppHubSearch, async (query) => need().llamacpp.hub.search(String(query ?? '').slice(0, 200)))
+  handle(CH.llamacppHubFiles, async (repo) => need().llamacpp.hub.files(String(repo ?? '')))
+  handle(CH.llamacppDownload, async (repo, name) => need().llamacpp.hub.startDownload(String(repo ?? ''), String(name ?? '')))
+  handle(CH.llamacppDownloadStatus, async () => need().llamacpp.hub.downloadStatus())
+  handle(CH.llamacppDownloadCancel, async () => need().llamacpp.hub.cancelDownload())
+  handle(CH.llamacppOptions, async () => need().llamacpp.options())
+  handle(CH.llamacppProfileAction, async (raw) => {
+    const action = (raw ?? {}) as { kind?: unknown; name?: unknown; to?: unknown }
+    const kind = action.kind === 'select' || action.kind === 'create' || action.kind === 'rename' || action.kind === 'delete' ? action.kind : null
+    if (!kind) throw new Error('ação de perfil inválida')
+    return need().llamacpp.profileAction({ kind, name: String(action.name ?? '').slice(0, 80), ...(typeof action.to === 'string' ? { to: action.to.slice(0, 80) } : {}) })
+  })
+  handle(CH.llamacppMachine, async () => need().llamacpp.builds.machine())
+  handle(CH.llamacppBuildInstall, async (kind, tag) => need().llamacpp.builds.start(String(kind ?? '') as BuildKind, String(tag ?? 'newest')))
+  handle(CH.llamacppBuildStatus, async () => need().llamacpp.builds.status())
+  handle(CH.llamacppBuildCancel, async () => need().llamacpp.builds.cancel())
+  handle(CH.llamacppBuildSelect, async (id) => need().llamacpp.selectBuild(String(id ?? '')))
+  handle(CH.llamacppBuildRemove, async (id) => need().llamacpp.removeBuild(String(id ?? '')))
+  handle(CH.llamacppStart, async () => need().llamacpp.start())
+  handle(CH.llamacppStop, async () => need().llamacpp.stop())
+  handle(CH.llamacppLog, async (since) => need().llamacpp.log(Math.max(0, Math.floor(Number(since) || 0))))
   // The card shows the notebook as a file the user drags into Colab's upload area. Electron only starts a native drag while the
   // page's `dragstart` is running, so this is a plain `send` (no reply). The file is the one `prepare` wrote: the page never names a path.
   ipcMain.on(CH.colabDragStart, (event) => {
@@ -1977,18 +2028,13 @@ function registerIpc(): void {
     let message = typeof text === 'string' ? text.slice(0, 200_000) : ''
     const parts = toImages(images)
     if (!message.trim() && !parts?.length) throw new Error('mensagem vazia')
-    // `/nome argumentos` runs a custom command (a markdown template) instead of sending the literal text.
-    if (message.startsWith('/')) {
-      const cwd = need().store.getSession(id)?.meta.cwd
-      const match = cwd ? matchCustomCommand(message, customCommandsFor(cwd)) : null
-      if (match) message = expandCommand(match.command, match.args)
-    }
+    // `/nome argumentos` (a custom command) is expanded by the orchestrator.
     await need().startSend(id, message, parts, mode === 'steer' || mode === 'queue' ? mode : 'auto')
     return true
   })
   handle(CH.commandsList, async (cwd) => {
     const folder = str(cwd, 'cwd', 4096)
-    return customCommandsFor(folder).map((command) => ({
+    return need().commandsFor(folder).map((command) => ({
       name: command.name,
       description: command.description,
       argumentHint: command.argumentHint,
@@ -1999,6 +2045,11 @@ function registerIpc(): void {
     await need().abort(str(sessionId, 'sessionId', 80))
     return true
   })
+  handle(CH.sessionsResumePlan, async (sessionId, itemId) => {
+    await need().resumePlan(str(sessionId, 'sessionId', 80), str(itemId, 'itemId', 120))
+    return true
+  })
+  handle(CH.sessionsDiscardPlan, async (sessionId) => need().discardPlan(str(sessionId, 'sessionId', 80)))
   handle(CH.sessionsSetMode, async (sessionId, mode) => {
     if (!AGENT_MODES.includes(mode as never)) throw new Error('modo inválido')
     await need().setMode(str(sessionId, 'sessionId', 80), mode as never)
@@ -2275,6 +2326,31 @@ function registerIpc(): void {
       await fs.promises.rm(extraction, { recursive: true, force: true }).catch(() => undefined)
     }
   })
+  handle(CH.memoryFiles, async (projectId) => need().memoryFiles(str(projectId, 'projectId', 80)))
+  handle(CH.memoryFileThumb, async (projectId, slug) => need().memoryFileThumb(str(projectId, 'projectId', 80), str(slug, 'slug', 100)))
+  handle(CH.memoryOpenFile, async (projectId, slug) => {
+    const error = await shell.openPath(need().memoryFilePath(str(projectId, 'projectId', 80), str(slug, 'slug', 100)))
+    if (error) throw new Error(error)
+    return true
+  })
+  handle(CH.memoryAddFiles, async (projectId, pick) => {
+    const id = str(projectId, 'projectId', 80)
+    const folder = pick === 'folder'
+    const options: Electron.OpenDialogOptions = folder
+      ? { title: 'Guardar uma pasta na memória (com as subpastas)', properties: ['openDirectory'] }
+      : { title: 'Guardar arquivos na memória', properties: ['openFile', 'multiSelections'] }
+    // OPENCLOD_E2E_MEMORY_PICK (set only by scripts/ui-memory-files.cjs): the paths a native dialog would return, which a
+    // test cannot click through.
+    const preset = process.env.OPENCLOD_E2E_MEMORY_PICK
+    const chosen = preset
+      ? { canceled: false, filePaths: preset.split('|').filter(Boolean) }
+      : mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options)
+    if (chosen.canceled || !chosen.filePaths.length) return null
+    return need().memoryAddFiles(id, chosen.filePaths.slice(0, 500))
+  })
+  handle(CH.memoryAddStatus, async (projectId) => need().memoryAddStatus(str(projectId, 'projectId', 80)))
   handle(CH.memoryOpen, async (projectId) => {
     const root = need().memoryRoot(str(projectId, 'projectId', 80))
     fs.mkdirSync(root, { recursive: true })
@@ -2313,6 +2389,10 @@ function registerIpc(): void {
     )
     return true
   })
+  handle(CH.approvalsSaved, async () => need().savedApprovals())
+  handle(CH.approvalsRevoke, async (projectId, rule, effect) =>
+    need().revokeApproval(str(projectId, 'projectId', 200), str(rule, 'rule', 4_000), effect === 'deny' ? 'deny' : 'allow')
+  )
   handle(CH.questionsAnswer, async (questionId, answers) => {
     const rows = Array.isArray(answers) ? answers : []
     const clean: QuestionAnswer[] = rows.slice(0, 12).map((row) => {
@@ -2492,6 +2572,8 @@ if (!gotLock) {
     try {
       await orchestrator.init()
       for (const change of orchestrator.settings.migrations) log('settings', `migração: ${change}`)
+      // "Iniciar com o Openclod": the saved llama.cpp model loads in the background, the window does not wait for it.
+      void orchestrator.llamacpp.autostart()
       const updateSettings = orchestrator.settings.get().updates
       if (updateSettings?.autoCheck && updateSettings.feedUrl && Notification.isSupported()) {
         void checkForUpdate(app.getVersion(), updateSettings.feedUrl).then((update) => {

@@ -80,7 +80,7 @@ function runCommand(hook: HookCommand, payload: string, cwd: string, signal?: Ab
       cwd,
       shell: true,
       windowsHide: true,
-      env: { ...sanitizedEnv(), FORJA_PROJECT_DIR: cwd, CLAUDE_PROJECT_DIR: cwd }
+      env: { ...sanitizedEnv(), OPENCLOD_PROJECT_DIR: cwd, CLAUDE_PROJECT_DIR: cwd }
     })
     let stdout = ''
     let stderr = ''
@@ -291,7 +291,7 @@ export class HookRunner {
       session_id: this.sessionId,
       cwd: this.cwd,
       hook_event_name: event,
-      ...(toolName ? { tool_name: toolAliases(toolName)[1] ?? toolName, forja_tool_name: toolName } : {}),
+      ...(toolName ? { tool_name: toolAliases(toolName)[1] ?? toolName, openclod_tool_name: toolName } : {}),
       ...payload
     })
 

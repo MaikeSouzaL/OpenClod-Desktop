@@ -51,8 +51,8 @@ async function main() {
   try {
     const { page } = app
     const before = await page.evaluate(async () => {
-      const settings = (await window.forja.app.settings()).value
-      const caps = (await window.forja.app.capabilities()).value
+      const settings = (await window.openclod.app.settings()).value
+      const caps = (await window.openclod.app.capabilities()).value
       const card = settings.providers.find((item) => item.id === 'openrouter')
       return { exists: Boolean(card), ref: (card?.apiKeyRef || '').split(':')[0], models: (card?.models || []).length, configured: caps.providers.find((item) => item.id === 'openrouter')?.configured }
     })
@@ -92,7 +92,7 @@ async function main() {
     report.shotDetect = await shot(page, 'provedor-detectar-modelos')
 
     // The draft must survive an unrelated refresh of settings while the dialog is open (a connector starting, the last model).
-    await page.evaluate(() => window.forja.app.rememberModel('deepseek', 'deepseek-flash'))
+    await page.evaluate(() => window.openclod.app.rememberModel('deepseek', 'deepseek-flash'))
     await page.waitForTimeout(500)
     const stillDetected = await page.evaluate(() => /modelo\(s\) detectado\(s\)/.test(document.querySelector('.provider-card')?.textContent || ''))
     check('o que foi detectado não some se outra coisa das configurações é atualizada com a janela aberta', stillDetected)
@@ -121,7 +121,7 @@ async function main() {
     await menuState(page, 'modelo-01')
     await page.locator('.model-menu', { hasText: 'fake/modelo-01' }).locator('text=fake/modelo-01').first().click()
     await page.waitForTimeout(600)
-    const picked = await page.evaluate(async (id) => ({ ui: document.querySelector('.model-btn .model-short')?.textContent?.trim(), meta: (await window.forja.sessions.get(id)).value.meta }), session.sessionId)
+    const picked = await page.evaluate(async (id) => ({ ui: document.querySelector('.model-btn .model-short')?.textContent?.trim(), meta: (await window.openclod.sessions.get(id)).value.meta }), session.sessionId)
     check('escolher o modelo novo no seletor muda a sessão (e o compositor mostra)', picked.ui === 'fake/modelo-01' && picked.meta.providerId === 'openrouter' && picked.meta.model === 'fake/modelo-01', picked)
 
     // "Nova conversa": the Home composer has the same list.
@@ -143,8 +143,8 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 2500))
     app = await e2e.launch({ port: PORT + 1, ...ws })
     const again = await app.page.evaluate(async () => {
-      const settings = (await window.forja.app.settings()).value
-      const caps = (await window.forja.app.capabilities()).value
+      const settings = (await window.openclod.app.settings()).value
+      const caps = (await window.openclod.app.capabilities()).value
       const card = settings.providers.find((item) => item.id === 'openrouter')
       return { models: (card.models || []).length, configured: caps.providers.find((item) => item.id === 'openrouter')?.configured, ref: card.apiKeyRef }
     })

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-<!-- forja:generated -->
+<!-- openclod:generated -->
 > Este arquivo é lido pelo Openclod, pelo Claude Code e por outros agentes
 > compatíveis. O Openclod o cria automaticamente quando ele não existe e nunca
 > sobrescreve o seu conteúdo. Edite à vontade.
@@ -9,7 +9,7 @@
 
 - Nome: Downloads bagunca
 - Raiz: este diretório
-- O Openclod também lê `AGENTS.md`, `FORJA.md` e `.forja/AGENTS.md` quando existem.
+- O Openclod também lê `AGENTS.md`, `OPENCLOD.md` e `.openclod/AGENTS.md` quando existem.
 
 ## Comandos do projeto
 

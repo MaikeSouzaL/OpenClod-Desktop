@@ -17,12 +17,12 @@ import type { ToolContext } from '../src/core/tools/types'
 import { bundledBinary, resetResourcesCache } from '../src/core/util/resources'
 import { makeTempDir, removeTempDir } from './helpers'
 
-delete process.env.FORJA_RG
+delete process.env.OPENCLOD_RG
 resetResourcesCache()
 const BUNDLED_RG = bundledBinary('rg')
 
 let root: string
-const savedEnv = { rg: process.env.FORJA_RG, res: process.env.FORJA_RESOURCES, path: process.env.PATH }
+const savedEnv = { rg: process.env.OPENCLOD_RG, res: process.env.OPENCLOD_RESOURCES, path: process.env.PATH }
 
 function write(rel: string, content: string | Buffer): void {
   const file = path.join(root, rel)
@@ -69,7 +69,7 @@ function buildTree(): void {
 }
 
 beforeAll(async () => {
-  root = await makeTempDir('forja-rg-')
+  root = await makeTempDir('openclod-rg-')
   buildTree()
 })
 
@@ -83,8 +83,8 @@ afterEach(() => {
 
 function restoreEnv(): void {
   for (const [key, value] of [
-    ['FORJA_RG', savedEnv.rg],
-    ['FORJA_RESOURCES', savedEnv.res],
+    ['OPENCLOD_RG', savedEnv.rg],
+    ['OPENCLOD_RESOURCES', savedEnv.res],
     ['PATH', savedEnv.path]
   ] as const) {
     if (value === undefined) delete process.env[key]
@@ -98,9 +98,9 @@ type Engine = 'rg' | 'node'
 function useEngine(engine: Engine): void {
   if (engine === 'rg') {
     expect(BUNDLED_RG).not.toBeNull()
-    process.env.FORJA_RG = BUNDLED_RG!
+    process.env.OPENCLOD_RG = BUNDLED_RG!
   } else {
-    process.env.FORJA_RG = 'off'
+    process.env.OPENCLOD_RG = 'off'
   }
 }
 
@@ -163,8 +163,8 @@ describe('bundled ripgrep', () => {
   })
 
   it('never resolves ripgrep from PATH: with no bundled copy the tools use the Node fallback', async () => {
-    const fakeBin = path.join(root, '..', `forja-fakepath-${process.pid}`)
-    const emptyResources = path.join(root, '..', `forja-emptyres-${process.pid}`)
+    const fakeBin = path.join(root, '..', `openclod-fakepath-${process.pid}`)
+    const emptyResources = path.join(root, '..', `openclod-emptyres-${process.pid}`)
     fs.mkdirSync(fakeBin, { recursive: true })
     fs.mkdirSync(emptyResources, { recursive: true })
     fs.writeFileSync(path.join(emptyResources, 'MANIFEST.json'), '{"version":1,"entries":[]}')
@@ -172,8 +172,8 @@ describe('bundled ripgrep', () => {
       // A perfectly good rg sits on PATH; it must be ignored.
       fs.copyFileSync(BUNDLED_RG!, path.join(fakeBin, process.platform === 'win32' ? 'rg.exe' : 'rg'))
       process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH}`
-      process.env.FORJA_RESOURCES = emptyResources
-      delete process.env.FORJA_RG
+      process.env.OPENCLOD_RESOURCES = emptyResources
+      delete process.env.OPENCLOD_RG
       resetResourcesCache()
       expect(ripgrepPath()).toBeNull()
       const { ctx } = makeCtx()
@@ -187,14 +187,14 @@ describe('bundled ripgrep', () => {
     }
   })
 
-  it('FORJA_RG overrides the bundled path; a missing path or "off" disables ripgrep', () => {
-    process.env.FORJA_RG = BUNDLED_RG!
+  it('OPENCLOD_RG overrides the bundled path; a missing path or "off" disables ripgrep', () => {
+    process.env.OPENCLOD_RG = BUNDLED_RG!
     expect(ripgrepPath()).toBe(BUNDLED_RG)
-    process.env.FORJA_RG = path.join(root, 'does-not-exist', 'rg.exe')
+    process.env.OPENCLOD_RG = path.join(root, 'does-not-exist', 'rg.exe')
     expect(ripgrepPath()).toBeNull()
-    process.env.FORJA_RG = 'off'
+    process.env.OPENCLOD_RG = 'off'
     expect(ripgrepPath()).toBeNull()
-    delete process.env.FORJA_RG
+    delete process.env.OPENCLOD_RG
     expect(ripgrepPath()).toBe(BUNDLED_RG)
   })
 })
@@ -293,7 +293,7 @@ describe('grep: ripgrep and the Node fallback agree', () => {
     const broken = path.join(root, process.platform === 'win32' ? 'broken-rg.exe' : 'broken-rg')
     fs.writeFileSync(broken, 'this is not an executable')
     fs.chmodSync(broken, 0o755)
-    process.env.FORJA_RG = broken
+    process.env.OPENCLOD_RG = broken
     const { ctx, warnings } = makeCtx()
     const result = await grepTool.execute({ pattern: 'TODO fix' }, ctx)
     expect(result.ok).toBe(true)
@@ -304,7 +304,7 @@ describe('grep: ripgrep and the Node fallback agree', () => {
   })
 
   it('does not follow directory links out of the workspace (junction/symlink)', async () => {
-    const outside = await makeTempDir('forja-outside-')
+    const outside = await makeTempDir('openclod-outside-')
     fs.writeFileSync(path.join(outside, 'secret.txt'), 'TODO outside-secret\n')
     const link = path.join(root, 'linked-outside')
     try {
@@ -362,7 +362,7 @@ describe('glob: ripgrep and the Node fallback agree', () => {
   })
 
   it('falls back to Node when ripgrep is unavailable', async () => {
-    process.env.FORJA_RG = path.join(root, 'nope', 'rg.exe')
+    process.env.OPENCLOD_RG = path.join(root, 'nope', 'rg.exe')
     const { ctx } = makeCtx()
     const result = await globTool.execute({ pattern: '*.md' }, ctx)
     expect(result.data?.engine).toBe('node')

@@ -8,6 +8,7 @@ import {
   findSymbols,
   repositoryOverview
 } from '../code-intelligence/index.js'
+import { repoMap } from '../code-intelligence/repomap.js'
 import { discoverQualityChecks, runQualityChecks } from '../quality/engine.js'
 import { grepTool } from './search.js'
 import { truncateMiddle } from '../util/ids.js'
@@ -19,15 +20,17 @@ function rootOf(args: { path?: string }, ctx: ToolContext): string {
 export const codeIntelligenceTool: ToolDef = {
   name: 'code_intelligence',
   description:
-    'Analisa a estrutura real do repositório: visão geral e linguagens, símbolos, importações/dependências, referências de impacto e diagnósticos TypeScript. Use antes de alterações amplas e para localizar onde um símbolo é usado.',
+    'Analisa a estrutura real do repositório: visão geral e linguagens, símbolos, importações/dependências, referências de impacto, diagnósticos TypeScript e repo_map (as definições de que o resto do código mais depende, ranqueadas por PageRank e cortadas a um orçamento de tokens; focus e query puxam o mapa para os arquivos e nomes da tarefa). Use antes de alterações amplas e para localizar onde um símbolo é usado.',
   risk: 'read',
   parallelSafe: true,
   schema: z.object({
-    action: z.enum(['overview', 'symbols', 'dependencies', 'impact', 'diagnostics']),
+    action: z.enum(['overview', 'symbols', 'dependencies', 'impact', 'diagnostics', 'repo_map']),
     path: z.string().optional().describe('Subdiretório ou raiz relativo ao workspace'),
     file: z.string().optional().describe('Arquivo para dependencies ou impacto'),
     query: z.string().optional().describe('Nome parcial do símbolo'),
-    limit: z.number().int().min(1).max(1000).optional()
+    limit: z.number().int().min(1).max(1000).optional(),
+    focus: z.array(z.string()).max(50).optional().describe('repo_map: arquivos da tarefa (relativos à raiz); os vizinhos deles sobem no mapa'),
+    max_tokens: z.number().int().min(200).max(16_000).optional().describe('repo_map: tamanho do mapa em tokens (padrão 2000)')
   }),
   describe(raw) {
     const args = raw as { action?: string; query?: string; file?: string }
@@ -35,11 +38,13 @@ export const codeIntelligenceTool: ToolDef = {
   },
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as {
-      action: 'overview' | 'symbols' | 'dependencies' | 'impact' | 'diagnostics'
+      action: 'overview' | 'symbols' | 'dependencies' | 'impact' | 'diagnostics' | 'repo_map'
       path?: string
       file?: string
       query?: string
       limit?: number
+      focus?: string[]
+      max_tokens?: number
     }
     const root = rootOf(args, ctx)
     const limit = args.limit ?? 200
@@ -55,6 +60,21 @@ export const codeIntelligenceTool: ToolDef = {
           `Diretórios: ${overview.topDirectories.slice(0, 20).map((item) => `${item.path}=${item.files}`).join(', ')}`
         ].join('\n'),
         summary: `${overview.files} arquivos-fonte`
+      }
+    }
+    if (args.action === 'repo_map') {
+      const map = await repoMap(root, {
+        focus: [...(args.focus ?? []), ...(args.file ? [args.file] : [])],
+        mentions: (args.query ?? '').split(/[\s,]+/).filter(Boolean),
+        maxTokens: args.max_tokens,
+        signal: ctx.signal
+      })
+      return {
+        ok: true,
+        text: map.shown
+          ? `Mapa do repositório (${map.shown} de ${map.definitions} definições em ${map.files} arquivos, ~${map.tokens} tokens; as mais usadas pelo resto do código primeiro):\n${map.text}`
+          : 'nenhuma definição encontrada para o mapa',
+        summary: `mapa: ${map.shown} definições de ${map.files} arquivos`
       }
     }
     if (args.action === 'symbols') {

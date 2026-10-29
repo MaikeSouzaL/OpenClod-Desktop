@@ -25,7 +25,7 @@ function stampOf(target: string): string | null {
   }
 }
 
-function rememberRead(ctx: ToolContext, target: string): void {
+export function rememberRead(ctx: ToolContext, target: string): void {
   ctx.tracker.markRead(target)
   const stamp = stampOf(target)
   if (!stamp) return
@@ -34,13 +34,13 @@ function rememberRead(ctx: ToolContext, target: string): void {
   readStamps.set(ctx.tracker, known)
 }
 
-function changedSinceRead(ctx: ToolContext, target: string): boolean {
+export function changedSinceRead(ctx: ToolContext, target: string): boolean {
   const known = readStamps.get(ctx.tracker)?.get(target)
   return Boolean(known && stampOf(target) !== known)
 }
 
 /** Reads an existing file as UTF-8, refusing files that a text round-trip would corrupt. */
-async function readUtf8Strict(target: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+export async function readUtf8Strict(target: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const buffer = await fs.promises.readFile(target)
   const text = buffer.toString('utf8')
   if (!Buffer.from(text, 'utf8').equals(buffer)) {
@@ -52,7 +52,7 @@ async function readUtf8Strict(target: string): Promise<{ ok: true; text: string 
   return { ok: true, text }
 }
 
-const STALE_MESSAGE = (name: string): string =>
+export const STALE_MESSAGE = (name: string): string =>
   `${name} mudou no disco depois da última leitura (outra edição, formatador ou agente). Leia o arquivo de novo antes de alterá-lo.`
 
 function numberLines(content: string, startLine: number): string {

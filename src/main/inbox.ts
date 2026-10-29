@@ -57,6 +57,29 @@ export class InboxStore {
     fs.rmSync(this.file(sessionId), { force: true })
   }
 
+  /** Sessions with an inbox file. */
+  sessions(): string[] {
+    try {
+      return fs.readdirSync(this.dir).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5))
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * After a restart nothing is running: a steer left behind was already delivered into its turn (it is in the
+   * conversation), and the main process's queued prompts go to the composer's queue (`ui`), which shows them and sends
+   * them when the session is open and idle — instead of turns starting unseen in the background.
+   */
+  recover(sessionId: string): { handedOver: number; dropped: number } {
+    const items = this.list(sessionId)
+    const kept = items.filter((item) => item.mode === 'queue').map((item) => ({ ...item, origin: 'ui' as const }))
+    const handedOver = items.filter((item) => item.mode === 'queue' && item.origin === 'agent').length
+    const dropped = items.length - kept.length
+    if (handedOver || dropped) this.write(sessionId, kept)
+    return { handedOver, dropped }
+  }
+
   private write(sessionId: string, items: InboxItem[]): void {
     fs.mkdirSync(this.dir, { recursive: true })
     const target = this.file(sessionId)

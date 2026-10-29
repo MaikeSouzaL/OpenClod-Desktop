@@ -6,6 +6,7 @@ import type {
   EnvironmentProfile,
   FileChange,
   HarnessEvent,
+  ImagePart,
   PlanItem,
   PolicyConfig,
   QuestionAnswer,
@@ -248,6 +249,8 @@ export interface ToolContext {
     aiMemory?: AiMemoryToolService
     /** The session's visible integrated terminal; absent in isolated harness tests. */
     terminal?: TerminalRunner
+    /** Describes a picture with a model that reads images (the vision relay); null when none answered. */
+    describeImage?(image: ImagePart, question?: string): Promise<{ text: string; via: string } | null>
   }
   /** Project scope used by the long-term memory index. */
   projectId?: string

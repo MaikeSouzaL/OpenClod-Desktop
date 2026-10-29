@@ -1,0 +1,34 @@
+{
+  "startedAt": "2026-10-29T18:02:14.825Z",
+  "model": "qwen3.5:4b",
+  "cardChosen": "Prints\\llamacpp-2026-10-29\\01-modelo-escolhido.png",
+  "loadSeconds": 17.7,
+  "cardReady": "Prints\\llamacpp-2026-10-29\\02-pronto.png",
+  "options": "Prints\\llamacpp-2026-10-29\\03-opcoes.png",
+  "hub": "Prints\\llamacpp-2026-10-29\\04-baixar.png",
+  "builds": "Prints\\llamacpp-2026-10-29\\05-versoes.png",
+  "chatSeconds": 28.6,
+  "chat": "Prints\\llamacpp-2026-10-29\\06-conversa.png",
+  "reloads": [
+    "2026-10-29T18:02:47.031Z"
+  ],
+  "checks": {
+    "o cartão do llama.cpp aparece em Provedores, com a versão embutida": "ok",
+    "acha os modelos deste computador (o qwen3.5:4b do Ollama, com visão)": "ok",
+    "escolher o modelo traz o nome, o apelido e o projetor de visão": "ok",
+    "Iniciar sobe o llama-server e ele fica Pronto": "ok",
+    "o cartão mostra camadas na GPU, a placa e o contexto aberto": "ok",
+    "virou o provedor \"llama.cpp (local)\" em 127.0.0.1, com visão": "ok",
+    "Opções do servidor lista os grupos da ajuda do llama-server": "ok",
+    "salvar uma opção muda a linha de comando do próximo início (sem a chave)": "ok",
+    "Novo perfil copia o atual e fica ativo": "ok",
+    "Baixar mostra a placa e os modelos que cabem nela": "ok",
+    "Ver arquivos traz os arquivos reais do repositório, com o sugerido": "ok",
+    "Versões mostra a versão embutida em uso e as do GitHub para esta placa": "ok",
+    "Parar desliga o servidor": "ok",
+    "uma conversa no llama.cpp com o servidor parado liga o servidor sozinha": "ok",
+    "e o modelo local responde": "ok",
+    "a conversa ficou no llama.cpp (não caiu para outro provedor)": "ok",
+    "sem erros no console da tela": "ok"
+  }
+}

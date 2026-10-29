@@ -32,7 +32,7 @@ interface ReviewComment {
   createdAt: number
 }
 
-const REVIEW_STORAGE = 'forja.diff.review-comments'
+const REVIEW_STORAGE = 'openclod.diff.review-comments'
 
 function readComments(): Record<string, ReviewComment[]> {
   try {
@@ -217,7 +217,7 @@ export function ChangesPane({ sessionId, root, changes, onReveal }: ChangesPaneP
     setLoading(true)
     setError('')
     try {
-      setStatus(await unwrap(window.forja.git.status(root)))
+      setStatus(await unwrap(window.openclod.git.status(root)))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -245,7 +245,7 @@ export function ChangesPane({ sessionId, root, changes, onReveal }: ChangesPaneP
     }
     let cancelled = false
     setDiffError('')
-    void window.forja.git.diff(root, current.path, current.staged).then((result) => {
+    void window.openclod.git.diff(root, current.path, current.staged).then((result) => {
       if (cancelled) return
       if (result.ok) setDiff({ text: result.value.diff, truncated: result.value.truncated })
       else {

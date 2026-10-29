@@ -9,7 +9,7 @@ disso.
 
 | Arquivo | Usado por | Formato recomendado |
 |---|---|---|
-| `build/icon.ico` | Ícone do `Forja.exe` e do instalador NSIS | ICO com 16, 24, 32, 48, 64, 128 e 256 px |
+| `build/icon.ico` | Ícone do `Openclod.exe` e do instalador NSIS | ICO com 16, 24, 32, 48, 64, 128 e 256 px |
 | `build/icon.png` | Ícone da janela em produção (`extraResources` → `resources/icon.png`) | PNG 512×512 (fundo transparente) |
 
 ## Comportamento sem os arquivos

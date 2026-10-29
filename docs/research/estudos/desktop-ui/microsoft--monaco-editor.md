@@ -215,7 +215,7 @@ Se um dia precisarmos de um editor “pesado”, o desenho seria:
    `shutdown`/`exit` e kill de árvore. O renderer só troca mensagens.
 3. **Workers** para o que for intensivo (parse de TS/JSON), com URL explícita e
    CSP `worker-src 'self' blob:`.
-4. **Diagnósticos** com owner estável (`forja-lsp`) e `setModelMarkers`; limpar
+4. **Diagnósticos** com owner estável (`openclod-lsp`) e `setModelMarkers`; limpar
    no `onWillDispose`.
 5. **Diff** com dois modelos e um editor somente-leitura; o “aceitar” aplica um
    `WorkspaceEdit` no modelo original, não no texto renderizado.

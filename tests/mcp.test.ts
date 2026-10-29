@@ -124,7 +124,7 @@ describe('McpClient (JSON-RPC over stdio)', () => {
   let client: McpClient | null = null
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-mcp-')
+    dir = await makeTempDir('openclod-mcp-')
     script = path.join(dir, 'fake-mcp.cjs')
     await fs.promises.writeFile(script, SERVER_SOURCE, 'utf8')
   })
@@ -399,7 +399,7 @@ describe('McpClient server options', () => {
   }
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-mcp-cfg-')
+    dir = await makeTempDir('openclod-mcp-cfg-')
     script = path.join(dir, 'fake-configurable.cjs')
     await fs.promises.writeFile(script, CONFIGURABLE_SERVER, 'utf8')
   })
@@ -509,7 +509,7 @@ describe('REA detection and preset', () => {
   let home: string
 
   beforeEach(async () => {
-    home = await makeTempDir('forja-rea-')
+    home = await makeTempDir('openclod-rea-')
   })
 
   afterEach(async () => {
@@ -677,7 +677,7 @@ describe('REA detection and preset', () => {
   })
 
   it('runs end to end: a client built from the preset filters and gates a REA-like server', async () => {
-    const dirServer = await makeTempDir('forja-rea-srv-')
+    const dirServer = await makeTempDir('openclod-rea-srv-')
     try {
       const script = path.join(dirServer, 'fake-rea.cjs')
       await fs.promises.writeFile(script, CONFIGURABLE_SERVER, 'utf8')

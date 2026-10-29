@@ -38,15 +38,16 @@ const PERMISSION_LABELS: Record<PermissionMode, string> = {
   readonly: 'Somente leitura',
   ask: 'Perguntar',
   'accept-edits': 'Aceitar edições',
-  auto: 'Ignorar permissões',
-  unrestricted: 'Ultrarrestrito'
+  auto: 'Automático',
+  // The mode with NO harness protection: named as in Claude Code, never as a "restricted" mode.
+  unrestricted: 'Ignorar permissões'
 }
 
 const PERMISSION_HINTS: Record<PermissionMode, string> = {
   readonly: 'Só lê e pesquisa; nada é alterado.',
   ask: 'Pede aprovação para editar arquivos e rodar comandos.',
   'accept-edits': 'Edita arquivos sem perguntar; comandos ainda pedem aprovação.',
-  auto: 'Executa sem perguntar. Regras de bloqueio e os segredos continuam valendo.',
+  auto: 'Executa sem perguntar; operações destrutivas e arquivos de segredo ainda pedem confirmação.',
   unrestricted: 'Sem bloqueios do harness; confirmações, blocklist e restrições de diretório desativadas.'
 }
 
@@ -243,7 +244,7 @@ export function Composer({
     () => (slashQuery === null ? [] : BUILTIN_COMMANDS.filter((command) => command.id.includes(slashQuery) || command.label.includes(slashQuery))),
     [slashQuery]
   )
-  // Custom commands (markdown templates in .claude/commands, .forja/commands or the user's commands folder).
+  // Custom commands (markdown templates in .claude/commands, .openclod/commands or the user's commands folder).
   const [customCommands, setCustomCommands] = useState<CustomCommandInfo[]>([])
   const commandsCwd = session?.meta.cwd ?? ''
   useEffect(() => {
@@ -252,7 +253,7 @@ export function Composer({
       return
     }
     let cancelled = false
-    void window.forja.commands.list(commandsCwd).then((result) => {
+    void window.openclod.commands.list(commandsCwd).then((result) => {
       if (!cancelled) setCustomCommands(result.ok ? result.value : [])
     })
     return () => {
@@ -461,7 +462,7 @@ export function Composer({
     /** Absolute path when the file came from the OS; empty for clipboard blobs. */
     const pathOf = (file: File): string => {
       try {
-        return window.forja.paths.fromFile(file)
+        return window.openclod.paths.fromFile(file)
       } catch {
         return ''
       }
@@ -544,7 +545,7 @@ export function Composer({
   }
 
   const pickFolder = async (): Promise<void> => {
-    const result = await window.forja.paths.pickFolder()
+    const result = await window.openclod.paths.pickFolder()
     if (!result.ok) {
       setLocalError(result.error)
       return
@@ -570,7 +571,7 @@ export function Composer({
       if (directory) {
         let path = ''
         try {
-          path = file ? window.forja.paths.fromFile(file) : ''
+          path = file ? window.openclod.paths.fromFile(file) : ''
         } catch {
           /* the preload bridge may reject synthetic File objects */
         }

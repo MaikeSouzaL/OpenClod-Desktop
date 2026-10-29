@@ -27,7 +27,7 @@ const seeing = (baseUrl) => ({
 
 async function snapshot(page, sessionId) {
   return page.evaluate(async (id) => {
-    const state = (await window.forja.sessions.get(id)).value
+    const state = (await window.openclod.sessions.get(id)).value
     const text = (message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text).join('')
     const answers = state.messages.filter((message) => message.role === 'assistant' && text(message).trim())
     const last = answers[answers.length - 1]
@@ -54,10 +54,10 @@ async function main() {
     const { page } = app
     // Providers of the run; the vision model is NOT chosen by hand in the first part (automatic: the first one of the reserve that reads images).
     await page.evaluate(async ({ providers }) => {
-      const settings = (await window.forja.app.settings()).value
+      const settings = (await window.openclod.app.settings()).value
       const keep = settings.providers.filter((item) => !providers.some((next) => next.id === item.id))
       const all = [...keep, ...providers]
-      await window.forja.app.updateSettings({
+      await window.openclod.app.updateSettings({
         providers: all, useAllModels: true, fallbackOrder: ['ollama-visao'],
         fallbackExclude: all.map((item) => item.id).filter((id) => !['ollama-texto', 'ollama-visao'].includes(id)),
         visionModel: { providerId: '', model: '' }
@@ -91,7 +91,7 @@ async function main() {
     const send = async (text, images) => {
       const before = (await snapshot(page, session.sessionId)).count
       const started = Date.now()
-      await page.evaluate(({ id, text, images }) => window.forja.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
+      await page.evaluate(({ id, text, images }) => window.openclod.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
       let timedOut = false
       try {
         await e2e.waitSettled(page, session.sessionId, { timeoutMs: TURN_TIMEOUT_MS, sinceCount: before })
@@ -120,13 +120,13 @@ async function main() {
 
     // No model that reads images is available: the turn must still end, saying so, instead of failing or inventing.
     await page.evaluate(async ({ providers }) => {
-      const settings = (await window.forja.app.settings()).value
+      const settings = (await window.openclod.app.settings()).value
       const keep = settings.providers.filter((item) => !providers.some((next) => next.id === item.id))
-      await window.forja.app.updateSettings({
+      await window.openclod.app.updateSettings({
         providers: [...keep, ...providers], visionModel: { providerId: 'fake-cego', model: 'fake-pro' },
         fallbackExclude: [...keep, ...providers].map((item) => item.id).filter((id) => id !== 'ollama-texto' && id !== 'fake-cego')
       })
-      await window.forja.app.setSecret('fake-cego', 'chave-de-teste-local-sem-valor')
+      await window.openclod.app.setSecret('fake-cego', 'chave-de-teste-local-sem-valor')
     }, {
       providers: [
         textOnly(textProxy.baseUrl),
@@ -136,7 +136,7 @@ async function main() {
     const other = await e2e.newSession(page, { folder: ws.project, title: 'Sem modelo com visão', projectName: 'Visao', providerId: 'ollama-texto', mode: 'ask' })
     const hitsBefore = textProxy.hits.length
     const state = await page.evaluate(async ({ id, image }) => {
-      await window.forja.sessions.send(id, 'Descreva a imagem anexada em uma frase.', [image], 'auto')
+      await window.openclod.sessions.send(id, 'Descreva a imagem anexada em uma frase.', [image], 'auto')
     }, { id: other.sessionId, image })
     void state
     try {

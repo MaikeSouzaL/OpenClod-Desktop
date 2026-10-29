@@ -46,7 +46,7 @@ async function main() {
   )
   fs.writeFileSync(path.join(fixture, 'README.md'), '# UI fixture\n\nLinha original.\n')
   fs.writeFileSync(path.join(fixture, 'src', 'index.ts'), 'export const answer = 42\n')
-  const git = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=Openclod', '-c', 'user.email=forja@example.invalid', ...args], { cwd: fixture, stdio: 'pipe' })
+  const git = (...args) => require('node:child_process').execFileSync('git', ['-c', 'user.name=Openclod', '-c', 'user.email=openclod@example.invalid', ...args], { cwd: fixture, stdio: 'pipe' })
   git('init', '-q')
   git('add', '.')
   git('commit', '-q', '-m', 'fixture')
@@ -54,10 +54,10 @@ async function main() {
   fs.writeFileSync(path.join(fixture, 'src', 'novo.ts'), 'export const novo = true\n')
 
   const created = await page.evaluate(async (folder) => {
-    const settings = await window.forja.app.settings()
-    const project = await window.forja.projects.add(folder, 'UI fixture')
+    const settings = await window.openclod.app.settings()
+    const project = await window.openclod.projects.add(folder, 'UI fixture')
     if (!project.ok) return { error: project.error }
-    const session = await window.forja.sessions.create({
+    const session = await window.openclod.sessions.create({
       projectId: project.value.id,
       cwd: project.value.path,
       mode: 'code',
@@ -90,18 +90,18 @@ async function main() {
   await page.waitForSelector('.xterm-host.active .xterm', { timeout: 15000 })
   await page.waitForTimeout(2500)
   await page.locator('.xterm-host.active .xterm').click()
-  await page.keyboard.type('echo FORJA_TERM_$((6*7))')
+  await page.keyboard.type('echo OPENCLOD_TERM_$((6*7))')
   await page.keyboard.press('Enter')
-  await page.keyboard.type('echo FORJA_TERM_OK')
+  await page.keyboard.type('echo OPENCLOD_TERM_OK')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(2000)
   results.terminal = await page.evaluate(async () => {
-    const list = await window.forja.terminal.list()
+    const list = await window.openclod.terminal.list()
     if (!list.ok || !list.value.length) return { ok: false, reason: 'sem terminais' }
     const info = list.value[list.value.length - 1]
-    const snap = await window.forja.terminal.snapshot(info.id)
+    const snap = await window.openclod.terminal.snapshot(info.id)
     const text = snap.ok ? snap.value : ''
-    return { ok: (text.match(/FORJA_TERM_OK/g) || []).length >= 2, shell: info.shell, pid: info.pid, tail: text.slice(-300) }
+    return { ok: (text.match(/OPENCLOD_TERM_OK/g) || []).length >= 2, shell: info.shell, pid: info.pid, tail: text.slice(-300) }
   })
   await shot('12-terminal')
 
@@ -125,7 +125,7 @@ async function main() {
       const view = document.querySelector('webview.browser-webview.active')
       return view ? { ok: view.getTitle() === 'Fixture dev server', title: view.getTitle(), url: view.getURL() } : { ok: false, error: document.querySelector('.browser-start .inline-error')?.textContent ?? null }
     })
-    results.launchJson = fs.existsSync(path.join(fixture, '.forja', 'launch.json')) ? JSON.parse(fs.readFileSync(path.join(fixture, '.forja', 'launch.json'), 'utf8')) : null
+    results.launchJson = fs.existsSync(path.join(fixture, '.openclod', 'launch.json')) ? JSON.parse(fs.readFileSync(path.join(fixture, '.openclod', 'launch.json'), 'utf8')) : null
     await shot('14-navegador-devserver')
   }
   await page.locator('.browser-tabs [title="Nova aba"]').click()
@@ -217,16 +217,16 @@ async function main() {
   await page.locator('.task-modal .btn.primary', { hasText: 'Salvar' }).click()
   await page.waitForTimeout(1000)
   const task = await page.evaluate(async () => {
-    const list = await window.forja.schedules.list()
+    const list = await window.openclod.schedules.list()
     return list.ok ? list.value.find((item) => item.name === 'Revisão diária do código') ?? null : null
   })
   results.scheduleCreated = task ? { id: task.id, nextRunAt: task.nextRunAt ? new Date(task.nextRunAt).toString() : null, schedule: task.schedule } : null
   if (task) {
     results.scheduleRun = await page.evaluate(async (taskId) => {
-      const started = await window.forja.schedules.runNow(taskId)
+      const started = await window.openclod.schedules.runNow(taskId)
       if (!started.ok) return { error: started.error }
       for (let i = 0; i < 40; i++) {
-        const list = await window.forja.schedules.list()
+        const list = await window.openclod.schedules.list()
         const item = list.value.find((entry) => entry.id === taskId)
         if (item && item.lastStatus !== 'running') return { status: item.lastStatus, error: item.lastError ?? null, sessionId: item.lastSessionId ?? null }
         await new Promise((resolve) => setTimeout(resolve, 500))
@@ -237,8 +237,8 @@ async function main() {
     await shot('24-agendados-lista')
     results.scheduleCleanup = await page.evaluate(
       async ({ taskId, sessionId }) => {
-        const removed = await window.forja.schedules.remove(taskId)
-        const deleted = sessionId ? await window.forja.sessions.delete(sessionId) : { ok: true }
+        const removed = await window.openclod.schedules.remove(taskId)
+        const deleted = sessionId ? await window.openclod.sessions.delete(sessionId) : { ok: true }
         return { removed: removed.ok, sessionDeleted: deleted.ok }
       },
       { taskId: task.id, sessionId: results.scheduleRun?.sessionId }
@@ -264,7 +264,7 @@ async function main() {
   results.effortMenu = await page.locator('.model-menu .menu-item').allTextContents()
   await shot('28-esforco-modelo-sem-suporte')
   await page.keyboard.press('Escape')
-  const originalMode = await page.evaluate(async () => (await window.forja.app.settings()).value.policy.mode)
+  const originalMode = await page.evaluate(async () => (await window.openclod.app.settings()).value.policy.mode)
   try {
     await page.locator('.composer-permission').click()
     await page.waitForTimeout(300)
@@ -272,27 +272,27 @@ async function main() {
     await shot('29-permissoes-compositor')
     await page.locator('.permission-menu .menu-item', { hasText: /^Perguntar/ }).click()
     await page.waitForTimeout(800)
-    results.permissionChanged = await page.evaluate(async () => (await window.forja.app.settings()).value.policy.mode)
+    results.permissionChanged = await page.evaluate(async () => (await window.openclod.app.settings()).value.policy.mode)
   } finally {
     await page.evaluate(async (mode) => {
-      const current = (await window.forja.app.settings()).value
-      await window.forja.app.updateSettings({ policy: { ...current.policy, mode } })
+      const current = (await window.openclod.app.settings()).value
+      await window.openclod.app.updateSettings({ policy: { ...current.policy, mode } })
     }, originalMode)
   }
-  results.permissionRestored = await page.evaluate(async () => (await window.forja.app.settings()).value.policy.mode) === originalMode
+  results.permissionRestored = await page.evaluate(async () => (await window.openclod.app.settings()).value.policy.mode) === originalMode
 
   results.keepAwake = await page.evaluate(async () => {
-    const on = await window.forja.power.keepAwake(true)
-    const state = await window.forja.power.state()
-    const off = await window.forja.power.keepAwake(false)
+    const on = await window.openclod.power.keepAwake(true)
+    const state = await window.openclod.power.state()
+    const off = await window.openclod.power.keepAwake(false)
     return { on: on.value, state: state.value, off: off.value }
   })
 
   // Skills: create one through the UI path (IPC) and remove it afterwards
   const skillName = 'ui-teste-temporaria'
   results.skillCreate = await page.evaluate(async (name) => {
-    const created = await window.forja.app.createSkill(name, 'Skill temporária do roteiro de UI', 'Passo 1: nada.')
-    const list = await window.forja.app.skills()
+    const created = await window.openclod.app.createSkill(name, 'Skill temporária do roteiro de UI', 'Passo 1: nada.')
+    const list = await window.openclod.app.skills()
     return { ok: created.ok, error: created.ok ? null : created.error, listed: list.ok && list.value.some((item) => item.name === name) }
   }, skillName)
   const skillDir = path.join(process.env.APPDATA, 'Openclod', 'skills', skillName)
@@ -301,16 +301,16 @@ async function main() {
 
   // Clean up: terminals of the fixture session (incl. the dev server), the session and the project entry.
   results.cleanup = await page.evaluate(async ({ projectId, sessionId }) => {
-    const list = await window.forja.terminal.list()
+    const list = await window.openclod.terminal.list()
     let killed = 0
     for (const item of list.ok ? list.value : []) {
       if (item.sessionId === sessionId) {
-        await window.forja.terminal.kill(item.id)
+        await window.openclod.terminal.kill(item.id)
         killed++
       }
     }
-    const deleted = await window.forja.sessions.delete(sessionId)
-    const removed = await window.forja.projects.remove(projectId)
+    const deleted = await window.openclod.sessions.delete(sessionId)
+    const removed = await window.openclod.projects.remove(projectId)
     return { killed, deleted: deleted.ok, removed: removed.ok }
   }, created)
 

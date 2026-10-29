@@ -176,7 +176,7 @@ export function CoworkView({
             >
               <option value="ask">Aprovar manualmente</option>
               <option value="auto">Aprovar automaticamente</option>
-              <option value="unrestricted">Ultrarrestrito</option>
+              <option value="unrestricted">Ignorar permissões</option>
             </select>
           </label>
           <button type="button" className="side-mini" title="O Cowork usa as mesmas permissões e a mesma auditoria do Code.">

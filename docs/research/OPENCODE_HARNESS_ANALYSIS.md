@@ -577,7 +577,7 @@ respostas ambíguas e mantém o turno vivo.
    registro de jobs e a notificação.
 5. **Hot reload** de agentes: hoje o registry é recriado por sessão
    (`src/core/agents/registry.ts:65-69`). Adicionar watcher em `%APPDATA%\Openclod\agents`
-   e `.forja/agents` com debounce, como o OpenCode faz.
+   e `.openclod/agents` com debounce, como o OpenCode faz.
 6. **Plan mode**: manter a regra de deny no motor de regras e reinjetar o lembrete após
    compactação, em vez de confiar só no system prompt.
 

@@ -1,0 +1,25 @@
+{
+  "label": "renomeado",
+  "startedAt": "2026-10-29T16:37:13.209Z",
+  "shotStopped": "Prints\\plano-dock-2026-10-29\\renomeado-01-plano-parado.png",
+  "shotResumed": "Prints\\plano-dock-2026-10-29\\renomeado-02-retomado.png",
+  "shotArmed": "Prints\\plano-dock-2026-10-29\\renomeado-03-lixeira-armada.png",
+  "shotAfter": "Prints\\plano-dock-2026-10-29\\renomeado-04-descartado.png",
+  "errors": [],
+  "checks": {
+    "o ▶ aparece só na frente do passo que estava rodando": "ok",
+    "o passo parado aparece como interrompido": "ok",
+    "a lixeira aparece no cabeçalho do plano": "ok",
+    "o ▶ manda \"Continue a partir do passo: Migrar o banco\" na conversa": "ok",
+    "a mensagem de retomada foi gravada na sessão como pedido do usuário": "ok",
+    "o turno recebeu o aviso <retomada> com o passo": "ok",
+    "o primeiro clique só arma: pede \"Descartar de vez?\" e nada some": "ok",
+    "sem o segundo clique, a lixeira desarma sozinha em alguns segundos": "ok",
+    "o segundo clique descarta: o dock do plano some": "ok",
+    "o plano gravado da sessão ficou vazio": "ok",
+    "o histórico ganhou a nota oculta <plano-descartado>": "ok",
+    "a cápsula de continuidade da sessão foi apagada do disco": "ok",
+    "o app avisa que o plano foi descartado e apagado da memória": "ok",
+    "depois de descartar nada recomeça (nenhum pedido novo na sessão)": "ok"
+  }
+}

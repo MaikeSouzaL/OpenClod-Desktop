@@ -324,7 +324,7 @@ describe('Scheduler', () => {
   const readFile = (): { version: number; tasks: ScheduledTask[] } => JSON.parse(fs.readFileSync(file, 'utf8'))
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-scheduler-')
+    dir = await makeTempDir('openclod-scheduler-')
     file = path.join(dir, 'state', 'scheduled-tasks.json')
     clock = d(2025, 1, 6, 8, 0) // Monday 08:00
   })

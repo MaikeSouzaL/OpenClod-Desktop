@@ -278,12 +278,12 @@ export class SessionStore {
   async exportSession(sessionId: string): Promise<string | null> {
     const state = this.sessions.get(sessionId)
     if (!state) return null
-    return JSON.stringify({ format: 'forja.session.v1', exportedAt: Date.now(), state }, null, 2)
+    return JSON.stringify({ format: 'openclod.session.v1', exportedAt: Date.now(), state }, null, 2)
   }
 
   async importSession(json: string): Promise<SessionMeta> {
     const parsed = JSON.parse(json) as { format?: string; state?: SessionState }
-    if (parsed.format !== 'forja.session.v1' || !parsed.state?.meta) {
+    if (parsed.format !== 'openclod.session.v1' || !parsed.state?.meta) {
       throw new Error('arquivo de sessão inválido')
     }
     const state = parsed.state

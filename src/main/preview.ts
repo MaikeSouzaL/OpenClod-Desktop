@@ -8,7 +8,7 @@ import type { TerminalManager } from './terminal.js'
  * Dev-server detection for the browser pane, compatible with the
  * `.claude/launch.json` shape ({version, configurations:[{name,
  * runtimeExecutable, runtimeArgs, port, url}]}). The user's choice is saved
- * to `.forja/launch.json`; `.claude/launch.json` is only read.
+ * to `.openclod/launch.json`; `.claude/launch.json` is only read.
  */
 
 interface LaunchConfiguration {
@@ -30,7 +30,7 @@ const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g
 const START_TIMEOUT_MS = 45_000
 
 export function launchFilePath(root: string): string {
-  return path.join(root, '.forja', 'launch.json')
+  return path.join(root, '.openclod', 'launch.json')
 }
 
 function readJson(file: string): unknown {
@@ -126,7 +126,7 @@ function findConfiguration(root: string, name: string): LaunchConfiguration | un
   return [...configurations(root).configs, ...scriptConfigurations(root)].find((config) => config.name === name)
 }
 
-/** Saves the chosen configuration first in .forja/launch.json (atomic write). */
+/** Saves the chosen configuration first in .openclod/launch.json (atomic write). */
 export function saveLaunchChoice(root: string, config: LaunchConfiguration): void {
   const file = launchFilePath(root)
   const others = readLaunch(file).filter((item) => item.name !== config.name)

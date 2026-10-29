@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { PolicyConfig } from '../src/shared/types'
 
-export async function makeTempDir(prefix = 'forja-test-'): Promise<string> {
+export async function makeTempDir(prefix = 'openclod-test-'): Promise<string> {
   return fs.promises.mkdtemp(path.join(os.tmpdir(), prefix))
 }
 

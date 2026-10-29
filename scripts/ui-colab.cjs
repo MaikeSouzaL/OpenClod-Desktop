@@ -316,7 +316,7 @@ async function main() {
     const summary = (await page.locator('.colab-summary').textContent()) || ''
     check('o cartão passa a mostrar o servidor, o modelo, a GPU, "lê imagens" e o contexto', summary.includes(MODEL) && /lê imagens/.test(summary) && /32\.768 tokens/.test(summary) && /notebook original/.test(summary), summary.replace(/\s+/g, ' ').slice(0, 220))
     check('depois de conectar a caixa do código some (não sobra a chave na tela)', (await page.locator('.colab-code').count()) === 0)
-    const capabilities = await page.evaluate(async () => (await window.forja.app.capabilities()).value.providers.find((item) => item.id === 'colab'))
+    const capabilities = await page.evaluate(async () => (await window.openclod.app.capabilities()).value.providers.find((item) => item.id === 'colab'))
     check('as capacidades do app já contam o Colab como provedor com credencial', capabilities && capabilities.configured === true, capabilities)
     report.shotConnected = await shot(page, '04-conectado')
     await page.locator('.provider-tile:has-text("Google Colab")').click()
@@ -345,8 +345,8 @@ async function main() {
     if (!SKIP_MODEL) {
       /* ---- 5. a real session: image + tool through the Colab ---- */
       const ask = async (text, images = []) => {
-        const before = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages.length, session.sessionId)
-        await page.evaluate(({ id, text, images }) => window.forja.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
+        const before = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages.length, session.sessionId)
+        await page.evaluate(({ id, text, images }) => window.openclod.sessions.send(id, text, images, 'auto'), { id: session.sessionId, text, images })
         const state = await e2e.waitSettled(page, session.sessionId, { timeoutMs: 900000, sinceCount: before })
         return { before, state, report: await e2e.turnReport(page, session.sessionId, before) }
       }
@@ -376,7 +376,7 @@ async function main() {
       check('...e CHAMOU a ferramenta write_file (chamada de ferramenta em stream pelo servidor)', calls.includes('write_file'), { calls, attempts })
       const live = await first.status()
       check('o servidor do Colab recebeu os pedidos, ao menos uma imagem, e contou tokens (e não registrou erro)', live.requests >= 2 && live.images >= 1 && live.prompt_tokens > 0 && live.completion_tokens > 0 && live.errors === 0, { requests: live.requests, images: live.images, prompt: live.prompt_tokens, completion: live.completion_tokens, errors: live.errors })
-      const meta = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.meta, session.sessionId)
+      const meta = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.meta, session.sessionId)
       check('a sessão terminou no Colab (a reserva não precisou entrar)', meta.providerId === 'colab' && meta.model === MODEL, { providerId: meta.providerId })
       report.shotSession = await shot(page, '07-sessao-com-imagem-e-ferramenta')
 
@@ -384,9 +384,9 @@ async function main() {
               the reserve takes over by itself ---- */
       reserve = await startOllamaProxy()
       await page.evaluate(async ({ baseUrl }) => {
-        const settings = (await window.forja.app.settings()).value
+        const settings = (await window.openclod.app.settings()).value
         const providers = settings.providers.map((provider) => (provider.id === 'ollama' ? { ...provider, baseUrl, model: 'qwen3.5:4b', supportsVision: true, supportsTools: true, models: ['qwen3.5:4b'] } : provider))
-        await window.forja.app.updateSettings({ providers, useAllModels: true, fallbackOrder: ['ollama'], fallbackExclude: [] })
+        await window.openclod.app.updateSettings({ providers, useAllModels: true, fallbackOrder: ['ollama'], fallbackExclude: [] })
       }, { baseUrl: reserve.baseUrl })
       if (TUNNEL) {
         first.stop() // the tunnel process is gone: the real Cloudflare edge now answers its HTTP 530 "Error 1033" page
@@ -401,7 +401,7 @@ async function main() {
       const second = await ask('Qual é o nome do arquivo que você criou antes e o que está escrito nele? Responda curto.')
       report.reserveSeconds = Math.round((Date.now() - t1) / 1000)
       const after2 = await page.evaluate(async (id) => {
-        const value = (await window.forja.sessions.get(id)).value
+        const value = (await window.openclod.sessions.get(id)).value
         return {
           meta: value.meta,
           notes: value.messages.filter((message) => message.role === 'system' && message.notice).map((message) => message.parts.map((part) => part.text || '').join(' '))
@@ -426,13 +426,13 @@ async function main() {
       // (c) a NEW conversation asked for on the Colab starts on the reserve, and says so.
       const fresh = await e2e.newSession(page, { folder: ws.project, title: 'Nova com o Colab caído', projectName: 'Colab', providerId: 'colab' })
       const third = await page.evaluate(async ({ id }) => {
-        await window.forja.sessions.send(id, 'Responda apenas: ok.', [], 'auto')
+        await window.openclod.sessions.send(id, 'Responda apenas: ok.', [], 'auto')
         return true
       }, { id: fresh.sessionId })
       void third
       const settledFresh = await e2e.waitSettled(page, fresh.sessionId, { timeoutMs: 900000, sinceCount: 0 })
       const freshState = await page.evaluate(async (id) => {
-        const value = (await window.forja.sessions.get(id)).value
+        const value = (await window.openclod.sessions.get(id)).value
         const last = [...value.messages].reverse().find((message) => message.role === 'assistant' && message.parts.some((part) => part.type === 'text'))
         return { providerId: value.meta.providerId, model: value.meta.model, answer: last ? last.parts.filter((part) => part.type === 'text').map((part) => part.text).join(' ') : '', run: value.state }
       }, fresh.sessionId)
@@ -460,7 +460,7 @@ async function main() {
     await page.waitForSelector('.colab-status.ok', { timeout: 60000 })
     const renewed = readSettings(ws).providers.find((provider) => provider.id === 'colab')
     check('reconectado em um passo: novo endereço no mesmo provedor (um só provedor Colab), chave nova no cofre', renewed.baseUrl === renewedDouble.url && readSettings(ws).providers.filter((provider) => provider.id === 'colab').length === 1 && foundInProfile(ws.profile, renewedDouble.key).length === 0, { baseUrl: renewed.baseUrl })
-    const live2 = await page.evaluate(() => window.forja.app.colabStatus(true))
+    const live2 = await page.evaluate(() => window.openclod.app.colabStatus(true))
     check('o estado do link volta a "conectado" com a chave nova', live2.ok && live2.value.state === 'conectado', live2.value && live2.value.state)
     report.shotReconnected = await shot(page, '10-reconectado')
     await closeSettings(page)
@@ -480,7 +480,7 @@ async function main() {
     await app.page.waitForFunction(() => !document.querySelector('.colab-summary'), null, { timeout: 15000 })
     const gone = readSettings(ws)
     check('desconectado: o provedor sai das configurações e da reserva', !gone.providers.some((provider) => provider.id === 'colab') && !(gone.fallbackOrder || []).includes('colab'))
-    check('desconectado: a chave foi apagada do cofre (o app não encontra mais credencial)', await app.page.evaluate(async () => !(await window.forja.app.capabilities()).value.providers.some((item) => item.id === 'colab' && item.configured)))
+    check('desconectado: a chave foi apagada do cofre (o app não encontra mais credencial)', await app.page.evaluate(async () => !(await window.openclod.app.capabilities()).value.providers.some((item) => item.id === 'colab' && item.configured)))
     await app.page.waitForFunction(() => !document.querySelector('.provider-tile') || ![...document.querySelectorAll('.provider-tile')].some((tile) => /Google Colab/.test(tile.textContent || '')), null, { timeout: 10000 })
     check('desconectado: o ladrilho do Colab some da lista', true)
     report.shotDisconnected = await shot(app.page, '11-desconectado')

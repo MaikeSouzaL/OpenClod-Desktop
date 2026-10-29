@@ -9,7 +9,7 @@ describe('Git file checkpoints', () => {
   let dir: string
   let repo: string
   beforeEach(async () => {
-    dir = await makeTempDir('forja-checkpoint-')
+    dir = await makeTempDir('openclod-checkpoint-')
     repo = path.join(dir, 'repo')
     fs.mkdirSync(repo)
     const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore', windowsHide: true })

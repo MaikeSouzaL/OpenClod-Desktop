@@ -197,13 +197,13 @@ async function main() {
       // Error bar must be centred over the chat column (the composer's column), with and without the side panel.
       // A provider WITHOUT credentials is picked, so the send fails locally and no model is called.
       const noKey = await page.evaluate(async (projectPath) => {
-        const settings = (await window.forja.app.settings()).value
-        const caps = (await window.forja.app.capabilities()).value
+        const settings = (await window.openclod.app.settings()).value
+        const caps = (await window.openclod.app.capabilities()).value
         const target = settings.providers.find((item) => caps.providers.find((cap) => cap.id === item.id)?.configured === false)
         if (!target) return { error: 'todos os provedores têm credencial neste perfil' }
-        const projects = (await window.forja.projects.list()).value
+        const projects = (await window.openclod.projects.list()).value
         const proj = projects.find((item) => item.path === projectPath) || projects[0]
-        const created = await window.forja.sessions.create({ projectId: proj.id, cwd: proj.path, mode: 'code', surface: 'code', providerId: target.id, model: target.model, title: 'Sem credencial' })
+        const created = await window.openclod.sessions.create({ projectId: proj.id, cwd: proj.path, mode: 'code', surface: 'code', providerId: target.id, model: target.model, title: 'Sem credencial' })
         return created.ok ? { provider: target.id } : { error: created.error }
       }, ws.project)
       check('provedor-sem-credencial-disponivel', !noKey.error, noKey)

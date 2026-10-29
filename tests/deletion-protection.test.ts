@@ -112,7 +112,7 @@ describe('deletion protection in the agent loop (automatic mode)', () => {
   let cwd: string
 
   beforeEach(async () => {
-    cwd = await makeTempDir('forja-deletion-')
+    cwd = await makeTempDir('openclod-deletion-')
     fs.writeFileSync(path.join(cwd, 'duplicada.txt'), 'conteúdo')
   })
 

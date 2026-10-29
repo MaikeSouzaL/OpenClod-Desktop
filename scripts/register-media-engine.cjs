@@ -1,4 +1,4 @@
-// Registers resources/media/forja_media.py in resources/MANIFEST.json (name, size, sha256) without running the whole
+// Registers resources/media/openclod_media.py in resources/MANIFEST.json (name, size, sha256) without running the whole
 // embed-stt.mjs again. embed-stt.mjs writes the same entry when it runs, so the two always agree.
 //
 //   node scripts/register-media-engine.cjs
@@ -7,14 +7,14 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.join(__dirname, '..')
-const script = path.join(root, 'resources', 'media', 'forja_media.py')
+const script = path.join(root, 'resources', 'media', 'openclod_media.py')
 const manifestPath = path.join(root, 'resources', 'MANIFEST.json')
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
 const entry = {
-  name: 'forja_media.py',
+  name: 'openclod_media.py',
   kind: 'script',
   version: '1',
-  source: 'resources/media/forja_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)',
+  source: 'resources/media/openclod_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)',
   sha256: crypto.createHash('sha256').update(fs.readFileSync(script)).digest('hex'),
   files: 1,
   size: fs.statSync(script).size,

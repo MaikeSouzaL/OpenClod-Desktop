@@ -43,6 +43,7 @@ import { digestCapsule } from '../memory/state-page.js'
 import { renderSuggestions, suggest, type Candidate } from './suggest.js'
 import { mergePlanTimes } from './plan-times.js'
 import { appendPlanActivity, planActivityEntry } from './plan-activity.js'
+import { discardedPlanNotice, resumePlanAt } from './plan-control.js'
 import { buildAutoLimitation } from './auto-limitation.js'
 import { detectRepetition, MAX_REASONING_ONLY_CHARS, MAX_REASONING_ONLY_MS, type RepetitionHit } from './loop-detection.js'
 import { addUsage, usageCost } from './usage.js'
@@ -148,6 +149,8 @@ function essentialsNamedBy(query: string): Set<string> {
 const MAX_LENGTH_CONTINUATIONS = 2
 /** Stream-level retries per turn (HTTP-level retries happen in postStream). */
 const MAX_STREAM_RETRIES = 2
+/** How much of the turn's diff the self-review shows the model; the rest it reads with git_diff/read_file. */
+const SELF_REVIEW_DIFF_CHARS = 12_000
 /** Times a Stop hook may send the agent back to work in one turn. */
 const MAX_STOP_HOOK_LOOPS = 3
 /** Times the plan guard may send the agent back to finish an open checklist item. */
@@ -262,6 +265,17 @@ export function keepRecentActionViews(messages: Message[], keep = ACTION_VIEWS_K
   return changed ? out : messages
 }
 
+/** `preview` pictures are for the chat only (ToolResult.preview): they never go into a request, whatever the adapter. */
+export function withoutPreviews(messages: Message[]): Message[] {
+  const hasPreview = (message: Message): boolean => message.parts.some((part) => part.type === 'tool_result' && Boolean(part.preview))
+  if (!messages.some(hasPreview)) return messages
+  return messages.map((message) =>
+    hasPreview(message)
+      ? { ...message, parts: message.parts.map((part) => (part.type === 'tool_result' && part.preview ? { ...part, preview: undefined } : part)) }
+      : message
+  )
+}
+
 /**
  * Screen captures accumulate fast. Before a request, keep the newest images up
  * to a 15 MB target (trimming only after a 25 MB trigger) and replace the older
@@ -353,6 +367,8 @@ export interface RunnerDeps {
     aiMemory?: AiMemoryToolService
     /** The session's visible integrated terminal; absent in isolated harness tests. */
     terminal?: TerminalRunner
+    /** Describes a picture with a model that reads images (memory_file); absent in isolated harness tests. */
+    describeImage?(image: import('../../shared/types.js').ImagePart, question?: string): Promise<{ text: string; via: string } | null>
   }
   project: ProjectMeta
   /** Id of the owning project, used as the AI-Memory scope. */
@@ -371,6 +387,11 @@ export interface RunnerDeps {
   createAgent?: (input: CreateAgentInput) => Promise<{ path: string; agent: import('../../shared/types.js').AgentDefinition }>
   /** Team mode: the system prompt tells the model to split work across agents (also on at max effort). */
   autoAgents?: boolean
+  /**
+   * Before a turn that changed files ends, the model sees its own diff once and confirms it or fixes it (on unless
+   * set to false in Configurações → Harness).
+   */
+  selfReview?: boolean
   /** UI surface; Cowork and Chat get their own operating guidance. */
   surface?: SessionSurface
   /** Ordered alternatives to switch to when the active model is exhausted or unavailable. */
@@ -399,7 +420,7 @@ export interface RunnerDeps {
   retryBaseMs?: number
   /**
    * Base directory for spilled tool output (one sub-folder per session).
-   * Defaults to <os tmpdir>/forja-tool-output.
+   * Defaults to <os tmpdir>/openclod-tool-output.
    */
   toolOutputDir?: string
 }
@@ -424,7 +445,15 @@ export interface SendOptions {
   prepare?: (control: { signal: AbortSignal; progress: (note: string) => void }) => Promise<{ text: string; images?: ImagePart[] } | null | undefined>
   /** Name the preparation shows under in the live activity (a running tool with its elapsed time); defaults to `preparar`. */
   prepareLabel?: string
+  /**
+   * A slash command's `allowed-tools`: the only tools this turn may use (plus planning and asking). A restriction, never
+   * an approval: each call still goes through the permission mode and rules.
+   */
+  allowedTools?: string[]
 }
+
+/** What a turn limited by a command's `allowed-tools` keeps anyway: the plan, asking the user and reporting a limit. */
+const TURN_ESSENTIAL_TOOLS = ['update_plan', 'ask_user', 'report_limitation']
 
 /** Ids come from the model; keep only characters that are safe in a file name. */
 function safeFileName(raw: string, fallback: string): string {
@@ -513,6 +542,10 @@ export class SessionRunner {
   private repeatedCalls = 0
   /** A fourth identical tool call ends the turn instead of nudging forever. */
   private toolLoopTripped = false
+  /** Instructions the user sent while a turn ran (steer): the turn compares it with what its last request carried. */
+  private steerCount = 0
+  /** The tools of the current turn when a slash command limited them (`allowed-tools`); null = no limit. */
+  private turnTools: Set<string> | null = null
   private toolCallCount = 0
   private startedAt = 0
   /** Usage of the current user turn; `usage` remains the session total. */
@@ -602,11 +635,42 @@ export class SessionRunner {
   }
 
   /**
+   * ▶ on a step of the dock after the user stopped the turn: that step becomes the interrupted active one, so the next
+   * turn gets the `<retomada>` notice and continues exactly from it. Between turns only. Null when the step cannot be resumed.
+   */
+  resumePlanFrom(itemId: string): PlanItem | null {
+    if (this.busy) throw new Error('aguarde o turno atual terminar para retomar o plano')
+    const next = resumePlanAt(this.plan, itemId)
+    if (!next) return null
+    this.plan = next
+    this.resumeNoticeFor = null
+    this.emit({ type: 'plan', sessionId: this.deps.sessionId, items: this.plan })
+    this.persist()
+    return this.plan.find((item) => item.id === itemId) ?? null
+  }
+
+  /**
+   * 🗑 on the dock: the user gave the plan up. It is cleared, and a hidden note in the history keeps the next turn from
+   * picking the abandoned steps up again from the update_plan calls. Between turns only.
+   */
+  discardPlan(): void {
+    if (this.busy) throw new Error('aguarde o turno atual terminar para descartar o plano')
+    const previous = this.plan
+    this.plan = []
+    this.resumeNoticeFor = null
+    noteTurnPlan(this.turnContext, this.plan)
+    this.emit({ type: 'plan', sessionId: this.deps.sessionId, items: this.plan })
+    if (previous.length) this.messages.push(discardedPlanNotice(previous))
+    this.persist()
+  }
+
+  /**
    * Injects a user instruction into the turn that is already running. The
    * model sees it on the next iteration, without losing the work in progress.
    */
   steer(text: string): boolean {
     if (!this.busy || !text.trim()) return false
+    this.steerCount++
     this.addMessage({
       id: id('msg'),
       role: 'user',
@@ -802,6 +866,7 @@ export class SessionRunner {
   private toolAllowed(name: string): { ok: boolean; reason?: string } {
     const hard = this.deps.allowedTools ? new Set(this.deps.allowedTools) : null
     if (hard && !hard.has(name)) return { ok: false, reason: 'não permitida para este agente' }
+    if (this.turnTools && !this.turnTools.has(name)) return { ok: false, reason: 'fora das ferramentas do comando (allowed-tools)' }
     const tool = this.deps.registry.get(name)
     if (!tool) return { ok: false, reason: 'ferramenta não registrada' }
     if (tool.requires === 'network' && !this.deps.policy.allowNetwork) {
@@ -1179,6 +1244,15 @@ export class SessionRunner {
     this.persist()
   }
 
+  /**
+   * Where a picture stored now goes, written on it so the chat can say whether the model really saw it: the model
+   * reads it, a model with vision describes it first (the relay), or no model sees it. Nothing sent changes.
+   */
+  private imageDelivery(): NonNullable<ImagePart['delivery']> {
+    if (this.provider.supportsVision) return 'model'
+    return this.deps.vision?.candidates().length ? 'relay' : 'none'
+  }
+
   /** The session's workspace, widened to the spill folders once something was spilled so read_file can open them. */
   private toolWorkspace(): WorkspaceGuard {
     if (this.deps.workspace.unrestricted) {
@@ -1192,15 +1266,15 @@ export class SessionRunner {
    * Builds the tool_result part. Output beyond the inline cap is written to a
    * file and replaced by a head/tail preview plus its path; if the file
    * cannot be written the old middle-out truncation applies. read_file output
-   * keeps the larger cap and is only truncated: spilling it would just copy a
-   * file the model can already read in smaller slices.
+   * keeps the larger cap (a slice the model asked for), and past it is saved
+   * like any other output, so the middle of very long lines is not lost unseen.
    */
   private async toolResultPart(call: ToolCall, result: ToolResult): Promise<Message['parts'][number]> {
     const raw = result.text ?? ''
     const cap = call.name === 'read_file' ? MAX_RESULT_CHARS : MAX_TOOL_RESULT_CHARS
     let text = raw
     if (raw.length > cap) {
-      const notice = call.name === 'read_file' ? null : await this.spillOutput(call, raw)
+      const notice = await this.spillOutput(call, raw)
       text = notice ?? truncateMiddle(raw, cap)
     }
     return {
@@ -1210,13 +1284,14 @@ export class SessionRunner {
       ok: result.ok,
       text,
       images: result.images?.map((image) => ({ ...image })),
+      ...(result.preview?.length ? { preview: result.preview.map((image) => ({ ...image })) } : {}),
       detail: result.summary
     }
   }
 
   private async spillOutput(call: ToolCall, text: string): Promise<string | null> {
     try {
-      const base = path.resolve(this.deps.toolOutputDir ?? path.join(os.tmpdir(), 'forja-tool-output'))
+      const base = path.resolve(this.deps.toolOutputDir ?? path.join(os.tmpdir(), 'openclod-tool-output'))
       const dir = path.join(base, safeFileName(this.deps.sessionId, 'session'))
       await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 })
       const file = await writeSpillFile(dir, safeFileName(call.id, 'call'), text)
@@ -1313,6 +1388,8 @@ export class SessionRunner {
     this.toolCallCount = 0
     this.repeatedCalls = 0
     this.toolLoopTripped = false
+    this.turnTools = options.allowedTools?.length ? new Set([...options.allowedTools, ...TURN_ESSENTIAL_TOOLS]) : null
+    this.deps.tracker.beginTurn?.()
     this.startedAt = Date.now()
     this.turnUsage = { input: 0, output: 0 }
     this.lastRequestTokens = 0
@@ -1330,6 +1407,8 @@ export class SessionRunner {
     for (const name of [...this.loadedTools]) {
       if (!this.deps.registry.get(name)?.mcp && !DEFERRED_ESSENTIAL_TOOL_NAMES.has(name)) this.loadedTools.delete(name)
     }
+    // A command that names its tools gets them in this turn's list, even the ones that wait for tool_load.
+    for (const name of options.allowedTools ?? []) if (this.deps.registry.get(name)) this.loadedTools.add(name)
     // A request that names a former essential in the words people use for it ("catálogo de skills", "handoff") gets it in the
     // tool list from the first call. A strong model finds it with tool_search; a small one does not look for a tool it cannot
     // see (a 4B model went 4 for 4 with the tools in the list and 2 for 4 without them), and the model that would have spent
@@ -1346,6 +1425,7 @@ export class SessionRunner {
     const turnStart = this.messages.length
     const blockedBefore = new Set(this.plan.filter((item) => item.status === 'blocked').map((item) => item.id))
 
+    const attachedDelivery = options.images?.length ? this.imageDelivery() : undefined
     const userMessage: Message = {
       id: options.messageId ?? id('msg'),
       role: 'user',
@@ -1354,7 +1434,7 @@ export class SessionRunner {
       parts: [
         { type: 'text', text },
         // Copies: the vision relay writes the description onto the picture, and the caller's object must stay as it was.
-        ...(options.images ?? []).map((image) => ({ ...image }))
+        ...(options.images ?? []).map((image) => ({ ...image, delivery: attachedDelivery }))
       ]
     }
     this.addMessage(userMessage)
@@ -1366,7 +1446,7 @@ export class SessionRunner {
         this.hiddenUserMessage(
           [
             '<retomada>',
-            'A execução anterior foi interrompida pelo fechamento do app no passo:',
+            'A execução anterior foi interrompida (o app fechou ou o usuário parou o turno) no passo:',
             ...interrupted.map((item) => `- ${item.text}`),
             'Reabra esse item como active com update_plan e continue exatamente dele. Não avance para os próximos passos sem concluí-lo.',
             '</retomada>'
@@ -1386,6 +1466,8 @@ export class SessionRunner {
     let streamRetries = 0
     let stopHookLoops = 0
     let planGuardLoops = 0
+    let selfReviewed = false
+    let steersSeen = this.steerCount
     let overflowCompactions = 0
     let fallbacksUsed = 0
     /** Set when reasoning, visible text or an identical tool call starts looping. */
@@ -1411,7 +1493,13 @@ export class SessionRunner {
               this.emit({ type: 'tool_progress', sessionId, toolCallId: prepareId, name: label, text: note })
             }
           })
-          if (prepared?.text) this.hiddenUserMessage(prepared.text, this.provider.supportsVision ? prepared.images : undefined)
+          // The chat shows these pictures (they are what the model looks at); a model without vision gets the text only.
+          if (prepared?.text) {
+            this.hiddenUserMessage(
+              prepared.text,
+              this.provider.supportsVision ? prepared.images?.map((image) => ({ ...image, delivery: 'model' as const })) : undefined
+            )
+          }
         } catch (err) {
           failure = (err as Error).message
           // A cancelled turn is handled by the loop's first check; anything else is reported and the turn goes on.
@@ -1494,7 +1582,7 @@ export class SessionRunner {
         const tools = this.toolSpecs(toolNames)
         // A model that cannot read images never gets one: a model that can describes each picture first (once).
         await this.describePendingImages(signal, text)
-        const requestMessages = inlineImageDescriptions(trimInlineImages(keepRecentActionViews(this.messages)), {
+        const requestMessages = inlineImageDescriptions(trimInlineImages(keepRecentActionViews(withoutPreviews(this.messages))), {
           vision: this.provider.supportsVision
         })
         const contextUsed = Math.max(
@@ -1515,6 +1603,8 @@ export class SessionRunner {
           // Another model is ready to take over: do not sit out a long rate-limit pause here.
           fastFail: this.hasReserve()
         }
+        // What the user sent mid-turn up to here is in this request; anything later must not be left unanswered.
+        steersSeen = this.steerCount
 
         this.setState('streaming')
         let textBuffer = ''
@@ -1817,6 +1907,14 @@ export class SessionRunner {
             this.hiddenUserMessage(CONTINUE_PROMPT)
             continue
           }
+          // The user sent an instruction after the last request went out (while this answer was being written): it is
+          // answered now, in this turn, instead of sitting unread at the end of the history.
+          if (this.steerCount > steersSeen && !signal.aborted) {
+            this.hiddenUserMessage(
+              '<instrucao-pendente>\nO usuário mandou a instrução acima enquanto você escrevia esta resposta. Atenda a ela agora.\n</instrucao-pendente>'
+            )
+            continue
+          }
           // A plan is a promise to the user: never end with open work while
           // the agent can still act. Blocked items are a legitimate stop.
           const openPlan = this.plan.filter((item) => item.status === 'pending' || item.status === 'active')
@@ -1837,6 +1935,15 @@ export class SessionRunner {
           // Out of nudges: stop the animated spinner honestly instead of
           // showing work in progress after the turn is over.
           if (openPlan.length) this.blockActivePlanItems()
+          // "Done" becomes "reviewed": a turn that changed files shows the model its own diff once before it ends.
+          if (!selfReviewed && !signal.aborted) {
+            selfReviewed = true
+            const review = this.selfReviewPrompt()
+            if (review) {
+              this.hiddenUserMessage(review)
+              continue
+            }
+          }
           const stopHook = await this.runHook(
             this.deps.depth ? 'SubagentStop' : 'Stop',
             { stop_hook_active: stopHookLoops > 0, last_assistant_message: textBuffer },
@@ -1863,6 +1970,11 @@ export class SessionRunner {
             text: 'ferramenta não executada'
           }
           const part = await this.toolResultPart(call, result)
+          if (part.type === 'tool_result' && part.images?.length) {
+            // The Anthropic adapter drops the pictures of a failed tool; say so instead of claiming the model saw them.
+            const delivery = !part.ok && this.providerConfig.kind === 'anthropic' && this.provider.supportsVision ? 'none' : this.imageDelivery()
+            for (const image of part.images) image.delivery = delivery
+          }
 
           // Vision-less models still receive a textual description, but the
           // images stay in the stored part so the user can see the screenshot
@@ -2142,6 +2254,14 @@ export class SessionRunner {
       })
       return
     }
+    // The chat holds its own copy of each message: send the described ones again, so their seal names who described them.
+    const writtenOn = new Set(batch.filter((item) => item.image.description).map((item) => item.image))
+    for (const message of this.messages) {
+      const touched = message.parts.some(
+        (part) => (part.type === 'image' && writtenOn.has(part)) || (part.type === 'tool_result' && part.images?.some((image) => writtenOn.has(image)))
+      )
+      if (touched) this.emit({ type: 'message', sessionId: this.deps.sessionId, message })
+    }
     this.persist()
   }
 
@@ -2247,6 +2367,43 @@ export class SessionRunner {
         '</plan-reminder>'
       ].join('\n')
     )
+  }
+
+  /**
+   * The review round before a turn that changed files ends: the diff of what the turn changed (bounded) and what to
+   * check. Null when there is nothing to review: no file changed, a subagent (its caller reviews), read-only or chat,
+   * or the user turned it off.
+   */
+  private selfReviewPrompt(): string | null {
+    if (this.deps.selfReview === false || this.deps.depth) return null
+    if (this.deps.policy.mode === 'readonly' || this.deps.mode === 'ask' || this.deps.surface === 'chat') return null
+    const changes = this.deps.tracker.turnChanges?.() ?? []
+    if (!changes.length) return null
+    const added = changes.reduce((sum, change) => sum + change.additions, 0)
+    const removed = changes.reduce((sum, change) => sum + change.deletions, 0)
+    let diff = ''
+    for (const change of changes) {
+      if (diff.length + change.diff.length > SELF_REVIEW_DIFF_CHARS) {
+        diff += `\n… o diff de ${change.path} e dos seguintes ficou de fora (grande demais): veja com git_diff ou read_file.\n`
+        break
+      }
+      diff += `${change.diff.trimEnd()}\n`
+    }
+    return [
+      '<self-review>',
+      `Antes de encerrar, revise o que você mudou neste turno: ${changes.length} arquivo(s), +${added} -${removed}.`,
+      ...changes.map((change) => `- ${change.path} (${change.status}, +${change.additions} -${change.deletions})`),
+      '',
+      'Confira:',
+      '- Faz o que o usuário pediu, inteiro? Falta algum arquivo ou caso?',
+      '- Há erro, sobra de depuração (console.log, print, TODO), código morto ou mudança fora do pedido?',
+      '- Se dava para verificar (teste, typecheck, build, rodar), você verificou e leu a saída?',
+      'Se achar um problema, corrija agora com as ferramentas. Se estiver certo, responda só com uma confirmação curta, sem repetir o resumo.',
+      '<diff>',
+      diff.trimEnd(),
+      '</diff>',
+      '</self-review>'
+    ].join('\n')
   }
 
   private budgetInfo(iteration: number, kindOverride?: BudgetInfo['kind']): BudgetInfo {

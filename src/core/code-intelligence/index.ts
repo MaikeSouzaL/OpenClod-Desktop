@@ -51,7 +51,7 @@ function slash(value: string): string {
   return value.replace(/\\/g, '/')
 }
 
-function languageOf(file: string): SourceLanguage {
+export function languageOf(file: string): SourceLanguage {
   return SOURCE_EXTENSIONS[path.extname(file).toLowerCase()] ?? 'other'
 }
 
@@ -88,11 +88,11 @@ export async function repositoryOverview(root: string, signal?: AbortSignal): Pr
   }
 }
 
-function exported(line: string): boolean {
+export function exported(line: string): boolean {
   return /^\s*export\s+/.test(line) || /^\s*pub(?:\([^)]*\))?\s+/.test(line) || /^(?:public|protected)\s+/.test(line)
 }
 
-function declarations(line: string): Array<{ name: string; kind: CodeSymbol['kind'] }> {
+export function declarations(line: string): Array<{ name: string; kind: CodeSymbol['kind'] }> {
   const out: Array<{ name: string; kind: CodeSymbol['kind'] }> = []
   const patterns: Array<[RegExp, CodeSymbol['kind']]> = [
     [/(?:^|\s)(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/g, 'class'],

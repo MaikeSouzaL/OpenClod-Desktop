@@ -317,7 +317,7 @@ describe('ImprovementService', () => {
   let analyzeCalls: Array<{ system: string; prompt: string }>
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-improvements-')
+    dir = await makeTempDir('openclod-improvements-')
     file = path.join(dir, 'reviews.json')
     saved = []
     notes = []
@@ -448,7 +448,7 @@ describe('ImprovementService', () => {
 describe('scheduler action', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await makeTempDir('forja-sched-action-')
+    dir = await makeTempDir('openclod-sched-action-')
   })
   afterEach(async () => {
     await removeTempDir(dir)

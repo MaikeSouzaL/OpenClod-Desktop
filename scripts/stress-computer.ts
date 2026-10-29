@@ -11,7 +11,7 @@
  *   STRESS_ITERS=100 npx tsx scripts/stress-computer.ts
  *
  * It MOVES THE REAL MOUSE AND TYPES for a minute or two — do not use the machine while it runs. Needs the
- * open-computer-use backend (resources/bin/open-computer-use.exe or FORJA_OCU). Output: a JSON matrix and a few
+ * open-computer-use backend (resources/bin/open-computer-use.exe or OPENCLOD_OCU). Output: a JSON matrix and a few
  * images in Prints/stress-computer-2026-10-27/, plus a console summary; exit code 1 on any unexpected failure.
  */
 import fs from 'node:fs'

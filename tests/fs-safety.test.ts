@@ -29,7 +29,7 @@ function context(root: string): ToolContext {
 const run = (tool: ToolDef, args: Record<string, unknown>) => tool.execute(args, ctx)
 
 beforeEach(async () => {
-  dir = await makeTempDir('forja-fs-safety-')
+  dir = await makeTempDir('openclod-fs-safety-')
   ctx = context(dir)
 })
 afterEach(async () => {

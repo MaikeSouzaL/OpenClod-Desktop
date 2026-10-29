@@ -41,7 +41,7 @@ const DEFAULT_OPTIONS: EditorOptions = {
   tabSize: 2
 }
 
-const OPTIONS_KEY = 'forja.files.options'
+const OPTIONS_KEY = 'openclod.files.options'
 
 function loadOptions(): EditorOptions {
   try {
@@ -219,7 +219,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
     setLoading(true)
     setError('')
     try {
-      setNodes(await unwrap(window.forja.files.tree(root, 4)))
+      setNodes(await unwrap(window.openclod.files.tree(root, 4)))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -258,7 +258,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
     }
     setSearching(true)
     const timer = setTimeout(() => {
-      void window.forja.files
+      void window.openclod.files
         .search(root, term)
         .then((result) => setHits(result.ok ? result.value : []))
         .finally(() => setSearching(false))
@@ -274,7 +274,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
       return
     }
     try {
-      const result = await unwrap(window.forja.files.read(root, path))
+      const result = await unwrap(window.openclod.files.read(root, path))
       const opened: OpenFile = { path, baseline: result.content, content: result.content, pinned: pin || !options.previewTabs, saving: false }
       setFiles((list) => {
         // A preview tab is replaced by the next file opened with a single click.
@@ -295,7 +295,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
     setFiles((list) => list.map((item) => (item.path === path ? { ...item, saving: true, error: undefined } : item)))
     try {
       // Refuse to silently overwrite changes made on disk (e.g. by the agent) since the file was opened.
-      const disk = await window.forja.files.read(root, path)
+      const disk = await window.openclod.files.read(root, path)
       if (disk.ok && disk.value.content !== file.baseline) {
         const overwrite = window.confirm(`${path} foi alterado no disco depois de aberto. Sobrescrever com a sua versão?`)
         if (!overwrite) {
@@ -303,7 +303,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
           return
         }
       }
-      await unwrap(window.forja.files.write(root, path, file.content))
+      await unwrap(window.openclod.files.write(root, path, file.content))
       setFiles((list) => list.map((item) => (item.path === path ? { ...item, baseline: file.content, saving: false, pinned: true } : item)))
     } catch (err) {
       setFiles((list) => list.map((item) => (item.path === path ? { ...item, saving: false, error: errorMessage(err) } : item)))
@@ -312,7 +312,7 @@ export function FilesPane({ root, active, onReveal }: FilesPaneProps): ReactElem
 
   const reloadFromDisk = async (path: string): Promise<void> => {
     try {
-      const result = await unwrap(window.forja.files.read(root, path))
+      const result = await unwrap(window.openclod.files.read(root, path))
       setFiles((list) => list.map((item) => (item.path === path ? { ...item, baseline: result.content, content: result.content, error: undefined } : item)))
     } catch (err) {
       setError(errorMessage(err))

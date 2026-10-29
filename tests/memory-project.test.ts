@@ -10,7 +10,7 @@ let root: string
 let memory: ProjectMemory
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-memory-'))
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-memory-'))
   memory = new ProjectMemory(root)
 })
 
@@ -57,7 +57,7 @@ describe('project memory: markdown wiki', () => {
   })
 
   it('keeps projects isolated by construction', async () => {
-    const otherRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-memory-other-'))
+    const otherRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-memory-other-'))
     const other = new ProjectMemory(otherRoot)
     await memory.writePage({ title: 'Só do projeto A', body: 'segredo local A' })
     expect(await other.listPages()).toEqual([])

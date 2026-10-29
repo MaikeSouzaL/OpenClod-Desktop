@@ -17,7 +17,7 @@ import { makeTempDir, removeTempDir } from './helpers'
  * WAV made by Windows' own Portuguese voice (skipped where it is not installed).
  */
 const python = resourcePath('runtime', 'python', process.platform === 'win32' ? 'python.exe' : 'python3')
-const script = resourcePath('media', 'forja_media.py')
+const script = resourcePath('media', 'openclod_media.py')
 const available = Boolean(python && script)
 const run = available ? describe : describe.skip
 
@@ -116,17 +116,17 @@ run('frames and contact sheets of a video', () => {
         'import sys, ctypes',
         'from ctypes import wintypes',
         `sys.path.insert(0, ${JSON.stringify(path.dirname(script!))})`,
-        'import forja_media',
+        'import openclod_media',
         'k = ctypes.WinDLL("kernel32", use_last_error=True)',
         'k.GetCurrentProcess.restype = wintypes.HANDLE',
         'k.GetPriorityClass.argtypes = [wintypes.HANDLE]',
         'k.GetPriorityClass.restype = wintypes.DWORD',
-        'forja_media.lower_priority()',
+        'openclod_media.lower_priority()',
         'print(hex(k.GetPriorityClass(k.GetCurrentProcess())))'
       ].join('\n')
     )
     const result = spawnSync(python!, ['-I', '-X', 'utf8', probe], { encoding: 'utf8' })
-    // forja_media sends everything it prints to stderr (stdout is for its protocol), so the answer is there
+    // openclod_media sends everything it prints to stderr (stdout is for its protocol), so the answer is there
     expect(`${result.stdout}${result.stderr}`).toContain('0x4000')
   }, 60_000)
 

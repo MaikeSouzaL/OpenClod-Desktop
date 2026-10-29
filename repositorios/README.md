@@ -52,3 +52,8 @@ git -C repositorios/<repo> fetch --unshallow
 .\scripts\clone-research-repos.ps1 -MaxRepos 55
 .\scripts\audit-research-repos.ps1
 ```
+
+Os assets portáveis (skills, agentes, comandos, prompts e 25 fontes de
+ferramentas) foram copiados para `resources/harvested/`, com licença e
+procedência. Os clones podem ser apagados depois da revisão; o que o runtime usa
+está em `resources/skills/` e `resources/agents/`.

@@ -37,7 +37,7 @@ const PROGRESS_MIN_GAP_MS = 400
 const PROGRESS_MAX_LINES = 40
 
 export interface ExternalAgentOptions {
-  /** CLI path per agent. Takes precedence over FORJA_CLAUDE_BIN / FORJA_CODEX_BIN and PATH. */
+  /** CLI path per agent. Takes precedence over OPENCLOD_CLAUDE_BIN / OPENCLOD_CODEX_BIN and PATH. */
   bin?: Partial<Record<ExternalAgentName, string>>
   /** Extra environment for the child (on top of the sanitized one). */
   env?: Record<string, string>
@@ -409,9 +409,9 @@ interface AgentSpec {
 const SPECS: Record<ExternalAgentName, AgentSpec> = {
   claude: {
     label: 'Claude Code',
-    binEnv: 'FORJA_CLAUDE_BIN',
+    binEnv: 'OPENCLOD_CLAUDE_BIN',
     binNames: ['claude'],
-    installHint: 'Instale com "npm i -g @anthropic-ai/claude-code", entre com "claude" uma vez, ou aponte FORJA_CLAUDE_BIN para o executável.',
+    installHint: 'Instale com "npm i -g @anthropic-ai/claude-code", entre com "claude" uma vez, ou aponte OPENCLOD_CLAUDE_BIN para o executável.',
     args: (mode) =>
       guardArgs([
         '-p',
@@ -427,9 +427,9 @@ const SPECS: Record<ExternalAgentName, AgentSpec> = {
   },
   codex: {
     label: 'Codex',
-    binEnv: 'FORJA_CODEX_BIN',
+    binEnv: 'OPENCLOD_CODEX_BIN',
     binNames: ['codex'],
-    installHint: 'Instale com "npm i -g @openai/codex", entre com "codex login", ou aponte FORJA_CODEX_BIN para o executável.',
+    installHint: 'Instale com "npm i -g @openai/codex", entre com "codex login", ou aponte OPENCLOD_CODEX_BIN para o executável.',
     args: (mode) =>
       guardArgs([
         'exec',
@@ -447,9 +447,9 @@ const SPECS: Record<ExternalAgentName, AgentSpec> = {
   },
   opencode: {
     label: 'OpenCode',
-    binEnv: 'FORJA_OPENCODE_BIN',
+    binEnv: 'OPENCLOD_OPENCODE_BIN',
     binNames: ['opencode'],
-    installHint: 'Instale com "npm i -g opencode-ai@latest" e reabra o Openclod, ou aponte FORJA_OPENCODE_BIN para o executável.',
+    installHint: 'Instale com "npm i -g opencode-ai@latest" e reabra o Openclod, ou aponte OPENCLOD_OPENCODE_BIN para o executável.',
     args: (mode, model) => [
       'run',
       '--format',
@@ -737,7 +737,7 @@ export function createExternalAgentTool(options: ExternalAgentOptions = {}): Too
   return {
     name: 'external_agent',
     description:
-      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code, Codex CLI ou OpenCode). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Openclod; no modo ultrarrestrito recebe o modo sem confirmações do respectivo CLI. Escreva o prompt completo, pois ele não vê esta conversa.',
+      'Delega uma tarefa de programação a um agente de código externo já instalado e autenticado nesta máquina (Claude Code, Codex CLI ou OpenCode). Ele roda sem interação no diretório do projeto e devolve a resposta final (com tokens/custo quando informados). Use para trabalhos grandes e independentes: investigar, implementar, revisar. Consome a conta/cota do usuário no serviço do agente e pede aprovação. O agente externo herda o modo de permissão do Openclod; no modo Ignorar permissões recebe o modo sem confirmações do respectivo CLI. Escreva o prompt completo, pois ele não vê esta conversa.',
     risk: 'exec',
     parallelSafe: false,
     requires: 'network',

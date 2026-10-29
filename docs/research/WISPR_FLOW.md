@@ -93,7 +93,7 @@ Fluxo reconstruído:
 | Botão de microfone com o mesmo fluxo | clicar no mic chama o mesmo motor global | `src/renderer/src/lib/dictation-store.ts`, `Composer.tsx`, `DictationHost.tsx` |
 | Pílula flutuante always-on-top | BrowserWindow transparente, data URL, nível + partial + estado | `src/main/dictation.ts` |
 | Microfone | `getUserMedia` + AudioWorklet (`public/pcm-worklet.js`) | `src/renderer/src/lib/voice.ts` |
-| STT local | faster-whisper + CTranslate2 + Silero VAD no Python embutido | `resources/stt/forja_stt.py`, `src/main/stt.ts` |
+| STT local | faster-whisper + CTranslate2 + Silero VAD no Python embutido | `resources/stt/openclod_stt.py`, `src/main/stt.ts` |
 | Inserção no compositor | evento `dictation:composer`, inserção no caret | `App.tsx`, `Composer.tsx` |
 | Inserção em qualquer app | clipboard + `Ctrl+V` via PowerShell (`SendKeys`) | `src/main/dictation.ts` |
 | Polish opcional | chamada curta ao provedor padrão, sem ferramentas | `Orchestrator.polishText` |

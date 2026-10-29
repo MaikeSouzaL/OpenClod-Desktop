@@ -180,7 +180,7 @@ export function TasksPanel({ sessionId, activity, onClear, onStopTurn }: TasksPa
     const read = async (): Promise<void> => {
       const next: Record<number, string> = {}
       for (const pid of pids) {
-        const result = await window.forja.tasks.output(sessionId, pid)
+        const result = await window.openclod.tasks.output(sessionId, pid)
         if (result.ok) next[pid] = result.value
       }
       if (!cancelled) setOutputs((current) => ({ ...current, ...next }))
@@ -198,7 +198,7 @@ export function TasksPanel({ sessionId, activity, onClear, onStopTurn }: TasksPa
     if (!pids.length) return
     let cancelled = false
     const check = async (): Promise<void> => {
-      const result = await window.forja.tasks.list(sessionId)
+      const result = await window.openclod.tasks.list(sessionId)
       if (cancelled || !result.ok) return
       const next = reconcileProcesses(activity, result.value, Date.now())
       if (next !== activity) onClear(next)
@@ -212,7 +212,7 @@ export function TasksPanel({ sessionId, activity, onClear, onStopTurn }: TasksPa
   }, [activity, onClear, pids, sessionId])
 
   const stop = (entry: ActivityEntry): void => {
-    if (entry.pid) void window.forja.tasks.stop(sessionId, entry.pid)
+    if (entry.pid) void window.openclod.tasks.stop(sessionId, entry.pid)
     else onStopTurn()
   }
 

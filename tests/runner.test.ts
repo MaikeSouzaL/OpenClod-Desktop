@@ -42,7 +42,7 @@ const writeTool: ToolDef = {
 let cwd: string
 
 beforeEach(async () => {
-  cwd = await makeTempDir('forja-runner-')
+  cwd = await makeTempDir('openclod-runner-')
 })
 
 afterEach(async () => {
@@ -399,7 +399,7 @@ describe('turn budget', () => {
 
 describe('tool output spill', () => {
   it('spills a 20k non-read_file result and keeps a short preview', async () => {
-    const outDir = await makeTempDir('forja-spill-')
+    const outDir = await makeTempDir('openclod-spill-')
     try {
       const bigTool: ToolDef = {
         name: 'run_command',
@@ -437,33 +437,44 @@ describe('tool output spill', () => {
     }
   })
 
-  it('truncates a huge read_file instead of spilling it', async () => {
-    const bigRead: ToolDef = {
-      name: 'read_file',
-      description: 'fake huge read',
-      schema: z.object({ path: z.string() }),
-      risk: 'read',
-      parallelSafe: true,
-      describe: () => ({ title: 'Ler', detail: 'big' }),
-      async execute() {
-        return { ok: true, text: `${'a'.repeat(70_000)}FIM`, summary: 'lido' }
+  it('keeps a read_file up to 60k inline and saves a bigger one like any other output', async () => {
+    const outDir = await makeTempDir('openclod-spill-read-')
+    try {
+      const sizes = [40_000, 70_000]
+      const bigRead: ToolDef = {
+        name: 'read_file',
+        description: 'fake huge read',
+        schema: z.object({ path: z.string() }),
+        risk: 'read',
+        parallelSafe: true,
+        describe: () => ({ title: 'Ler', detail: 'big' }),
+        async execute() {
+          return { ok: true, text: `${'a'.repeat(sizes.shift() ?? 0)}FIM`, summary: 'lido' }
+        }
       }
+      const provider = new ScriptedProvider([
+        { toolCalls: [{ id: 'c_read1', name: 'read_file', args: { path: 'medium.txt' } }] },
+        { toolCalls: [{ id: 'c_read2', name: 'read_file', args: { path: 'big.txt' } }] },
+        { text: 'ok' }
+      ])
+      const { runner } = makeRunner(provider, { registry: buildRegistry(bigRead), toolOutputDir: outDir })
+
+      await runner.send('leia os arquivos grandes')
+
+      const results = runner.messages
+        .flatMap((message) => message.parts)
+        .flatMap((part) => (part.type === 'tool_result' ? [part.text] : []))
+      // Above the 16k of other tools, under its own 60k cap: the slice the model asked for, whole.
+      expect(results[0]).toHaveLength(40_003)
+      // Past 60k nothing is cut unseen: a head, a tail and the file with all of it.
+      expect(results[1].length).toBeLessThan(16_000)
+      expect(results[1]).toContain('salva em arquivo')
+      expect(results[1]).toContain('FIM')
+      const [saved] = fs.readdirSync(path.join(outDir, 'ses_test'))
+      expect(fs.readFileSync(path.join(outDir, 'ses_test', saved), 'utf8')).toHaveLength(70_003)
+    } finally {
+      await removeTempDir(outDir)
     }
-    const provider = new ScriptedProvider([
-      { toolCalls: [{ id: 'c_read', name: 'read_file', args: { path: 'big.txt' } }] },
-      { text: 'ok' }
-    ])
-    const { runner } = makeRunner(provider, { registry: buildRegistry(bigRead) })
-
-    await runner.send('leia o arquivo grande')
-
-    const toolMessage = runner.messages.find((message) => message.role === 'tool')!
-    const text = toolMessage.parts
-      .filter((part) => part.type === 'tool_result')
-      .map((part) => (part.type === 'tool_result' ? part.text : ''))
-      .join('')
-    expect(text.length).toBeLessThanOrEqual(60_000)
-    expect(text).not.toContain('salva em arquivo')
   })
 })
 

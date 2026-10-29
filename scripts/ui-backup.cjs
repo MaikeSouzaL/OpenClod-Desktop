@@ -45,11 +45,11 @@ async function main() {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('.app-shell', { timeout: 30_000 })
   const api = await page.evaluate(() => ({
-    export: typeof window.forja.app.backupExport,
-    inspect: typeof window.forja.app.backupInspect,
-    restore: typeof window.forja.app.backupRestore,
-    exportConfiguration: typeof window.forja.app.exportConfiguration,
-    importConfiguration: typeof window.forja.app.importConfiguration
+    export: typeof window.openclod.app.backupExport,
+    inspect: typeof window.openclod.app.backupInspect,
+    restore: typeof window.openclod.app.backupRestore,
+    exportConfiguration: typeof window.openclod.app.exportConfiguration,
+    importConfiguration: typeof window.openclod.app.importConfiguration
   }))
   if (Object.values(api).some((kind) => kind !== 'function')) throw new Error(`backup bridge incomplete: ${JSON.stringify(api)}`)
 

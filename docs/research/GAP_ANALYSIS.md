@@ -14,7 +14,7 @@ verificado está marcado como tal.
 
 - **A base compila e os testes passam.** `npm run build` (typecheck + bundle)
   sem erros; `vitest`: 6 arquivos, **64 testes, todos verdes**. A UI abre e
-  navega (capturas em `evidence/forja-ui-2026-10-23/`).
+  navega (capturas em `evidence/openclod-ui-2026-10-23/`).
 - **Nenhum teste de aceitação (A–J) foi executado com modelo real.** Não há
   credencial de provedor nesta máquina: nenhuma variável `*_API_KEY`, nenhum
   segredo salvo no Openclod, Ollama e LM Studio sem servidor ativo. O provedor
@@ -43,7 +43,7 @@ verificado está marcado como tal.
 | Typecheck + build | `npm run build` | ok: `out/main` 212 kB, `out/preload` 4 kB, renderer 990 kB JS + 88 kB CSS |
 | Testes | `npx vitest run` | 6 arquivos, 64 testes, 0 falhas (4,4 s) |
 | Grafo da aplicação | REA `analyze_javascript_application` em `out/` | 1 `BrowserWindow`, 1 preload, 1 API no `contextBridge` com 8 membros, 11 operações IPC (canais dinâmicos via constantes), 5 handlers no main, 1 validação de remetente |
-| Superfície IPC declarada | leitura de `src/shared/api.ts` | 38 canais `invoke` + 1 canal de eventos (`forja:event`) |
+| Superfície IPC declarada | leitura de `src/shared/api.ts` | 38 canais `invoke` + 1 canal de eventos (`openclod:event`) |
 | UI | Electron com `--remote-debugging-port` + Playwright | Início, Cowork, Code, sessão com painel lateral e Configurações renderizam; 0 erros de console |
 | Provedores disponíveis | variáveis de ambiente, `%APPDATA%\Openclod\config`, portas 11434/1234 | nenhuma chave; `secrets.bin` ausente; Ollama e LM Studio sem servidor |
 | Computer Use | `open-computer-use call click` em processo novo | `isError: true`, "No app state is available… Run get_app_state" |
@@ -63,7 +63,7 @@ Código próprio: cerca de 18,5 mil linhas em `src/` (a maior parte em
 | Ferramentas | `src/core/tools/*` | arquivos, busca, shell, git, web, navegador (10), Computer Use (12), plano, skills, memória, subagente |
 | Permissões | `src/core/security/{policy,permissions}.ts` | 4 modos; blocklist de comandos; `WorkspaceGuard`; aprovação "sempre nesta sessão" em memória |
 | Contexto | `src/core/agent/{context,compaction}.ts` | lê `AGENTS.md`/`CLAUDE.md`; compactação por LLM a 75% com fallback |
-| Sessões | `src/core/session/store.ts` | JSON atômico + `events.jsonl`; export/import `forja.session.v1` |
+| Sessões | `src/core/session/store.ts` | JSON atômico + `events.jsonl`; export/import `openclod.session.v1` |
 | MCP | `src/core/mcp/client.ts` | stdio; só `tools/list` e `tools/call` |
 | Navegador | `src/core/browser/layer.ts` | Playwright com Chrome/Edge do sistema; árvore ARIA; console/rede |
 | Computer Use | `src/core/computer/layer.ts` | backend `open-computer-use` + captura GDI via PowerShell (defeitos em §5) |
@@ -122,7 +122,7 @@ nesta máquina.
 
 A investigar (não confirmado): a sessão "oi" mostra **OpenRouter
 deepseek-chat** no cabeçalho e no rodapé, mas a resposta veio do provedor
-**Scripted** (`evidence/forja-ui-2026-10-23/08-session-pane.png`). Pode ser
+**Scripted** (`evidence/openclod-ui-2026-10-23/08-session-pane.png`). Pode ser
 troca de modelo depois da mensagem ou um descompasso entre o modelo exibido e
 o usado.
 
@@ -293,7 +293,7 @@ o app abriu com 0 erros de console e aplicou a migração de configurações.
 | 4 | Coordenadas erradas | origem e escala da última captura guardadas; `clickAt`/`drag` convertem; clique por coordenada da janela via `window` | `screenshotToScreen` com monitor à esquerda e escala 1600/3840 |
 | 5 | `edit_file` com `$` | `applyEdit` sem `String.replace`; CRLF preservado; aspas tipográficas toleradas | 5 testes, incluindo gravação em disco de `$$` |
 | 6 | Memória fora do prompt | fatos carregados a cada turno e após `memory_write` | prompt contém o fato salvo |
-| 7 | Permissões sem argumentos | motor de regras na sintaxe do Claude Code (`Bash(npm test:*)`, `Edit(src/**)`, `Read(.env)`, `WebFetch(domain:…)`, `mcp__srv`), deny > ask > allow; "permitir sempre" grava regra por projeto; `.forja/settings.json` (e `.claude/` opcional) | 11 testes |
+| 7 | Permissões sem argumentos | motor de regras na sintaxe do Claude Code (`Bash(npm test:*)`, `Edit(src/**)`, `Read(.env)`, `WebFetch(domain:…)`, `mcp__srv`), deny > ask > allow; "permitir sempre" grava regra por projeto; `.openclod/settings.json` (e `.claude/` opcional) | 11 testes |
 | 8 | Padrão "perguntar" | padrão `auto`; migração única de instalações no antigo padrão (backup em `settings.json.bak-2026-10-23`); arquivos de segredo pedem confirmação | teste de migração; `settings.json` real migrado para `auto`, versão 2 |
 | 9 | Parâmetros fixos por modelo | `temperature` só quando configurada e nunca para o-series/gpt-5; `max_completion_tokens` na OpenAI; raciocínio guardado e reenviado dentro do loop de ferramentas para modelos "thinking" | testes de corpo da requisição |
 | 10 | Código morto / rótulo | `RightPane.tsx` removido; aba "Terminal" → "Atividade" | typecheck |

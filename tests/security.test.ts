@@ -217,7 +217,7 @@ describe('prompt-injection scanner', () => {
     )
     expect(findings.length).toBeGreaterThanOrEqual(3)
     expect(findings.length).toBeLessThanOrEqual(5)
-    expect(findings.map((f) => f.label)).toContain('tags de papel forjadas')
+    expect(findings.map((f) => f.label)).toContain('tags de papel falsificadas')
   })
 })
 
@@ -232,16 +232,16 @@ describe('secret helpers', () => {
   })
 
   it('drops credential-like environment variables but keeps PATH', () => {
-    process.env.FORJA_TEST_API_KEY = 'segredo'
-    process.env.FORJA_TEST_TOKEN = 'segredo'
+    process.env.OPENCLOD_TEST_API_KEY = 'segredo'
+    process.env.OPENCLOD_TEST_TOKEN = 'segredo'
     try {
       const env = sanitizedEnv()
-      expect(env.FORJA_TEST_API_KEY).toBeUndefined()
-      expect(env.FORJA_TEST_TOKEN).toBeUndefined()
+      expect(env.OPENCLOD_TEST_API_KEY).toBeUndefined()
+      expect(env.OPENCLOD_TEST_TOKEN).toBeUndefined()
       expect(env.PATH ?? env.Path).toBeTruthy()
     } finally {
-      delete process.env.FORJA_TEST_API_KEY
-      delete process.env.FORJA_TEST_TOKEN
+      delete process.env.OPENCLOD_TEST_API_KEY
+      delete process.env.OPENCLOD_TEST_TOKEN
     }
   })
 })

@@ -1,20 +1,46 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseFrontmatter } from '../skills/library.js'
+import { toolsForAlias } from '../security/rules.js'
 
 /**
- * Custom slash commands, as in Claude Code: every `*.md` under `.claude/commands/` (or `.forja/commands/`)
+ * Custom slash commands, as in Claude Code: every `*.md` under `.claude/commands/` (or `.openclod/commands/`)
  * of the project, or under the user's commands folder, is a prompt template. `/review src/a.ts` expands the
  * template of review.md, where `$ARGUMENTS` is everything after the name and `$1`..`$9` are the words.
- * A subfolder becomes a namespace: `frontend/lint.md` is `/frontend:lint`. Project files win over user files.
+ * A subfolder becomes a namespace: `frontend/lint.md` is `/frontend:lint`. Project files win over user files, and
+ * user files over the ones that ship with the app.
+ *
+ * Frontmatter: `description`, `argument-hint`, `allowed-tools` (the tools the command's turn may use: a restriction,
+ * never an approval) and `model` (shown as a suggestion; the session keeps its model). `@caminho` in the text brings
+ * that project file into the message.
  */
 export interface CustomCommand {
   name: string
   description: string
   argumentHint?: string
+  /** Openclod tool names the command's turn is limited to (from `allowed-tools`, Claude names mapped). */
+  allowedTools?: string[]
+  /** `model` of the frontmatter: a suggestion shown in the menu. */
+  model?: string
   body: string
-  source: 'projeto' | 'usuario'
+  source: 'projeto' | 'usuario' | 'app'
   file: string
+}
+
+/**
+ * `allowed-tools: Bash(git status:*), Read, Grep` → the Openclod tools those names cover. The pattern in parentheses is
+ * not a permission: approvals stay with the permission mode and rules.
+ */
+export function parseAllowedTools(value: string | undefined): string[] | undefined {
+  if (!value?.trim()) return undefined
+  const names = new Set<string>()
+  // Commas and new lines separate entries; a comma inside parentheses belongs to the pattern.
+  for (const entry of value.split(/,(?![^(]*\))|\n/)) {
+    const name = entry.trim().replace(/^-\s*/, '').replace(/\(.*\)$/s, '').trim()
+    if (!name) continue
+    for (const tool of toolsForAlias(name)) names.add(tool)
+  }
+  return names.size ? [...names].sort() : undefined
 }
 
 const MAX_COMMANDS = 200
@@ -32,7 +58,8 @@ function walk(dir: string, depth: number, out: string[]): void {
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory() && !entry.name.startsWith('.')) walk(full, depth + 1, out)
-    else if (entry.isFile() && /\.md$/i.test(entry.name)) out.push(full)
+    // A README explains the folder; it is not a command.
+    else if (entry.isFile() && /\.md$/i.test(entry.name) && !/^readme\.md$/i.test(entry.name)) out.push(full)
   }
 }
 
@@ -59,6 +86,8 @@ export function loadCustomCommands(roots: Array<{ dir: string; source: CustomCom
           name,
           description: (meta.description || firstLine).slice(0, 200),
           argumentHint: meta['argument-hint'] || undefined,
+          allowedTools: parseAllowedTools(meta['allowed-tools']),
+          model: meta.model?.trim() || undefined,
           body,
           source: root.source,
           file
@@ -77,12 +106,13 @@ function words(args: string): string[] {
   return out
 }
 
-export function expandCommand(command: CustomCommand, args: string): string {
+export function expandCommand(command: CustomCommand, args: string, options: { cwd?: string } = {}): string {
   const trimmed = args.trim()
   const positional = words(trimmed)
   let used = false
   let text = command.body
-    .replace(/\$ARGUMENTS\b/g, () => {
+    // `{{args}}` is how Cline writes it.
+    .replace(/\$ARGUMENTS\b|\{\{\s*args\s*\}\}/g, () => {
       used = true
       return trimmed
     })
@@ -91,13 +121,61 @@ export function expandCommand(command: CustomCommand, args: string): string {
       return positional[Number(digit) - 1] ?? ''
     })
   if (!used && trimmed) text = `${text.trimEnd()}\n\nArgumentos: ${trimmed}`
-  return text.trim()
+  text = text.trim()
+  return options.cwd ? withIncludedFiles(text, options.cwd) : text
+}
+
+const MAX_INCLUDES = 5
+const MAX_INCLUDE_BYTES = 64 * 1024
+
+/**
+ * `@caminho/arquivo` (at the start of the text or after a space) brings that file of the project into the message, as
+ * Claude Code does. Only files inside `cwd`: a path that leaves the project, a folder, a binary or a missing file is
+ * left as written (it may be an @mention).
+ */
+export function withIncludedFiles(text: string, cwd: string): string {
+  const root = path.resolve(cwd)
+  const blocks: string[] = []
+  const seen = new Set<string>()
+  for (const match of text.matchAll(/(?:^|[\s(])@([^\s@`'"<>|]+)/g)) {
+    if (blocks.length >= MAX_INCLUDES) break
+    const relative = match[1].replace(/[.,;:!?)\]]+$/, '')
+    if (!relative || seen.has(relative)) continue
+    seen.add(relative)
+    const target = path.resolve(root, relative)
+    const inside = path.relative(root, target)
+    if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) continue
+    try {
+      // The real path too: a link inside the project must not reach out of it.
+      const real = fs.realpathSync(target)
+      const realInside = path.relative(fs.realpathSync(root), real)
+      if (realInside.startsWith('..') || path.isAbsolute(realInside)) continue
+      const stat = fs.statSync(real)
+      if (!stat.isFile()) continue
+      const buffer = fs.readFileSync(real).subarray(0, MAX_INCLUDE_BYTES)
+      if (buffer.includes(0)) continue
+      const cut = stat.size > MAX_INCLUDE_BYTES ? `\n… (cortado em ${MAX_INCLUDE_BYTES / 1024} KB de ${Math.round(stat.size / 1024)} KB)` : ''
+      blocks.push(`<arquivo path="${inside.replace(/\\/g, '/')}">\n${buffer.toString('utf8')}${cut}\n</arquivo>`)
+    } catch {
+      /* missing or unreadable: left as written */
+    }
+  }
+  return blocks.length ? `${text}\n\n${blocks.join('\n\n')}` : text
 }
 
 /** `/name rest of the line` → the command and its arguments, or null when the text is not a custom command. */
 export function matchCustomCommand(text: string, commands: CustomCommand[]): { command: CustomCommand; args: string } | null {
-  const match = /^\/([A-Za-z0-9:_-]+)(?:\s+([\s\S]*))?$/.exec(text.trim())
+  const match = slashWord(text)
   if (!match) return null
-  const command = commands.find((candidate) => candidate.name === match[1].toLowerCase())
-  return command ? { command, args: match[2] ?? '' } : null
+  const command = commands.find((candidate) => candidate.name === match.name)
+  return command ? { command, args: match.args } : null
+}
+
+/**
+ * The command a text names, when it has the shape of one: `/word` alone or followed by a space. `/usr/bin/x` or
+ * `/c:\pasta` are paths, not commands.
+ */
+export function slashWord(text: string): { name: string; args: string } | null {
+  const match = /^\/([A-Za-z0-9:_-]+)(?:\s+([\s\S]*))?$/.exec(text.trim())
+  return match ? { name: match[1].toLowerCase(), args: match[2] ?? '' } : null
 }

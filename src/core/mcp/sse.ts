@@ -16,6 +16,13 @@ export class SseParser {
   private event = ''
   private data: string[] = []
   private id: string | undefined
+  /**
+   * The last `id:` the stream sent. Unlike the event fields it persists from event to event (as in the SSE spec): it is
+   * what a client sends back as `Last-Event-ID` to resume a stream that dropped.
+   */
+  lastEventId: string | undefined
+  /** The last `retry:` (ms) the server asked a reconnecting client to wait. */
+  retryMs: number | undefined
 
   /** Feeds a decoded chunk and returns the events completed by it. */
   push(chunk: string): SseEvent[] {
@@ -67,7 +74,13 @@ export class SseParser {
     if (value.startsWith(' ')) value = value.slice(1)
     if (field === 'event') this.event = value
     else if (field === 'data') this.data.push(value)
-    else if (field === 'id') this.id = value
+    else if (field === 'id') {
+      // An id with a NUL is ignored, as the spec says.
+      if (!value.includes('\0')) {
+        this.id = value
+        this.lastEventId = value
+      }
+    } else if (field === 'retry' && /^\d+$/.test(value)) this.retryMs = Number(value)
     return null
   }
 

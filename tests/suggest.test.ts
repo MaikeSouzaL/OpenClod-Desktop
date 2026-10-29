@@ -60,6 +60,16 @@ describe('suggest', () => {
     expect(jira).not.toContain('mcp__jira__create_issue')
   })
 
+  it('knows "memória" and "arquivo" are memory and file: a request to keep pictures in the memory brings memory_file', () => {
+    const tools: Candidate[] = [
+      ...catalogue,
+      { kind: 'ferramenta', name: 'memory_file', description: 'Guarda arquivos na memória do projeto: imagens com descrição e OCR, PDFs, documentos, pastas.' }
+    ]
+    expect(suggest('pegue todas as memórias, conversas e imagens e coloque na ai memory', tools).map((item) => item.name)).toContain('memory_file')
+    expect(suggest('salve esse arquivo na memória do projeto', tools).map((item) => item.name)).toContain('memory_file')
+    expect(suggest('corrija o bug do login', tools)).toEqual([])
+  })
+
   it('needs more than a stray word: one description hit among many words is not a suggestion', () => {
     const stems = significantStems('quero um relatório mensal de vendas com gráfico e tabela de provas')
     expect(scoreCandidate(stems, catalogue[2])).toBe(0)

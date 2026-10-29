@@ -136,7 +136,7 @@ async function main() {
     }
     throw new Error(`item de menu não encontrado: ${labels.join('/')}`)
   }
-  const status = (id) => page.evaluate(async (projectId) => (await window.forja.improvements.status(projectId)).value, id)
+  const status = (id) => page.evaluate(async (projectId) => (await window.openclod.improvements.status(projectId)).value, id)
   const reviewPages = () => findFiles(ws.profile, /^revisao-melhorias-\d{4}-\d{2}-\d{2}\.md$/)
   try {
     // ---- evidence: one real turn with real tools -------------------------------------------------
@@ -163,17 +163,17 @@ async function main() {
     check('turno-de-evidencia-terminou-sem-erro', settled.run !== 'error', settled.run)
     check('modelo-seguiu-o-roteiro (image_generate 2x falhando, report_limitation 2x, run_command 3x falhando)', imageFailures.length === 2 && limitationCalls.length === 2 && runCalls.length === 3 && runFailures.length === 3, results.expected)
     check('limitacoes-registradas-com-o-titulo-combinado', limitationCalls.length > 0 && limitationCalls.every((call) => call.args && call.args.title === LIMITATION), limitationCalls.map((call) => call.args && call.args.title))
-    const registered = (await page.evaluate(async () => (await window.forja.projects.list()).value)).find((item) => item.id === projectId)
+    const registered = (await page.evaluate(async () => (await window.openclod.projects.list()).value)).find((item) => item.id === projectId)
     check('projeto-registrado-com-segredo-e-caminho-no-nome (origem da redacao)', Boolean(registered && registered.name.includes(SECRET) && registered.name.includes('maike')), registered && registered.name)
     await shot('00-evidencia-gerada')
 
     // ---- Phase A: rules only (the default provider has no credential => no AI available) ----------
     const noKey = await page.evaluate(async () => {
-      const settings = (await window.forja.app.settings()).value
-      const caps = (await window.forja.app.capabilities()).value
+      const settings = (await window.openclod.app.settings()).value
+      const caps = (await window.openclod.app.capabilities()).value
       const target = settings.providers.find((item) => caps.providers.find((cap) => cap.id === item.id)?.configured === false)
       if (!target) return { error: 'todos os provedores têm credencial neste perfil' }
-      await window.forja.app.updateSettings({ defaultProviderId: target.id })
+      await window.openclod.app.updateSettings({ defaultProviderId: target.id })
       return { id: target.id }
     })
     check('provedor-sem-credencial-escolhido-como-padrao', !noKey.error, noKey)
@@ -222,8 +222,8 @@ async function main() {
     await goto('Atividades')
     await page.waitForSelector('.improve-card')
     await page.locator('.improve-weekly input[type=checkbox]').click()
-    await page.waitForFunction(async (id) => (await window.forja.improvements.status(id)).value.weekly.enabled, projectId, { timeout: 10000 })
-    const tasks = await page.evaluate(async () => (await window.forja.schedules.list()).value)
+    await page.waitForFunction(async (id) => (await window.openclod.improvements.status(id)).value.weekly.enabled, projectId, { timeout: 10000 })
+    const tasks = await page.evaluate(async () => (await window.openclod.schedules.list()).value)
     const weekly = tasks.find((task) => task.action === 'improvement-review')
     check('weekly task exists with the built-in action', weekly && weekly.enabled && weekly.schedule.kind === 'weekly' && weekly.actionOptions?.useAi === false, weekly && { name: weekly.name, schedule: weekly.schedule, options: weekly.actionOptions })
     await goto('Agendados', 'Rotinas')
@@ -234,29 +234,29 @@ async function main() {
     await shot('04-agendados')
 
     const before = lastA.history.length
-    await page.evaluate(async (taskId) => window.forja.schedules.runNow(taskId), weekly.id)
+    await page.evaluate(async (taskId) => window.openclod.schedules.runNow(taskId), weekly.id)
     await page.waitForFunction(
       async ({ id, count }) => {
-        const current = (await window.forja.improvements.status(id)).value
+        const current = (await window.openclod.improvements.status(id)).value
         return !current.current && current.history.length > count
       },
       { id: projectId, count: before },
       { timeout: 30000 }
     )
     const afterRun = await status(projectId)
-    const taskAfter = (await page.evaluate(async () => (await window.forja.schedules.list()).value)).find((task) => task.id === weekly.id)
+    const taskAfter = (await page.evaluate(async () => (await window.openclod.schedules.list()).value)).find((task) => task.id === weekly.id)
     check('scheduler "run now" executed the review (trigger=schedule)', afterRun.last.trigger === 'schedule' && afterRun.last.state === 'done' && taskAfter.lastStatus === 'ok', { trigger: afterRun.last.trigger, lastStatus: taskAfter.lastStatus })
-    await page.evaluate(async (id) => window.forja.improvements.setWeekly(id, false), projectId)
-    const paused = (await page.evaluate(async () => (await window.forja.schedules.list()).value)).find((task) => task.id === weekly.id)
+    await page.evaluate(async (id) => window.openclod.improvements.setWeekly(id, false), projectId)
+    const paused = (await page.evaluate(async () => (await window.openclod.schedules.list()).value)).find((task) => task.id === weekly.id)
     check('turning the switch off pauses the task', paused && paused.enabled === false)
 
     // ---- Phase B: AI path through the recording proxy to the REAL provider ----------------------
     const realProvider = await page.evaluate(async ({ port, providerId }) => {
-      const settings = (await window.forja.app.settings()).value
+      const settings = (await window.openclod.app.settings()).value
       const target = settings.providers.find((item) => item.id === providerId)
       if (!target) return { error: `provedor ${providerId} não existe` }
       const providers = settings.providers.map((item) => (item.id === providerId ? { ...item, baseUrl: `http://127.0.0.1:${port}/v1` } : item))
-      await window.forja.app.updateSettings({ providers, defaultProviderId: providerId })
+      await window.openclod.app.updateSettings({ providers, defaultProviderId: providerId })
       return { label: target.label, model: target.model, upstream: target.baseUrl }
     }, { port: PROXY_PORT, providerId: session.provider })
     check('provedor-real-apontado-para-o-proxy-gravador', !realProvider.error, realProvider.error ?? { label: realProvider.label, model: realProvider.model })
@@ -306,11 +306,11 @@ async function main() {
 
     // a second start while one is running is refused
     proxyMode = 'hang'
-    const first = await page.evaluate(async (id) => window.forja.improvements.start(id, { useAi: true }), projectId)
-    const second = await page.evaluate(async (id) => window.forja.improvements.start(id, { useAi: true }), projectId)
+    const first = await page.evaluate(async (id) => window.openclod.improvements.start(id, { useAi: true }), projectId)
+    const second = await page.evaluate(async (id) => window.openclod.improvements.start(id, { useAi: true }), projectId)
     check('second concurrent start is refused', first.ok && !second.ok && String(second.error).includes('em andamento'), second.error)
-    await page.evaluate(async () => window.forja.improvements.cancel())
-    await page.waitForFunction(async (id) => !(await window.forja.improvements.status(id)).value.current, projectId, { timeout: 10000 })
+    await page.evaluate(async () => window.openclod.improvements.cancel())
+    await page.waitForFunction(async (id) => !(await window.openclod.improvements.status(id)).value.current, projectId, { timeout: 10000 })
     proxyMode = 'ok'
 
     results.usage = await e2e.usageOf(page, session.sessionId)

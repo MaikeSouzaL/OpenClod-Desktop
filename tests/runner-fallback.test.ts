@@ -377,3 +377,93 @@ describe('the vision relay: a model that cannot read images gets a description',
     expect(second.events.some((event) => event.type === 'notice' && event.level === 'warn' && event.text.includes('Nenhum modelo com visão'))).toBe(true)
   })
 })
+
+/**
+ * Every picture is shown in the chat with whether the model really saw it: the runner writes where each one went on
+ * the stored picture (`delivery`), and pictures meant for the user only (`preview`) never reach a model.
+ */
+describe('the chat can tell whether the model saw a picture', () => {
+  const picture: ImagePart = { type: 'image', mediaType: 'image/png', data: 'VVNFUi1QSUNUVVJF', label: 'tela.png' }
+  const shot: ImagePart = { type: 'image', mediaType: 'image/png', data: 'VE9PTC1TSE9U', label: 'captura' }
+  const page: ImagePart = { type: 'image', mediaType: 'image/jpeg', data: 'UERGLVBBR0U=', label: 'página 1' }
+  const ocrTool: ToolDef = {
+    name: 'document_extract',
+    description: 'fake document reader that only shows the page to the user',
+    schema: z.object({ path: z.string() }),
+    risk: 'read',
+    parallelSafe: true,
+    describe: () => ({ title: 'Ler documentos', detail: '' }),
+    async execute() {
+      return { ok: true, text: 'Texto extraído da página 1', summary: '1 página', preview: [page] }
+    }
+  }
+  const seeingModel = (): { provider: ScriptedProvider; config: ProviderConfig } => ({
+    provider: new ScriptedProvider([{ text: 'Uma tela com um botão.' }, { text: 'Outra tela.' }]),
+    config: cfg('olhos', { supportsVision: true })
+  })
+  const stored = (runner: SessionRunner): { user: ImagePart[]; tool: ImagePart[] } => {
+    const parts = runner.messages.flatMap((message) => message.parts)
+    return {
+      user: parts.filter((part): part is ImagePart => part.type === 'image'),
+      tool: parts.flatMap((part) => (part.type === 'tool_result' ? (part.images ?? []) : []))
+    }
+  }
+  const turn = (): MockTurn[] => [{ toolCalls: [{ id: 'call_1', name: 'read_file', args: { path: 'x' } }] }, { text: 'feito' }]
+
+  it("a model with vision: the user's picture and the screenshot are marked as received", async () => {
+    const { runner } = build(new ScriptedProvider(turn()), [], {}, [shotTool(shot)])
+    await runner.send('olhe', { images: [picture] })
+    const { user, tool } = stored(runner)
+    expect(user.map((image) => image.delivery)).toEqual(['model'])
+    expect(tool.map((image) => image.delivery)).toEqual(['model'])
+    expect(picture.delivery).toBeUndefined() // the caller's object is untouched
+  })
+
+  it('a text-only model with a relay: marked as relayed, and the description is on the picture', async () => {
+    const { runner, events } = build(new TextOnly(turn()), [], { vision: { candidates: () => [seeingModel()] } }, [shotTool(shot)])
+    await runner.send('olhe', { images: [picture] })
+    const { user, tool } = stored(runner)
+    expect(user[0]).toMatchObject({ delivery: 'relay', describedBy: 'OLHOS/olhos-m' })
+    expect(user[0].description).toBeTruthy()
+    expect(tool[0].delivery).toBe('relay')
+    // The chat keeps its own copy of each message: once described, the message is sent again so the seal can say so.
+    const userMessage = runner.messages.find((message) => message.role === 'user' && !message.hidden)!
+    const sent = events.filter((event) => event.type === 'message' && event.message.id === userMessage.id)
+    expect(sent).toHaveLength(2)
+  })
+
+  it('a text-only model and nobody to describe: marked as NOT seen', async () => {
+    const { runner } = build(new TextOnly(turn()), [], {}, [shotTool(shot)])
+    await runner.send('olhe', { images: [picture] })
+    const { user, tool } = stored(runner)
+    expect(user[0].delivery).toBe('none')
+    expect(tool[0].delivery).toBe('none')
+  })
+
+  it('the contact sheets of an attached video are kept (marked as received) only for a model with vision', async () => {
+    const prepare = async (): Promise<{ text: string; images: ImagePart[] }> => ({
+      text: '<midia>transcrição</midia>',
+      images: [{ ...shot, label: 'folha 1' }]
+    })
+    const seeing = build(new ScriptedProvider([{ text: 'ok' }]), [])
+    await seeing.runner.send('veja o vídeo', { prepare })
+    const hidden = seeing.runner.messages.find((message) => message.hidden && message.parts.some((part) => part.type === 'image'))
+    expect(hidden?.parts.find((part) => part.type === 'image')).toMatchObject({ delivery: 'model', label: 'folha 1' })
+
+    const blind = build(new TextOnly([{ text: 'ok' }]), [], { sessionId: 'ses_blind' })
+    await blind.runner.send('veja o vídeo', { prepare })
+    expect(blind.runner.messages.some((message) => message.parts.some((part) => part.type === 'image'))).toBe(false)
+  })
+
+  it('a preview is stored for the chat and never sent, even to a model with vision', async () => {
+    const active = new ScriptedProvider([{ toolCalls: [{ id: 'call_1', name: 'document_extract', args: { path: 'a.pdf' } }] }, { text: 'li' }])
+    const { runner } = build(active, [], {}, [ocrTool])
+    await runner.send('leia o pdf')
+    const result = runner.messages.flatMap((message) => message.parts).find((part) => part.type === 'tool_result')
+    expect(result && result.type === 'tool_result' ? result.preview : undefined).toEqual([page])
+    const sent = JSON.stringify(active.requests[1].messages)
+    expect(sent).toContain('Texto extraído da página 1')
+    expect(sent).not.toContain(page.data)
+    expect(JSON.stringify(toOpenAIMessages('', runner.messages, false, false, true))).not.toContain(page.data)
+  })
+})

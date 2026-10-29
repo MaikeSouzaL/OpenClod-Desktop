@@ -28,9 +28,9 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
     let latest = ''
     let removeToggle: (() => void) | null = null
 
-    const send = (state: Parameters<typeof window.forja.dictation.state>[0]): void => {
+    const send = (state: Parameters<typeof window.openclod.dictation.state>[0]): void => {
       try {
-        window.forja.dictation.state(state)
+        window.openclod.dictation.state(state)
       } catch {
         /* the window may be closing */
       }
@@ -62,7 +62,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       send({ phase: 'processing', text: latest })
       mic?.stop()
       mic = null
-      await window.forja.stt.stop().catch(() => undefined)
+      await window.openclod.stt.stop().catch(() => undefined)
       // `flush` finalizes the last utterance; give the final event a moment to arrive.
       await new Promise((resolve) => setTimeout(resolve, 300))
       const text = (engine?.text ?? latest).trim()
@@ -73,7 +73,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       updateDictation({ phase: 'idle', level: 0, text: '', error: '' })
       if (text) {
         try {
-          await window.forja.dictation.insert(text)
+          await window.openclod.dictation.insert(text)
         } catch {
           /* the error event already reached the pill */
         }
@@ -87,13 +87,13 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       updateDictation({ phase: 'loading', level: 0, text: '', error: '' })
       send({ phase: 'loading' })
       try {
-        const status = await window.forja.stt.status()
+        const status = await window.openclod.stt.status()
         if (!status.ok) throw new Error(status.error)
         if (!status.value.available) throw new Error(status.value.reason ?? 'O reconhecimento de voz não está disponível.')
 
         engine = new Dictation('')
         latest = ''
-        unsubscribe = window.forja.stt.onEvent((event) => {
+        unsubscribe = window.openclod.stt.onEvent((event) => {
           if (event.type === 'level') {
             updateDictation({ level: Math.min(1, event.rms * 6) })
             send({ phase: 'listening', level: Math.min(1, event.rms * 6), text: latest })
@@ -122,7 +122,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
           }
         })
 
-        const ready = await window.forja.stt.start({
+        const ready = await window.openclod.stt.start({
           model: voiceRef.current?.model,
           language: voiceRef.current?.language
         })
@@ -130,7 +130,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
         if (phase !== 'loading') return
 
         mic = await startMic((chunk) => {
-          window.forja.stt.audio(chunk.pcm)
+          window.openclod.stt.audio(chunk.pcm)
           const level = Math.min(1, chunk.rms * 6)
           updateDictation({ level })
           send({ phase: 'listening', level, text: latest })
@@ -147,7 +147,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
         const cancelled = phase !== 'loading'
         teardown()
         phase = 'idle'
-        await window.forja.stt.stop().catch(() => undefined)
+        await window.openclod.stt.stop().catch(() => undefined)
         if (!cancelled) fail(micErrorMessage(err))
       }
     }
@@ -162,7 +162,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       if (phase === 'idle') return
       phase = 'idle'
       teardown()
-      void window.forja.stt.stop().catch(() => undefined)
+      void window.openclod.stt.stop().catch(() => undefined)
       reset()
     }
 
@@ -175,7 +175,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
     window.addEventListener('keydown', onKeyDown)
 
     const unregister = registerDictationHandlers({ toggle, stop, cancel })
-    removeToggle = window.forja.dictation.onToggle(toggle)
+    removeToggle = window.openclod.dictation.onToggle(toggle)
 
     return () => {
       window.removeEventListener('keydown', onKeyDown)
@@ -185,7 +185,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
       if (phase !== 'idle') {
         mic?.stop()
         unsubscribe?.()
-        void window.forja.stt.stop()
+        void window.openclod.stt.stop()
       }
       reset()
     }
@@ -197,7 +197,7 @@ export function DictationHost({ voice }: { voice?: AppSettings['voice'] }): null
     if (!voice) return
     const timer = setTimeout(() => {
       if (dictationSnapshot().phase !== 'idle') return
-      void window.forja.stt.preload({ model: voice.model, language: voice.language })
+      void window.openclod.stt.preload({ model: voice.model, language: voice.language })
     }, 1200)
     return () => clearTimeout(timer)
   }, [voice?.model, voice?.language])

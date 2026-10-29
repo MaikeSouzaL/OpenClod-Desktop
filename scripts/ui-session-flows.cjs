@@ -71,7 +71,7 @@ async function main() {
 
     const sessionState = (id) =>
       page.evaluate(async (sessionId) => {
-        const value = (await window.forja.sessions.get(sessionId)).value
+        const value = (await window.openclod.sessions.get(sessionId)).value
         return { run: value.state, approvals: value.approvals.length, effort: value.meta.effort }
       }, id)
 
@@ -87,8 +87,8 @@ async function main() {
     }
     check('turno-B-chegou-a-executar-a-ferramenta', live.run === 'tool', live.run)
     const change = await page.evaluate(async ({ id, provider, model }) => {
-      const a = await window.forja.sessions.setModel(id, provider, model)
-      const b = await window.forja.sessions.setEffort(id, 'low')
+      const a = await window.openclod.sessions.setModel(id, provider, model)
+      const b = await window.openclod.sessions.setEffort(id, 'low')
       return { model: a.ok, effort: b.ok, modelError: a.ok ? undefined : a.error, effortError: b.ok ? undefined : b.error }
     }, { id: sessionB.sessionId, provider: sessionB.provider, model: sessionB.model })
     results.changeAccepted = change
@@ -104,8 +104,8 @@ async function main() {
 
     // --- 3. approval survives a session switch
     await page.evaluate(async () => {
-      const settings = (await window.forja.app.settings()).value
-      await window.forja.app.updateSettings({ policy: { ...settings.policy, mode: 'ask', fullAccess: false } })
+      const settings = (await window.openclod.app.settings()).value
+      await window.openclod.app.updateSettings({ policy: { ...settings.policy, mode: 'ask', fullAccess: false } })
     })
     await page.waitForTimeout(500)
     await e2e.openSession(page, 'Sessão A', PROJECT)
@@ -132,8 +132,8 @@ async function main() {
 
     // --- 5. a custom slash command (.claude/commands/revisar.md) appears in the menu and expands on send
     await page.evaluate(async () => {
-      const settings = (await window.forja.app.settings()).value
-      await window.forja.app.updateSettings({ policy: { ...settings.policy, mode: 'unrestricted' } })
+      const settings = (await window.openclod.app.settings()).value
+      await window.openclod.app.updateSettings({ policy: { ...settings.policy, mode: 'unrestricted' } })
     })
     await e2e.openSession(page, 'Sessão X', PROJECT)
     const startedX = Date.now()
@@ -149,7 +149,7 @@ async function main() {
     const settledX = await e2e.waitSettled(page, sessionX.sessionId, { timeoutMs: 240000 })
     results.turns.X = { seconds: Math.round((Date.now() - startedX) / 1000), run: settledX.run }
     const customCommandSent = await page.evaluate(async (id) => {
-      const value = (await window.forja.sessions.get(id)).value
+      const value = (await window.openclod.sessions.get(id)).value
       const sent = [...value.messages].reverse().find((m) => m.role === 'user' && !m.hidden)
       return sent ? sent.parts.filter((p) => p.type === 'text').map((p) => p.text).join('') : ''
     }, sessionX.sessionId)

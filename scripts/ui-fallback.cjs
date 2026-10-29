@@ -38,18 +38,18 @@ const realConfig = (baseUrl) => ({
 
 async function configure(page, { providers = [], order, only }) {
   return page.evaluate(async ({ providers, order, only }) => {
-    const current = (await window.forja.app.settings()).value
+    const current = (await window.openclod.app.settings()).value
     const keep = current.providers.filter((item) => !providers.some((next) => next.id === item.id))
     const all = [...keep, ...providers]
     const exclude = all.map((item) => item.id).filter((id) => !only.includes(id))
-    const saved = await window.forja.app.updateSettings({ providers: all, useAllModels: true, fallbackOrder: order, fallbackExclude: exclude })
+    const saved = await window.openclod.app.updateSettings({ providers: all, useAllModels: true, fallbackOrder: order, fallbackExclude: exclude })
     return saved.ok ? { ok: true } : { ok: false, error: saved.error }
   }, { providers, order, only })
 }
 
 async function snapshot(page, sessionId) {
   return page.evaluate(async (id) => {
-    const state = (await window.forja.sessions.get(id)).value
+    const state = (await window.openclod.sessions.get(id)).value
     const text = (message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text).join('')
     const answers = state.messages.filter((message) => message.role === 'assistant' && text(message).trim())
     const last = answers[answers.length - 1]
@@ -121,7 +121,7 @@ async function main() {
   try {
     const setup = await configure(app.page, { providers: [fakeConfig(fake.baseUrl), realConfig(proxy.baseUrl)], order: ['ollama-real'], only: ['fake-a', 'ollama-real'] })
     check('configuração dos provedores de teste gravada', setup.ok, setup.error)
-    await app.page.evaluate(() => window.forja.app.setSecret('fake-a', 'chave-de-teste-local-sem-valor'))
+    await app.page.evaluate(() => window.openclod.app.setSecret('fake-a', 'chave-de-teste-local-sem-valor'))
 
     /* ------------------------------ 402: credit runs out mid-conversation ----------------------------- */
     if (wants('402')) {
@@ -153,16 +153,16 @@ async function main() {
 
       // A new conversation asked to start on the exhausted provider starts on the one that works.
       const fresh = await app.page.evaluate(async ({ folder }) => {
-        const project = (await window.forja.projects.list()).value.find((item) => item.path === folder)
-        const created = await window.forja.sessions.create({ projectId: project.id, cwd: folder, mode: 'code', surface: 'code', providerId: 'fake-a', model: 'fake-pro', title: 'Nova depois da falha' })
+        const project = (await window.openclod.projects.list()).value.find((item) => item.path === folder)
+        const created = await window.openclod.sessions.create({ projectId: project.id, cwd: folder, mode: 'code', surface: 'code', providerId: 'fake-a', model: 'fake-pro', title: 'Nova depois da falha' })
         return created.ok ? { providerId: created.value.providerId, model: created.value.model } : { error: created.error }
       }, { folder: ws.project })
       check('402: uma conversa nova pedida no provedor esgotado já começa no que funciona', fresh.providerId === 'ollama-real', fresh)
 
       // The settings are saved (what the user does when adding a provider): the session must not go back to the exhausted one.
       await app.page.evaluate(async () => {
-        const settings = (await window.forja.app.settings()).value
-        await window.forja.app.updateSettings({ providers: settings.providers })
+        const settings = (await window.openclod.app.settings()).value
+        await window.openclod.app.updateSettings({ providers: settings.providers })
       })
       const t4 = await turn(app, s.sessionId, 'Repita a palavra-código, só a palavra.')
       check('402: depois de salvar as configurações a sessão continua no modelo que funciona', t4.meta.providerId === 'ollama-real' && /CAJU/i.test(t4.lastText), { meta: t4.meta, text: t4.lastText.slice(0, 80) })
@@ -216,7 +216,7 @@ async function main() {
     /* ----------------- the real DeepSeek of this PC: out of balance (402) -> the real local model ---------------- */
     if (wants('real-402')) {
       await configure(app.page, { providers: [], order: ['ollama-real'], only: ['deepseek', 'ollama-real'] })
-      const probe = await app.page.evaluate(async () => (await window.forja.app.testProvider('deepseek')))
+      const probe = await app.page.evaluate(async () => (await window.openclod.app.testProvider('deepseek')))
       const detail = probe.ok ? String(probe.value.detail) : String(probe.error)
       const exhausted = probe.ok && !probe.value.ok && /402|insufficient|balance|saldo/i.test(detail)
       if (!exhausted) {
@@ -225,7 +225,7 @@ async function main() {
       } else {
         await configure(app.page, { providers: [], order: ['ollama-real'], only: ['deepseek', 'ollama-real'] })
         const s = await openFresh(app, ws, { title: 'Reserva DeepSeek real', providerId: 'deepseek' })
-        const before = (await app.page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.meta, s.sessionId))
+        const before = (await app.page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.meta, s.sessionId))
         const t = await turn(app, s.sessionId, 'Responda apenas com a palavra: pronto.')
         const ui = await composerUi(app.page)
         report.scenarios['real-402'] = { before, t, ui, deepseek: detail.slice(0, 160) }
@@ -239,7 +239,7 @@ async function main() {
 
     /* ----------------- OpenRouter as the reserve (needs the user's OpenRouter key in the vault copy) ---------------- */
     if (wants('openrouter')) {
-      const caps = await app.page.evaluate(async () => (await window.forja.app.capabilities()).value.providers.find((item) => item.id === 'openrouter'))
+      const caps = await app.page.evaluate(async () => (await window.openclod.app.capabilities()).value.providers.find((item) => item.id === 'openrouter'))
       if (!caps?.configured) {
         console.log('SKIP openrouter: o OpenRouter não tem chave no cofre do perfil de origem (salve a chave em Configurações → Provedores e rode de novo)')
         report.scenarios.openrouter = { skipped: 'sem chave no cofre' }
@@ -247,7 +247,7 @@ async function main() {
         // The user's own OpenRouter provider (key from the vault copy), with a cheap model unless --openrouter-model says otherwise.
         const model = e2e.arg('openrouter-model', 'deepseek/deepseek-chat')
         const card = await app.page.evaluate(async (model) => {
-          const settings = (await window.forja.app.settings()).value
+          const settings = (await window.openclod.app.settings()).value
           return { ...settings.providers.find((item) => item.id === 'openrouter'), model }
         }, model)
         await configure(app.page, { providers: [fakeConfig(fake.baseUrl), card], order: ['openrouter'], only: ['fake-a', 'openrouter'] })
@@ -269,9 +269,9 @@ async function main() {
         id: 'fake-b', kind: 'openai', label: 'Provedor B (falso)', baseUrl: fake.baseUrl, model: 'fake-b-1', apiKeyRef: 'secret:fake-b',
         contextWindow: 128000, supportsVision: false, supportsTools: true, models: ['fake-b-1', 'fake-b-2', 'fake-b-3']
       }
-      await app.page.evaluate(() => window.forja.app.setSecret('fake-b', 'chave-de-teste-local-sem-valor').catch(() => undefined))
+      await app.page.evaluate(() => window.openclod.app.setSecret('fake-b', 'chave-de-teste-local-sem-valor').catch(() => undefined))
       await configure(app.page, { providers: [fakeConfig(fake.baseUrl), fakeB, realConfig(proxy.baseUrl)], order: ['fake-b', 'ollama-real'], only: ['fake-a', 'fake-b', 'ollama-real'] })
-      await app.page.evaluate(() => window.forja.app.setSecret('fake-b', 'chave-de-teste-local-sem-valor'))
+      await app.page.evaluate(() => window.openclod.app.setSecret('fake-b', 'chave-de-teste-local-sem-valor'))
       await app.page.reload()
       await app.page.waitForSelector('.app-shell')
       await app.page.keyboard.press('Control+,')
@@ -292,11 +292,11 @@ async function main() {
       report.shotModelos = await shot(app, 'modelos-da-reserva')
       await app.page.getByRole('button', { name: 'Salvar alterações' }).click()
       for (let attempt = 0; attempt < 40; attempt++) {
-        const ticked = await app.page.evaluate(async () => (await window.forja.app.settings()).value.fallbackModels?.['fake-b'])
+        const ticked = await app.page.evaluate(async () => (await window.openclod.app.settings()).value.fallbackModels?.['fake-b'])
         if (Array.isArray(ticked) && ticked.length === 2) break
         await app.page.waitForTimeout(250)
       }
-      const saved = await app.page.evaluate(async () => (await window.forja.app.settings()).value.fallbackModels)
+      const saved = await app.page.evaluate(async () => (await window.openclod.app.settings()).value.fallbackModels)
       check('modelos: "Salvar alterações" grava só os modelos marcados', JSON.stringify(saved?.['fake-b']) === JSON.stringify(['fake-b-1', 'fake-b-2']), saved)
 
       // The ticked models are the ones tried, in order; the unticked one never is; a real model answers at the end.
@@ -335,7 +335,7 @@ async function main() {
         report.shotOrdem = await shot(app, 'ordem-da-reserva')
         await app.page.getByRole('button', { name: 'Salvar alterações' }).click()
         await app.page.waitForTimeout(1500)
-        const saved = await app.page.evaluate(async () => { const s = (await window.forja.app.settings()).value; return { order: s.fallbackOrder, exclude: s.fallbackExclude } })
+        const saved = await app.page.evaluate(async () => { const s = (await window.openclod.app.settings()).value; return { order: s.fallbackOrder, exclude: s.fallbackExclude } })
         check('ordem: "Salvar alterações" grava a ordem e quem fica fora', saved.order?.[0] === 'ollama-real' && saved.exclude?.includes('fake-a'), saved)
       }
     }

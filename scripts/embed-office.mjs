@@ -57,7 +57,7 @@ const WHEELS = [
 ]
 /** Declared by python-docx / python-pptx; shipped by embed-stt, only checked here. */
 const EXTERNAL = [{ dist: 'typing-extensions', minimum: '4.9.0' }]
-const ENGINE = path.join(RESOURCES, 'office', 'forja_office.py')
+const ENGINE = path.join(RESOURCES, 'office', 'openclod_office_cli.py')
 /** Our own builders (openclod_office) are not copied: python310._pth points at the folder, relative to the runtime. */
 const PYLIB_DIR = path.join(RESOURCES, 'office', 'pylib')
 const PTH_ENTRY = '..\\..\\office\\pylib'
@@ -243,7 +243,7 @@ import docx, openpyxl, pptx, xlsxwriter, PIL, lxml.etree
 from importlib import metadata as md
 names = ("python-docx", "openpyxl", "python-pptx", "XlsxWriter", "Pillow", "lxml", "et-xmlfile", "typing-extensions")
 out["versions"] = {n: md.version(n) for n in names}
-tmp = tempfile.mkdtemp(prefix="forja-office-verify-")
+tmp = tempfile.mkdtemp(prefix="openclod-office-verify-")
 
 # .docx: heading, paragraph, table, image from Pillow
 from docx.shared import Cm
@@ -379,7 +379,7 @@ function main() {
     log(`external      : ${dep.dist} ${probe.stdout.trim()} (needs >= ${dep.minimum})`)
   }
 
-  const stampFile = path.join(RUNTIME, '.forja-office.json')
+  const stampFile = path.join(RUNTIME, '.openclod-office.json')
   // Only the pinned wheels decide whether the libraries are reinstalled (the pylib folder and the ._pth entry are checked on every run).
   const signature = sha256Buffer(Buffer.from(JSON.stringify({ wheels: WHEELS.map((w) => [w.file, w.sha256]) })))
 
@@ -401,7 +401,7 @@ function main() {
     }
     const recorded = (name) => manifest.entries?.find((entry) => entry?.name === name && entry?.group === GROUP)
     const expected = {
-      'forja_office.py': fs.existsSync(ENGINE) ? sha256File(ENGINE) : null,
+      'openclod_office_cli.py': fs.existsSync(ENGINE) ? sha256File(ENGINE) : null,
       openclod_office: treeDigest(PYLIB_DIR).sha256,
       'openclod-office-commands': treeDigest(path.join(RESOURCES, 'office', 'bin'), path.join(RESOURCES, 'office', 'bin-fallback')).sha256
     }
@@ -423,7 +423,7 @@ function main() {
     log('libraries     : up to date (signature unchanged and packages present). Use --force to reinstall.')
     built = stamp.built
   } else {
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-office-'))
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-office-'))
     try {
       const wheelDir = path.join(work, 'wheels')
       fs.mkdirSync(wheelDir)
@@ -511,10 +511,10 @@ function main() {
   ]
   if (fs.existsSync(ENGINE)) {
     entries.push({
-      name: 'forja_office.py',
+      name: 'openclod_office_cli.py',
       kind: 'script',
       version: '1',
-      source: 'resources/office/forja_office.py (openclod-office: check / inspect / pdf / recalc)',
+      source: 'resources/office/openclod_office_cli.py (openclod-office: check / inspect / pdf / recalc)',
       sha256: sha256File(ENGINE),
       files: 1,
       size: fs.statSync(ENGINE).size,

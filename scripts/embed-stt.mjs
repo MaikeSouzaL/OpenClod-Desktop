@@ -455,7 +455,7 @@ faster_whisper imports \`av\` at import time but only calls it from decode_audio
 PCM and never decodes media files, so this module only has to be importable.
 """
 
-__version__ = "0.0.0+forja-stub"
+__version__ = "0.0.0+openclod-stub"
 
 
 def open(*_args, **_kwargs):  # noqa: A001 - mirrors av.open
@@ -496,7 +496,7 @@ function buildRuntime(opts, plan, stageDir) {
     if (opts.stubAv && dist.name === 'av') {
       fs.mkdirSync(path.join(sp, 'av'), { recursive: true })
       fs.writeFileSync(path.join(sp, 'av', '__init__.py'), AV_STUB)
-      perDist.push({ name: 'av', version: `${dist.version}+forja-stub`, license: 'MIT', files: 1, bytes: AV_STUB.length, stub: true })
+      perDist.push({ name: 'av', version: `${dist.version}+openclod-stub`, license: 'MIT', files: 1, bytes: AV_STUB.length, stub: true })
       continue
     }
     for (const [rel, hash] of dist.files) {
@@ -593,21 +593,21 @@ function verifyRuntime(runtimeDir) {
   const info = JSON.parse(res.stdout.trim().split('\n').pop())
 
   // PYTHONPATH / user site must be ignored thanks to the ._pth file
-  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-pythonpath-'))
-  fs.writeFileSync(path.join(probeDir, 'forja_pythonpath_probe.py'), 'VALUE = 1\n')
-  const ignored = run(['-X', 'utf8', '-c', 'import forja_pythonpath_probe'], cleanEnv({ PYTHONPATH: probeDir }))
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-pythonpath-'))
+  fs.writeFileSync(path.join(probeDir, 'openclod_pythonpath_probe.py'), 'VALUE = 1\n')
+  const ignored = run(['-X', 'utf8', '-c', 'import openclod_pythonpath_probe'], cleanEnv({ PYTHONPATH: probeDir }))
   rmrf(probeDir)
   const pythonPathIgnored = ignored.status !== 0 && /No module named/.test(ignored.stderr ?? '')
 
   // The user site (%APPDATA%\Python\Python310\site-packages) is NOT disabled by the ._pth file on 3.10.0,
   // so the engine must start the interpreter with -I. Prove both facts with a fake APPDATA.
-  const fakeAppData = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-appdata-'))
+  const fakeAppData = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-appdata-'))
   const userSite = path.join(fakeAppData, 'Python', 'Python310', 'site-packages')
   fs.mkdirSync(userSite, { recursive: true })
-  fs.writeFileSync(path.join(userSite, 'forja_usersite_probe.py'), 'VALUE = 1\n')
+  fs.writeFileSync(path.join(userSite, 'openclod_usersite_probe.py'), 'VALUE = 1\n')
   const probeEnv = cleanEnv({ APPDATA: fakeAppData })
-  const withoutI = run(['-X', 'utf8', '-c', 'import forja_usersite_probe'], probeEnv)
-  const withI = run(['-I', '-X', 'utf8', '-c', 'import forja_usersite_probe'], probeEnv)
+  const withoutI = run(['-X', 'utf8', '-c', 'import openclod_usersite_probe'], probeEnv)
+  const withI = run(['-I', '-X', 'utf8', '-c', 'import openclod_usersite_probe'], probeEnv)
   rmrf(fakeAppData)
   const userSiteLeaksWithoutI = withoutI.status === 0
   const userSiteBlockedWithI = withI.status !== 0 && /No module named/.test(withI.stderr ?? '')
@@ -722,7 +722,7 @@ function resolveSnapshot(hfCache, id) {
 function copyModel(opts, id) {
   const snap = resolveSnapshot(opts.hfCache, id)
   const dst = path.join(RESOURCES, 'models', 'whisper', id)
-  const metaFile = path.join(dst, 'forja-model.json')
+  const metaFile = path.join(dst, 'openclod-model.json')
   fs.mkdirSync(dst, { recursive: true })
 
   const names = fs.readdirSync(snap.dir).filter((n) => !n.startsWith('.') && !n.endsWith('.md') && n !== '.gitattributes')
@@ -832,7 +832,7 @@ function main() {
 
   const runtimeParent = path.join(RESOURCES, 'runtime')
   const runtimeDir = path.join(runtimeParent, 'python')
-  const stampFile = path.join(runtimeDir, '.forja-embed.json')
+  const stampFile = path.join(runtimeDir, '.openclod-embed.json')
   fs.mkdirSync(runtimeParent, { recursive: true })
 
   // ---- plan (closure of faster-whisper) --------------------------------------------
@@ -924,7 +924,7 @@ function main() {
   }
 
   // ---- manifest ---------------------------------------------------------------------
-  const sidecar = path.join(RESOURCES, 'stt', 'forja_stt.py')
+  const sidecar = path.join(RESOURCES, 'stt', 'openclod_stt.py')
   const entries = [
     {
       name: 'python-embedded',
@@ -957,10 +957,10 @@ function main() {
   ]
   if (fs.existsSync(sidecar)) {
     entries.push({
-      name: 'forja_stt.py',
+      name: 'openclod_stt.py',
       kind: 'script',
       version: '1',
-      source: 'resources/stt/forja_stt.py',
+      source: 'resources/stt/openclod_stt.py',
       sha256: sha256File(sidecar),
       files: 1,
       size: fs.statSync(sidecar).size,
@@ -968,13 +968,13 @@ function main() {
     })
   }
   // The media ingestion engine (audio/video -> transcript, frames, contact sheets) runs on this same runtime.
-  const mediaEngine = path.join(RESOURCES, 'media', 'forja_media.py')
+  const mediaEngine = path.join(RESOURCES, 'media', 'openclod_media.py')
   if (fs.existsSync(mediaEngine)) {
     entries.push({
-      name: 'forja_media.py',
+      name: 'openclod_media.py',
       kind: 'script',
       version: '1',
-      source: 'resources/media/forja_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)',
+      source: 'resources/media/openclod_media.py (frame logic ported from claude-real-video, MIT, (c) 2026 LeoAido)',
       sha256: sha256File(mediaEngine),
       files: 1,
       size: fs.statSync(mediaEngine).size,

@@ -45,6 +45,8 @@ export class FileTracker implements Tracker {
       { context: 3 }
     )
     const { additions, deletions } = countLines(patch)
+    if (!this.turnBefore.has(relative)) this.turnBefore.set(relative, before)
+    this.turnAfter.set(relative, after)
     this.changeMap.set(relative, {
       path: relative,
       status: before === null ? 'added' : after === null ? 'deleted' : 'modified',
@@ -67,6 +69,29 @@ export class FileTracker implements Tracker {
 
   readFiles(): string[] {
     return [...this.readSet]
+  }
+
+  /** Each file's text before its first change of the current turn, and after its last one. */
+  private turnBefore = new Map<string, string | null>()
+  private turnAfter = new Map<string, string | null>()
+
+  /** Starts a turn: from here on, turnChanges() has only what this turn changes. */
+  beginTurn(): void {
+    this.turnBefore.clear()
+    this.turnAfter.clear()
+  }
+
+  /** What this turn changed, one diff per file from before its first change to after its last (several edits add up). */
+  turnChanges(): FileChange[] {
+    const out: FileChange[] = []
+    for (const [relative, before] of this.turnBefore) {
+      const after = this.turnAfter.get(relative) ?? null
+      if (before === after) continue
+      const patch = createTwoFilesPatch(`a/${relative}`, `b/${relative}`, before ?? '', after ?? '', '', '', { context: 3 })
+      const { additions, deletions } = countLines(patch)
+      out.push({ path: relative, status: before === null ? 'added' : after === null ? 'deleted' : 'modified', additions, deletions, diff: patch })
+    }
+    return out.sort((a, b) => a.path.localeCompare(b.path))
   }
 }
 

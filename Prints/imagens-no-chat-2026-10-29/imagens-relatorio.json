@@ -1,0 +1,23 @@
+{
+  "label": "imagens",
+  "startedAt": "2026-10-29T16:26:29.105Z",
+  "seeded": {
+    "shotThread": "Prints\\imagens-no-chat-2026-10-29\\imagens-01-semeada-conversa.png",
+    "shotSheets": "Prints\\imagens-no-chat-2026-10-29\\imagens-02-semeada-folhas.png",
+    "shotPdf": "Prints\\imagens-no-chat-2026-10-29\\imagens-03-semeada-pdf.png",
+    "shotWeb": "Prints\\imagens-no-chat-2026-10-29\\imagens-04-semeada-navegador.png",
+    "errors": []
+  },
+  "checks": {
+    "captura do computador: legenda \"Tela do computador\" e selo \"O modelo recebeu esta imagem\"": "ok",
+    "página do navegador: legenda e selo \"Descrita por …; o modelo leu a descrição\"": "ok",
+    "\"Ver o que o modelo leu\" abre a descrição que o modelo de texto recebeu": "ok",
+    "folhas de contato do vídeo (mensagem oculta) aparecem: 2 imagens, legenda e selo de recebidas": "ok",
+    "o TEXTO da mensagem oculta não aparece no chat (só as imagens)": "ok",
+    "PDF lido por OCR: prévia da página, legenda \"Documento · contrato.pdf\" e selo \"o modelo recebeu o texto extraído\"": "ok",
+    "a linha da ferramenta do PDF continua no grupo (o texto que o modelo leu)": "ok",
+    "imagem anexada a um modelo sem visão: selo \"O modelo NÃO viu esta imagem (sem visão)\"": "ok",
+    "nenhum erro de página": "ok"
+  },
+  "ok": true
+}

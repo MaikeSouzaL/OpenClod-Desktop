@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- forja:generated -->
+<!-- openclod:generated -->
 > Arquivo canônico de instruções do projeto, lido pelo Openclod, pelo Codex e
 > por agentes compatíveis. O Openclod o cria automaticamente quando ele não existe
 > e nunca sobrescreve o seu conteúdo. Edite à vontade.

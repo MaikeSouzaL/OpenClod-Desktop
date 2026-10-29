@@ -31,7 +31,7 @@ export const createAgentTool: ToolDef = {
     model: z.string().max(200).optional().describe('inherit (padrão) ou providerId/modelo'),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
     max_turns: z.number().int().min(1).max(200).optional(),
-    scope: z.enum(['user', 'project']).optional().describe('user (padrão) grava em <userData>/agents; project em .forja/agents')
+    scope: z.enum(['user', 'project']).optional().describe('user (padrão) grava em <userData>/agents; project em .openclod/agents')
   }),
   describe(a) {
     const args = a as { name?: string }

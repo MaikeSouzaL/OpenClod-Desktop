@@ -1,0 +1,93 @@
+/* Plan dock actions: ▶ resumes from the step that stopped, the trash discards the plan (two clicks). */
+
+.plan-dock-headrow {
+  position: relative;
+}
+
+.plan-dock-headrow.has-discard .plan-dock-head {
+  padding-right: 46px;
+}
+
+.plan-dock-headrow.has-discard.is-confirming .plan-dock-head {
+  padding-right: 168px;
+}
+
+.plan-dock-discard {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  min-width: 28px;
+  padding: 0 7px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.plan-dock-discard:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--red);
+}
+
+.plan-dock-discard.is-confirming {
+  border-color: color-mix(in srgb, var(--red) 55%, transparent);
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+  font-weight: 500;
+}
+
+.plan-dock-discard:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plan-dock-entry.has-resume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.plan-dock-entry.has-resume .plan-dock-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-dock-resume {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.plan-dock-resume:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.plan-dock-resume:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plan-dock-resume:focus-visible,
+.plan-dock-discard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

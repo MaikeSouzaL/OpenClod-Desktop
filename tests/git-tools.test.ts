@@ -13,7 +13,7 @@ let ctx: ToolContext
 const git = (...args: string[]): string => execFileSync('git', args, { cwd: dir, encoding: 'utf8' })
 
 beforeEach(async () => {
-  dir = await makeTempDir('forja-git-tools-')
+  dir = await makeTempDir('openclod-git-tools-')
   git('init', '-q', '-b', 'main')
   git('config', 'user.email', 't@example.com')
   git('config', 'user.name', 'T')

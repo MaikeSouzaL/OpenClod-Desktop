@@ -7,7 +7,7 @@ import { resourcePath } from '../util/resources.js'
 
 /**
  * Media ingestion: an audio file becomes a transcript, a video becomes a transcript plus the frames that matter
- * (scene changes, no repeats) and contact sheets of them. The work is done by `resources/media/forja_media.py` on the
+ * (scene changes, no repeats) and contact sheets of them. The work is done by `resources/media/openclod_media.py` on the
  * embedded Python runtime (PyAV, numpy, faster-whisper): no ffmpeg binary, no network, nothing leaves the machine.
  * Frame logic ported from claude-real-video (MIT, (c) 2026 LeoAido); see THIRD_PARTY_NOTICES.md.
  */
@@ -144,7 +144,7 @@ export async function ingestMedia(file: string, options: IngestOptions): Promise
   if (!stat.isFile()) throw new Error('a mídia não é um arquivo')
   if (stat.size > MAX_BYTES) throw new Error('mídia maior que 8 GB')
   const python = resourcePath('runtime', 'python', process.platform === 'win32' ? 'python.exe' : 'python3')
-  const script = resourcePath('media', 'forja_media.py')
+  const script = resourcePath('media', 'openclod_media.py')
   const models = resourcePath('models', 'whisper')
   if (!python || !script) throw new Error('runtime de mídia embutido indisponível')
   const outDir = path.resolve(options.outDir)
@@ -169,7 +169,7 @@ export async function ingestMedia(file: string, options: IngestOptions): Promise
       cwd: path.dirname(script),
       env: {
         ...sanitizedEnv(),
-        ...(models ? { FORJA_STT_MODELS: models } : {}),
+        ...(models ? { OPENCLOD_STT_MODELS: models } : {}),
         HF_HUB_OFFLINE: '1',
         TRANSFORMERS_OFFLINE: '1',
         HF_HUB_DISABLE_TELEMETRY: '1',

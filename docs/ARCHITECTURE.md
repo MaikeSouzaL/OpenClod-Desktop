@@ -45,7 +45,7 @@ src/
       rules.ts               regras Tool(padrão), deny > ask > allow
       sensitive.ts           credenciais do usuário: negadas em qualquer modo
     hooks/runner.ts          hooks command/http (formato do Claude Code)
-    config/project.ts        .forja/settings*.json, regras "permitir sempre"
+    config/project.ts        .openclod/settings*.json, regras "permitir sempre"
     git/                     status/diff por arquivo, worktrees (service.ts)
     scheduler/               tarefas agendadas (nextRun, persistência atômica)
     session/
@@ -156,7 +156,7 @@ não existe ferramenta que escreva em `PolicyConfig`.
 - **Contexto de trabalho:** histórico da sessão, truncado por ferramenta
   (saída de shell limitada, diff limitado, árvore de acessibilidade limitada).
 - **Contexto de projeto:** `CLAUDE.md` é o arquivo canônico (lido primeiro);
-  `AGENTS.md`, `FORJA.md` e `.forja/AGENTS.md` continuam suportados e conteúdo
+  `AGENTS.md`, `OPENCLOD.md` e `.openclod/AGENTS.md` continuam suportados e conteúdo
   idêntico não é duplicado. `ensureProjectInstructions` cria um `CLAUDE.md`
   modelo quando ele não existe, sem sobrescrever o arquivo do usuário. Também
   entram skills instaladas, branch git, fatos e a wiki de memória do projeto.
@@ -202,7 +202,7 @@ serializadas por trava por caminho no processo principal.
   vários agentes no mesmo turno e consolidar/verificar o resultado.
 - `agent-smith` é um agente visível que estuda o caso e, quando nenhum agente
   existente cobre o assunto, chama `create_agent`. A ferramenta grava um
-  arquivo markdown em `<userData>/agents/<nome>.md` (ou `.forja/agents` com
+  arquivo markdown em `<userData>/agents/<nome>.md` (ou `.openclod/agents` com
   `scope: project`), valida a definição e a registra **no registry da sessão**
   imediatamente; o agente criado pode ser chamado no passo seguinte.
 - O registro é o mesmo objeto compartilhado pelo runner e pelo runtime de
@@ -281,7 +281,7 @@ simular um modelo real.
 atalho global (main) ─┐
 botão de microfone ───┤→ dictation-toggle → DictationHost (renderer)
                       │      ├─ getUserMedia + AudioWorklet 16 kHz
-                      │      ├─ window.forja.stt.audio() → SttService (main)
+                      │      ├─ window.openclod.stt.audio() → SttService (main)
                       │      │      └─ Python embutido + faster-whisper + Silero VAD
                       │      └─ partial/final → dictation-store (UI) + pílula
                       └─ stop → dictation:insert
@@ -290,7 +290,7 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
 ```
 
 - `src/main/stt.ts` é o supervisor: resolve `resources/runtime/python`,
-  `resources/stt/forja_stt.py` e `resources/models/whisper`, fala JSON-line com
+  `resources/stt/openclod_stt.py` e `resources/models/whisper`, fala JSON-line com
   o sidecar e repassa eventos. O sidecar carrega o modelo uma vez e mantém
   decoder/áudio em threads separadas.
 - A pílula é uma `BrowserWindow` transparente, always-on-top, `focusable:false`,
@@ -321,7 +321,7 @@ botão de microfone ───┤→ dictation-toggle → DictationHost (renderer
 - `electron-vite build` gera `out/main` (Node/Electron), `out/preload` e
   `out/renderer` (React). O main externiza as dependências de produção, que vão
   em `node_modules` dentro do `asar`.
-- `electron-builder.yml` define o pacote: `appId com.forja.desktop`, produto
+- `electron-builder.yml` define o pacote: `appId com.openclod.desktop`, produto
   `Openclod`, alvo NSIS x64, saída em `release/` e artefato
   `Openclod-<versão>-setup.exe`. O electron-builder lê o bloco `build` do
   `package.json`; o `electron-builder.yml` repete os mesmos campos para

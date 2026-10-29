@@ -26,7 +26,7 @@ export function DiagnosticsPanel(): ReactElement {
     setBusy(true)
     setError('')
     try {
-      setData(await unwrap(window.forja.app.observability({
+      setData(await unwrap(window.openclod.app.observability({
         query: query || undefined,
         level: level || undefined,
         type: type || undefined,
@@ -47,7 +47,7 @@ export function DiagnosticsPanel(): ReactElement {
     setBusy(true)
     setError('')
     try {
-      setExported(await unwrap(window.forja.app.exportDiagnostics()))
+      setExported(await unwrap(window.openclod.app.exportDiagnostics()))
     } catch (err) {
       setError(errorMessage(err))
     } finally {

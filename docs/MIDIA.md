@@ -31,7 +31,7 @@ Ferramentas, para quando o modelo precisa de mais controle (não estão no conju
 
 ## O que o harness faz por dentro
 
-`resources/media/forja_media.py` (Python 3.10 embutido) → `src/core/media/*.ts` (orquestração) → memória do projeto.
+`resources/media/openclod_media.py` (Python 3.10 embutido) → `src/core/media/*.ts` (orquestração) → memória do projeto.
 
 1. **Leitura** (PyAV): duração, resolução, fps, trilhas. Um `.mp3` com capa embutida é áudio, não vídeo.
 2. **Frames** (portado do claude-real-video): decodifica o vídeo uma vez; um frame vira *candidato* quando há **corte de cena**
@@ -101,7 +101,7 @@ Com modelo real e a interface de verdade (`scripts/ui-media.cjs`, DeepSeek `deep
 
 ## Código e testes
 
-- Motor: `resources/media/forja_media.py` (registrado em `resources/MANIFEST.json`; licença do claude-real-video em
+- Motor: `resources/media/openclod_media.py` (registrado em `resources/MANIFEST.json`; licença do claude-real-video em
   `resources/licenses/claude-real-video/MIT.txt` e em `THIRD_PARTY_NOTICES.md`).
 - `src/core/media/{ingest,memory,paths,ocr}.ts`, `src/core/tools/media.ts` (`media_ingest`, `media_view`),
   `Orchestrator.mediaPrepare` + `SendOptions.prepare` no runner.

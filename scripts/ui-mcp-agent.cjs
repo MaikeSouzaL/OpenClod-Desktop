@@ -29,13 +29,13 @@ async function main() {
     // 1. connect from the directory
     const connected = await page.evaluate(async (id) => {
       const started = performance.now()
-      const r = await window.forja.app.connectConnector(id)
+      const r = await window.openclod.app.connectConnector(id)
       return { ok: r.ok, error: r.error, state: r.value && r.value.state, ms: Math.round(performance.now() - started) }
     }, CONNECTOR)
     result.connect = connected
     check('conecta-pelo-diretorio', connected.ok && connected.state && connected.state.status === 'connected', JSON.stringify(connected).slice(0, 300))
     const serverName = connected.state && connected.state.serverName
-    const tools = serverName ? await page.evaluate(async (name) => (await window.forja.app.connectorTools(name)).value, serverName) : []
+    const tools = serverName ? await page.evaluate(async (name) => (await window.openclod.app.connectorTools(name)).value, serverName) : []
     result.tools = (tools || []).map((tool) => `${tool.name}:${tool.policy}`)
     check('lista-ferramentas-reais', Array.isArray(tools) && tools.length > 0, `${(tools || []).length} ferramentas`)
     if (!tools || !tools.length) throw new Error('sem ferramentas: não dá para seguir')
@@ -46,7 +46,7 @@ async function main() {
     await page.waitForSelector('.cnx-card, [data-connector-id]', { timeout: 15000 })
     // The card carries the directory's display name ("Microsoft Learn"), not the technical server name.
     const displayName = await page.evaluate(async (id) => {
-      const entries = (await window.forja.app.connectorDirectory()).value
+      const entries = (await window.openclod.app.connectorDirectory()).value
       const list = Array.isArray(entries) ? entries : entries && entries.entries
       const found = (list || []).find((entry) => entry.id === id)
       return found ? found.name : id
@@ -83,7 +83,7 @@ async function main() {
     check('modelo-respondeu-com-base-no-resultado', report.finalText.trim().length > 20, report.finalText.slice(0, 100))
 
     // 4. block the tool: the next turn must not be able to call it
-    const blocked = await page.evaluate(async ({ name, tool }) => (await window.forja.app.setToolPolicy(name, tool, 'deny')).ok, { name: serverName, tool: readOnly.name })
+    const blocked = await page.evaluate(async ({ name, tool }) => (await window.openclod.app.setToolPolicy(name, tool, 'deny')).ok, { name: serverName, tool: readOnly.name })
     check('bloqueio-gravado', blocked)
     const before = first.count
     await e2e.send(page, `Agora use de novo a ferramenta ${readOnly.name} do conector para buscar "Azure Functions triggers". Se não puder, diga exatamente que não consegue usá-la.`)
@@ -98,7 +98,7 @@ async function main() {
     await page.screenshot({ path: path.join(OUT, '19-conversa-com-conector-bloqueado.png') })
 
     // 5. clean up: disconnect
-    const gone = await page.evaluate(async (id) => (await window.forja.app.disconnectConnector(id)).ok, CONNECTOR)
+    const gone = await page.evaluate(async (id) => (await window.openclod.app.disconnectConnector(id)).ok, CONNECTOR)
     check('desconecta', gone)
     check('sem-erros-de-pagina', app.errors.filter((line) => line.startsWith('pageerror')).length === 0, app.errors.join(' | '))
   } finally {

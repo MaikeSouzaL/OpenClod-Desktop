@@ -126,6 +126,11 @@ export interface MemoryStats {
 interface IndexFile {
   version: 1
   pages: MemoryPageSummary[]
+  /**
+   * `file.md` → `size:mtime` when each summary was read. A rebuild rereads only the pages whose stamp changed (a wiki of
+   * thousands of pages used to be parsed whole every time one page was written). Older index files have none.
+   */
+  stamps?: Record<string, string>
 }
 
 interface HandoffFile {
@@ -198,9 +203,18 @@ export class ProjectMemory {
   async init(): Promise<void> {
     if (!this.initPromise) {
       this.initPromise = (async () => {
-        await this.migrateLegacyPages()
-        await this.enrichTurnTags()
-        await this.rebuildTopicHubs()
+        // One read of the wiki for the three passes (each used to read every page again: three times the whole wiki on
+        // every start); it is read again only when the migration changed it, which is rare.
+        // All three only maintain derived pages (turn notes, tags, subject hubs): one that fails (a file held by another
+        // program) must not keep the memory from opening — the wiki is intact, and the next start tries again.
+        try {
+          let pages = await this.readWiki()
+          if (await this.migrateLegacyPages(pages)) pages = await this.readWiki()
+          await this.enrichTurnTags(pages)
+          await this.rebuildTopicHubs(pages)
+        } catch {
+          /* maintenance only */
+        }
       })()
     }
     return this.initPromise
@@ -210,19 +224,24 @@ export class ProjectMemory {
    * Builds one small index page per recurring subject tag. These are hubs the
    * LLM can open and follow, not a second giant transcript.
    */
-  private async rebuildTopicHubs(): Promise<void> {
+  /** Every page of the wiki, read once, with the file it came from. */
+  private async readWiki(): Promise<Array<{ file: string; page: MemoryPage }>> {
     let files: string[] = []
     try {
       files = (await fs.promises.readdir(this.wikiDir)).filter((file) => file.endsWith('.md'))
     } catch {
-      return
+      return []
     }
-    const pages: MemoryPage[] = []
+    const out: Array<{ file: string; page: MemoryPage }> = []
     for (const file of files) {
       const page = await this.readPageFile(path.join(this.wikiDir, file))
-      if (!page) continue
-      pages.push({ ...page, slug: path.basename(file, '.md') })
+      if (page) out.push({ file, page: { ...page, slug: path.basename(file, '.md') } })
     }
+    return out
+  }
+
+  private async rebuildTopicHubs(entries: Array<{ file: string; page: MemoryPage }>): Promise<void> {
+    const pages = entries.map((entry) => entry.page)
     const byTag = new Map<string, MemoryPage[]>()
     for (const page of pages) {
       if (page.tags.includes('indice')) continue
@@ -249,15 +268,30 @@ export class ProjectMemory {
       const existing = await this.readPage(slug)
       if (existing && existing.source !== 'auto') continue
       if (existing?.body.trim() === body.trim()) continue
-      await this.writePage({
-        title,
-        body,
-        tags: ['indice', tag],
-        source: 'auto',
-        memoryType: 'fact',
-        confidence: 'observed',
-        context: 'auto:hub'
-      })
+      // Written straight to the wiki, all in one pass: through writePage each hub reread and rewrote the whole index, which
+      // made opening a memory of thousands of pages take minutes (hundreds of hubs × the index). The index picks up only
+      // these files afterwards (their stamps changed).
+      const now = new Date().toISOString()
+      // One hub that cannot be written (the file is held) does not stop the others.
+      await this.writeAtomic(
+        path.join(this.wikiDir, `${slug}.md`),
+        serializePage({
+          slug,
+          title: clean(title, MAX_TITLE),
+          body: clean(body, MAX_BODY),
+          tags: cleanTags(['indice', tag]),
+          pinned: false,
+          created: existing?.created ?? now,
+          updated: now,
+          source: 'auto',
+          memoryType: 'fact',
+          confidence: normalizeConfidence('observed'),
+          evidence: [],
+          context: 'auto:hub',
+          status: 'active',
+          possibleConflicts: []
+        })
+      ).catch(() => undefined)
     }
     await this.archiveStaleHubs(pages, qualifying)
   }
@@ -288,16 +322,10 @@ export class ProjectMemory {
   }
 
   /** Backfills subject tags on turn notes created before the tag index existed. */
-  private async enrichTurnTags(): Promise<void> {
-    let files: string[] = []
-    try {
-      files = (await fs.promises.readdir(this.wikiDir)).filter((file) => file.endsWith('.md'))
-    } catch {
-      return
-    }
-    for (const file of files) {
-      const page = await this.readPageFile(path.join(this.wikiDir, file))
-      if (!page || !page.tags.includes('turno')) continue
+  private async enrichTurnTags(entries: Array<{ file: string; page: MemoryPage }>): Promise<void> {
+    for (const entry of entries) {
+      const { file, page } = entry
+      if (!page.tags.includes('turno')) continue
       const tags = cleanTags([
         'turno',
         'automatico',
@@ -308,24 +336,19 @@ export class ProjectMemory {
         ? `${page.title} · ${shortText(headline, 60)}`
         : page.title
       if (tags.join(',') === page.tags.join(',') && title === page.title) continue
-      await this.writeAtomic(
-        path.join(this.wikiDir, file),
-        serializePage({ ...page, slug: path.basename(file, '.md'), title, tags })
-      )
+      const enriched = { ...page, slug: path.basename(file, '.md'), title, tags }
+      // A note that cannot be written now (held by another program) keeps its old tags until the next start.
+      if (!(await this.writeAtomic(path.join(this.wikiDir, file), serializePage(enriched)).then(() => true, () => false))) continue
+      // The hubs built next see the new title and tags.
+      entry.page = enriched
     }
   }
 
-  private async migrateLegacyPages(): Promise<void> {
+  /** Splits old one-file session logs into turn notes. True when it changed the wiki. */
+  private async migrateLegacyPages(entries: Array<{ file: string; page: MemoryPage }>): Promise<boolean> {
     await this.ensureDirs()
-    let files: string[] = []
-    try {
-      files = (await fs.promises.readdir(this.wikiDir)).filter((file) => file.endsWith('.md'))
-    } catch {
-      return
-    }
-    for (const file of files) {
-      const page = await this.readPageFile(path.join(this.wikiDir, file))
-      if (!page) continue
+    let migrated = false
+    for (const { page } of entries) {
       if (!page.tags.includes('sessao') || page.tags.includes('indice')) continue
       if (!/^###\s+/m.test(page.body)) continue
       const sections = splitLegacySections(page.body)
@@ -344,6 +367,7 @@ export class ProjectMemory {
         })
         links.push(`- [[${turn.slug}]] — ${section.stamp} — ${shortText(section.request, 90)}`)
       }
+      migrated = true
       await this.writePage({
         title: page.title,
         body: ['## Turnos', '', ...links.slice(-300)].join('\n'),
@@ -354,6 +378,7 @@ export class ProjectMemory {
         context: page.context
       })
     }
+    return migrated
   }
 
   private async readJson<T>(file: string): Promise<T | null> {
@@ -368,7 +393,21 @@ export class ProjectMemory {
     await fs.promises.mkdir(path.dirname(file), { recursive: true, mode: 0o700 })
     const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
     await fs.promises.writeFile(tmp, text, { encoding: 'utf8', mode: 0o600 })
-    await fs.promises.rename(tmp, file)
+    // On Windows the swap fails (EBUSY, EPERM) while another program holds the file for a moment: an antivirus, the search
+    // indexer, a backup or copy. It is tried again a few times before giving up, and the temporary file never stays behind.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await fs.promises.rename(tmp, file)
+        return
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (attempt >= 5 || !(code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
+          await fs.promises.rm(tmp, { force: true }).catch(() => undefined)
+          throw err
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt))
+      }
+    }
   }
 
   /**
@@ -376,62 +415,76 @@ export class ProjectMemory {
    * a `.md` file outside Openclod. The derived index is rebuilt when the folder
    * signature changes, so the UI's "Atualizar" always sees the files on disk.
    */
-  private async ensureFresh(): Promise<boolean> {
-    const signature = await this.wikiSignature()
-    if (this.indexSignature === signature) return false
-    this.indexSignature = signature
-    this.loadedIndex = null
-    return true
-  }
-
-  private async wikiSignature(): Promise<string> {
+  /** `file.md` → `size:mtime` of every page on disk: one readdir and one stat per file. */
+  private async wikiStamps(): Promise<Map<string, string>> {
     try {
       const files = (await fs.promises.readdir(this.wikiDir)).filter((file) => file.endsWith('.md')).sort()
-      const parts = await Promise.all(
+      const stamps = await Promise.all(
         files.map(async (file) => {
-          const stat = await fs.promises.stat(path.join(this.wikiDir, file))
-          return `${file}:${stat.size}:${stat.mtimeMs}`
+          const stat = await fs.promises.stat(path.join(this.wikiDir, file)).catch(() => null)
+          return [file, stat ? `${stat.size}:${stat.mtimeMs}` : ''] as const
         })
       )
-      return parts.join('|')
+      return new Map(stamps.filter(([, stamp]) => stamp))
     } catch {
-      return ''
+      return new Map()
     }
   }
 
-  private async index(): Promise<IndexFile> {
-    const stale = await this.ensureFresh()
-    if (stale) {
-      const rebuilt = await this.rebuildIndex()
-      this.loadedIndex = rebuilt
-      await this.writeAtomic(this.indexFile, `${JSON.stringify(rebuilt, null, 2)}\n`)
-      return rebuilt
+  /** The index in use while a rebuild runs: callers at the same time (the screen asks for pages and stats together) share it. */
+  private indexing: Promise<IndexFile> | null = null
+
+  private index(): Promise<IndexFile> {
+    if (!this.indexing) {
+      this.indexing = this.freshIndex().finally(() => {
+        this.indexing = null
+      })
     }
-    if (this.loadedIndex) return this.loadedIndex
-    const stored = await this.readJson<IndexFile>(this.indexFile)
-    if (stored && stored.version === 1 && Array.isArray(stored.pages)) {
-      this.loadedIndex = stored
-      return stored
-    }
-    const rebuilt = await this.rebuildIndex()
-    this.loadedIndex = rebuilt
-    await this.writeAtomic(this.indexFile, `${JSON.stringify(rebuilt, null, 2)}\n`)
-    return rebuilt
+    return this.indexing
   }
 
-  private async rebuildIndex(): Promise<IndexFile> {
+  /**
+   * The wiki is the source of truth (a human or another agent may change a `.md` outside Openclod): the index follows it,
+   * rereading only the pages whose size or time changed since they were summarized.
+   */
+  private async freshIndex(): Promise<IndexFile> {
+    const stamps = await this.wikiStamps()
+    const signature = [...stamps].map(([file, stamp]) => `${file}:${stamp}`).join('|')
+    if (this.loadedIndex && this.indexSignature === signature) return this.loadedIndex
+    let known = this.loadedIndex
+    if (!known) {
+      const stored = await this.readJson<IndexFile>(this.indexFile)
+      known = stored && stored.version === 1 && Array.isArray(stored.pages) ? stored : null
+    }
+    const previous = new Map((known?.pages ?? []).map((page) => [page.slug, page]))
+    const previousStamps = known?.stamps ?? {}
     const pages: MemoryPageSummary[] = []
-    try {
-      const files = await fs.promises.readdir(this.wikiDir)
-      for (const file of files) {
-        if (!file.endsWith('.md')) continue
-        const page = await this.readPageFile(path.join(this.wikiDir, file))
-        if (page) pages.push(summarize(page))
+    let reread = 0
+    for (const [file, stamp] of stamps) {
+      const prior = previous.get(file.slice(0, -3))
+      if (prior && previousStamps[file] === stamp) {
+        pages.push(prior)
+        continue
       }
-    } catch {
-      /* empty memory */
+      const page = await this.readPageFile(path.join(this.wikiDir, file))
+      reread++
+      if (page) pages.push(summarize(page))
     }
-    return { version: 1, pages: withBacklinks(sortSummaries(pages)) }
+    const next: IndexFile = { version: 1, pages: withBacklinks(sortSummaries(pages)), stamps: Object.fromEntries(stamps) }
+    this.loadedIndex = next
+    this.indexSignature = signature
+    // Written only when something changed (a page read again, one removed, or an index without stamps yet).
+    if (reread || !known || !known.stamps || known.pages.length !== next.pages.length) await this.writeIndex(next)
+    return next
+  }
+
+  /**
+   * Compact JSON: the index of a big wiki is tens of megabytes, and indentation only made it bigger and slower. The index
+   * is derived from the wiki, so failing to save it never fails the read: the pages are in memory, and the next change
+   * writes it again.
+   */
+  private async writeIndex(index: IndexFile): Promise<void> {
+    await this.writeAtomic(this.indexFile, `${JSON.stringify(index)}\n`).catch(() => undefined)
   }
 
   private async readPageFile(file: string): Promise<MemoryPage | null> {
@@ -446,10 +499,10 @@ export class ProjectMemory {
   }
 
   private async saveIndex(pages: MemoryPageSummary[]): Promise<void> {
-    const sorted = withBacklinks(sortSummaries(pages))
-    this.loadedIndex = { version: 1, pages: sorted }
-    this.indexSignature = await this.wikiSignature()
-    await this.writeAtomic(this.indexFile, `${JSON.stringify(this.loadedIndex, null, 2)}\n`)
+    const stamps = await this.wikiStamps()
+    this.loadedIndex = { version: 1, pages: withBacklinks(sortSummaries(pages)), stamps: Object.fromEntries(stamps) }
+    this.indexSignature = [...stamps].map(([file, stamp]) => `${file}:${stamp}`).join('|')
+    await this.writeIndex(this.loadedIndex)
   }
 
   /** Creates or updates a page by slug (derived from the title). Returns the summary. */
@@ -508,17 +561,26 @@ export class ProjectMemory {
         updated: now
       }))
     }
-    page.possibleConflicts = detectPotentialConflicts(page, await Promise.all(
-      indexBefore.pages
-        .filter((candidate) => candidate.slug !== slug && candidate.slug !== supersedes)
-        .map((candidate) => this.readPage(candidate.slug))
-    ))
+    // Only pages of the same semantic type can conflict (detectPotentialConflicts skips every other one): reading the whole
+    // wiki for each write made a 2000-page project take seconds per page.
+    page.possibleConflicts = page.memoryType && SEMANTIC_TYPES.has(page.memoryType)
+      ? detectPotentialConflicts(page, await Promise.all(
+          indexBefore.pages
+            .filter((candidate) => candidate.slug !== slug && candidate.slug !== supersedes && candidate.memoryType === page.memoryType)
+            .map((candidate) => this.readPage(candidate.slug))
+        ))
+      : []
     await this.writeAtomic(file, serializePage(page))
-    const index = await this.index()
-    const summaries = await Promise.all(index.pages.filter((item) => item.slug !== slug).map((item) => this.readPage(item.slug)))
-    const pages = summaries.flatMap((candidate) => candidate ? [summarize(candidate)] : [])
+    // The index read above is fresh (index() rebuilds it when the wiki changed behind it): only this page, and the one it
+    // supersedes, change in it.
+    const changed = new Set([slug, ...(supersedes ? [supersedes] : [])])
+    const pages = indexBefore.pages.filter((item) => !changed.has(item.slug))
     const summary = summarize(page)
     pages.push(summary)
+    if (supersedes) {
+      const replaced = await this.readPage(supersedes)
+      if (replaced) pages.push(summarize(replaced))
+    }
     await this.saveIndex(pages)
     return summary
   }

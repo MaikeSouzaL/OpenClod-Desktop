@@ -1,0 +1,230 @@
+{
+  "generatedAt": "2026-10-29T17:16:36.362Z",
+  "tools": [
+    {
+      "id": "apply-patch",
+      "repo": "OpenInterpreter--open-interpreter",
+      "source": "repositorios/_research/agents/OpenInterpreter--open-interpreter/codex-rs/core/assets/tools/apply_patch.lark",
+      "dest": "resources/harvested/tools/sources/apply-patch/apply_patch.lark",
+      "license": "Apache-2.0",
+      "destination": "src/core/tools/apply-patch/",
+      "status": "queued"
+    },
+    {
+      "id": "apply-patch-spec",
+      "repo": "OpenInterpreter--open-interpreter",
+      "source": "repositorios/_research/agents/OpenInterpreter--open-interpreter/codex-rs/core/src/tools/handlers/apply_patch_spec.rs",
+      "dest": "resources/harvested/tools/sources/apply-patch-spec/apply_patch_spec.rs",
+      "license": "Apache-2.0",
+      "destination": "src/core/tools/apply-patch/",
+      "status": "queued"
+    },
+    {
+      "id": "repo-map",
+      "repo": "Aider-AI--aider",
+      "source": "repositorios/_research/agents/Aider-AI--aider/aider/repomap.py",
+      "dest": "resources/harvested/tools/sources/repo-map/repomap.py",
+      "license": "Apache-2.0",
+      "destination": "src/core/code-intelligence/repomap.ts",
+      "status": "queued"
+    },
+    {
+      "id": "prior-read",
+      "repo": "QwenLM--qwen-code",
+      "source": "repositorios/_research/agents/QwenLM--qwen-code/packages/core/src/tools/priorReadEnforcement.ts",
+      "dest": "resources/harvested/tools/sources/prior-read/priorReadEnforcement.ts",
+      "license": "Apache-2.0",
+      "destination": "src/core/tools/prior-read.ts",
+      "status": "queued"
+    },
+    {
+      "id": "shell-arity",
+      "repo": "Kilo-Org--kilocode",
+      "source": "repositorios/_research/agents/Kilo-Org--kilocode/packages/opencode/src/permission/arity.ts",
+      "dest": "resources/harvested/tools/sources/shell-arity/arity.ts",
+      "license": "MIT",
+      "destination": "src/core/permissions/arity.ts",
+      "status": "queued"
+    },
+    {
+      "id": "tool-output-truncate",
+      "repo": "Kilo-Org--kilocode",
+      "source": "repositorios/_research/agents/Kilo-Org--kilocode/packages/opencode/src/tool/truncate.ts",
+      "dest": "resources/harvested/tools/sources/tool-output-truncate/truncate.ts",
+      "license": "MIT",
+      "destination": "src/core/tools/truncate.ts",
+      "status": "queued"
+    },
+    {
+      "id": "submit-review",
+      "repo": "SWE-agent--SWE-agent",
+      "source": "repositorios/_research/agents/SWE-agent--SWE-agent/tools/review_on_submit_m/bin/submit",
+      "dest": "resources/harvested/tools/sources/submit-review/submit",
+      "license": "MIT",
+      "destination": "src/core/tools/submit-review.ts",
+      "status": "queued"
+    },
+    {
+      "id": "mcp-stdio-lifecycle",
+      "repo": "modelcontextprotocol--python-sdk",
+      "source": "repositorios/_research/mcp/modelcontextprotocol--python-sdk/src/mcp/client/stdio.py",
+      "dest": "resources/harvested/tools/sources/mcp-stdio-lifecycle/stdio.py",
+      "license": "MIT",
+      "destination": "src/core/mcp/transport/stdio.ts",
+      "status": "queued"
+    },
+    {
+      "id": "mcp-streamable-http",
+      "repo": "modelcontextprotocol--typescript-sdk",
+      "source": "repositorios/_research/mcp/modelcontextprotocol--typescript-sdk/packages/client/src/client/streamableHttp.ts",
+      "dest": "resources/harvested/tools/sources/mcp-streamable-http/streamableHttp.ts",
+      "license": "Apache-2.0",
+      "destination": "src/core/mcp/transport/http.ts",
+      "status": "queued"
+    },
+    {
+      "id": "mcp-path-guard",
+      "repo": "modelcontextprotocol--servers",
+      "source": "repositorios/_research/mcp/modelcontextprotocol--servers/src/filesystem/path-validation.ts",
+      "dest": "resources/harvested/tools/sources/mcp-path-guard/path-validation.ts",
+      "license": "MIT",
+      "destination": "src/core/security/path-guard.ts",
+      "status": "queued"
+    },
+    {
+      "id": "mcp-fetch-guard",
+      "repo": "modelcontextprotocol--servers",
+      "source": "repositorios/_research/mcp/modelcontextprotocol--servers/src/fetch/src/mcp_server_fetch/server.py",
+      "dest": "resources/harvested/tools/sources/mcp-fetch-guard/server.py",
+      "license": "MIT",
+      "destination": "src/core/browser/fetch-guard.ts",
+      "status": "queued"
+    },
+    {
+      "id": "provider-retry",
+      "repo": "vercel--ai",
+      "source": "repositorios/_research/models/vercel--ai/packages/ai/src/util/retry-with-exponential-backoff.ts",
+      "dest": "resources/harvested/tools/sources/provider-retry/retry-with-exponential-backoff.ts",
+      "license": "Apache-2.0",
+      "destination": "src/core/providers/http.ts",
+      "status": "queued"
+    },
+    {
+      "id": "tool-call-parser",
+      "repo": "ggml-org--llama.cpp",
+      "source": "repositorios/_research/models/ggml-org--llama.cpp/common/chat-auto-parser.h",
+      "dest": "resources/harvested/tools/sources/tool-call-parser/chat-auto-parser.h",
+      "license": "MIT",
+      "destination": "src/core/providers/tool-parse.ts",
+      "status": "queued"
+    },
+    {
+      "id": "eval-trajectory",
+      "repo": "promptfoo--promptfoo",
+      "source": "repositorios/_research/testing/promptfoo--promptfoo/src/assertions/trajectory.ts",
+      "dest": "resources/harvested/tools/sources/eval-trajectory/trajectory.ts",
+      "license": "MIT",
+      "destination": "src/core/eval/assertions/trajectory.ts",
+      "status": "queued"
+    },
+    {
+      "id": "observability-taxonomy",
+      "repo": "langfuse--langfuse",
+      "source": "repositorios/_research/testing/langfuse--langfuse/packages/shared/src/domain/observations.ts",
+      "dest": "resources/harvested/tools/sources/observability-taxonomy/observations.ts",
+      "license": "MIT",
+      "destination": "src/core/observability/types.ts",
+      "status": "queued"
+    },
+    {
+      "id": "browser-snapshot",
+      "repo": "browserbase--stagehand",
+      "source": "repositorios/_research/browser/browserbase--stagehand/packages/extension/understudy/a11y/snapshot/capture.ts",
+      "dest": "resources/harvested/tools/sources/browser-snapshot/capture.ts",
+      "license": "MIT",
+      "destination": "src/core/browser/snapshot/capture.ts",
+      "status": "queued"
+    },
+    {
+      "id": "browser-element-identity",
+      "repo": "browser-use--browser-use",
+      "source": "repositorios/_research/browser/browser-use--browser-use/browser_use/dom/views.py",
+      "dest": "resources/harvested/tools/sources/browser-element-identity/views.py",
+      "license": "MIT",
+      "destination": "src/core/browser/element-identity.ts",
+      "status": "queued"
+    },
+    {
+      "id": "pty-flow-control",
+      "repo": "crynta--terax-ai",
+      "source": "repositorios/_research/desktop-ui/crynta--terax-ai/src-tauri/src/modules/pty/output.rs",
+      "dest": "resources/harvested/tools/sources/pty-flow-control/output.rs",
+      "license": "Apache-2.0",
+      "destination": "src/main/terminal/flow.ts",
+      "status": "queued"
+    },
+    {
+      "id": "keymap",
+      "repo": "asweigart--pyautogui",
+      "source": "repositorios/_research/computer-use/asweigart--pyautogui/pyautogui/_pyautogui_win.py",
+      "dest": "resources/harvested/tools/sources/keymap/_pyautogui_win.py",
+      "license": "BSD",
+      "destination": "src/core/computer/keymap.ts",
+      "status": "queued"
+    },
+    {
+      "id": "computer-settle",
+      "repo": "munim-computer-use",
+      "source": "repositorios/munim-computer-use/windows-linux/src/settle.rs",
+      "dest": "resources/harvested/tools/sources/computer-settle/settle.rs",
+      "license": "Apache-2.0",
+      "destination": "src/core/computer/settle.ts",
+      "status": "ported"
+    },
+    {
+      "id": "operation-state-machine",
+      "repo": "block--goose",
+      "source": "repositorios/_research/agents/block--goose/crates/goose-agent/src/machine.rs",
+      "dest": "resources/harvested/tools/sources/operation-state-machine/machine.rs",
+      "license": "Apache-2.0",
+      "destination": "src/core/agent/state-machine.ts",
+      "status": "queued"
+    },
+    {
+      "id": "exec-policy",
+      "repo": "openai--codex",
+      "source": "repositorios/_research/agents/openai--codex/codex-rs/execpolicy/src/policy.rs",
+      "dest": "resources/harvested/tools/sources/exec-policy/policy.rs",
+      "license": "Apache-2.0",
+      "destination": "src/core/security/exec-policy.ts",
+      "status": "queued"
+    },
+    {
+      "id": "durable-operation",
+      "repo": "pydantic--pydantic-ai",
+      "source": "repositorios/_research/orchestration/pydantic--pydantic-ai/pydantic_ai_slim/pydantic_ai/durable_exec/_operation.py",
+      "dest": "resources/harvested/tools/sources/durable-operation/_operation.py",
+      "license": "MIT",
+      "destination": "src/core/session/run-journal.ts",
+      "status": "queued"
+    },
+    {
+      "id": "memory-extraction",
+      "repo": "mem0ai--mem0",
+      "source": "repositorios/_research/memory/mem0ai--mem0/mem0/memory/main.py",
+      "dest": "resources/harvested/tools/sources/memory-extraction/main.py",
+      "license": "Apache-2.0",
+      "destination": "src/core/memory/extract.ts",
+      "status": "queued"
+    },
+    {
+      "id": "memory-waterfall",
+      "repo": "run-llama--llama_index",
+      "source": "repositorios/_research/memory/run-llama--llama_index/llama-index-core/llama_index/core/memory/memory.py",
+      "dest": "resources/harvested/tools/sources/memory-waterfall/memory.py",
+      "license": "MIT",
+      "destination": "src/core/agent/compaction.ts",
+      "status": "queued"
+    }
+  ]
+}

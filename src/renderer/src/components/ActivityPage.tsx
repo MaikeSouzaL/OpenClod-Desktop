@@ -30,7 +30,7 @@ export function ActivityPage({ projects, activeProjectId, onOpenSession, onOpenM
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
-      setItems(await unwrap(window.forja.app.activity({ query, type: type || undefined, severity: severity || undefined, archived, limit: 500 })))
+      setItems(await unwrap(window.openclod.app.activity({ query, type: type || undefined, severity: severity || undefined, archived, limit: 500 })))
       setError('')
     } catch (err) {
       setError(errorMessage(err))
@@ -57,7 +57,7 @@ export function ActivityPage({ projects, activeProjectId, onOpenSession, onOpenM
         </div>
         <div className="activity-head-actions">
           <button type="button" className="btn ghost small" onClick={() => void refresh()}><Icon name="refresh" size={12} /> Atualizar</button>
-          <button type="button" className="btn ghost small" onClick={async () => { await unwrap(window.forja.app.clearActivity(true)); await refresh() }}>Limpar arquivadas</button>
+          <button type="button" className="btn ghost small" onClick={async () => { await unwrap(window.openclod.app.clearActivity(true)); await refresh() }}>Limpar arquivadas</button>
         </div>
       </header>
       <ImprovementReviewCard projects={projects} activeProjectId={activeProjectId} onOpenMemory={onOpenMemory} />
@@ -103,10 +103,10 @@ export function ActivityPage({ projects, activeProjectId, onOpenSession, onOpenM
               {item.actionable === 'memory' && typeof item.metadata?.projectId === 'string' && typeof item.metadata?.slug === 'string' ? (
                 <button type="button" className="btn tiny ghost" onClick={() => onOpenMemory(item.metadata!.projectId as string, item.metadata!.slug as string)}>Abrir na Memória</button>
               ) : null}
-              <button type="button" className="icon-btn small" title={item.read ? 'Marcar como não lida' : 'Marcar como lida'} onClick={async () => { await unwrap(window.forja.app.setActivityRead(item.id, !item.read)); await refresh() }}>
+              <button type="button" className="icon-btn small" title={item.read ? 'Marcar como não lida' : 'Marcar como lida'} onClick={async () => { await unwrap(window.openclod.app.setActivityRead(item.id, !item.read)); await refresh() }}>
                 <Icon name={item.read ? 'bell' : 'check'} size={12} />
               </button>
-              <button type="button" className="icon-btn small" title={item.archived ? 'Desarquivar' : 'Arquivar'} onClick={async () => { await unwrap(window.forja.app.archiveActivity(item.id, !item.archived)); await refresh() }}>
+              <button type="button" className="icon-btn small" title={item.archived ? 'Desarquivar' : 'Arquivar'} onClick={async () => { await unwrap(window.openclod.app.archiveActivity(item.id, !item.archived)); await refresh() }}>
                 <Icon name="archive" size={12} />
               </button>
             </div>

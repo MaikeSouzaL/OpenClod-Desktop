@@ -58,9 +58,9 @@ export function useConnectors(): ConnectorsStore {
   const readStates = useCallback(async (): Promise<void> => {
     const ticket = ++sequence.current
     const [nextStates, nextServers] = await Promise.all([
-      unwrap(window.forja.app.connectorStates()),
+      unwrap(window.openclod.app.connectorStates()),
       // Masked: only used to describe the servers the user added by hand.
-      unwrap(window.forja.app.maskedMcpSettings()).catch(() => null)
+      unwrap(window.openclod.app.maskedMcpSettings()).catch(() => null)
     ])
     if (!alive.current || ticket !== sequence.current) return
     setStates(nextStates)
@@ -84,7 +84,7 @@ export function useConnectors(): ConnectorsStore {
   const loadDirectory = useCallback(async (): Promise<void> => {
     setLoadError('')
     try {
-      const directory = await unwrap(window.forja.app.connectorDirectory())
+      const directory = await unwrap(window.openclod.app.connectorDirectory())
       if (!alive.current) return
       setEntries(Array.isArray(directory.entries) ? directory.entries : [])
       await readStates()
@@ -113,7 +113,7 @@ export function useConnectors(): ConnectorsStore {
   // `settings_changed` (scope mcp): login finished, a server dropped, a policy saved from elsewhere.
   useEffect(() => {
     let pending: number | undefined
-    const off = window.forja.events.on((event) => {
+    const off = window.openclod.events.on((event) => {
       if (event.type !== 'settings_changed' || event.scope !== 'mcp') return
       window.clearTimeout(pending)
       pending = window.setTimeout(() => void refresh(), 120)
@@ -156,7 +156,7 @@ export function useConnectors(): ConnectorsStore {
   const connect = useCallback(
     (id: string, input?: ConnectInputWithApp): Promise<ConnectResult> =>
       withBusy(id, 'connect', async () => {
-        const result = await unwrap(window.forja.app.connectConnector(id, input))
+        const result = await unwrap(window.openclod.app.connectConnector(id, input))
         if (result.authUrl) setAuthUrls((current) => ({ ...current, [result.state.id]: result.authUrl! }))
         const redirect = redirectUriOf(result) ?? redirectUriOf(result.state)
         if (redirect) setRedirectUris((current) => ({ ...current, [result.state.id]: redirect }))
@@ -169,7 +169,7 @@ export function useConnectors(): ConnectorsStore {
   const disconnect = useCallback(
     (id: string): Promise<void> =>
       withBusy(id, 'disconnect', async () => {
-        await unwrap(window.forja.app.disconnectConnector(id))
+        await unwrap(window.openclod.app.disconnectConnector(id))
         setAuthUrls((current) => {
           const next = { ...current }
           delete next[id]
@@ -188,7 +188,7 @@ export function useConnectors(): ConnectorsStore {
   const reload = useCallback(async (): Promise<void> => {
     setReloading(true)
     try {
-      const next = await unwrap(window.forja.app.reloadMcp())
+      const next = await unwrap(window.openclod.app.reloadMcp())
       if (alive.current) setStates(next)
       await refresh()
     } finally {
@@ -196,9 +196,9 @@ export function useConnectors(): ConnectorsStore {
     }
   }, [refresh])
 
-  const loadTools = useCallback((serverName: string): Promise<ConnectorTool[]> => unwrap(window.forja.app.connectorTools(serverName)), [])
+  const loadTools = useCallback((serverName: string): Promise<ConnectorTool[]> => unwrap(window.openclod.app.connectorTools(serverName)), [])
   const setPolicy = useCallback(
-    (serverName: string, tool: string, policy: ToolPolicy): Promise<ConnectorTool[]> => unwrap(window.forja.app.setToolPolicy(serverName, tool, policy)),
+    (serverName: string, tool: string, policy: ToolPolicy): Promise<ConnectorTool[]> => unwrap(window.openclod.app.setToolPolicy(serverName, tool, policy)),
     []
   )
 

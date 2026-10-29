@@ -70,7 +70,7 @@ async function main() {
     await page.screenshot({ path: file })
     result.shots.push(file)
   }
-  const api = (fn, ...args) => page.evaluate(async ({ fn, args }) => (await window.forja.app[fn](...args)), { fn, args })
+  const api = (fn, ...args) => page.evaluate(async ({ fn, args }) => (await window.openclod.app[fn](...args)), { fn, args })
   const waitFor = async (label, probe, timeoutMs = 40000) => {
     const started = Date.now()
     for (;;) {

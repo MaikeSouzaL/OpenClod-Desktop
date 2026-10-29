@@ -19,7 +19,7 @@ export interface LoadedAgents {
 export interface LoadAgentsOptions {
   /** Openclod's per-user folder (the app uses %APPDATA%\Openclod\agents). */
   userDir?: string
-  /** Project root: `.forja/agents` is read from it, and `.claude/agents` when `importClaude` is set. */
+  /** Project root: `.openclod/agents` is read from it, and `.claude/agents` when `importClaude` is set. */
   cwd?: string
   /** Also read Claude Code's agent folders (project `.claude/agents` and `~/.claude/agents`), read-only. */
   importClaude?: boolean
@@ -27,6 +27,8 @@ export interface LoadAgentsOptions {
   homeDir?: string
   /** Replaces the built-in agents. */
   builtins?: AgentDefinition[]
+  /** App-shipped agents (`resources/agents`), loaded after built-ins and before the user's. */
+  bundledDir?: string
 }
 
 export function isValidAgentName(name: string): boolean {
@@ -493,19 +495,20 @@ export function loadAgentsFromDir(dir: string, source: AgentSource, imported = f
 /**
  * Built-ins first, then each folder; a later definition replaces an earlier one
  * with the same name. Order (later wins): built-ins, ~/.claude/agents, the user
- * folder, <project>/.claude/agents, <project>/.forja/agents. So the project
+ * folder, <project>/.claude/agents, <project>/.openclod/agents. So the project
  * beats the user, and Openclod's own files beat imported Claude ones at the same
  * level. Claude folders are read only when `importClaude` is set.
  */
 export function loadAgents(options: LoadAgentsOptions = {}): LoadedAgents {
   const layers: LoadedAgents[] = [{ agents: options.builtins ?? BUILTIN_AGENTS, warnings: [] }]
+  if (options.bundledDir) layers.push(loadAgentsFromDir(options.bundledDir, 'builtin'))
   if (options.importClaude) {
     layers.push(loadAgentsFromDir(path.join(options.homeDir ?? os.homedir(), '.claude', 'agents'), 'user', true))
   }
   if (options.userDir) layers.push(loadAgentsFromDir(options.userDir, 'user'))
   if (options.cwd) {
     if (options.importClaude) layers.push(loadAgentsFromDir(path.join(options.cwd, '.claude', 'agents'), 'project', true))
-    layers.push(loadAgentsFromDir(path.join(options.cwd, '.forja', 'agents'), 'project'))
+    layers.push(loadAgentsFromDir(path.join(options.cwd, '.openclod', 'agents'), 'project'))
   }
   const byName = new Map<string, AgentDefinition>()
   const warnings: AgentLoadWarning[] = []

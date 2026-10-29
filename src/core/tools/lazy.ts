@@ -61,7 +61,9 @@ export const DEFERRED_ESSENTIAL_TOOL_NAMES: ReadonlySet<string> = new Set([
   'mcp_catalog',
   'mcp_call',
   'list_agents',
-  'task'
+  'task',
+  // Codex/GPT models write this one on their own: calling it by name loads it.
+  'apply_patch'
 ])
 
 export const toolSearchTool: ToolDef = {

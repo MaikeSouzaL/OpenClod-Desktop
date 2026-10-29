@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import type { Message, RunState, ToolCallPart, ToolResultPart } from '../../../shared/types'
-import { Icon } from './Icons'
+import type { ImagePart, Message, RunState, ToolCallPart, ToolResultPart } from '../../../shared/types'
+import { Icon, type IconName } from './Icons'
 import { Markdown } from './Markdown'
 import { ToolCard } from './ToolCard'
 import { EditCard } from './EditCard'
@@ -10,7 +10,9 @@ import { OpenclodMark } from './Chrome'
 import { buildAssistantBlocks, isEditCall, isLimitationCall, isPlanCall, isQuestionCall, summarizeCalls, type AssistantBlock } from '../lib/groups'
 import { formatDuration, type ActivityEntry } from '../lib/activity'
 import { SPEECH_FALLBACK, speechText } from '../lib/speech'
+import { imageCaption, imageSeal, type SealTone } from '../lib/seen-images'
 import type { LiveTool } from '../lib/types'
+import './seen-images.css'
 
 interface TranscriptProps {
   /** Resets the scroll anchor when the user opens another session. */
@@ -25,60 +27,111 @@ interface TranscriptProps {
   onOpenTasks(): void
 }
 
+const SEAL_ICON: Record<SealTone, IconName> = { seen: 'eye', described: 'sparkles', waiting: 'clock', unseen: 'alert', text: 'file' }
+
+/** Whether the model saw this picture; the relay's description opens under it, since it is what the model read. */
+function ImageSealLine({ image, busy, preview = false }: { image: ImagePart; busy: boolean; preview?: boolean }): ReactElement | null {
+  const seal = imageSeal(image, busy, preview)
+  if (!seal) return null
+  return (
+    <div className={`image-seal is-${seal.tone}`} data-seal={seal.tone}>
+      <span className="image-seal-text">
+        <Icon name={SEAL_ICON[seal.tone]} size={11} />
+        {seal.text}
+      </span>
+      {seal.description ? (
+        <details className="image-seal-description">
+          <summary>Ver o que o modelo leu</summary>
+          <p>{seal.description}</p>
+        </details>
+      ) : null}
+    </div>
+  )
+}
+
+function captionIcon(toolName: string | undefined): IconName {
+  if (toolName?.startsWith('computer_')) return 'monitor'
+  if (toolName?.startsWith('browser_')) return 'globe'
+  return 'image'
+}
+
 /**
- * A run of tool calls as one summary line ("Executou 3 comandos, leu 2 arquivos")
- * that expands into the individual cards. Edits get their own diff card instead.
+ * Every picture the agent looks at is conversation content, not a hidden tool detail: it is shown inline (even when
+ * the tool group is collapsed), with what it is and whether the model really saw it.
  */
-/**
- * Screenshots are conversation content, not a hidden tool detail: show the
- * image inline in the transcript, even when the tool group is collapsed.
- */
-function ScreenshotCard({
-  result,
+function SeenImagesCard({
+  images,
+  preview = [],
+  toolName,
+  args,
+  detail,
+  busy,
   onOpen
 }: {
-  result: ToolResultPart
+  images: ImagePart[]
+  /** Shown to the user only: the model got the text the tool extracted from them. */
+  preview?: ImagePart[]
+  toolName?: string
+  args?: unknown
+  detail?: string
+  busy: boolean
   onOpen(src: string, alt: string): void
 }): ReactElement | null {
-  if (!result.images?.length) return null
+  const items = [...images.map((image) => ({ image, preview: false })), ...preview.map((image) => ({ image, preview: true }))]
+  if (!items.length) return null
+  const caption = imageCaption(toolName, items.map((item) => item.image), args)
   return (
-    <figure className="chat-shot">
+    <figure className={`chat-shot ${items.length > 1 ? 'is-multi' : ''}`} data-seen-images={toolName ?? 'contexto'}>
       <div className="chat-shot-images">
-        {result.images.map((image, index) => {
+        {items.map(({ image, preview: onlyShown }, index) => {
           const src = `data:${image.mediaType};base64,${image.data}`
-          const alt = image.label ?? 'Captura de tela'
+          const alt = image.label ?? caption
           return (
-            <button key={index} type="button" className="chat-shot-image" onClick={() => onOpen(src, alt)}>
-              <img src={src} alt={alt} title={`${alt} — clique para ampliar`} loading="lazy" />
-            </button>
+            <div key={index} className="chat-shot-item">
+              <button type="button" className="chat-shot-image" onClick={() => onOpen(src, alt)}>
+                <img src={src} alt={alt} title={`${alt} — clique para ampliar`} loading="lazy" />
+              </button>
+              {items.length > 1 && image.label ? <span className="chat-shot-label">{image.label}</span> : null}
+              <ImageSealLine image={image} busy={busy} preview={onlyShown} />
+            </div>
           )
         })}
       </div>
       <figcaption>
-        <Icon name="camera" size={12} />
-        <span>Captura de tela</span>
-        {result.detail ? <em>{result.detail}</em> : null}
+        <Icon name={captionIcon(toolName)} size={12} />
+        <span>{caption}</span>
+        {detail ? <em>{detail}</em> : null}
       </figcaption>
     </figure>
   )
 }
 
+/**
+ * A run of tool calls as one summary line ("Executou 3 comandos, leu 2 arquivos")
+ * that expands into the individual cards. Edits get their own diff card instead.
+ */
 function ToolGroup({
   calls,
   results,
   tools,
+  busy,
   onOpenImage
 }: {
   calls: ToolCallPart[]
   results: Map<string, ToolResultPart>
   tools: Record<string, LiveTool>
+  busy: boolean
   onOpenImage(src: string, alt: string): void
 }): ReactElement {
   const limitations = calls.filter((call) => isLimitationCall(call.name))
   const questions = calls.filter((call) => isQuestionCall(call.name))
   const edits = calls.filter((call) => isEditCall(call.name))
-  const screenshots = calls.filter((call) => Boolean(results.get(call.id)?.images?.length))
-  const screenshotIds = new Set(screenshots.map((call) => call.id))
+  const screenshots = calls.filter((call) => {
+    const result = results.get(call.id)
+    return Boolean(result?.images?.length || result?.preview?.length)
+  })
+  // A capture is its own card; a tool that only shows a preview (OCR, PDF) keeps its row, whose text is what the model read.
+  const screenshotIds = new Set(screenshots.filter((call) => results.get(call.id)?.images?.length).map((call) => call.id))
   const others = calls.filter(
     (call) =>
       !screenshotIds.has(call.id) &&
@@ -129,9 +182,21 @@ function ToolGroup({
           </div>
         </details>
       ) : null}
-      {screenshots.map((call) => (
-        <ScreenshotCard key={`shot-${call.id}`} result={results.get(call.id)!} onOpen={onOpenImage} />
-      ))}
+      {screenshots.map((call) => {
+        const result = results.get(call.id)!
+        return (
+          <SeenImagesCard
+            key={`shot-${call.id}`}
+            images={result.images ?? []}
+            preview={result.preview}
+            toolName={call.name}
+            args={call.args}
+            detail={result.detail}
+            busy={busy}
+            onOpen={onOpenImage}
+          />
+        )
+      })}
     </>
   )
 }
@@ -233,8 +298,14 @@ export function Transcript({
   }, [messages])
 
   // System messages are for the user only (a model switch, for instance) and are shown as a line in the conversation.
+  // A hidden message that carries pictures (the contact sheets of an attached video) shows only those pictures.
   const visible = useMemo(
-    () => messages.filter((message) => !message.hidden && (message.role !== 'system' || Boolean(message.notice))),
+    () =>
+      messages.filter((message) =>
+        message.hidden
+          ? message.role === 'user' && message.parts.some((part) => part.type === 'image')
+          : message.role !== 'system' || Boolean(message.notice)
+      ),
     [messages]
   )
   const blocks = useMemo(() => buildAssistantBlocks(visible), [visible])
@@ -313,7 +384,7 @@ export function Transcript({
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => window.forja.tts.onEvent((event) => {
+  useEffect(() => window.openclod.tts.onEvent((event) => {
     // The "idle" that ends the synthesis arrives just before the audio does: the button stays on "Parar" until then.
     if ((event.phase === 'idle' || event.phase === 'error') && !ttsPendingRef.current) setSpeakingId(null)
   }), [])
@@ -381,7 +452,7 @@ export function Transcript({
       if (ttsAudioRef.current) ttsAudioRef.current.src = ''
       ttsAudioRef.current = null
       setSpeakingId(null)
-      await window.forja.tts.stop()
+      await window.openclod.tts.stop()
       return
     }
     ttsAudioRef.current?.pause()
@@ -392,10 +463,10 @@ export function Transcript({
     ttsPendingRef.current = id
     setSpeakingId(id)
     try {
-      await window.forja.tts.stop()
-      const settings = await window.forja.app.settings()
+      await window.openclod.tts.stop()
+      const settings = await window.openclod.app.settings()
       const voice = settings.ok ? settings.value.voice : undefined
-      const result = await window.forja.tts.speak({
+      const result = await window.openclod.tts.speak({
         text,
         provider: voice?.ttsProvider ?? 'edge',
         voice: voice?.ttsVoice,
@@ -427,7 +498,7 @@ export function Transcript({
         await audio.play()
       } else {
         // The Windows voice speaks on its own; an "idle" that came while this was pending was not applied, so ask.
-        const status = await window.forja.tts.status()
+        const status = await window.openclod.tts.status()
         if (ttsPendingRef.current === id && status.ok && (status.value.phase === 'idle' || status.value.phase === 'error')) setSpeakingId(null)
       }
     } catch {
@@ -456,6 +527,7 @@ export function Transcript({
             calls={calls}
             results={results}
             tools={tools}
+            busy={busy}
             onOpenImage={(src, alt) => setPreview({ src, alt })}
           />
         ) : null}
@@ -506,7 +578,7 @@ export function Transcript({
             <span className="thread-empty-mark">
               <OpenclodMark size={26} />
             </span>
-            <h2>O que vamos forjar?</h2>
+            <h2>O que vamos construir?</h2>
             <p>Peça uma tarefa. O agente lê o projeto, edita arquivos, roda comandos, navega ou controla o Windows.</p>
             <div className="thread-examples">
               <span>Encontre por que o login falha e corrija com teste.</span>
@@ -528,6 +600,18 @@ export function Transcript({
             )
           }
           if (message.role !== 'user') return null
+          if (message.hidden) {
+            // Only the pictures: the text of a hidden message is context for the model, not something the user said.
+            return (
+              <article key={message.id} className="message assistant seen-context">
+                <SeenImagesCard
+                  images={message.parts.filter((part): part is ImagePart => part.type === 'image')}
+                  busy={busy}
+                  onOpen={(src, alt) => setPreview({ src, alt })}
+                />
+              </article>
+            )
+          }
           const { text, images } = userParts(message)
           return (
             <article key={message.id} className="message user">
@@ -540,14 +624,12 @@ export function Transcript({
                       const src = `data:${image.mediaType};base64,${image.data}`
                       const alt = image.label ?? 'imagem colada'
                       return (
-                        <button
-                          key={index}
-                          type="button"
-                          className="message-image-button"
-                          onClick={() => setPreview({ src, alt })}
-                        >
-                          <img src={src} alt={alt} title="Clique para ampliar" />
-                        </button>
+                        <div key={index} className="message-image">
+                          <button type="button" className="message-image-button" onClick={() => setPreview({ src, alt })}>
+                            <img src={src} alt={alt} title="Clique para ampliar" />
+                          </button>
+                          <ImageSealLine image={image} busy={busy} />
+                        </div>
                       )
                     })}
                   </div>

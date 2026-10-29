@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { z } from 'zod'
 import type { ToolResult } from '../../shared/types.js'
+import { previewImage } from '../images/preview.js'
 import { editImage, generateImage, inspectImage } from '../images/service.js'
 import { ocrImage } from '../media/ocr.js'
 import type { ToolDef } from './types.js'
@@ -99,30 +100,36 @@ export const imageGenerateTool: ToolDef = {
 export const imageOcrTool: ToolDef = {
   name: 'image_ocr',
   description:
-    'Extrai texto offline de capturas, fotos e documentos digitalizados com Windows.Media.Ocr. Retorna linhas e coordenadas das palavras para rastrear a posição na imagem.',
+    'Extrai texto offline de capturas, fotos, páginas inteiras e documentos digitalizados com Windows.Media.Ocr, numa chamada só. ' +
+    'Lê a imagem inteira e, se o motor não reconhecer nada (ou a imagem passar de 10 000 px num lado, como prints de rolagem), lê em blocos ampliados e junta o texto na ordem de leitura. ' +
+    'Para um PDF digitalizado use document_extract (ele renderiza as páginas e faz este OCR). Retorna linhas e, se pedido, as coordenadas das palavras.',
   risk: 'read',
   parallelSafe: false,
   schema: z.object({
     path: z.string().min(1).max(1_000),
-    include_boxes: z.boolean().optional().describe('Incluir coordenadas x/y/largura/altura das palavras')
+    include_boxes: z.boolean().optional().describe('Incluir coordenadas x/y/largura/altura das palavras'),
+    blocks: z.boolean().optional().describe('Ler direto em blocos ampliados (quando a leitura inteira veio incompleta)')
   }),
   describe(raw) {
     return { title: 'OCR de imagem', detail: (raw as { path?: string }).path ?? '' }
   },
   async execute(raw, ctx): Promise<ToolResult> {
-    const args = this.schema.parse(raw) as { path: string; include_boxes?: boolean }
-    const result = await ocrImage(ctx.workspace.resolve(args.path, ctx.cwd), { signal: ctx.signal })
+    const args = this.schema.parse(raw) as { path: string; include_boxes?: boolean; blocks?: boolean }
+    const result = await ocrImage(ctx.workspace.resolve(args.path, ctx.cwd), { signal: ctx.signal, mode: args.blocks ? 'blocos' : 'auto' })
     const text = result.lines.length
       ? result.lines.map((line) => args.include_boxes
           ? `${line.text}\n  ${line.words.map((word) => `${word.text}@${word.x},${word.y},${word.width}x${word.height}`).join(' · ')}`
           : line.text).join('\n')
-      : '(nenhum texto reconhecido)'
+      : '(nenhum texto reconhecido, nem lendo em blocos ampliados)'
+    // The chat shows the image that was read; the model gets only its text.
+    const preview = await previewImage(result.source, path.basename(result.source))
     return {
       ok: Boolean(result.text),
       text,
-      summary: `${result.lines.length} linha(s) OCR`,
+      summary: `${result.lines.length} linha(s) OCR${result.mode === 'blocos' ? ' · lida em blocos' : ''}`,
       files: [result.source],
-      data: { text: result.text, lines: result.lines }
+      ...(preview ? { preview: [preview] } : {}),
+      data: { text: result.text, lines: result.lines, mode: result.mode }
     }
   }
 }

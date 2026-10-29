@@ -86,7 +86,7 @@ function readIfExists(file: string, maxChars = 12_000): string | undefined {
   }
 }
 
-const INSTRUCTION_NAMES = ['CLAUDE.md', 'AGENTS.md', 'FORJA.md', '.forja/AGENTS.md']
+const INSTRUCTION_NAMES = ['CLAUDE.md', 'AGENTS.md', 'OPENCLOD.md', '.openclod/AGENTS.md']
 const MAX_INSTRUCTION_TOTAL = 40_000
 const MAX_IMPORT_DEPTH = 3
 
@@ -162,7 +162,7 @@ export function loadProjectInstructions(cwd: string): string | undefined {
 
 const CLAUDE_TEMPLATE = (projectName: string): string => `# CLAUDE.md
 
-<!-- forja:generated -->
+<!-- openclod:generated -->
 > Este arquivo é lido pelo Openclod, pelo Claude Code e por outros agentes
 > compatíveis. O Openclod o cria automaticamente quando ele não existe e nunca
 > sobrescreve o seu conteúdo. Edite à vontade.
@@ -171,7 +171,7 @@ const CLAUDE_TEMPLATE = (projectName: string): string => `# CLAUDE.md
 
 - Nome: ${projectName}
 - Raiz: este diretório
-- O Openclod também lê \`AGENTS.md\`, \`FORJA.md\` e \`.forja/AGENTS.md\` quando existem.
+- O Openclod também lê \`AGENTS.md\`, \`OPENCLOD.md\` e \`.openclod/AGENTS.md\` quando existem.
 
 ## Comandos do projeto
 
@@ -274,7 +274,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
 - Investigue antes de mudar: list_dir/glob/grep e leia os arquivos relevantes.
 - Quando o pedido envolver documentação, API, versão ou estado atual de uma biblioteca, pesquise na web com \`web_research\` (ou \`web_search\` + \`fetch_url\`) e cite a URL e o trecho que sustenta cada conclusão. Não invente documentação.
 - Para tarefas com 3+ passos, registre o plano com update_plan e mantenha os status atualizados.
-- Faça mudanças pequenas e verificáveis. Prefira edit_file (substituição exata) ou patch_file (diff unificado) a reescrever arquivos.
+- Faça mudanças pequenas e verificáveis. Prefira edit_file (substituição exata) ou patch_file (diff unificado) a reescrever arquivos; para mudar vários arquivos de uma vez, tudo ou nada, use apply_patch.
 - Para consertar um erro, rode o comando/teste, leia a saída e altere apenas o arquivo e as linhas que causaram a falha. Nunca reescreva o arquivo inteiro para mudar alguns trechos.
 - Execute a verificação real do projeto (test, typecheck, lint, build) e leia a saída antes de concluir.
 - Depois de alterar interface, valide visualmente (browser_screenshot ou computer_screenshot) quando possível.

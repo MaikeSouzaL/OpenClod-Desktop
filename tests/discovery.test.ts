@@ -1,7 +1,7 @@
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
-import { discoverForProvider, discoverModels, inferDiscoveryKind } from '../src/core/providers/discovery'
+import { discoverForProvider, discoverModels, inferDiscoveryKind, openAiModelsUrl } from '../src/core/providers/discovery'
 
 /**
  * Discovery talks to throwaway local HTTP servers that imitate the shape of
@@ -384,6 +384,22 @@ describe('discoverForProvider', () => {
     const openai = await discoverForProvider({ kind: 'openai', baseUrl: `${fake.url}/v1` }, '')
     expect(openai.source).toBe('openai')
     expect(fake.requests[1].headers.authorization).toBeUndefined()
+  })
+})
+
+describe('openAiModelsUrl', () => {
+  it('lists most servers at <baseUrl>/models', () => {
+    expect(openAiModelsUrl('https://api.deepseek.com/v1')).toBe('https://api.deepseek.com/v1/models')
+    expect(openAiModelsUrl('https://api.openai.com/v1/')).toBe('https://api.openai.com/v1/models')
+  })
+
+  it('points OpenCode at its /zen/v1/models catalog (the chat base returns 404 for /models)', () => {
+    expect(openAiModelsUrl('https://opencode.ai/inference/go/openai/v1')).toBe('https://opencode.ai/zen/v1/models')
+    expect(openAiModelsUrl('https://opencode.ai/inference/openai/v1')).toBe('https://opencode.ai/zen/v1/models')
+  })
+
+  it('falls back to the default when the base URL is not parseable', () => {
+    expect(openAiModelsUrl('not a url')).toBe('not a url/models')
   })
 })
 

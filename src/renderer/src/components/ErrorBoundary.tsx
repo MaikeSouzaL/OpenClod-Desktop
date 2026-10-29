@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error(`[forja] erro em ${this.props.label}:`, error, info.componentStack)
+    console.error(`[openclod] erro em ${this.props.label}:`, error, info.componentStack)
   }
 
   componentDidUpdate(previous: ErrorBoundaryProps): void {

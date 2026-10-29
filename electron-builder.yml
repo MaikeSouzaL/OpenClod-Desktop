@@ -1,10 +1,10 @@
-# Empacotamento do Forja (electron-builder).
+# Empacotamento do Openclod (electron-builder).
 # Este arquivo tem precedência sobre o bloco "build" do package.json.
 # Alvo: Windows x64, instalador NSIS assistido.
 
-appId: com.forja.desktop
-productName: Forja
-copyright: Forja
+appId: com.openclod.desktop
+productName: Openclod
+copyright: Openclod
 
 directories:
   output: release
@@ -46,7 +46,7 @@ win:
   # automaticamente (buildResources: build). Descomente para EXIGIR o ícone —
   # nesse caso o build falha se o arquivo não existir.
   # icon: build/icon.ico
-  artifactName: Forja-${version}-setup.${ext}
+  artifactName: Openclod-${version}-setup.${ext}
 
 # Ícone da janela em produção: src/main/index.ts procura
 # process.resourcesPath/icon.png. Descomente quando build/icon.png existir.
@@ -61,5 +61,5 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Forja
+  shortcutName: Openclod
   deleteAppDataOnUninstall: false

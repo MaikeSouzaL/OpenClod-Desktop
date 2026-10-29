@@ -13,7 +13,7 @@ import { makeTempDir, policy, removeTempDir } from './helpers'
 let cwd: string
 
 beforeEach(async () => {
-  cwd = await makeTempDir('forja-lazy-')
+  cwd = await makeTempDir('openclod-lazy-')
 })
 
 afterEach(async () => {
@@ -225,8 +225,9 @@ describe('the always-sent set', () => {
     for (const name of everyday) expect(CORE_TOOL_NAMES.has(name), name).toBe(true)
     // The former essentials: found with tool_search, enabled with tool_load, still in the pool a child agent is built from.
     for (const name of DEFERRED_ESSENTIAL_TOOL_NAMES) expect(CORE_TOOL_NAMES.has(name), name).toBe(false)
+    // apply_patch is not a former essential: it is here because Codex/GPT models call it by name without loading it.
     expect([...DEFERRED_ESSENTIAL_TOOL_NAMES].sort()).toEqual(
-      ['list_agents', 'list_skills', 'mcp_call', 'mcp_catalog', 'mcp_servers', 'memory_brief', 'memory_handoff', 'memory_search', 'task']
+      ['apply_patch', 'list_agents', 'list_skills', 'mcp_call', 'mcp_catalog', 'mcp_servers', 'memory_brief', 'memory_handoff', 'memory_search', 'task']
     )
     // The delegation helpers are sent only to whoever delegates (team mode, or an agent that may call others).
     for (const name of TEAM_CORE_TOOL_NAMES) {

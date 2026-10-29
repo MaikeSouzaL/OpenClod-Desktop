@@ -10,7 +10,7 @@ const { chromium } = require('playwright-core')
 
 const ROOT = path.join(__dirname, '..')
 const PORT = 9341
-const work = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-mic-pill-'))
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-mic-pill-'))
 const profile = path.join(work, 'profile')
 const appData = path.join(work, 'appdata')
 const localAppData = path.join(work, 'localappdata')

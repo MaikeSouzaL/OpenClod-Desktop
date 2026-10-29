@@ -4,9 +4,11 @@ import type {
   CapabilityReport,
   ContextBreakdown,
   FileChange,
+  MCPStatus,
+  PermissionMode,
   SessionState
 } from '../../../shared/types'
-import type { ScreenshotResult } from '../../../shared/api'
+import type { GitStatusInfo, ScreenshotResult } from '../../../shared/api'
 import { Icon, type IconName } from './Icons'
 import { MenuPopover, type MenuItem, type PanelTab } from './Chrome'
 import { TerminalPane } from './TerminalPane'
@@ -27,7 +29,11 @@ import {
 } from '../lib/format'
 import { errorMessage, unwrap } from '../lib/api'
 import type { LogEntry } from '../lib/types'
-import { billableTokens } from '../../../shared/limits'
+import { useConnectors, type ConnectorsStore } from '../lib/useConnectors'
+import { detailPlan, isInstalled, plural, type ConnectorRow } from '../lib/connectors'
+import { AUTO_COMPACT_RATIO, billableTokens } from '../../../shared/limits'
+import { protectionsFor } from '../lib/protections'
+import './session-protections.css'
 
 const PLAN_ICON: Record<string, IconName> = {
   pending: 'clock',
@@ -48,11 +54,14 @@ const TAB_TITLES: Record<PanelTab, string> = {
   tasks: 'Tarefas em segundo plano'
 }
 
-const PERMISSION_LABELS: Record<string, string> = {
+// Same names as the composer. Typed by every mode: the panel once had no `unrestricted` key and showed "Perguntar"
+// for the mode that never asks.
+const PERMISSION_LABELS: Record<PermissionMode, string> = {
   readonly: 'Somente leitura',
-  ask: 'Perguntar antes de agir',
+  ask: 'Perguntar',
   'accept-edits': 'Aceitar edições',
-  auto: 'Automático'
+  auto: 'Automático',
+  unrestricted: 'Ignorar permissões'
 }
 
 export interface PanelLayout {
@@ -85,6 +94,8 @@ interface SessionPanelProps {
   onTab(tab: PanelTab): void
   onCompact(): Promise<void>
   onReveal(path: string): void
+  /** Opens Personalização → Conectores (a connector that needs a credential is fixed there). */
+  onOpenConnectors(): void
 }
 
 /** Panes with live state (pty, webview, open editors) stay mounted once visited. */
@@ -108,7 +119,8 @@ export function SessionPanel({
   onClearLogs,
   onTab,
   onCompact,
-  onReveal
+  onReveal,
+  onOpenConnectors
 }: SessionPanelProps): ReactElement | null {
   const [visited, setVisited] = useState<PanelTab[]>([])
   const [layoutMenu, setLayoutMenu] = useState(false)
@@ -209,6 +221,7 @@ export function SessionPanel({
             onTab={onTab}
             onCompact={onCompact}
             onReveal={onReveal}
+            onOpenConnectors={onOpenConnectors}
           />
         ) : null}
         {tab === 'plan' ? (
@@ -284,6 +297,42 @@ function contextBreakdown(session: SessionState): Array<{ id: string; label: str
   ]
 }
 
+/** Connectors listed before "Mostrar mais"; the ones that need attention always come first. */
+const VISIBLE_CONNECTORS = 5
+
+/** Problems first, as in Claude Code's panel: a connector that needs a login or failed is the one the user acts on. */
+const CONNECTOR_RANK: Record<string, number> = { 'needs-auth': 0, error: 1, connecting: 2, connected: 3, disabled: 4 }
+
+interface ConnectorAction {
+  label: 'Autenticar' | 'Reconectar'
+  run(): Promise<unknown> | void
+}
+
+/**
+ * The button of a connector row, with the decision the connector detail makes (detailPlan): a login or a reconnect one click
+ * can do goes straight to `connect`; one that needs a credential typed again opens Personalização → Conectores; a server
+ * added by hand cannot be rebuilt from the directory, so reconnecting it restarts the MCP servers.
+ */
+function connectorAction(row: ConnectorRow, store: ConnectorsStore, openConnectors: () => void): ConnectorAction | null {
+  const status = row.state.status
+  if (status !== 'needs-auth' && status !== 'error') return null
+  const label = status === 'needs-auth' ? 'Autenticar' : 'Reconectar'
+  if (row.custom) return status === 'error' ? { label, run: () => store.reload() } : { label, run: openConnectors }
+  return detailPlan(row, Boolean(store.authUrls[row.id])).oneClick ? { label, run: () => store.connect(row.id) } : { label, run: openConnectors }
+}
+
+/** What a healthy connector says on the right: tools, resources and prompts (live counts when the server reports them). */
+function connectorSummary(row: ConnectorRow, live: MCPStatus | undefined): string {
+  const status = row.state.status
+  if (status === 'connecting') return 'Conectando…'
+  if (status === 'disabled') return 'Desativado'
+  const tools = live?.tools.length ?? row.state.toolCount ?? 0
+  const parts = [tools ? plural(tools, 'ferramenta', 'ferramentas') : 'Conectado']
+  if (live?.resources.length) parts.push(plural(live.resources.length, 'recurso', 'recursos'))
+  if (live?.prompts.length) parts.push(plural(live.prompts.length, 'prompt', 'prompts'))
+  return parts.join(' · ')
+}
+
 function ContextPane({
   session,
   changes,
@@ -291,7 +340,8 @@ function ContextPane({
   settings,
   onTab,
   onCompact,
-  onReveal
+  onReveal,
+  onOpenConnectors
 }: {
   session: SessionState
   changes: FileChange[]
@@ -300,6 +350,7 @@ function ContextPane({
   onTab(tab: PanelTab): void
   onCompact(): Promise<void>
   onReveal(path: string): void
+  onOpenConnectors(): void
 }): ReactElement {
   const [compacting, setCompacting] = useState(false)
   const [compactNote, setCompactNote] = useState('')
@@ -308,7 +359,7 @@ function ContextPane({
   const [measured, setMeasured] = useState<ContextBreakdown | null>(null)
   useEffect(() => {
     let current = true
-    void window.forja.sessions
+    void window.openclod.sessions
       .contextBreakdown(session.meta.id)
       .then((result) => {
         if (current) setMeasured(result.ok ? result.value : null)
@@ -320,6 +371,26 @@ function ContextPane({
       current = false
     }
   }, [session.meta.id, session.messages.length, session.state, session.meta.model])
+  // Same states and actions as Personalização → Conectores (login, reconnect, polling while a login is open).
+  const connectors = useConnectors()
+  const [showAllConnectors, setShowAllConnectors] = useState(false)
+  const [connectorNote, setConnectorNote] = useState('')
+  // Branch and working-tree diff, read again when the agent changes files or a turn ends.
+  const [git, setGit] = useState<GitStatusInfo | null>(null)
+  useEffect(() => {
+    let current = true
+    void window.openclod.git
+      .status(session.meta.cwd)
+      .then((result) => {
+        if (current) setGit(result.ok && result.value.isRepo ? result.value : null)
+      })
+      .catch(() => {
+        if (current) setGit(null)
+      })
+    return () => {
+      current = false
+    }
+  }, [session.meta.cwd, changes.length, session.state])
   const done = session.plan.filter((item) => item.status === 'done').length
   const provider = settings?.providers.find((item) => item.id === session.meta.providerId)
   const contextWindow = provider?.contextWindow ?? 0
@@ -330,6 +401,36 @@ function ContextPane({
   const mcp = capabilities?.mcp ?? []
   const busy = ['thinking', 'streaming', 'tool', 'waiting_approval'].includes(session.state)
   const sessionTokens = billableTokens(session.usage)
+  // The runner compacts on its own at AUTO_COMPACT_RATIO of the window: what is above it is the reserve the summary needs
+  // (the buffer), what is between the request and it is the room left. Shares are of the window, so the rows add up to 100%.
+  const autoCompactAt = contextWindow * AUTO_COMPACT_RATIO
+  const buffer = contextWindow ? contextWindow - autoCompactAt : 0
+  const free = contextWindow ? Math.max(0, autoCompactAt - used) : 0
+  const share = (tokens: number): number => {
+    const base = contextWindow || used
+    return base ? Math.round((tokens / base) * 1000) / 10 : 0
+  }
+  const width = (tokens: number): string => `${contextWindow ? (tokens / contextWindow) * 100 : used ? (tokens / used) * 100 : 0}%`
+
+  const mcpByName = new Map(mcp.map((server) => [server.name, server]))
+  const installedConnectors = connectors.rows
+    .filter(isInstalled)
+    .sort((a, b) => (CONNECTOR_RANK[a.state.status] ?? 9) - (CONNECTOR_RANK[b.state.status] ?? 9) || a.name.localeCompare(b.name, 'pt-BR'))
+  const shownConnectors = showAllConnectors ? installedConnectors : installedConnectors.slice(0, VISIBLE_CONNECTORS)
+  const runConnectorAction = async (row: ConnectorRow, action: ConnectorAction): Promise<void> => {
+    setConnectorNote('')
+    try {
+      await action.run()
+    } catch (err) {
+      setConnectorNote(`${row.name}: ${errorMessage(err)}`)
+    }
+  }
+
+  const gitAdded = git ? git.files.reduce((sum, file) => sum + (file.additions ?? 0), 0) : 0
+  const gitRemoved = git ? git.files.reduce((sum, file) => sum + (file.deletions ?? 0), 0) : 0
+  const tracking = git
+    ? [git.ahead ? `↑${git.ahead}` : '', git.behind ? `↓${git.behind}` : ''].filter(Boolean).join(' ') || (git.upstream ? 'em dia' : 'sem upstream')
+    : ''
 
   const compact = async (): Promise<void> => {
     setCompacting(true)
@@ -361,10 +462,17 @@ function ContextPane({
             <span>{session.meta.cwd.split(/[\\/]/).pop() || session.meta.cwd}</span>
             <em>{shortPath(session.meta.cwd, 24)}</em>
           </button>
+          {git?.branch ? (
+            <div className="env-row" title={git.upstream ? `${git.branch} → ${git.upstream}` : `${git.branch} (sem upstream)`}>
+              <Icon name="gitBranch" size={13} />
+              <span>{git.branch}</span>
+              <em>{tracking}</em>
+            </div>
+          ) : null}
           <div className="env-row">
             <Icon name="code" size={13} />
             <span>{MODE_LABELS[session.meta.mode]}</span>
-            <em>{PERMISSION_LABELS[settings?.policy.mode ?? 'ask'] ?? 'Perguntar'}</em>
+            <em>{PERMISSION_LABELS[settings?.policy.mode ?? 'ask']}</em>
           </div>
           <div className="env-row">
             <Icon name="cpu" size={13} />
@@ -401,33 +509,52 @@ function ContextPane({
           </span>
         </div>
         <div className="context-bar" title={measured ? `${formatTokens(used)} tokens (medido no prompt, nas ferramentas e no histórico)` : `${formatTokens(used)} tokens estimados`}>
-          {breakdown.map((row) => {
-            // Widths are relative to the context window, not to the used
-            // total: an 8%-used session must fill 8% of the track.
-            const width = contextWindow
-              ? (row.tokens / contextWindow) * 100
-              : used
-                ? (row.tokens / used) * 100
-                : 0
-            return width > 0.2 ? <span key={row.id} className={`seg seg-${row.id}`} style={{ width: `${width}%` }} /> : null
-          })}
+          {/* Widths are of the context window, not of the used total: an 8%-used session fills 8% of the track. */}
+          {breakdown.map((row) =>
+            share(row.tokens) > 0.2 ? <span key={row.id} className={`seg seg-${row.id}`} style={{ width: width(row.tokens) }} /> : null
+          )}
+          {free ? <span className="seg seg-free" style={{ width: width(free) }} /> : null}
+          {buffer ? <span className="seg seg-buffer" style={{ width: width(buffer) }} title="Reserva acima do auto-compact" /> : null}
         </div>
         <ul className="context-rows">
-          {breakdown.map((row) => {
-            const pct = used ? Math.round((row.tokens / used) * 1000) / 10 : 0
-            return (
-              <li key={row.id}>
-                <span className={`seg-chip seg-${row.id}`} />
-                <span className="ctx-label">{row.label}</span>
-                <span className="ctx-tokens">{formatTokens(row.tokens)}</span>
-                <span className="ctx-pct">{pct}%</span>
+          {breakdown.map((row) => (
+            <li key={row.id}>
+              <span className={`seg-chip seg-${row.id}`} />
+              <span className="ctx-label">{row.label}</span>
+              <span className="ctx-tokens">{formatTokens(row.tokens)}</span>
+              <span className="ctx-pct">{share(row.tokens)}%</span>
+            </li>
+          ))}
+          {contextWindow ? (
+            <>
+              <li title={`O histórico é compactado sozinho quando o pedido passa de ${Math.round(AUTO_COMPACT_RATIO * 100)}% da janela`}>
+                <span className="seg-chip seg-buffer" />
+                <span className="ctx-label">Buffer de auto-compact</span>
+                <span className="ctx-tokens">{formatTokens(buffer)}</span>
+                <span className="ctx-pct">{share(buffer)}%</span>
               </li>
-            )
-          })}
+              <li>
+                <span className="seg-chip seg-free" />
+                <span className="ctx-label">Espaço livre</span>
+                <span className="ctx-tokens">{formatTokens(free)}</span>
+                <span className="ctx-pct">{share(free)}%</span>
+              </li>
+            </>
+          ) : null}
         </ul>
+        {mcp.length ? (
+          <div className="context-counts">
+            <span>Ferramentas MCP</span>
+            <em>{mcp.reduce((sum, server) => sum + server.tools.length, 0)}</em>
+          </div>
+        ) : null}
         <div className="context-foot">
           <span>
-            {Math.max(0, contextWindow - used) ? `${formatTokens(Math.max(0, contextWindow - used))} até a janela` : 'janela cheia'}
+            {!contextWindow
+              ? 'janela do modelo desconhecida'
+              : used >= autoCompactAt
+                ? 'auto-compact no próximo pedido'
+                : `${formatTokens(free)} até o auto-compact`}
             {measured ? '' : ' · estimativa (ainda sem turno nesta sessão)'}
           </span>
           <button type="button" className="btn tiny" onClick={() => void compact()} disabled={compacting || busy}>
@@ -441,6 +568,9 @@ function ContextPane({
         <div className="panel-card-head">
           <Icon name="plug" size={14} />
           <span>Conectores</span>
+          <button type="button" className="panel-card-action" title="Gerenciar conectores" onClick={onOpenConnectors}>
+            <Icon name="external" size={12} />
+          </button>
         </div>
         <ul className="connector-list">
           <li>
@@ -453,17 +583,32 @@ function ContextPane({
             <span>Navegador</span>
             <em>{capabilities?.browser.available ? capabilities.browser.engine ?? 'pronto' : 'indisponível'}</em>
           </li>
-          {mcp.length ? (
+          {connectors.loaded && installedConnectors.length ? (
+            shownConnectors.map((row) => {
+              const action = connectorAction(row, connectors, onOpenConnectors)
+              const status = row.state.status
+              const working = Boolean(connectors.busy[row.id]) || (row.custom && connectors.reloading)
+              return (
+                <li key={row.id} title={row.state.lastError ?? row.state.hint ?? row.state.detail ?? row.name}>
+                  <span className={`dot ${status === 'connected' ? 'on' : status === 'needs-auth' || status === 'connecting' ? 'idle' : 'off'}`} />
+                  <span>{row.name}</span>
+                  {action ? (
+                    <button type="button" className="connector-action" disabled={working} onClick={() => void runConnectorAction(row, action)}>
+                      {working ? 'Aguarde…' : action.label}
+                    </button>
+                  ) : (
+                    <em>{connectorSummary(row, mcpByName.get(row.state.serverName ?? row.name))}</em>
+                  )}
+                </li>
+              )
+            })
+          ) : mcp.length ? (
+            // Until the connector states arrive, the live MCP list keeps the card informative.
             mcp.map((server) => (
-              <li key={server.name}>
+              <li key={server.name} title={server.error ?? server.name}>
                 <span className={`dot ${server.state === 'ready' ? 'on' : server.state === 'error' ? 'off' : 'idle'}`} />
                 <span>{server.name}</span>
-                <em>
-                  {server.state}
-                  {server.tools.length ? ` · ${server.tools.length} ferramentas` : ''}
-                  {server.resources.length ? ` · ${server.resources.length} recursos` : ''}
-                  {server.prompts.length ? ` · ${server.prompts.length} prompts` : ''}
-                </em>
+                <em>{server.state === 'ready' ? (server.tools.length ? plural(server.tools.length, 'ferramenta', 'ferramentas') : 'pronto') : server.state}</em>
               </li>
             ))
           ) : (
@@ -474,13 +619,27 @@ function ContextPane({
             </li>
           )}
         </ul>
+        {installedConnectors.length > VISIBLE_CONNECTORS ? (
+          <button type="button" className="connector-more" onClick={() => setShowAllConnectors((value) => !value)}>
+            <Icon name={showAllConnectors ? 'chevronDown' : 'chevronRight'} size={12} />
+            {showAllConnectors ? 'Mostrar menos' : `Mostrar mais (${installedConnectors.length - VISIBLE_CONNECTORS})`}
+          </button>
+        ) : null}
+        {connectorNote ? <div className="panel-note">{connectorNote}</div> : null}
       </section>
 
       <section className="panel-card">
         <div className="panel-card-head">
-          <Icon name="sparkles" size={14} />
-          <span>Saídas</span>
+          <Icon name="diff" size={14} />
+          <span>Alterações</span>
         </div>
+        {git?.files.length ? (
+          <button type="button" className="diff-total" onClick={() => onTab('changes')} title="Diferença da árvore de trabalho do git (o que ainda não foi commitado)">
+            <em className="plus">+{gitAdded.toLocaleString('pt-BR')}</em>
+            <em className="minus">−{gitRemoved.toLocaleString('pt-BR')}</em>
+            <span>{plural(git.files.length, 'arquivo', 'arquivos')}</span>
+          </button>
+        ) : null}
         {changes.length ? (
           <ul className="output-list">
             {changes.slice(0, 5).map((change) => (
@@ -494,12 +653,12 @@ function ContextPane({
               </li>
             ))}
           </ul>
-        ) : (
+        ) : git?.files.length ? null : (
           <p className="panel-muted">Arquivos criados ou alterados aparecem aqui.</p>
         )}
         <div className="context-foot">
           <span>{session.plan.length ? `${done}/${session.plan.length} do plano` : 'sem plano ativo'}</span>
-          <button type="button" className="btn tiny" onClick={() => onTab('changes')} disabled={!changes.length}>
+          <button type="button" className="btn tiny" onClick={() => onTab('changes')} disabled={!changes.length && !git?.files.length}>
             Ver alterações
           </button>
         </div>
@@ -510,11 +669,17 @@ function ContextPane({
           <Icon name="shield" size={14} />
           <span>Proteções</span>
         </div>
+        {settings?.policy.mode === 'unrestricted' ? (
+          <p className="shield-warning">
+            <Icon name="alert" size={12} /> Ignorar permissões: o harness não bloqueia nem pede confirmação.
+          </p>
+        ) : null}
         <ul className="shield-list">
-          <li><Icon name="check" size={12} /> Raiz restrita à pasta do projeto</li>
-          <li><Icon name="check" size={12} /> Comandos destrutivos bloqueados</li>
-          <li><Icon name="check" size={12} /> Segredos cifrados com DPAPI</li>
-          <li><Icon name="check" size={12} /> Trilha de auditoria da sessão</li>
+          {protectionsFor(settings?.policy).map((item) => (
+            <li key={item.text} className={item.on ? undefined : 'is-off'}>
+              <Icon name={item.on ? 'check' : 'alert'} size={12} /> {item.text}
+            </li>
+          ))}
         </ul>
       </section>
     </div>
@@ -641,7 +806,7 @@ function CapturesPane(): ReactElement {
     setLoading(true)
     setError('')
     try {
-      const result = await unwrap(window.forja.files.screenshot())
+      const result = await unwrap(window.openclod.files.screenshot())
       setShot({ ...result, at: Date.now() })
     } catch (err) {
       setError(errorMessage(err))

@@ -72,7 +72,7 @@ async function main() {
       await page.waitForTimeout(100)
       if (emptiedAt === null && (await input.inputValue()) === '') emptiedAt = Date.now() - t0
       if (shownAt === null) {
-        const count = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages.length, session.sessionId)
+        const count = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages.length, session.sessionId)
         if (count >= 1) shownAt = Date.now() - t0
       }
     }

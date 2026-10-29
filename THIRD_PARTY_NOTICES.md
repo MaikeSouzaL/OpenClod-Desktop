@@ -110,9 +110,17 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
 | Pillow 12.3.0 | **MIT-CMU** | Imagens e gráficos em PNG dos documentos. A roda inclui FreeType (FreeType License), HarfBuzz, LittleCMS, libjpeg-turbo, libavif, brotli e outros; o aviso completo está em `resources/licenses/office/pillow/LICENSE`. |
 | typing-extensions 4.15.0 | **PSF-2.0** | Já embarcado como dependência do huggingface-hub; também exigido por python-docx e python-pptx. |
 | `openclod_office` (construtores de documentos) | **MIT** (código do projeto) | `resources/office/pylib`: relatório Word, planilha e apresentação sobre as bibliotecas acima, mais os comandos `openclod-python` e `openclod-office`. |
-| claude-real-video 0.7.19 (lógica portada) | **MIT** — Copyright (c) 2026 LeoAido. Texto em `resources/licenses/claude-real-video/MIT.txt` | Seleção de frames por mudança de cena com piso de densidade, deduplicação em três canais, folhas de contato e linha do tempo do ingestor de áudio/vídeo (`resources/media/forja_media.py`), reescritos sobre PyAV e numpy (sem ffmpeg nem Pillow). https://github.com/HUANGCHIHHUNGLeo/claude-real-video |
+| claude-real-video 0.7.19 (lógica portada) | **MIT** — Copyright (c) 2026 LeoAido. Texto em `resources/licenses/claude-real-video/MIT.txt` | Seleção de frames por mudança de cena com piso de densidade, deduplicação em três canais, folhas de contato e linha do tempo do ingestor de áudio/vídeo (`resources/media/openclod_media.py`), reescritos sobre PyAV e numpy (sem ffmpeg nem Pillow). https://github.com/HUANGCHIHHUNGLeo/claude-real-video |
 | open-computer-use 1.3.0 | **MIT** | Backend de Computer Use (Go). |
 | ripgrep 14.1.1 | **MIT OR Unlicense** | Busca de arquivos. |
+| llama.cpp b11972 — `llama-server` e as DLLs do ggml (build Vulkan oficial para Windows x64) | **MIT** — Copyright (c) 2023-2026 The ggml authors. Texto em `resources/licenses/llama.cpp/LICENSE` | Motor local de LLM (Configurações → Provedores → llama.cpp). `scripts/embed-llamacpp.mjs` baixa o zip oficial de https://github.com/ggml-org/llama.cpp/releases, confere o SHA-256 e guarda só o servidor e as DLLs que ele carrega em `resources/llamacpp/b11972-vulkan/`. Sem modificações. |
+| LLVM OpenMP runtime (`libomp.dll`, dentro do zip do llama.cpp) | **Apache-2.0 WITH LLVM-exception** | Threads do llama.cpp na CPU. A licença vai junto dos binários (`resources/llamacpp/b11972-vulkan/LICENSE-LLVM-OpenMP`). |
+
+As versões CUDA e "só CPU" do llama.cpp (Versões) **não vêm no instalador**: são baixadas
+do mesmo release oficial do GitHub quando a pessoa pede, conferidas pelo SHA-256 que o
+GitHub publica. As CUDA trazem o runtime da NVIDIA (`cudart`, cuBLAS), sob a NVIDIA CUDA
+Toolkit EULA. Os modelos GGUF baixados do Hugging Face (Baixar) têm cada um a sua licença,
+mostrada antes do download; alguns exigem aceitar termos na página do modelo.
 
 O `edge-tts` acessa o serviço de leitura em voz alta do Microsoft Edge, sem chave
 de API. O recurso exige internet, pode mudar ou ficar indisponível por decisão da
@@ -134,6 +142,23 @@ afiliado nem endossado pela Microsoft.
 | [REA](https://github.com/morluto/rea) | MIT | Ferramenta de análise usada no estudo; preset MCP opcional. |
 | [claw-code-local](https://github.com/codetwentyfive/claw-code-local) | Sem licença | Apenas conceitos (hooks exit 2/JSON, deny > ask > allow); nenhum código. |
 | [Mcp.ComputerUse](https://github.com/tdav/Mcp.ComputerUse) | Sem licença | Apenas ideias de DPI/coordenadas; nenhum código. |
+
+## 4.3. Assets de pesquisa (skills, agentes, comandos e prompts)
+
+O aplicativo distribui cópias de assets portáveis (MIT/Apache-2.0) em
+`resources/harvested/`. Cada item tem origem, commit, licença e hash em
+`resources/harvested/manifest.json`; os textos integrais das licenças estão em
+`resources/harvested/LICENSES/`.
+
+- **387 skills**, **21 agentes**, **23 comandos**, **168 prompts** e **25 fontes
+  de ferramentas** de referência.
+- Desses, **5 skills** e **5 agentes** foram curados para o runtime em
+  `resources/skills/` e `resources/agents/`, com `origin`/`license` no
+  frontmatter e adaptação às ferramentas do Openclod.
+- Nenhum asset de `zed`, `claw-code-local`, `Mcp.ComputerUse`, `wisprflow`,
+  `ee/` ou `enterprise/` foi copiado.
+- As cópias são de referência e **não são compiladas**; o código portado para
+  `src/core` tem entrada própria neste arquivo.
 
 ## 5. Marcas e código proprietário
 

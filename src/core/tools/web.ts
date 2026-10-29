@@ -2,8 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import type { ToolResult } from '../../shared/types.js'
-import type { ToolDef } from './types.js'
+import type { ToolContext, ToolDef } from './types.js'
 import { scanForInjection } from '../security/policy.js'
+import { guardedFetch, type TargetCheck } from '../security/net-guard.js'
 import { truncateMiddle } from '../util/ids.js'
 
 const USER_AGENT =
@@ -17,10 +18,25 @@ function assertFetchable(rawUrl: string): URL {
     throw new Error(`URL inválida: ${rawUrl}`)
   }
   if (!/^https?:$/.test(url.protocol)) throw new Error('apenas http(s) é permitido')
-  const host = url.hostname.toLowerCase()
-  const blocked = ['169.254.169.254', 'metadata.google.internal', '100.100.100.200']
-  if (blocked.includes(host)) throw new Error('destino de metadados de nuvem bloqueado')
+  // Metadata, link-local and the local network are judged per hop by guardedFetch, after the name is resolved.
   return url
+}
+
+/**
+ * This computer or the local network (a localhost dev server, an intranet page): free in the auto and unrestricted
+ * modes, asked in the others — a page the model read may be what sent it there.
+ */
+function internalAccess(ctx: ToolContext, tool: string): (check: TargetCheck, url: URL, via?: URL) => Promise<boolean> {
+  return async (check, url, via) => {
+    if (ctx.policy.mode === 'auto' || ctx.policy.mode === 'unrestricted') return true
+    return ctx.approve({
+      tool,
+      title: 'Acessar a rede local',
+      detail: `${url.href} vai para ${check.detail}${via ? `, redirecionado por ${via.host}` : ''}: este computador ou a rede local. Uma página lida pelo agente pode pedir isso para alcançar serviços internos.`,
+      risk: 'network',
+      preview: url.href
+    })
+  }
 }
 
 /** HTML → readable text without external dependencies. */
@@ -52,23 +68,31 @@ export function htmlToText(html: string): { title: string; text: string } {
   return { title, text: body }
 }
 
-async function fetchText(url: string, signal: AbortSignal, timeoutMs = 25_000): Promise<{ html: string; finalUrl: string; status: number }> {
+async function fetchText(
+  url: string,
+  ctx: Pick<ToolContext, 'signal' | 'policy' | 'approve'>,
+  tool: string,
+  timeoutMs = 25_000
+): Promise<{ html: string; finalUrl: string; status: number }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   const onAbort = (): void => controller.abort()
+  const signal = ctx.signal
   signal.addEventListener('abort', onAbort, { once: true })
   try {
-    const response = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8' }
+    const { response, url: finalUrl } = await guardedFetch(new URL(url), {
+      init: {
+        signal: controller.signal,
+        headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8' }
+      },
+      allowInternal: internalAccess(ctx as ToolContext, tool)
     })
     const contentType = response.headers.get('content-type') ?? ''
     if (!/text\/|json|xml|javascript/.test(contentType) && contentType) {
       throw new Error(`tipo de conteúdo não suportado: ${contentType}`)
     }
     const html = await response.text()
-    return { html, finalUrl: response.url || url, status: response.status }
+    return { html, finalUrl: finalUrl.toString(), status: response.status }
   } finally {
     clearTimeout(timer)
     signal.removeEventListener('abort', onAbort)
@@ -93,7 +117,7 @@ export const fetchUrlTool: ToolDef = {
   async execute(raw, ctx): Promise<ToolResult> {
     const args = this.schema.parse(raw) as { url: string; max_chars?: number }
     const url = assertFetchable(args.url)
-    const { html, finalUrl, status } = await fetchText(url.toString(), ctx.signal)
+    const { html, finalUrl, status } = await fetchText(url.toString(), ctx, 'fetch_url')
     const { title, text } = /json|javascript|xml/.test(html.slice(0, 200)) ? { title: '', text: html } : htmlToText(html)
     const findings = scanForInjection(text)
     if (findings.length) {
@@ -133,7 +157,7 @@ export const webSearchTool: ToolDef = {
     const args = this.schema.parse(raw) as { query: string; limit?: number }
     const limit = args.limit ?? 8
     const endpoint = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(args.query)}`
-    const { html, status } = await fetchText(endpoint, ctx.signal)
+    const { html, status } = await fetchText(endpoint, ctx, 'web_search')
     if (status >= 400) return { ok: false, text: `busca falhou (HTTP ${status})` }
 
     const results: Array<{ title: string; url: string; snippet: string }> = []
@@ -183,7 +207,10 @@ export const downloadFileTool: ToolDef = {
     const args = this.schema.parse(raw) as { url: string; path: string }
     const url = assertFetchable(args.url)
     const target = ctx.workspace.resolve(args.path, ctx.cwd)
-    const response = await fetch(url, { signal: ctx.signal, headers: { 'user-agent': USER_AGENT } })
+    const { response } = await guardedFetch(url, {
+      init: { signal: ctx.signal, headers: { 'user-agent': USER_AGENT } },
+      allowInternal: internalAccess(ctx, 'download_file')
+    })
     if (!response.ok) return { ok: false, text: `download falhou: HTTP ${response.status}` }
     const buffer = Buffer.from(await response.arrayBuffer())
     if (buffer.length > 50 * 1024 * 1024) return { ok: false, text: 'arquivo maior que 50 MB' }

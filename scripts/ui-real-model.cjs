@@ -86,7 +86,7 @@ async function main() {
   try {
     const created = await e2e.newSession(page, { folder: project, title: 'Modelo real', projectName: 'Projeto real' })
     const configured = await page.evaluate(async (providerId) => {
-      const caps = (await window.forja.app.capabilities()).value
+      const caps = (await window.openclod.app.capabilities()).value
       return caps.providers.find((item) => item.id === providerId)?.configured
     }, created.provider)
     if (!configured) throw new Error(`provedor ${created.provider} sem credencial neste perfil (use --from)`)
@@ -97,7 +97,7 @@ async function main() {
     const report = { model: created.model, defaultProvider: created.provider, turns: [], errors }
     const sessionId = created.sessionId
     for (const [index, prompt] of PROMPTS.entries()) {
-      const before = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages.length, sessionId)
+      const before = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages.length, sessionId)
       const started = Date.now()
       await e2e.send(page, prompt.text)
       let settleError = ''

@@ -108,7 +108,7 @@ async function main() {
     await page.screenshot({ path: file })
     result.shots.push(file)
   }
-  const api = (fn, ...args) => page.evaluate(async ({ fn, args }) => (await window.forja.app[fn](...args)), { fn, args })
+  const api = (fn, ...args) => page.evaluate(async ({ fn, args }) => (await window.openclod.app[fn](...args)), { fn, args })
   const screenText = () => page.evaluate(() => {
     const parts = [document.body.innerText, document.documentElement.outerHTML]
     for (const field of document.querySelectorAll('input, textarea')) parts.push(field.value || '')

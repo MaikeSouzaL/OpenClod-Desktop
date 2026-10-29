@@ -193,8 +193,8 @@ class Gerador:
                  "como nome de arquivo ou caminho: rejeitado; nunca le fora da pasta")
         self.add(t, "caminho", "travessia Windows", "..\\..\\..\\windows\\win.ini", "idem, separador do Windows")
         m = self.marca("log")
-        self.add(t, "log", "linha falsa de log (quebra de linha)", f"qa\n[ERROR] {m} linha forjada",
-                 "no log do servidor a entrada nao vira uma segunda linha forjada")
+        self.add(t, "log", "linha falsa de log (quebra de linha)", f"qa\n[ERROR] {m} linha falsificada",
+                 "no log do servidor a entrada nao vira uma segunda linha falsificada")
         self.add(t, "cabecalho", "injecao de cabecalho (CRLF)", "qa\r\nX-QA-Injetado: 1",
                  "em campo que vai para cabecalho (nome de arquivo, assunto): CRLF removido ou recusado")
         for val in ("=1+1", "+1+1", "-1+1", "@SUM(1+1)", '=HYPERLINK("https://example.invalid","qa")', "\t=1+1"):

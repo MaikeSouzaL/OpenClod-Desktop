@@ -71,7 +71,7 @@ export function QuestionDock({ request, onAnswer, onSkip }: QuestionDockProps): 
     const incoming: IncomingPath[] = []
     for (const file of Array.from(files)) {
       try {
-        const path = window.forja.paths.fromFile(file)
+        const path = window.openclod.paths.fromFile(file)
         if (path) incoming.push({ path, kind: 'file' })
       } catch {
         /* synthetic File without an OS path */
@@ -96,7 +96,7 @@ export function QuestionDock({ request, onAnswer, onSkip }: QuestionDockProps): 
   }
 
   const pickFolder = async (index: number): Promise<void> => {
-    const result = await window.forja.paths.pickFolder()
+    const result = await window.openclod.paths.pickFolder()
     if (!result.ok) {
       setAttachError(result.error)
       return
@@ -134,7 +134,7 @@ export function QuestionDock({ request, onAnswer, onSkip }: QuestionDockProps): 
       }
       if (directory) {
         try {
-          const path = file ? window.forja.paths.fromFile(file) : ''
+          const path = file ? window.openclod.paths.fromFile(file) : ''
           if (path) incoming.push({ path, kind: 'folder' })
         } catch {
           setAttachError('Não foi possível ler o caminho da pasta arrastada.')

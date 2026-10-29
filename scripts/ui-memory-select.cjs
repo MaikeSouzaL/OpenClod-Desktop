@@ -50,7 +50,7 @@ async function main() {
     app = await e2e.launch({ port: 9483, ...ws })
     const { page } = app
 
-    const added = await page.evaluate((folder) => window.forja.projects.add(folder, 'Memória E2E'), ws.project)
+    const added = await page.evaluate((folder) => window.openclod.projects.add(folder, 'Memória E2E'), ws.project)
     if (!added.ok) throw new Error(added.error)
     const wiki = path.join(ws.profile, 'data', 'memory', 'projects', added.value.id, 'wiki')
     fs.mkdirSync(wiki, { recursive: true })

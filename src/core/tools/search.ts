@@ -26,11 +26,11 @@ const MAX_STDERR = 8 * 1024
 
 /**
  * The bundled `resources/bin/rg(.exe)`. Never looks at PATH: the app must behave the
- * same on every machine. `FORJA_RG` overrides it for tests: a path to use instead,
+ * same on every machine. `OPENCLOD_RG` overrides it for tests: a path to use instead,
  * `off` to force the pure-Node fallback, and a path that does not exist counts as "missing".
  */
 export function ripgrepPath(): string | null {
-  const override = process.env.FORJA_RG?.trim()
+  const override = process.env.OPENCLOD_RG?.trim()
   if (override) {
     if (/^(off|none|false|0)$/i.test(override)) return null
     try {

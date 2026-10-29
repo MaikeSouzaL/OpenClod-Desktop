@@ -58,7 +58,7 @@ Decisão: **integrar** (dependência), **portar** (reimplementar conceito),
 
 | Recurso | Origem / decisão | Estado | Evidência |
 |---|---|---|---|
-| Ditado local com Whisper | faster-whisper + CTranslate2 + Silero VAD embutidos | **implementado** | `resources/stt/forja_stt.py`, `src/main/stt.ts`; teste real `tiny` carregou em 2,7 s e transcreveu |
+| Ditado local com Whisper | faster-whisper + CTranslate2 + Silero VAD embutidos | **implementado** | `resources/stt/openclod_stt.py`, `src/main/stt.ts`; teste real `tiny` carregou em 2,7 s e transcreveu |
 | Pílula flutuante estilo Wispr Flow | análise REA do app original; implementação própria | **implementado** | `src/main/dictation.ts`; UI verificada com `scripts/ui-mic-pill.cjs` |
 | Atalho global + botão de microfone no mesmo motor | requisito do usuário | **implementado** | `dictation-store.ts`, `DictationHost.tsx`; `scripts/ui-wispr.cjs` inseriu no compositor |
 | Inserção em qualquer app (clipboard + Ctrl+V) | comportamento observado no helper original | **implementado** | teste com Chrome: textarea recebeu `TESTE_EXTERNO_123` |

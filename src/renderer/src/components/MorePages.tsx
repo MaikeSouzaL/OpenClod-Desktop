@@ -21,7 +21,7 @@ const ARTIFACT_KINDS = [
 ]
 
 const ARTIFACT_EXT = /\.(md|mdx|html?|svg|csv|json|openclod-slides\.json|txt|css|js|jsx|ts|tsx|py)$/i
-const IGNORED = /(^|[\\/])(node_modules|\.git|dist|out|build|release|\.next|coverage|_indice|_templates|\.obsidian|\.claude|\.qa|\.forja)([\\/]|$)|(^|[\\/])\.[^\\/]+[\\/]/i
+const IGNORED = /(^|[\\/])(node_modules|\.git|dist|out|build|release|\.next|coverage|_indice|_templates|\.obsidian|\.claude|\.qa|\.openclod)([\\/]|$)|(^|[\\/])\.[^\\/]+[\\/]/i
 
 function fileKind(path: string): string {
   return path.split('.').pop()?.toUpperCase() ?? 'FILE'
@@ -49,7 +49,7 @@ export function ArtifactsPage({ projects, activeProjectId, sessions, onCreate }:
     setLoading(true)
     setError('')
     try {
-      const tree = await unwrap(window.forja.files.tree(project.path, 5))
+      const tree = await unwrap(window.openclod.files.tree(project.path, 5))
       setNodes(tree.filter((node) => !node.dir && ARTIFACT_EXT.test(node.path) && !IGNORED.test(node.path)))
     } catch (err) {
       setError(errorMessage(err))

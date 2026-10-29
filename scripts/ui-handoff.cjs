@@ -40,7 +40,7 @@ const { SPEC, hiddenTests, fileTree } = require('./lib/handoff-fixture.cjs')
 
 async function usage(page, sessionId) {
   return page.evaluate(async (id) => {
-    const value = (await window.forja.sessions.get(id)).value
+    const value = (await window.openclod.sessions.get(id)).value
     const calls = value.messages.filter((m) => m.role === 'assistant' && m.usage)
     const tools = value.messages.flatMap((m) => m.parts.filter((p) => p.type === 'tool_call').map((p) => p.name))
     const last = [...value.messages].reverse().find((m) => m.role === 'assistant' && m.parts.some((p) => p.type === 'text'))
@@ -62,7 +62,7 @@ async function usage(page, sessionId) {
 
 async function runSession(page, { folder, title, projectName, model, prompt }) {
   const session = await e2e.newSession(page, { folder, title, projectName })
-  if (model) await page.evaluate(async ({ id, model }) => { await window.forja.sessions.setModel(id, 'deepseek', model) }, { id: session.sessionId, model })
+  if (model) await page.evaluate(async ({ id, model }) => { await window.openclod.sessions.setModel(id, 'deepseek', model) }, { id: session.sessionId, model })
   await page.reload()
   await page.waitForSelector('.app-shell')
   await e2e.openSession(page, title, projectName)
@@ -71,10 +71,10 @@ async function runSession(page, { folder, title, projectName, model, prompt }) {
   await page.evaluate(() => {
     if (window.__handoffAsked) return
     window.__handoffAsked = []
-    window.forja.events.on((event) => {
+    window.openclod.events.on((event) => {
       if (event.type !== 'question_request') return
       window.__handoffAsked.push(event.request.questions.map((question) => question.question).join(' | '))
-      void window.forja.questions.answer(
+      void window.openclod.questions.answer(
         event.request.id,
         event.request.questions.map((question) => ({
           header: question.header,

@@ -887,7 +887,7 @@ def autoteste_mascara() -> list:
     s, _ = _mascara.mascarar(url, estrito=True)
     if "4f9Xk2Lm8Qp7" in s or "Zr7Tq1Wv5Ns3" in s or "lang=pt-BR" not in s:
         falhas.append("_mascara nao trocou code/state da URL (ou apagou o parametro neutro lang)")
-    for neutro in ("https://forja.exemplo.test/x/issues?state=closed&q=bug", "Sair remove app.token do localStorage",
+    for neutro in ("https://openclod.exemplo.test/x/issues?state=closed&q=bug", "Sair remove app.token do localStorage",
                    "apaga o token do sessionStorage", "o cookie de sessao passou a ser httpOnly"):
         if _mascara.tipos_de_segredo(neutro):
             falhas.append(f"falso positivo da mascara num texto que devia passar: {neutro!r}")

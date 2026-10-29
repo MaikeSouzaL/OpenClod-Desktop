@@ -13,9 +13,9 @@ async function main() {
   })
   page.on('pageerror', (err) => errors.push(`[pageerror] ${err.message}`))
 
-  const maximized = await page.evaluate(() => window.forja.window.isMaximized())
+  const maximized = await page.evaluate(() => window.openclod.window.isMaximized())
   if (maximized) {
-    await page.evaluate(() => window.forja.window.maximize())
+    await page.evaluate(() => window.openclod.window.maximize())
     await page.waitForTimeout(600)
   }
   await page.evaluate(() => window.resizeTo(1440, 900))

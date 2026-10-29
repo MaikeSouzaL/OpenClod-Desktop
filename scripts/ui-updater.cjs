@@ -66,7 +66,7 @@ async function main() {
     hasVersion: document.body.innerText.includes('Versão 9.9.9'),
     hasChecksum: document.body.innerText.includes('SHA-256'),
     downloadButton: [...document.querySelectorAll('button')].some((button) => button.textContent?.includes('Baixar e verificar')),
-    bridge: typeof window.forja.app.checkForUpdates
+    bridge: typeof window.openclod.app.checkForUpdates
   }))
   if (!result.hasVersion || !result.hasChecksum || !result.downloadButton || result.bridge !== 'function') throw new Error(`updater UI incomplete: ${JSON.stringify(result)}`)
   if (errors.length) throw new Error(`renderer errors: ${errors.join(' | ')}`)

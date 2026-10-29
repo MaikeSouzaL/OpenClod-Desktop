@@ -33,7 +33,7 @@ Evidências existentes que sustentam os ✅:
 
 | Evidência | O que cobre |
 |---|---|
-| `scripts/ui-work.cjs` (perfil descartável, ferramentas reais, modelo roteirizado `FORJA_MOCK_SCRIPT`) | plano acima do composer, ponto "trabalhando", resumo/grupos de ferramentas, cartões de edição com diff, painel Tarefas em segundo plano |
+| `scripts/ui-work.cjs` (perfil descartável, ferramentas reais, modelo roteirizado `OPENCLOD_MOCK_SCRIPT`) | plano acima do composer, ponto "trabalhando", resumo/grupos de ferramentas, cartões de edição com diff, painel Tarefas em segundo plano |
 | `scripts/ui-panes.cjs` + `docs/research/UI_COMPARISON.md` | Terminal (PTY), Alterações, Navegador (dev server), Arquivos (CodeMirror), layout do painel, ⋮ superior |
 | `scripts/ui-voice.cjs`, `ui-mic-pill.cjs`, `ui-wispr.cjs` | microfone do composer, pílula, ditado global |
 | `scripts/ui-slides.cjs`, `ui-worktrees.cjs`, `ui-plugins.cjs`, `ui-backup.cjs`, `ui-diagnostics.cjs`, `ui-notifications.cjs`, `ui-tts.cjs`, `ui-updater.cjs`, `ui-memory-provenance.cjs`, `ui-images.cjs`, `ui-documents.cjs`, `ui-media-transcribe.cjs` | slides, worktrees, plugins locais, backup, diagnóstico, notificações, voz/TTS, updater, memória/proveniência, imagens, documentos, transcrição |
@@ -134,8 +134,8 @@ Atenção: `scripts/ui-shots.cjs` usa o seletor `.modal-tabs button` (CSS órfã
 | M49 | 70: menu de permissões (Automático, Manual, Aceitar edições, Plano, Ignorar) "esta sessão" | `Composer.tsx:572-579,938-945` | IPC real (**global**) | 🟡 | 5 modos ≠ dos 5 do Claude; "Plano" é modo do agente, não permissão; escopo global em vez de por sessão; rótulos inconsistentes (**BUG-13**) |
 | M50 | 74, 75: comandos `/` (plugin, model, effort, fast, plan, permissions, skills, workflows, usage, config, storage, sandbox, theme, resume, login…) | `Composer.tsx:94-103,722-760` | IPC real | 🟡 | 8 comandos em pt (`/novo /compactar /exportar /arquivar /limpar-fila /tema /config /skills`) + skills. Faltam model/effort/plan/permissions/usage/resume/login |
 | M51 | 76, 77: **Novidades** (release notes por versão) | — | — | ❌ | `grep` por "Novidades" no renderer não retorna nada |
-| M52 | 78–81, `copy 12`: Terminal (abas, ⋮ com Estilo do cursor, Cursor piscante, Copiar ao selecionar, Histórico 10.000) | `TerminalPane.tsx:36-234` | IPC real (ConPTY) | ✅ | `ui-panes.cjs`: `echo FORJA_TERM_OK` ida e volta. Menu só cria/encerra terminais; cursor piscante e scrollback 5000 fixos (`:47-48`); **BUG-20** (Ctrl+C) |
-| M53 | `copy 14`: Navegador (abas, URL, detecção de dev server, "Usar esta", `launch.json`) | `BrowserPane.tsx:1-395` | IPC real (`preview.detect`, `<webview>` isolado) | ✅ | `ui-panes.cjs`: servidor `npm run dev` aberto, `.forja/launch.json` gravado |
+| M52 | 78–81, `copy 12`: Terminal (abas, ⋮ com Estilo do cursor, Cursor piscante, Copiar ao selecionar, Histórico 10.000) | `TerminalPane.tsx:36-234` | IPC real (ConPTY) | ✅ | `ui-panes.cjs`: `echo OPENCLOD_TERM_OK` ida e volta. Menu só cria/encerra terminais; cursor piscante e scrollback 5000 fixos (`:47-48`); **BUG-20** (Ctrl+C) |
+| M53 | `copy 14`: Navegador (abas, URL, detecção de dev server, "Usar esta", `launch.json`) | `BrowserPane.tsx:1-395` | IPC real (`preview.detect`, `<webview>` isolado) | ✅ | `ui-panes.cjs`: servidor `npm run dev` aberto, `.openclod/launch.json` gravado |
 | M54 | `copy 15-17`: Arquivos (árvore, filtro/`?`, editor, ⋮ de opções) | `FilesPane.tsx:44+` (CodeMirror 6) | IPC real | ✅ | `ui-panes.cjs`: salvar mudou o arquivo no disco; Ctrl+Shift+Y (`:238`). Autosave "não exercitado" |
 | M55 | `copy 13`: Alterações (lista/árvore, diff, vazio "precisam de um repositório Git") | `ChangesPane.tsx:60-135,327-400` | IPC real (`git status v2`) | ✅ | `ui-panes.cjs` (`M README.md +2 −1`). Extra: comentários por linha de diff (`:119-135`). Cada linha de diff é um nó DOM (**BUG-15**) |
 | M56 | `copy 11`, 84: painel da sessão (Ambiente, Contexto detalhado, Conectores, Saídas) | `SessionPanel.tsx:286-470` (`ContextPane`) | IPC real | 🟡 | Seções Ambiente/Contexto/Conectores/Saídas ✅, mas o detalhamento usa constantes inventadas (`:280-281`, **BUG-21**). Sem "Remote Control" |
@@ -205,7 +205,7 @@ agrupamento "Este computador / Personalização".
 | X05 | Contraste (cálculo manual WCAG 2.1) | `--text-3` é usado 240× em `styles.css`. Escuro `#827f77` sobre `#151515` = 4,56:1 (passa por pouco), sobre `--elevated #1f1f1f` ≈ 4,1:1 e `--hover #232323` ≈ 3,9:1 (falha). Claro `#8a877d` sobre `#faf9f5` = 3,4:1 e sobre `#fff` ≈ 3,6:1 (**falha AA** em todo texto secundário) | 🟡 |
 | X06 | Responsividade / janela estreita | Janela com mínimo 1060×680 (`index.ts:986-989`); breakpoints em 1240/1080 (blocos **duplicados** em `styles.css:5415-5430` e `:6949-6965`) e 900/800/760 só para memória, atividade, slides, worktree. Painel lateral 600 px (padrão) + sidebar 248-300 px deixa 160-212 px para o chat a 1060 px (`App.tsx:84-95`, `SessionPanel.tsx:63-64` sem limite pela janela). Não há atalhos de zoom | 🟡 |
 | X07 | Tema claro/escuro | Tokens em `styles.css:20-66`; só `dark`/`light` (sem "Sistema", sem `prefers-color-scheme`); o tema só é aplicado depois de carregar `settings` (`App.tsx:415-419`), então usuários do tema claro veem um flash escuro; a prévia só muda ao salvar (texto em `SettingsDialog.tsx:916`) | 🟡 |
-| X08 | i18n (mistura pt/en) | Interface praticamente toda em pt-BR (`lang="pt-BR"`). Vazamentos: "From Anthropic" e "Anthropic Directory" (`CustomizePage.tsx:600,638`), "Como o Claude deve chamar você?" (`SettingsDialog.tsx:904`), `.forja.json` no nome do arquivo exportado (`App.tsx:1178`), caminho errado `%APPDATA%\Openclod Desktop\skills` (`:1256`), "Ultrarrestrito" (**BUG-13**) | ✅ (poucos vazamentos) |
+| X08 | i18n (mistura pt/en) | Interface praticamente toda em pt-BR (`lang="pt-BR"`). Vazamentos: "From Anthropic" e "Anthropic Directory" (`CustomizePage.tsx:600,638`), "Como o Claude deve chamar você?" (`SettingsDialog.tsx:904`), `.openclod.json` no nome do arquivo exportado (`App.tsx:1178`), caminho errado `%APPDATA%\Openclod Desktop\skills` (`:1256`), "Ultrarrestrito" (**BUG-13**) | ✅ (poucos vazamentos) |
 | X09 | Atalhos de teclado | `Ctrl+,` `Ctrl+B` `Ctrl+N` `Ctrl+Shift+E` `Esc` (`App.tsx:658-698`); `Enter`/`Ctrl+Enter` no composer; `Ctrl+Shift+Y` no painel de arquivos; `Ctrl+Alt+F` global; `F12`. Ausentes: Ctrl+W, Ctrl+Shift+T, Ctrl+U, Ctrl+F, Ctrl+; (chat lateral), zoom | 🟡 |
 | X10 | Virtualização / listas grandes | Nenhuma lista é virtualizada: `Transcript.tsx:467` (todas as mensagens), `Sidebar.tsx:349-353` (sessões por projeto), `ProjectsPage.tsx:114`, `MemoryPage.tsx:418`, `ChangesPane.tsx:~85` (linha de diff = nó DOM), `MemoryGraph.tsx:106-152` | ❌ |
 | X11 | Listeners / vazamentos | Os efeitos principais limpam (`App.tsx:421-602`, `Chrome.tsx:96-109`, `TerminalPane.tsx:89-97`, `BrowserPane.tsx:97-105`, `DictationHost.tsx:180-191`). Exceções: `SessionPanel.tsx:127-145` (sem `pointercancel`/`lostpointercapture`), `useDictation.ts` é código morto com listeners próprios, `activityBySession` nunca é podado | 🟡 |
@@ -279,7 +279,7 @@ frequente; **P2** polimento. IDs referenciados na matriz e no roteiro.
 
 **BUG-09 — Configurações: edições não salvas são apagadas por qualquer mudança em `settings`; fechar pelo fundo descarta sem aviso.**
 - Onde: `SettingsDialog.tsx:203-277` (efeito em `[open, settings]` refaz **todo** o estado local, zera `keyDrafts`, erros e notas); `:521` (`onMouseDown` no backdrop fecha). Eventos `settings_changed` (`App.tsx:457-462`), Composer→permissão, MCP OAuth etc. mudam `settings` com o diálogo aberto.
-- Reproduzir: abrir Configurações → MCP, editar o JSON; disparar uma mudança externa (ex.: `window.forja.app.updateSettings({ theme: 'light' })` no console) → o JSON editado volta ao anterior. Clicar fora do diálogo com edições: fecha sem confirmar.
+- Reproduzir: abrir Configurações → MCP, editar o JSON; disparar uma mudança externa (ex.: `window.openclod.app.updateSettings({ theme: 'light' })` no console) → o JSON editado volta ao anterior. Clicar fora do diálogo com edições: fecha sem confirmar.
 
 **BUG-10 — Editor de artefatos: sem Ctrl+S, fechar descarta alterações, a seleção se perde ao trocar de projeto.**
 - Onde: `ArtifactStudio.tsx:103` (`keymap.of([])`), `:235` (botão Fechar sem guarda de `dirty`), `MorePages.tsx:125-128` (`setSelected(null)` ao trocar de projeto).
@@ -322,7 +322,7 @@ frequente; **P2** polimento. IDs referenciados na matriz e no roteiro.
 - Onde: `App.tsx:57-59,265` (`normalizeState` troca estados ocupados por `idle`), `:463` descarta eventos de outras sessões (inclusive `text_delta`, `tool_start`), e `applySession` zera `streaming/tools`. O composer mostra "Enviar" em vez de "Parar" enquanto o ponto da sidebar diz "Trabalhando". **Confirmar ao vivo.**
 
 **BUG-23 — Largura do painel não é limitada pela janela.**
-- Onde: `App.tsx:84-95` (limites 280–1400, `SessionPanel.tsx:63-64`) com janela mínima de 1060 px (`index.ts:986-988`): painel de 600 px + sidebar deixa o chat com 160–212 px; a largura persiste em `localStorage` (`forja.panel.layout`).
+- Onde: `App.tsx:84-95` (limites 280–1400, `SessionPanel.tsx:63-64`) com janela mínima de 1060 px (`index.ts:986-988`): painel de 600 px + sidebar deixa o chat com 160–212 px; a largura persiste em `localStorage` (`openclod.panel.layout`).
 
 **BUG-24 — Fechar a janela com um turno em andamento não pede confirmação; o renderer travado não é recuperado.**
 - Onde: `index.ts:1060-1066` (`close` → `cleanup` → `destroy`), `index.ts:1048-1050` (`render-process-gone` só loga).
@@ -334,7 +334,7 @@ frequente; **P2** polimento. IDs referenciados na matriz e no roteiro.
 - **BUG-27** `Esc` dispara duas ações: `DictationHost.tsx:169-174` e `App.tsx:683-696` (para o ditado e fecha o painel); `Esc` em Configurações fecha o diálogo mesmo com um popover aninhado aberto.
 - **BUG-28** `ArtifactStudio.tsx:166-201` recarrega o iframe a cada tecla; CSV truncado em 200 linhas sem aviso (`:55`).
 - **BUG-29** Código morto/duplicado: `lib/useDictation.ts` (não importado), `.modal-tabs` (`styles.css:3994-4018`), blocos `@media` duplicados (`styles.css:5415/6949`), `scripts/ui-shots.cjs` com seletor órfão.
-- **BUG-30** Textos: `App.tsx:1256` (caminho `%APPDATA%\Openclod Desktop\skills` incorreto; o real é `%APPDATA%\Openclod\skills`), `App.tsx:1178` (`.forja.json`), `RewindDialog.tsx:45` ("Arquivos alterados não são revertidos") contradiz a opção de restaurar checkpoint (`:54-57`), `SettingsDialog.tsx:916` ("A prévia muda imediatamente ao salvar"), `CLAUDE.md` cita atalho padrão que a migração removeu.
+- **BUG-30** Textos: `App.tsx:1256` (caminho `%APPDATA%\Openclod Desktop\skills` incorreto; o real é `%APPDATA%\Openclod\skills`), `App.tsx:1178` (`.openclod.json`), `RewindDialog.tsx:45` ("Arquivos alterados não são revertidos") contradiz a opção de restaurar checkpoint (`:54-57`), `SettingsDialog.tsx:916` ("A prévia muda imediatamente ao salvar"), `CLAUDE.md` cita atalho padrão que a migração removeu.
 - **BUG-31** Flash escuro para usuários do tema claro (`App.tsx:415-419`; `index.html` sem script de tema).
 - **BUG-32** 13 usos de `window.confirm` (nativo, não temático e bloqueante): `App.tsx:1467`, `Sidebar.tsx:176,210,222`, `ProjectsPage.tsx:59,69`, `ScheduledPage.tsx:375`, `CustomizePage.tsx:582`, `FilesPane.tsx:300,324`, `MemoryPage.tsx:140`, `RewindDialog.tsx:71`, `SettingsDialog.tsx:1727`, `WorktreeDialog.tsx:84`.
 - **BUG-33** Controles sem efeito: `CoworkView.tsx:106,182,191`; abas de Design `MorePages.tsx:260-262`; toggle Meus/Descobrir em Skills/Plugins/Agentes `CustomizePage.tsx:294-302`; cartões "Sessões recentes" não clicáveis `MorePages.tsx:219-226`; "Notificações móveis" `checked disabled` `:306`; "Conversas arquivadas" estática `:366-368`.
@@ -397,7 +397,7 @@ frequente; **P2** polimento. IDs referenciados na matriz e no roteiro.
 ## 4. Roteiro de teste ao vivo para o orquestrador
 
 Preparação (T00): subir o Electron como `scripts/ui-work.cjs:84` faz, com **perfil e projetos descartáveis**:
-`electron . --remote-debugging-port=9333 --user-data-dir=<tmp>`, `FORJA_MOCK_SCRIPT=<arquivo>` para turnos roteirizados
+`electron . --remote-debugging-port=9333 --user-data-dir=<tmp>`, `OPENCLOD_MOCK_SCRIPT=<arquivo>` para turnos roteirizados
 (`src/core/providers/index.ts:20-26`), janela 1440×900 (`scripts/ensure-1440.cjs`), dois projetos git descartáveis
 (um com ≥ 250 arquivos `.md`, outro com 2.000 notas de memória). Conectar por CDP (`playwright-core`,
 `chromium.connectOverCDP('http://127.0.0.1:9333')`) coletando `pageerror` e `console.error` durante todo o roteiro.
@@ -451,16 +451,16 @@ Cada passo: **Ação** → **Esperado**. `[prever falha: BUG-xx]` = o código su
 | T32 | Estourar orçamento (limite baixo) | `BudgetDock` com "Continuar"; continuar envia "continuar de onde parou" |
 | T33 | Título → "Voltar ou ramificar conversa" | Lista de mensagens, filtro, ramificar cria "· lateral"; subtítulo contradiz a opção de restaurar checkpoint (BUG-30) |
 | T34 | Escrever no texto do assistente um caminho (`src/App.tsx:10`) e um link `http://localhost:3000` e clicar | **[prever falha: BUG-16]** caminho deveria abrir o painel Arquivos e o link o navegador padrão; previsto nada |
-| T35 | Exportar sessão e importar de volta | Arquivo `<título>.forja.json` (BUG-30), importa e abre; título termina em "(importada)" |
+| T35 | Exportar sessão e importar de volta | Arquivo `<título>.openclod.json` (BUG-30), importa e abre; título termina em "(importada)" |
 
 ### D. Painéis da sessão
 
 | # | Ação | Resultado esperado |
 |---|---|---|
-| T40 | Terminal → `echo FORJA_TERM_$((6*7))` | Saída `FORJA_TERM_42` (já provado em `ui-panes.cjs`) |
+| T40 | Terminal → `echo OPENCLOD_TERM_$((6*7))` | Saída `OPENCLOD_TERM_42` (já provado em `ui-panes.cjs`) |
 | T41 | **[prever falha: BUG-20]** Selecionar texto no terminal e Ctrl+C | Deveria copiar; previsto enviar ^C |
 | T42 | Botão direito no terminal e no composer | **[prever falha: BUG-17]** previsto sem menu |
-| T43 | Navegador: `localhost:5174`, "Usar esta", URL inválida | Dev server detectado; `.forja/launch.json` criado; URL inválida mostra o erro inline |
+| T43 | Navegador: `localhost:5174`, "Usar esta", URL inválida | Dev server detectado; `.openclod/launch.json` criado; URL inválida mostra o erro inline |
 | T44 | Arquivos: abrir, editar, Ctrl+S, alterar o arquivo por fora e salvar | "Salvo"; conflito pergunta "Sobrescrever?" |
 | T45 | Artefatos → abrir `.md` → Dividido | **[prever falha: BUG-04]** previsto preview com ~110 px de altura; esperado ≥ 540 px |
 | T46 | **[prever falha: BUG-10]** Editar no editor de artefatos e apertar Ctrl+S | Deveria salvar; previsto nada |
@@ -492,7 +492,7 @@ Cada passo: **Ação** → **Esperado**. `[prever falha: BUG-xx]` = o código su
 | # | Ação | Resultado esperado |
 |---|---|---|
 | T60 | Ctrl+, → percorrer as 10 abas | Todas renderizam sem erro de console; rodapé "Salvar alterações / Fechar" |
-| T61 | **[prever falha: BUG-09]** Aba MCP: editar o JSON; no console CDP rodar `window.forja.app.updateSettings({ theme:'light' })` | O texto editado deveria permanecer; previsto voltar ao anterior |
+| T61 | **[prever falha: BUG-09]** Aba MCP: editar o JSON; no console CDP rodar `window.openclod.app.updateSettings({ theme:'light' })` | O texto editado deveria permanecer; previsto voltar ao anterior |
 | T62 | **[prever falha: BUG-09]** Editar um campo e clicar no fundo escuro | Deveria perguntar; previsto fechar e perder |
 | T63 | JSON inválido em MCP, Hooks e Ambientes | Mensagem de erro e troca para a aba correta; nada é salvo |
 | T64 | Trocar o tema no diálogo sem salvar | Prévia só ao salvar (texto da tela diz o contrário: BUG-30); salvar aplica |

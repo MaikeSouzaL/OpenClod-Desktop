@@ -15,11 +15,11 @@
  * Usage:
  *   node scripts/embed-bin.mjs                    # everything
  *   node scripts/embed-bin.mjs --only rg          # or: --only ocu
- *   node scripts/embed-bin.mjs --rg C:\path\rg.exe  # explicit ripgrep source (or env FORJA_RG_SRC)
+ *   node scripts/embed-bin.mjs --rg C:\path\rg.exe  # explicit ripgrep source (or env OPENCLOD_RG_SRC)
  *   node scripts/embed-bin.mjs --check            # verify bundled files against MANIFEST.json
  *   node scripts/embed-bin.mjs --force            # rewrite even when hashes match
  *
- * Environment: FORJA_RG_SRC (ripgrep to copy), FORJA_OCU_SRC (Go module dir), GO (go binary).
+ * Environment: OPENCLOD_RG_SRC (ripgrep to copy), OPENCLOD_OCU_SRC (Go module dir), GO (go binary).
  */
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -113,7 +113,7 @@ function probeRipgrep(file) {
 
 function ripgrepCandidates() {
   const list = []
-  const explicit = option('--rg') ?? process.env.FORJA_RG_SRC
+  const explicit = option('--rg') ?? process.env.OPENCLOD_RG_SRC
   if (explicit) list.push({ origin: 'explicit', file: path.resolve(explicit) })
   for (const dir of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
     list.push({ origin: 'PATH', file: path.join(dir, `rg${EXE}`) })
@@ -139,7 +139,7 @@ function embedRipgrep() {
       log('rg: no source found, keeping the bundled copy')
       chosen = { origin: 'bundled', file: dst, ...probeRipgrep(dst) }
     } else {
-      fail('no ripgrep >= 14 found. Pass --rg <path-to-rg.exe> or set FORJA_RG_SRC (release builds: https://github.com/BurntSushi/ripgrep/releases).')
+      fail('no ripgrep >= 14 found. Pass --rg <path-to-rg.exe> or set OPENCLOD_RG_SRC (release builds: https://github.com/BurntSushi/ripgrep/releases).')
     }
   }
 
@@ -180,7 +180,7 @@ function git(repo, ...gitArgs) {
 function embedOpenComputerUse() {
   const goBin = process.env.GO ?? 'go'
   const repo = path.join(ROOT, 'repositorios', 'open-computer-use')
-  const moduleDir = path.resolve(process.env.FORJA_OCU_SRC ?? path.join(repo, 'apps', 'OpenComputerUseWindows'))
+  const moduleDir = path.resolve(process.env.OPENCLOD_OCU_SRC ?? path.join(repo, 'apps', 'OpenComputerUseWindows'))
   if (!fs.existsSync(path.join(moduleDir, 'go.mod'))) {
     fail(`Go module not found at ${moduleDir} (clone open-computer-use into repositorios/ first)`)
   }
@@ -192,7 +192,7 @@ function embedOpenComputerUse() {
   const rev = git(repo, 'log', '-1', '--format=%H') ?? 'unknown'
 
   // Build in a temp copy: the clone stays untouched (no go.sum edits, no build cache files).
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'forja-ocu-'))
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'openclod-ocu-'))
   try {
     for (const name of fs.readdirSync(moduleDir)) {
       if (name.endsWith('_test.go') || !/\.(go|mod|sum)$/.test(name)) continue

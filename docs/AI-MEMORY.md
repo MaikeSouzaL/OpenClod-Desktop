@@ -125,6 +125,65 @@ seleção** e **Apagar N**.
 
 Verificação em app real (perfil descartável): `node scripts/ui-memory-select.cjs`.
 
+## Arquivos na memória (imagens, PDFs, documentos, áudio, vídeo, qualquer arquivo)
+
+A memória guarda **arquivos**, não só texto. Cada arquivo vira uma página da wiki, entra no índice AI-Memory e fica
+ligado às páginas a que pertence. Assim, outra sessão ou outro modelo acha uma imagem **pelo que há nela**.
+
+**O que entra em cada página.** Cada arquivo é copiado para `<memória>/files/<slug>/` com `meta.json`, `text.txt` e
+uma miniatura `thumb.jpg` (de imagens e da 1ª página de PDFs). A página `arquivo-<nome>-<hash>` traz:
+
+- **Descrição:** a de uma imagem é escrita por um modelo que enxerga, pelo relé de visão: o modelo de visão escolhido
+  ou o primeiro provedor que lê imagens, inclusive o llama.cpp local. A de um arquivo do usuário ou do agente vem
+  como foi dada.
+- **Texto:**
+  - imagem: OCR do Windows;
+  - PDF: o texto, ou OCR se for digitalizado;
+  - Word, Excel, PowerPoint, Markdown, HTML, CSV, JSON, texto e código: o conteúdo.
+
+  Texto longo continua em `…-parte-N`, ligado à página principal.
+- **Ficha:** tipo, origem, cópia, tamanho, SHA-256 e data.
+- **Ligações:** `[[links]]` para as páginas indicadas, mais `## Relacionados` automático pelo assunto.
+
+O mesmo conteúdo é sempre a mesma página: repetir só atualiza tags, ligações e descrição. Arquivos acima de 300 MB
+ficam na origem, só referenciados. Áudio e vídeo continuam no pipeline de mídia (transcrição e frames,
+`docs/MIDIA.md`) e são contados junto.
+
+**Como os arquivos entram:**
+
+| Como | O que acontece |
+|---|---|
+| Memória → **Guardar arquivos** / **Guardar pasta** | Seleção do Windows (a pasta vai com as subpastas, até 5000 arquivos). Grava em segundo plano, com uma barra de progresso. |
+| O agente: `memory_file action=add paths=[…] recursive kinds tags links` | O mesmo, dentro do workspace. Exemplo: "pegue todas as imagens e PDFs do vault e guarde na memória". `describe` grava a descrição escrita pelo modelo depois de olhar (`view`). `list` e `remove` também. |
+| Uma imagem **colada na conversa** | Vai para a memória depois do turno, com a descrição que o relé já fez, ligada à página do turno e à da sessão. |
+| Um caminho de arquivo **escrito pelo usuário** na mensagem | O mesmo: PDF, imagem, Office, texto; até 100 MB. Áudio e vídeo vão para o pipeline de mídia. |
+
+**Tela.** Abaixo dos números aparece uma barra com os arquivos por tipo (imagens, PDFs, documentos, planilhas,
+apresentações, textos, código, áudios, vídeos, outros):
+
+- um tipo mostra só os cards daquele tipo, com a miniatura;
+- **Páginas** esconde as páginas de arquivos;
+- a página de um arquivo mostra a imagem grande e **Abrir o arquivo** (a cópia guardada).
+
+O número **no índice AI-Memory** é o real (`/admin/projects`). Enquanto a cópia avança, aparece "de N" e
+"copiando (x de y)".
+
+**Índice.** A sincronização da wiki com o AI-Memory tinha três defeitos:
+
+- marcava o projeto como sincronizado mesmo quando parava no limite de 60 s, e só voltava no próximo início do app
+  (~15 páginas por vez);
+- fazia uma busca no sidecar por página, segundos cada uma;
+- num projeto que o índice ainda não conhecia, a primeira consulta voltava 404 e a passada falhava: o projeto ficava
+  de fora.
+
+Agora o 404 conta como índice vazio (a primeira gravação cria o projeto). Uma passada que falha tenta de novo em 30 s,
+e uma que para continua sozinha 3 s depois. "Relacionados" vem da própria wiki (instantâneo), com 3
+gravações em paralelo. Uma passada completa volta a conferir em 2 min. A escrita de uma página também não relê mais a
+wiki inteira: só as páginas do mesmo tipo semântico, para ver conflitos, e o índice é atualizado no lugar.
+
+Verificação em app real: `node scripts/ui-memory-files.cjs --root <snapshot>`. O modelo que descreve é o llama.cpp
+local (qwen3.5:4b do Ollama). Testes: `tests/memory-files.test.ts`.
+
 ## Grafo de memória (estilo Obsidian)
 
 Cada projeto tem a aba **Grafo** na tela Memória. O menu do projeto (botão de

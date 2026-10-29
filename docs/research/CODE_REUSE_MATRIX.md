@@ -134,6 +134,32 @@ mestre + `munim-computer-use`). Cada repositório tem um estudo individual em
 | 4 | Correção de tools determinística | DeepEval `tool_correctness.py:474-621` | `src/core/eval/metrics/tool-correctness.ts` | 23 |
 | 5 | Detecção de loop de agente | DeepEval `agent_loop_detection.py:65-258` | `src/core/eval/metrics/agent-loop.ts` | 22 |
 
+### 2.1. Assets colhidos (para poder apagar os clones)
+
+`scripts/harvest-research-assets.mjs` gerou `resources/harvested/`:
+
+| Tipo | Quantidade | Onde |
+|---|---:|---|
+| skills | 387 | `resources/harvested/skills/` |
+| agentes | 21 | `resources/harvested/agents/` |
+| comandos | 23 | `resources/harvested/commands/` |
+| prompts | 168 | `resources/harvested/prompts/` |
+| fontes de ferramentas | 25 | `resources/harvested/tools/sources/` |
+
+O manifesto com origem, commit, licença, hash e qualidade está em
+`resources/harvested/manifest.json`. Foram excluídos `zed`, `claw-code-local`,
+`Mcp.ComputerUse`, `wisprflow` e pastas `ee/`/`enterprise/`.
+
+Para o runtime foram promovidos:
+
+- **5 skills**: `agent-delegation`, `structured-debugging`, `e2e-testing`,
+  `create-pull-request`, `harness-eval`.
+- **5 agentes**: `test-engineer`, `css-specialist`,
+  `playwright-test-generator`, `playwright-test-healer`,
+  `playwright-test-planner`.
+
+O restante fica como arquivo de referência e não entra no contexto do modelo.
+
 ## 3. Fila de implementação
 
 Ordem por dependência e risco. Uma fatia por vez, com teste e build.

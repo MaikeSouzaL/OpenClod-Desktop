@@ -39,7 +39,7 @@ describe('scheduled task surface', () => {
   const stored = (): ScheduledTask[] => JSON.parse(fs.readFileSync(file, 'utf8')).tasks
 
   beforeEach(async () => {
-    dir = await makeTempDir('forja-sched-surface-')
+    dir = await makeTempDir('openclod-sched-surface-')
     file = path.join(dir, 'tasks.json')
   })
 

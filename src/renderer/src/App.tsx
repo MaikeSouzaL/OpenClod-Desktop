@@ -71,8 +71,8 @@ function mergeMessage(
   return next
 }
 
-const LAYOUT_KEY = 'forja.panel.layout'
-const EFFORT_KEY = 'forja.effort'
+const LAYOUT_KEY = 'openclod.panel.layout'
+const EFFORT_KEY = 'openclod.effort'
 
 function loadEffort(): ReasoningEffort | null {
   try {
@@ -150,7 +150,7 @@ export default function App(): ReactElement {
 
   useEffect(
     () =>
-      window.forja.dictation.onComposerInsert((text) => {
+      window.openclod.dictation.onComposerInsert((text) => {
         setDictationInsert({ id: logId(), text, sessionId: activeSessionRef.current })
       }),
     []
@@ -227,7 +227,7 @@ export default function App(): ReactElement {
 
   const refreshCapabilities = useCallback(async (): Promise<void> => {
     try {
-      setCapabilities(await unwrap(window.forja.app.capabilities()))
+      setCapabilities(await unwrap(window.openclod.app.capabilities()))
     } catch {
       /* capabilities are informational */
     }
@@ -235,7 +235,7 @@ export default function App(): ReactElement {
 
   const refreshSkills = useCallback(async (): Promise<void> => {
     try {
-      setSkills(await unwrap(window.forja.app.skills()))
+      setSkills(await unwrap(window.openclod.app.skills()))
     } catch {
       /* skills are optional */
     }
@@ -243,7 +243,7 @@ export default function App(): ReactElement {
 
   const refreshSessions = useCallback(async (): Promise<SessionSummary[]> => {
     try {
-      const list = await unwrap(window.forja.sessions.list())
+      const list = await unwrap(window.openclod.sessions.list())
       setSessions(list)
       return list
     } catch (err) {
@@ -294,7 +294,7 @@ export default function App(): ReactElement {
       clearSession()
       const epoch = ++sessionEpoch.current
       try {
-        const state = await unwrap(window.forja.sessions.get(sessionId))
+        const state = await unwrap(window.openclod.sessions.get(sessionId))
         // A slower request for the previous project must never replace the
         // session the user is looking at now.
         if (epoch !== sessionEpoch.current) return state
@@ -340,7 +340,7 @@ export default function App(): ReactElement {
       const model = preferred?.providerId === provider.id && preferred.model ? preferred.model : provider.model
       try {
         const meta = await unwrap(
-          window.forja.sessions.create({
+          window.openclod.sessions.create({
             projectId: project.id,
             cwd: sessionCwd,
             mode: defaultAgentMode(targetSurface),
@@ -352,13 +352,13 @@ export default function App(): ReactElement {
         // Provider/model default first; the global choice is only a fallback.
         const initialEffort = provider.defaultEffort ?? defaultEffortRef.current
         if (initialEffort) {
-          await unwrap(window.forja.sessions.setEffort(meta.id, initialEffort))
+          await unwrap(window.openclod.sessions.setEffort(meta.id, initialEffort))
         }
         // A project that never chose a model adopts the one used by its first
         // session, so a later choice in another project cannot change it.
         if (!project.model) {
           try {
-            const updated = await unwrap(window.forja.projects.setModel(project.id, provider.id, model))
+            const updated = await unwrap(window.openclod.projects.setModel(project.id, provider.id, model))
             setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)))
           } catch {
             /* the session still works with its own model */
@@ -395,12 +395,12 @@ export default function App(): ReactElement {
     void (async () => {
       try {
         const [projectList, sessionList, settingsValue, capabilityValue, presetList, versionValue] = await Promise.all([
-          unwrap(window.forja.projects.list()),
-          unwrap(window.forja.sessions.list()),
-          unwrap(window.forja.app.settings()),
-          unwrap(window.forja.app.capabilities()).catch(() => null),
-          unwrap(window.forja.app.presets()),
-          unwrap(window.forja.app.versions())
+          unwrap(window.openclod.projects.list()),
+          unwrap(window.openclod.sessions.list()),
+          unwrap(window.openclod.app.settings()),
+          unwrap(window.openclod.app.capabilities()).catch(() => null),
+          unwrap(window.openclod.app.presets()),
+          unwrap(window.openclod.app.versions())
         ])
         if (cancelled) return
         setProjects(projectList)
@@ -432,7 +432,7 @@ export default function App(): ReactElement {
   /* ------------------------------ events ------------------------------ */
 
   useEffect(() => {
-    const off = window.forja.events.on((event: HarnessEvent) => {
+    const off = window.openclod.events.on((event: HarnessEvent) => {
       // Activity and the "working" dot are tracked for every session, not only the one on screen.
       if (event.type === 'tool_start' || event.type === 'tool_end' || event.type === 'subagent' || event.type === 'turn_end' || event.type === 'status') {
         const at = Date.now()
@@ -465,7 +465,7 @@ export default function App(): ReactElement {
           setSession((current) => (current && current.meta.id === event.sessionId ? { ...current, meta: follow(current.meta) } : current))
         }
         // The provider that failed now shows why in Settings → Provedores.
-        void window.forja.app.capabilities().then((result) => {
+        void window.openclod.app.capabilities().then((result) => {
           if (result.ok) setCapabilities(result.value)
         })
       }
@@ -479,7 +479,7 @@ export default function App(): ReactElement {
         void refreshSessions()
       }
       if (event.type === 'settings_changed') {
-        void window.forja.app.settings().then((result) => {
+        void window.openclod.app.settings().then((result) => {
           if (result.ok) setSettings(result.value)
         })
         if (event.scope === 'mcp' || event.scope === 'browser') void refreshCapabilities()
@@ -583,7 +583,7 @@ export default function App(): ReactElement {
         case 'approval_request':
           setApprovals((current) => [...current.filter((item) => item.id !== event.request.id), event.request])
           if (document.hidden) {
-            void window.forja.app.notify('Openclod Desktop - aprovação necessária', event.request.title)
+            void window.openclod.app.notify('Openclod Desktop - aprovação necessária', event.request.title)
           }
           break
         case 'approval_resolved':
@@ -592,7 +592,7 @@ export default function App(): ReactElement {
         case 'question_request':
           setQuestion(event.request)
           if (document.hidden) {
-            void window.forja.app.notify(
+            void window.openclod.app.notify(
               'Openclod Desktop - pergunta',
               'O agente precisa de mais contexto para continuar.'
             )
@@ -614,7 +614,7 @@ export default function App(): ReactElement {
           void refreshSessions()
           if (document.hidden) {
             const title = sessionsRef.current.find((item) => item.meta.id === event.sessionId)?.meta.title ?? 'Openclod Desktop'
-            void window.forja.app.notify(
+            void window.openclod.app.notify(
               event.stopReason === 'error' ? 'Openclod Desktop - turno com erro' : 'Openclod Desktop - turno concluído',
               event.error || title
             )
@@ -651,12 +651,12 @@ export default function App(): ReactElement {
   }, [session?.meta.id])
 
   useEffect(() => {
-    void window.forja.power.state().then((result) => result.ok && setKeepAwake(result.value))
+    void window.openclod.power.state().then((result) => result.ok && setKeepAwake(result.value))
   }, [])
 
   const toggleKeepAwake = useCallback(async (): Promise<void> => {
     try {
-      setKeepAwake(await unwrap(window.forja.power.keepAwake(!keepAwake)))
+      setKeepAwake(await unwrap(window.openclod.power.keepAwake(!keepAwake)))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -666,7 +666,7 @@ export default function App(): ReactElement {
 
   useEffect(() => {
     const check = (): void => {
-      void window.forja.window.isMaximized().then(setMaximized).catch(() => undefined)
+      void window.openclod.window.isMaximized().then(setMaximized).catch(() => undefined)
     }
     check()
     window.addEventListener('resize', check)
@@ -721,10 +721,10 @@ export default function App(): ReactElement {
 
   const addProject = useCallback(async (): Promise<void> => {
     try {
-      const folder = await unwrap(window.forja.projects.pick())
+      const folder = await unwrap(window.openclod.projects.pick())
       if (!folder) return
-      const project = await unwrap(window.forja.projects.add(folder))
-      const list = await unwrap(window.forja.projects.list())
+      const project = await unwrap(window.openclod.projects.add(folder))
+      const list = await unwrap(window.openclod.projects.list())
       setProjects(list)
       setActiveProjectId(project.id)
       await createSession(project)
@@ -736,8 +736,8 @@ export default function App(): ReactElement {
   const removeProject = useCallback(
     async (project: Project): Promise<void> => {
       try {
-        await unwrap(window.forja.projects.remove(project.id))
-        const list = await unwrap(window.forja.projects.list())
+        await unwrap(window.openclod.projects.remove(project.id))
+        const list = await unwrap(window.openclod.projects.list())
         setProjects(list)
         if (activeProjectId === project.id) {
           clearSession()
@@ -758,10 +758,10 @@ export default function App(): ReactElement {
 
   const deleteProject = useCallback(    async (project: Project): Promise<void> => {
       try {
-        await unwrap(window.forja.projects.delete(project.id))
+        await unwrap(window.openclod.projects.delete(project.id))
         const [list, sessionList] = await Promise.all([
-          unwrap(window.forja.projects.list()),
-          unwrap(window.forja.sessions.list())
+          unwrap(window.openclod.projects.list()),
+          unwrap(window.openclod.sessions.list())
         ])
         setProjects(list)
         setSessions(sessionList)
@@ -794,7 +794,7 @@ export default function App(): ReactElement {
   const deleteSession = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
-        await unwrap(window.forja.sessions.delete(sessionId))
+        await unwrap(window.openclod.sessions.delete(sessionId))
         const list = await refreshSessions()
         if (activeSessionRef.current === sessionId) {
           const project = projectsRef.current.find((item) => item.id === activeProjectId)
@@ -818,7 +818,7 @@ export default function App(): ReactElement {
 
   const renameSession = useCallback(async (sessionId: string, title: string): Promise<void> => {
     try {
-      const state = await unwrap(window.forja.sessions.rename(sessionId, title))
+      const state = await unwrap(window.openclod.sessions.rename(sessionId, title))
       setSessions((current) =>
         current.map((item) => (item.meta.id === sessionId ? { ...item, meta: state.meta } : item))
       )
@@ -833,7 +833,7 @@ export default function App(): ReactElement {
   const archiveSession = useCallback(
     async (sessionId: string, archived: boolean): Promise<void> => {
       try {
-        await unwrap(window.forja.sessions.archive(sessionId, archived))
+        await unwrap(window.openclod.sessions.archive(sessionId, archived))
         const list = await refreshSessions()
         setToast({ level: 'info', text: archived ? 'Sessão arquivada.' : 'Sessão restaurada.' })
         if (archived && activeSessionRef.current === sessionId) {
@@ -861,14 +861,14 @@ export default function App(): ReactElement {
   const compactSession = useCallback(async (): Promise<void> => {
     const id = activeSessionRef.current
     if (!id) throw new Error('nenhuma sessão ativa')
-    const state = await unwrap(window.forja.sessions.compact(id))
+    const state = await unwrap(window.openclod.sessions.compact(id))
     setSession(state)
     setToast({ level: 'info', text: 'Contexto compactado.' })
   }, [])
 
   const revealPath = useCallback(async (target: string): Promise<void> => {
     try {
-      await unwrap(window.forja.files.reveal(target))
+      await unwrap(window.openclod.files.reveal(target))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -878,7 +878,7 @@ export default function App(): ReactElement {
     async (file: File): Promise<void> => {
       try {
         const json = await file.text()
-        const meta = await unwrap(window.forja.sessions.import(json))
+        const meta = await unwrap(window.openclod.sessions.import(json))
         await refreshSessions()
         await openSession(meta.id)
         setToast({ level: 'info', text: `Sessão "${meta.title}" importada.` })
@@ -904,7 +904,7 @@ export default function App(): ReactElement {
           // user's Desktop (never Openclod's own data folder), and full access lets
           // the agent reach the rest of the computer.
           try {
-            const ensured = await unwrap(window.forja.projects.ensureDefault())
+            const ensured = await unwrap(window.openclod.projects.ensureDefault())
             project = ensured
             setProjects((current) => (current.some((item) => item.id === ensured.id) ? current : [ensured, ...current]))
           } catch (err) {
@@ -926,7 +926,7 @@ export default function App(): ReactElement {
         4_000
       )
       try {
-        const result = await window.forja.sessions.send(target, text, images)
+        const result = await window.openclod.sessions.send(target, text, images)
         if (!result.ok) {
           setRunState(previousState)
           setError(result.error)
@@ -948,7 +948,7 @@ export default function App(): ReactElement {
     const id = activeSessionRef.current
     if (!id) return
     try {
-      await unwrap(window.forja.sessions.abort(id))
+      await unwrap(window.openclod.sessions.abort(id))
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -960,7 +960,7 @@ export default function App(): ReactElement {
     setQueued((current) => [...current.slice(-24), { id: localId, text, images }])
     const sessionId = activeSessionRef.current
     if (!sessionId) return
-    void window.forja.inbox
+    void window.openclod.inbox
       .add(sessionId, text, images, 'queue', 'ui')
       .then((result) => {
         if (!result.ok) return
@@ -972,7 +972,7 @@ export default function App(): ReactElement {
   const removeQueued = useCallback((id: string): void => {
     setQueued((current) => current.filter((item) => item.id !== id))
     const sessionId = activeSessionRef.current
-    if (sessionId) void window.forja.inbox.remove(sessionId, id).catch(() => undefined)
+    if (sessionId) void window.openclod.inbox.remove(sessionId, id).catch(() => undefined)
   }, [])
 
   /**
@@ -990,7 +990,7 @@ export default function App(): ReactElement {
       }
       const localId = logId()
       setQueued((current) => [{ id: localId, text, images }, ...current].slice(0, 25))
-      void window.forja.inbox
+      void window.openclod.inbox
         .add(sessionId, text, images, 'queue', 'ui')
         .then((result) => {
           if (result.ok) setQueued((current) => current.map((item) => (item.id === localId ? { ...item, id: result.value.id } : item)))
@@ -1010,8 +1010,8 @@ export default function App(): ReactElement {
       const steer = BUSY_STATES.includes(runState)
       setQueued((current) => current.filter((entry) => entry.id !== id))
       try {
-        await window.forja.inbox.remove(sessionId, id).catch(() => undefined)
-        const result = await window.forja.sessions.send(sessionId, item.text, item.images, steer ? 'steer' : 'auto')
+        await window.openclod.inbox.remove(sessionId, id).catch(() => undefined)
+        const result = await window.openclod.sessions.send(sessionId, item.text, item.images, steer ? 'steer' : 'auto')
         if (!result.ok) throw new Error(result.error)
         if (steer) setToast({ level: 'info', text: 'Mensagem enviada ao turno em execução.' })
         else setRunState('thinking')
@@ -1035,7 +1035,7 @@ export default function App(): ReactElement {
     if (!next || !sessionId || queueSessionRef.current !== sessionId) return
     drainingRef.current = true
     setQueued((current) => current.filter((item) => item.id !== next.id))
-    void window.forja.inbox.remove(sessionId, next.id).catch(() => undefined)
+    void window.openclod.inbox.remove(sessionId, next.id).catch(() => undefined)
     void send(next.text, next.images)
       .then((ok) => {
         if (!ok && queueSessionRef.current === sessionId) {
@@ -1054,7 +1054,7 @@ export default function App(): ReactElement {
     setQueued([])
     queuedRef.current = []
     if (!sessionId) return
-    void window.forja.inbox
+    void window.openclod.inbox
       .list(sessionId)
       .then((result) => {
         if (!result.ok || queueSessionRef.current !== sessionId) return
@@ -1078,7 +1078,7 @@ export default function App(): ReactElement {
     const id = activeSessionRef.current
     if (!id) return
     try {
-      await unwrap(window.forja.sessions.setEnvironment(id, environmentId))
+      await unwrap(window.openclod.sessions.setEnvironment(id, environmentId))
       const patch = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, environment: environmentId })
       setSession((current) => (current ? { ...current, meta: patch(current.meta) } : current))
       setSessions((current) => current.map((item) => (item.meta.id === id ? { ...item, meta: patch(item.meta) } : item)))
@@ -1091,7 +1091,7 @@ export default function App(): ReactElement {
   const changeMode = useCallback(async (agentMode: AgentMode): Promise<void> => {    const id = activeSessionRef.current
     if (!id) return
     try {
-      await unwrap(window.forja.sessions.setMode(id, agentMode))
+      await unwrap(window.openclod.sessions.setMode(id, agentMode))
       const patch = (meta: SessionState['meta']): SessionState['meta'] => ({ ...meta, mode: agentMode })
       setSession((current) => (current ? { ...current, meta: patch(current.meta) } : current))
       setSessions((current) =>
@@ -1107,12 +1107,12 @@ export default function App(): ReactElement {
     const projectId = session?.meta.projectId ?? activeProjectId
     try {
       // Global fallback for projects that never chose a model.
-      await unwrap(window.forja.app.rememberModel(providerId, model))
-      if (id) await unwrap(window.forja.sessions.setModel(id, providerId, model))
+      await unwrap(window.openclod.app.rememberModel(providerId, model))
+      if (id) await unwrap(window.openclod.sessions.setModel(id, providerId, model))
       // The choice belongs to the project: switching to another project keeps
       // that project's own LLM.
       if (projectId) {
-        const updated = await unwrap(window.forja.projects.setModel(projectId, providerId, model))
+        const updated = await unwrap(window.openclod.projects.setModel(projectId, providerId, model))
         setProjects((current) => current.map((item) => (item.id === updated.id ? updated : item)))
       }
       setSettings((current) => (current ? { ...current, lastModel: { providerId, model } } : current))
@@ -1131,7 +1131,7 @@ export default function App(): ReactElement {
     async (approvalId: string, approved: boolean, always: boolean, reason = ''): Promise<void> => {
       setApprovals((current) => current.filter((item) => item.id !== approvalId))
       try {
-        await unwrap(window.forja.approvals.resolve(approvalId, approved, always, reason))
+        await unwrap(window.openclod.approvals.resolve(approvalId, approved, always, reason))
         pushLog('info', `aprovação ${approved ? 'concedida' : 'negada'}${always ? ' (sempre nesta sessão)' : ''}`)
       } catch (err) {
         setError(errorMessage(err))
@@ -1144,7 +1144,7 @@ export default function App(): ReactElement {
     async (questionId: string, answers: QuestionAnswer[]): Promise<void> => {
       setQuestion((current) => (current?.id === questionId ? null : current))
       try {
-        await unwrap(window.forja.questions.answer(questionId, answers))
+        await unwrap(window.openclod.questions.answer(questionId, answers))
         pushLog('info', answers.length ? 'respostas enviadas ao agente' : 'perguntas puladas')
       } catch (err) {
         setError(errorMessage(err))
@@ -1169,7 +1169,7 @@ export default function App(): ReactElement {
       }
       if (!session) return
       try {
-        await unwrap(window.forja.sessions.setEffort(session.meta.id, next))
+        await unwrap(window.openclod.sessions.setEffort(session.meta.id, next))
         setSession((current) => (current ? { ...current, meta: { ...current.meta, effort: next ?? undefined } } : current))
       } catch (err) {
         setError(errorMessage(err))
@@ -1193,8 +1193,8 @@ export default function App(): ReactElement {
 
   const saveSettings = useCallback(
     async (patch: Partial<AppSettings>): Promise<void> => {
-      const before = session ? await unwrap(window.forja.app.settings()).catch(() => null) : null
-      const next = await unwrap(window.forja.app.updateSettings(patch))
+      const before = session ? await unwrap(window.openclod.app.settings()).catch(() => null) : null
+      const next = await unwrap(window.openclod.app.updateSettings(patch))
       setSettings(next)
       void refreshCapabilities()
 
@@ -1207,7 +1207,7 @@ export default function App(): ReactElement {
         const was = before?.providers.find((item) => item.id === session.meta.providerId)?.model
         const followsCard = !own || (was !== undefined && was !== provider?.model && session.meta.model === was)
         if (provider && followsCard && (provider.id !== session.meta.providerId || provider.model !== session.meta.model)) {
-          await unwrap(window.forja.sessions.setModel(session.meta.id, provider.id, provider.model))
+          await unwrap(window.openclod.sessions.setModel(session.meta.id, provider.id, provider.model))
           setSession((current) =>
             current
               ? { ...current, meta: { ...current.meta, providerId: provider.id, model: provider.model } }
@@ -1222,7 +1222,7 @@ export default function App(): ReactElement {
   const refreshChanges = useCallback(async (): Promise<void> => {
     if (!activeSessionRef.current) return
     try {
-      setChanges(await unwrap(window.forja.files.changes(activeSessionRef.current)))
+      setChanges(await unwrap(window.openclod.files.changes(activeSessionRef.current)))
     } catch {
       /* informational */
     }
@@ -1234,13 +1234,13 @@ export default function App(): ReactElement {
 
   const exportSession = useCallback(async (sessionId: string): Promise<void> => {
     try {
-      const json = await unwrap(window.forja.sessions.export(sessionId))
+      const json = await unwrap(window.openclod.sessions.export(sessionId))
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       const title = sessionsRef.current.find((item) => item.meta.id === sessionId)?.meta.title ?? 'sessao'
-      link.download = `${slug(title)}.forja.json`
+      link.download = `${slug(title)}.openclod.json`
       link.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -1252,7 +1252,7 @@ export default function App(): ReactElement {
     const active = session
     if (!active) return false
     try {
-      const state = await unwrap(window.forja.sessions.rewind(active.meta.id, messageId, restoreFiles))
+      const state = await unwrap(window.openclod.sessions.rewind(active.meta.id, messageId, restoreFiles))
       applySession(state)
       setSessions((current) => current.map((item) => item.meta.id === state.meta.id ? { ...item, meta: state.meta } : item))
       setRewindOpen(false)
@@ -1268,7 +1268,7 @@ export default function App(): ReactElement {
     const active = session
     if (!active) return false
     try {
-      const state = await unwrap(window.forja.sessions.fork(active.meta.id, messageId))
+      const state = await unwrap(window.openclod.sessions.fork(active.meta.id, messageId))
       await refreshSessions()
       setActiveProjectId(state.meta.projectId)
       rememberSession(state.meta.id)
@@ -1372,6 +1372,36 @@ export default function App(): ReactElement {
     setPlanFocus(itemId)
     setPanelTab('plan')
     setPanelLayout((current) => (current.side === 'right' ? current : { ...current, side: 'right' }))
+  }, [])
+
+  /** ▶ on a stopped plan step: the main process reopens that step and starts the turn that continues from it. */
+  const resumePlanStep = useCallback(async (itemId: string): Promise<void> => {
+    const id = activeSessionRef.current
+    if (!id) return
+    try {
+      await unwrap(window.openclod.sessions.resumePlan(id, itemId))
+      setRunState('thinking')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }, [])
+
+  /** 🗑 on the plan dock. The local queue goes too, or the drain would start the abandoned work again once the turn stops. */
+  const discardPlan = useCallback(async (): Promise<void> => {
+    const id = activeSessionRef.current
+    if (!id) return
+    setQueued([])
+    queuedRef.current = []
+    try {
+      const result = await unwrap(window.openclod.sessions.discardPlan(id))
+      setSession((current) => (current && current.meta.id === id ? { ...current, plan: [] } : current))
+      setToast({
+        level: 'info',
+        text: result.capsules ? 'Plano descartado e apagado da memória da sessão.' : 'Plano descartado.'
+      })
+    } catch (err) {
+      setError(errorMessage(err))
+    }
   }, [])
 
   const commitRename = useCallback((): void => {
@@ -1683,7 +1713,7 @@ export default function App(): ReactElement {
         capabilities={capabilities}
         onOpenSettings={openSettingsAt}
         onRestartMcp={async () => {
-          await window.forja.mcp.restart()
+          await window.openclod.mcp.restart()
           await refreshCapabilities()
         }}
         openTab={customizeOpenTab}
@@ -1756,7 +1786,13 @@ export default function App(): ReactElement {
         onSkip={(id) => void answerQuestion(id, [])}
       />
       <ApprovalDock approvals={approvals} onResolve={(id, approved, always, reason) => void resolveApproval(id, approved, always, reason)} />
-      <PlanDock plan={session.plan} running={BUSY_STATES.includes(runState)} onOpenStep={openPlanStep} />
+      <PlanDock
+        plan={session.plan}
+        running={BUSY_STATES.includes(runState)}
+        onOpenStep={openPlanStep}
+        onResumeStep={resumePlanStep}
+        onDiscard={discardPlan}
+      />
       {composerNode}
     </div>
   ) : (
@@ -1835,9 +1871,9 @@ export default function App(): ReactElement {
           setMenuOpen(false)
           setTitleMenuOpen(false)
         }}
-        onMinimize={() => window.forja.window.minimize()}
-        onMaximize={() => window.forja.window.maximize()}
-        onClose={() => window.forja.window.close()}
+        onMinimize={() => window.openclod.window.minimize()}
+        onMaximize={() => window.openclod.window.maximize()}
+        onClose={() => window.openclod.window.close()}
       />
 
       <div className="app-body">
@@ -1919,6 +1955,7 @@ export default function App(): ReactElement {
             onTab={togglePanel}
             onCompact={compactSession}
             onReveal={(path) => void revealPath(path)}
+            onOpenConnectors={openConnectors}
           />
         ) : null}
       </div>

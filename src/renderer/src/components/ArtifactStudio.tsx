@@ -80,7 +80,7 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
     setError('')
     void (async () => {
       try {
-        const result = await unwrap(window.forja.files.read(root, file.path))
+        const result = await unwrap(window.openclod.files.read(root, file.path))
         if (cancelled) return
         setDraft(result.content)
         setSaved(result.content)
@@ -132,7 +132,7 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
     setSaving(true)
     setError('')
     try {
-      await unwrap(window.forja.files.write(root, file.path, draft))
+      await unwrap(window.openclod.files.write(root, file.path, draft))
       setSaved(draft)
       onSaved?.()
     } catch (err) {
@@ -153,7 +153,7 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
     setNotice('')
     try {
       const target = file.path.replace(/\.openclod-slides\.json$/i, '.slides.html')
-      await unwrap(window.forja.files.write(root, target, slidesToHtml(document)))
+      await unwrap(window.openclod.files.write(root, target, slidesToHtml(document)))
       setNotice(`Apresentação exportada para ${target}`)
       onSaved?.()
     } catch (err) {
@@ -221,7 +221,7 @@ export function ArtifactStudio({ root, file, onClose, onSaved }: ArtifactStudioP
           <button type="button" className="btn ghost small" onClick={() => setDark((value) => !value)}>
             {dark ? 'Claro' : 'Escuro'}
           </button>
-          <button type="button" className="btn ghost small" onClick={() => void window.forja.files.reveal(`${root}\\${file.path}`)}>
+          <button type="button" className="btn ghost small" onClick={() => void window.openclod.files.reveal(`${root}\\${file.path}`)}>
             <Icon name="external" size={12} /> Explorer
           </button>
           {file.path.toLowerCase().endsWith('.openclod-slides.json') ? (

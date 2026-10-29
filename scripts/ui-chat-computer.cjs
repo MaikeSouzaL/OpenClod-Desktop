@@ -50,10 +50,10 @@ const toolsOf = (messages) =>
     .filter((item) => item.name)
 
 async function ask(page, sessionId, text) {
-  const before = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value.messages.length, sessionId)
-  await page.evaluate(({ id, text }) => window.forja.sessions.send(id, text, [], 'auto'), { id: sessionId, text })
+  const before = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value.messages.length, sessionId)
+  await page.evaluate(({ id, text }) => window.openclod.sessions.send(id, text, [], 'auto'), { id: sessionId, text })
   const state = await e2e.waitSettled(page, sessionId, { timeoutMs: 600000, sinceCount: before })
-  const value = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value, sessionId)
+  const value = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value, sessionId)
   return { state, tools: toolsOf(value.messages.slice(before)) }
 }
 
@@ -86,14 +86,14 @@ async function main() {
     // The only project is a throwaway folder: the app picks the first project for a conversation started on Início, so nothing here
     // touches the Desktop of the person running this.
     report.model = await page.evaluate(async ({ folder, baseUrl, model, real }) => {
-      await window.forja.projects.add(folder, 'Pasta de teste')
-      const settings = (await window.forja.app.settings()).value
+      await window.openclod.projects.add(folder, 'Pasta de teste')
+      const settings = (await window.openclod.app.settings()).value
       if (real) {
         const chosen = settings.providers.find((provider) => provider.id === settings.defaultProviderId)
         return chosen ? `${chosen.id}/${chosen.model}` : 'sem provedor'
       }
       const providers = settings.providers.map((provider) => (provider.id === 'ollama' ? { ...provider, baseUrl, model, supportsVision: true, supportsTools: true, models: [model] } : provider))
-      await window.forja.app.updateSettings({ providers, defaultProviderId: 'ollama', useAllModels: false, policy: { ...settings.policy, mode: 'auto', allowComputerControl: true } })
+      await window.openclod.app.updateSettings({ providers, defaultProviderId: 'ollama', useAllModels: false, policy: { ...settings.policy, mode: 'auto', allowComputerControl: true } })
       return `ollama/${model}`
     }, { folder: ws.project, baseUrl: proxy ? proxy.baseUrl : '', model: LOCAL_MODEL, real: REAL })
     console.log(`modelo: ${report.model}`)
@@ -106,12 +106,12 @@ async function main() {
     report.shotHome = await shot(page, '01-inicio')
 
     /* ---- 1. by command ---- */
-    const sessionsBefore = await page.evaluate(async () => (await window.forja.sessions.list()).value.length)
+    const sessionsBefore = await page.evaluate(async () => (await window.openclod.sessions.list()).value.length)
     await e2e.send(page, `Crie uma nova pasta chamada ${FOLDER} aqui, no diretório de trabalho desta conversa. Depois me diga em uma frase o que você fez.`)
     let created = null
     for (let attempt = 0; attempt < 60 && !created; attempt++) {
       await page.waitForTimeout(1000)
-      const list = await page.evaluate(async () => (await window.forja.sessions.list()).value)
+      const list = await page.evaluate(async () => (await window.openclod.sessions.list()).value)
       if (list.length > sessionsBefore) created = list[0]
     }
     check('a primeira mensagem do Início abriu uma conversa de Chat', Boolean(created) && created.meta.surface === 'chat', created && created.meta.surface)
@@ -129,7 +129,7 @@ async function main() {
       ;({ state } = await ask(page, sessionId, `A pasta ${FOLDER} ainda NÃO existe. Crie-a agora, de verdade, com uma ferramenta (por exemplo run_command com mkdir ${FOLDER}) no diretório de trabalho, e confira com list_dir.`))
     }
     report.command = { attempts, seconds: Math.round((Date.now() - t0) / 1000) }
-    const full = await page.evaluate(async (id) => (await window.forja.sessions.get(id)).value, sessionId)
+    const full = await page.evaluate(async (id) => (await window.openclod.sessions.get(id)).value, sessionId)
     const tools = toolsOf(full.messages).map((item) => item.name)
     report.command.tools = tools
     check('POR COMANDO: o modelo CRIOU a pasta no computador (não só explicou como fazer)', fs.existsSync(folder) && fs.statSync(folder).isDirectory(), { attempts, tools: tools.slice(0, 8) })

@@ -49,7 +49,7 @@ export function ImprovementReviewCard({ projects, activeProjectId, onOpenMemory 
       return
     }
     try {
-      const next = await unwrap(window.forja.improvements.status(id))
+      const next = await unwrap(window.openclod.improvements.status(id))
       if (projectRef.current === id) setStatus(next)
     } catch (err) {
       setError(errorMessage(err))
@@ -76,7 +76,7 @@ export function ImprovementReviewCard({ projects, activeProjectId, onOpenMemory 
     setBusy(true)
     setError('')
     try {
-      await unwrap(window.forja.improvements.start(projectId, { useAi: aiOn, days }))
+      await unwrap(window.openclod.improvements.start(projectId, { useAi: aiOn, days }))
       await refresh()
     } catch (err) {
       setError(errorMessage(err))
@@ -87,7 +87,7 @@ export function ImprovementReviewCard({ projects, activeProjectId, onOpenMemory 
 
   const cancel = async (): Promise<void> => {
     try {
-      await unwrap(window.forja.improvements.cancel())
+      await unwrap(window.openclod.improvements.cancel())
       await refresh()
     } catch (err) {
       setError(errorMessage(err))
@@ -98,7 +98,7 @@ export function ImprovementReviewCard({ projects, activeProjectId, onOpenMemory 
     setError('')
     setWeeklyPending(enabled)
     try {
-      await unwrap(window.forja.improvements.setWeekly(projectId, enabled, { useAi: aiOn }))
+      await unwrap(window.openclod.improvements.setWeekly(projectId, enabled, { useAi: aiOn }))
       await refresh()
     } catch (err) {
       setError(errorMessage(err))

@@ -162,7 +162,7 @@ Os que mais importam para o Openclod:
 | Verificar opções de `<webview>` antes de anexar | `security.md:547-591` | OK, com partição e allow-list (`src/main/index.ts:522-535`) |
 | CSP forte | `security.md:355-413` | `script-src 'self' 'unsafe-inline'` (`src/renderer/index.html:5-7`) |
 | Fuses e integridade do asar | `fuses.md:78-123` | não configuradas (`electron-builder.yml:1-66`) |
-| Não expor API do Electron a conteúdo não confiável | `security.md:823-850` | preload expõe só `forja` (`src/preload/index.ts:214`) |
+| Não expor API do Electron a conteúdo não confiável | `security.md:823-850` | preload expõe só `openclod` (`src/preload/index.ts:214`) |
 
 O sandbox é desabilitado automaticamente quando `nodeIntegration` está ligado
 (`docs/tutorial/sandbox.md:18-34, 98`). Em renderer sandboxed, o preload não tem

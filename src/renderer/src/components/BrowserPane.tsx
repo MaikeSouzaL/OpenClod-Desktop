@@ -4,7 +4,7 @@ import { Icon } from './Icons'
 import { errorMessage, unwrap } from '../lib/api'
 
 /** Must match PREVIEW_PARTITION in the main process (will-attach-webview). */
-const PARTITION = 'persist:forja-preview'
+const PARTITION = 'persist:openclod-preview'
 
 /** The subset of Electron's WebviewTag used here (the renderer has no Electron types). */
 interface WebviewElement extends HTMLElement {
@@ -165,7 +165,7 @@ function DevServers({
       </div>
       {detection ? (
         <p className="browser-start-note">
-          Sua escolha é salva em <code>.forja/launch.json</code>. O servidor roda numa aba do Terminal desta sessão.
+          Sua escolha é salva em <code>.openclod/launch.json</code>. O servidor roda numa aba do Terminal desta sessão.
         </p>
       ) : null}
       <div className="browser-start-actions">
@@ -210,7 +210,7 @@ export function BrowserPane({ sessionId, root, active }: BrowserPaneProps): Reac
     setDetecting(true)
     setServerError('')
     try {
-      setDetection(await unwrap(window.forja.preview.detect(root)))
+      setDetection(await unwrap(window.openclod.preview.detect(root)))
     } catch (err) {
       setServerError(errorMessage(err))
     } finally {
@@ -248,7 +248,7 @@ export function BrowserPane({ sessionId, root, active }: BrowserPaneProps): Reac
     setStarting(candidate.name)
     setServerError('')
     try {
-      const result = await unwrap(window.forja.preview.start(root, candidate.name, sessionId))
+      const result = await unwrap(window.openclod.preview.start(root, candidate.name, sessionId))
       await detect()
       if (result.url) navigate(result.url)
       else setServerError('O servidor foi iniciado no Terminal, mas nenhuma URL apareceu em 45 s. Confira a aba do Terminal e digite a URL acima.')

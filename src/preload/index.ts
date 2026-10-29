@@ -37,6 +37,29 @@ const api: OpenclodApi = {
     colabDisconnect: () => call(CH.colabDisconnect),
     colabRevealNotebook: () => call(CH.colabReveal),
     colabStartDrag: () => ipcRenderer.send(CH.colabDragStart),
+    llamacppStatus: () => call(CH.llamacppStatus),
+    llamacppSetProfile: (patch) => call(CH.llamacppSetProfile, patch),
+    llamacppPickModel: () => call(CH.llamacppPickModel),
+    llamacppModels: () => call(CH.llamacppModels),
+    llamacppPickFolder: () => call(CH.llamacppPickFolder),
+    llamacppHubList: () => call(CH.llamacppHubList),
+    llamacppHubRefresh: () => call(CH.llamacppHubRefresh),
+    llamacppHubSearch: (query) => call(CH.llamacppHubSearch, query),
+    llamacppHubFiles: (repo) => call(CH.llamacppHubFiles, repo),
+    llamacppDownload: (repo, name) => call(CH.llamacppDownload, repo, name),
+    llamacppDownloadStatus: () => call(CH.llamacppDownloadStatus),
+    llamacppDownloadCancel: () => call(CH.llamacppDownloadCancel),
+    llamacppOptions: () => call(CH.llamacppOptions),
+    llamacppProfileAction: (action) => call(CH.llamacppProfileAction, action),
+    llamacppMachine: () => call(CH.llamacppMachine),
+    llamacppBuildInstall: (kind, tag) => call(CH.llamacppBuildInstall, kind, tag),
+    llamacppBuildStatus: () => call(CH.llamacppBuildStatus),
+    llamacppBuildCancel: () => call(CH.llamacppBuildCancel),
+    llamacppBuildSelect: (id) => call(CH.llamacppBuildSelect, id),
+    llamacppBuildRemove: (id) => call(CH.llamacppBuildRemove, id),
+    llamacppStart: () => call(CH.llamacppStart),
+    llamacppStop: () => call(CH.llamacppStop),
+    llamacppLog: (since) => call(CH.llamacppLog, since),
     rememberModel: (providerId, model) => call(CH.appRememberModel, providerId, model),
     mcpPresets: () => call(CH.appMcpPresets),
     mcpCatalog: () => call(CH.appMcpCatalog),
@@ -96,6 +119,8 @@ const api: OpenclodApi = {
     rename: (sessionId, title) => call(CH.sessionsRename, sessionId, title),
     send: (sessionId, text, images, mode) => call(CH.sessionsSend, sessionId, text, images, mode),
     abort: (sessionId) => call(CH.sessionsAbort, sessionId),
+    resumePlan: (sessionId, itemId) => call(CH.sessionsResumePlan, sessionId, itemId),
+    discardPlan: (sessionId) => call(CH.sessionsDiscardPlan, sessionId),
     setMode: (sessionId, mode) => call(CH.sessionsSetMode, sessionId, mode),
     setModel: (sessionId, providerId, model) => call(CH.sessionsSetModel, sessionId, providerId, model),
     setEffort: (sessionId, effort) => call(CH.sessionsSetEffort, sessionId, effort),
@@ -193,7 +218,12 @@ const api: OpenclodApi = {
     graph: (projectId) => call(CH.memoryGraph, projectId),
     exportMarkdown: (projectId) => call(CH.memoryExport, projectId),
     importMarkdown: (projectId) => call(CH.memoryImport, projectId),
-    importZip: (projectId) => call(CH.memoryImportZip, projectId)
+    importZip: (projectId) => call(CH.memoryImportZip, projectId),
+    files: (projectId) => call(CH.memoryFiles, projectId),
+    fileThumb: (projectId, slug) => call(CH.memoryFileThumb, projectId, slug),
+    openFile: (projectId, slug) => call(CH.memoryOpenFile, projectId, slug),
+    addFiles: (projectId, pick) => call(CH.memoryAddFiles, projectId, pick),
+    addStatus: (projectId) => call(CH.memoryAddStatus, projectId)
   },
   power: {
     keepAwake: (enabled) => call(CH.powerKeepAwake, enabled),
@@ -207,7 +237,9 @@ const api: OpenclodApi = {
     runNow: (taskId) => call(CH.schedulesRunNow, taskId)
   },
   approvals: {
-    resolve: (approvalId, approved, always, reason) => call(CH.approvalsResolve, approvalId, approved, always, reason)
+    resolve: (approvalId, approved, always, reason) => call(CH.approvalsResolve, approvalId, approved, always, reason),
+    saved: () => call(CH.approvalsSaved),
+    revoke: (projectId, rule, effect) => call(CH.approvalsRevoke, projectId, rule, effect)
   },
   questions: {
     answer: (questionId, answers) => call(CH.questionsAnswer, questionId, answers)
@@ -250,4 +282,4 @@ const api: OpenclodApi = {
   }
 }
 
-contextBridge.exposeInMainWorld('forja', api)
+contextBridge.exposeInMainWorld('openclod', api)

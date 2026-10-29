@@ -77,7 +77,7 @@ app/PTY → terminal.write(bytes)
   é `setRenderer` (`:247-253`).
 - Browser: `CoreBrowserTerminal.open` cria `RenderService` e o renderer inicial
   (`src/browser/CoreBrowserTerminal.ts:536-580`).
-- Saída de input: `term.onData` → `window.forja.terminal.write` no nosso app
+- Saída de input: `term.onData` → `window.openclod.terminal.write` no nosso app
   (`src/renderer/src/components/TerminalPane.tsx:76`).
 - Resize: `FitAddon.fit()` calcula dimensões e chama `terminal.resize`
   (`addons/addon-fit/src/FitAddon.ts:55-90`), que dispara `onResize` →
@@ -266,8 +266,8 @@ const newWindow = window.open(); newWindow.opener = null
 
 $ grep -n "onData\|terminal.write\|snapshot" src/renderer/src/components/TerminalPane.tsx
 63: if (ready) term.write(event.data)
-76: const input = term.onData((data) => window.forja.terminal.write(info.id, data))
-69: window.forja.terminal.snapshot(info.id).then(...)
+76: const input = term.onData((data) => window.openclod.terminal.write(info.id, data))
+69: window.openclod.terminal.snapshot(info.id).then(...)
 ```
 
 Limitações: não rodei os testes nem o benchmark. O clone não contém a

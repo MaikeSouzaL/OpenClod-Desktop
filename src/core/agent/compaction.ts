@@ -1,4 +1,5 @@
 import type { Message, Provider, ToolSpec } from '../../shared/types.js'
+import { AUTO_COMPACT_RATIO } from '../../shared/limits.js'
 import { estimateTokens } from '../util/ids.js'
 import { isTurnContext } from './turn-context.js'
 
@@ -179,7 +180,7 @@ export async function compactIfNeeded(options: {
   onNote?: (note: string) => void
 }): Promise<CompactionResult> {
   const { system, messages, provider, contextWindow } = options
-  const budget = contextWindow * 0.75
+  const budget = contextWindow * AUTO_COMPACT_RATIO
   const used = Math.max(
     options.usedTokens ?? 0,
     estimateContextTokens(system, messages, options.tools)

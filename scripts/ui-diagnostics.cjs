@@ -51,12 +51,12 @@ async function main() {
   await page.screenshot({ path: path.join(OUT, '01-diagnostics-overview.png'), fullPage: true })
 
   const result = await page.evaluate(async () => {
-    const api = await window.forja.app.observability({ limit: 20 })
+    const api = await window.openclod.app.observability({ limit: 20 })
     if (!api.ok) throw new Error(api.error)
     return {
       bridge: {
-        observability: typeof window.forja.app.observability,
-        exportDiagnostics: typeof window.forja.app.exportDiagnostics
+        observability: typeof window.openclod.app.observability,
+        exportDiagnostics: typeof window.openclod.app.exportDiagnostics
       },
       metrics: document.querySelectorAll('.diagnostic-metric').length,
       health: document.querySelectorAll('.health-card').length,

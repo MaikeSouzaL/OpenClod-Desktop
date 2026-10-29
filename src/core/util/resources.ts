@@ -20,7 +20,7 @@ const MARKER = 'MANIFEST.json'
 
 function candidates(): string[] {
   const list: string[] = []
-  if (process.env.FORJA_RESOURCES) list.push(process.env.FORJA_RESOURCES)
+  if (process.env.OPENCLOD_RESOURCES) list.push(process.env.OPENCLOD_RESOURCES)
   const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
   if (resourcesPath) list.push(path.join(resourcesPath, 'resources'))
   list.push(path.resolve(process.cwd(), 'resources'))

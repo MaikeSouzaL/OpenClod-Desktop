@@ -27,9 +27,9 @@ async function main() {
       await e2e.send(page, 'ola')
       await e2e.waitSettled(page, session.sessionId, { timeoutMs: 180000 })
       const sample = await page.evaluate(async (id) => {
-        const value = (await window.forja.sessions.get(id)).value
+        const value = (await window.openclod.sessions.get(id)).value
         const calls = value.messages.filter((message) => message.role === 'assistant' && message.usage)
-        const meter = (await window.forja.sessions.contextBreakdown(id)).value
+        const meter = (await window.openclod.sessions.contextBreakdown(id)).value
         return { firstInput: calls[0] ? calls[0].usage.input : 0, firstCached: calls[0] ? calls[0].usage.cachedInput || 0 : 0, calls: calls.length, meter }
       }, session.sessionId)
       if (!sample.firstInput) {

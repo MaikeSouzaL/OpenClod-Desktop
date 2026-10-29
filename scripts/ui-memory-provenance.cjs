@@ -68,7 +68,7 @@ async function main() {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.waitForSelector('.app-shell', { timeout: 30_000 })
 
-  const added = await page.evaluate((folder) => window.forja.projects.add(folder, 'Memória avançada E2E'), project)
+  const added = await page.evaluate((folder) => window.openclod.projects.add(folder, 'Memória avançada E2E'), project)
   if (!added.ok) throw new Error(added.error)
   const wiki = path.join(profile, 'data', 'memory', 'projects', added.value.id, 'wiki')
   fs.mkdirSync(wiki, { recursive: true })
@@ -99,7 +99,7 @@ async function main() {
     conflicts: [...document.querySelectorAll('.memory-badge.conflict')].map((node) => node.textContent),
     superseded: [...document.querySelectorAll('.memory-badge.status-superseded')].map((node) => node.textContent),
     summary: document.querySelector('.field-note')?.textContent?.replace(/\s+/g, ' ').trim(),
-    bridge: typeof window.forja.memory.invalidate
+    bridge: typeof window.openclod.memory.invalidate
   }))
   if (result.rows < 3 || !result.types.length || !result.conflicts.length || !result.superseded.length) {
     throw new Error(`memory UI incomplete: ${JSON.stringify(result)}`)

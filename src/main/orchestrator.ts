@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import path from 'node:path'
@@ -29,10 +30,14 @@ import { SessionStore } from '../core/session/store.js'
 import { FileTracker } from '../core/session/tracker.js'
 import { SettingsStore } from './settings.js'
 import { ColabService, type ColabHost } from './colab.js'
+import { LlamaCppService } from './llamacpp/service.js'
+import { LLAMACPP_PROVIDER_ID } from '../shared/llamacpp.js'
+import type { MemoryAddJobInfo, MemoryFileInfo } from '../shared/api.js'
 import { SkillLibrary } from '../core/skills/library.js'
 import { MemoryStore } from '../core/memory/store.js'
 import { ProjectMemory } from '../core/memory/project.js'
 import { memoryScopeId } from '../core/memory/scope.js'
+import { relatedDurable } from '../core/memory/pack.js'
 import { BrowserLayer } from '../core/browser/layer.js'
 import { ComputerLayer } from '../core/computer/layer.js'
 import { ToolRegistry } from '../core/tools/registry.js'
@@ -42,6 +47,7 @@ import { writeAgentFile } from '../core/agents/loader.js'
 import { agentForgeTools } from '../core/agents/tools.js'
 import { spawnAgent, type AgentRuntimeEnv } from '../core/agents/runtime.js'
 import { fsTools } from '../core/tools/fs.js'
+import { applyPatchTool } from '../core/tools/apply-patch.js'
 import { searchTools } from '../core/tools/search.js'
 import { shellTools, killSessionProcesses } from '../core/tools/shell.js'
 import { gitTools } from '../core/tools/git.js'
@@ -56,12 +62,13 @@ import { askTools } from '../core/tools/ask.js'
 import { projectMemoryTools } from '../core/memory/tools.js'
 import { SessionRunner } from '../core/agent/runner.js'
 import type { RunnerSnapshot, SendOptions } from '../core/agent/runner.js'
+import { discardedPlanNotice } from '../core/agent/plan-control.js'
 import { createProvider, hasCredentials, resolveApiKey } from '../core/providers/index.js'
 import { errorKindOf } from '../core/providers/http.js'
 import { describeFailure, isAccountLevelKind } from '../core/providers/health.js'
 import { ProviderReserve } from './reserve.js'
 import { WorkspaceGuard } from '../core/security/policy.js'
-import { mergeRules, ruleForApproval } from '../core/security/rules.js'
+import { mergeRules, rulesForApproval } from '../core/security/rules.js'
 import { HookRunner } from '../core/hooks/runner.js'
 import { ApprovalStore, loadProjectSettings, mergeHooks } from '../core/config/project.js'
 import { McpClient, normalizeMcpServerSettings, type McpServerConfig } from '../core/mcp/client.js'
@@ -78,6 +85,7 @@ import { captureGitFileCheckpoint, restoreGitFileCheckpoint } from '../core/sess
 import { describeToolchains, toolchains } from '../core/util/toolchains.js'
 import { ensureProjectInstructions } from '../core/agent/context.js'
 import { resourcePath } from '../core/util/resources.js'
+import { expandCommand, loadCustomCommands, matchCustomCommand, slashWord, type CustomCommand } from '../core/commands/library.js'
 import { listMcpPresets, type McpPresetInfo } from '../core/mcp/presets.js'
 import { discoverForProvider, type DiscoveryResult } from '../core/providers/discovery.js'
 import { importClaudeCatalog, type ClaudeImportReport } from './claude-import.js'
@@ -89,6 +97,17 @@ import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/ex
 import { codeIntelligenceTools } from '../core/tools/code-intelligence.js'
 import { documentTools } from '../core/tools/documents.js'
 import { mediaTools } from '../core/tools/media.js'
+import { memoryFileTools } from '../core/memory/file-tools.js'
+import {
+  addMemoryFile,
+  collectFiles as collectMemoryFiles,
+  countMemoryFiles,
+  findFilePaths,
+  findMemoryFile,
+  listMemoryFiles,
+  memoryFileThumb
+} from '../core/memory/files.js'
+import { describeImage } from '../core/vision/relay.js'
 import { findMediaPaths } from '../core/media/paths.js'
 import { ingestToMemory, loadSheetImages } from '../core/media/memory.js'
 import { imageTools } from '../core/tools/images.js'
@@ -163,6 +182,8 @@ export class Orchestrator {
   private projectMemories = new Map<string, ProjectMemory>()
   /** Projects whose native wiki was already mirrored into AI-Memory this run. */
   private syncedMemories = new Set<string>()
+  /** Mirror of each project's wiki into the AI-Memory index: pages copied so far, of how many, and whether it is running. */
+  private memorySyncState = new Map<string, { done: number; total: number; running: boolean }>()
   /** In-flight mirror, shared by concurrent list/status/runner calls. */
   private memorySyncs = new Map<string, Promise<void>>()
   private persistTimers = new Map<string, NodeJS.Timeout>()
@@ -182,6 +203,8 @@ export class Orchestrator {
   readonly reserve: ProviderReserve
   /** Settings → Provedores → Google Colab (GPU): notebook, connection code, link health. */
   readonly colab: ColabService
+  /** The local engine: llama.cpp's own server, started by the app (no Ollama to run). */
+  readonly llamacpp: LlamaCppService
 
   constructor(private readonly options: OrchestratorOptions) {
     this.store = new SessionStore(userDataPath(options.userData, 'data'))
@@ -197,6 +220,17 @@ export class Orchestrator {
         copyText: () => undefined
       },
       // Idle sessions are rebuilt with the new provider list; the interface reloads the settings (and the model picker).
+      emitChanged: () => {
+        this.settingsChanged()
+        this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'general' })
+      },
+      log: (message) => this.options.log?.(message)
+    })
+    this.llamacpp = new LlamaCppService({
+      settings: this.settings,
+      health: this.reserve.health,
+      userData: options.userData,
+      // Same as the Colab: idle sessions are rebuilt with the new provider list and the screens reload it.
       emitChanged: () => {
         this.settingsChanged()
         this.onEvent({ type: 'settings_changed', sessionId: '', scope: 'general' })
@@ -236,14 +270,14 @@ export class Orchestrator {
 
   /**
    * Effective policy and hooks for a session: app settings + project
-   * `.forja/settings*.json` (+ `.claude/` when enabled) + "always allow"
+   * `.openclod/settings*.json` (+ `.claude/` when enabled) + "always allow"
    * choices saved for the project.
    */
   private sessionConfig(state: SessionState): { policy: PolicyConfig; hooks: HookRunner } {    const settings = this.settings.get()
     const project = loadProjectSettings(state.meta.cwd, { importClaude: settings.importClaudeSettings })
     const policy: PolicyConfig = {
       ...settings.policy,
-      rules: mergeRules(settings.policy.rules, project.rules, { allow: this.approvals.load(state.meta.projectId) })
+      rules: mergeRules(settings.policy.rules, project.rules, this.approvals.rules(state.meta.projectId))
     }
     const hooks = new HookRunner(mergeHooks(settings.hooks, project.hooks), state.meta.cwd, state.meta.id)
     if (project.sources.length) {
@@ -262,6 +296,13 @@ export class Orchestrator {
     await this.plugins.init()
     await this.store.init()
     await this.chromeBridge.start().catch((err) => this.options.log?.(`ponte Chrome: ${(err as Error).message}`))
+
+    // What the inboxes kept from before the restart: queued prompts go to the composer's queue of their session,
+    // steers already delivered into a turn are dropped.
+    for (const sessionId of this.inbox.sessions()) {
+      const recovered = this.inbox.recover(sessionId)
+      if (recovered.handedOver) this.options.log?.(`fila de ${sessionId}: ${recovered.handedOver} mensagem(ns) da fila voltaram para o compositor`)
+    }
 
     // Every registered project gets the canonical CLAUDE.md if it is missing.
     // Existing files are never touched.
@@ -595,7 +636,9 @@ export class Orchestrator {
     // The session's own provider, unless it has no key or the harness already knows it cannot answer (no balance, refused
     // key...) and another one works: then the session starts there, and the conversation says so.
     const start = this.reserve.startingPoint({ ...providerConfig, model: state.meta.model || providerConfig.model })
-    const activeConfig = start.config
+    // llama.cpp (local) is started by the app: a session on it starts the server and waits for the model to load.
+    const activeConfig =
+      start.config.id === LLAMACPP_PROVIDER_ID ? await this.slowStep('iniciar o llama.cpp', this.llamacpp.ensureReady(start.config)) : start.config
     if (!hasCredentials(activeConfig, this.settings.resolver())) {
       throw new Error(
         `o provedor "${activeConfig.label}" não tem credencial configurada. Abra Configurações → Provedores.`
@@ -686,7 +729,9 @@ export class Orchestrator {
         projectMemory,
         mcp: this.mcpToolService(),
         aiMemory: this.aiMemory,
-        terminal: this.options.terminalRunner
+        terminal: this.options.terminalRunner,
+        // memory_file: pictures saved in the memory are described by the first model that reads images.
+        describeImage: (image, question) => describeImage({ candidates: this.reserve.visionCandidates(), image, question })
       },
       projectId: memoryScope,
       project: {
@@ -702,6 +747,7 @@ export class Orchestrator {
       ask: (request) => this.askQuestions(request),
       agents,
       autoAgents: Boolean(settings.autoAgents),
+      selfReview: settings.selfReview !== false,
       surface: state.meta.surface ?? 'code',
       createAgent: (input) => this.createAgentFromTool(input, agents, state.meta.cwd),
       runSubagent: (spec, caller) => spawnAgent(agentEnv, caller, spec),
@@ -740,14 +786,15 @@ export class Orchestrator {
   }
 
   /**
-   * Built-in agents plus the user's (`<userData>/agents`) and the project's (`.forja/agents`);
+   * Built-in agents plus the user's (`<userData>/agents`) and the project's (`.openclod/agents`);
    * `.claude/agents` too when the Claude settings import is on. Cheap, so it is re-read whenever a runner is built.
    */
   agentRegistryFor(cwd?: string): AgentRegistry {
     return createAgentRegistry({
       userDir: this.userAgentsDir(),
       cwd,
-      importClaude: Boolean(this.settings.get().importClaudeSettings)
+      importClaude: Boolean(this.settings.get().importClaudeSettings),
+      bundledDir: resourcePath('agents') ?? undefined
     })
   }
 
@@ -757,12 +804,12 @@ export class Orchestrator {
   }
 
   /**
-   * Writes a new agent file (`user`: <userData>/agents, `project`: <cwd>/.forja/agents) and refreshes idle
+   * Writes a new agent file (`user`: <userData>/agents, `project`: <cwd>/.openclod/agents) and refreshes idle
    * sessions so their next turn sees it. Throws a readable error for invalid input or an existing name.
    */
   createAgent(input: { scope: 'user' | 'project'; cwd?: string; agent: AgentDefinition; overwrite?: boolean }): { path: string; listing: AgentsListing } {
     if (input.scope === 'project' && !input.cwd) throw new Error('informe a pasta do projeto para criar um agente de projeto')
-    const dir = input.scope === 'project' ? path.join(input.cwd as string, '.forja', 'agents') : this.userAgentsDir()
+    const dir = input.scope === 'project' ? path.join(input.cwd as string, '.openclod', 'agents') : this.userAgentsDir()
     const file = writeAgentFile(dir, input.agent, { overwrite: input.overwrite })
     this.settingsChanged()
     return { path: file, listing: this.listAgents(input.cwd) }
@@ -780,7 +827,7 @@ export class Orchestrator {
   ): Promise<{ path: string; agent: AgentDefinition }> {
     const scope = input.scope === 'project' ? 'project' : 'user'
     if (scope === 'project' && !cwd) throw new Error('agente de projeto exige uma pasta de projeto')
-    const dir = scope === 'project' ? path.join(cwd as string, '.forja', 'agents') : this.userAgentsDir()
+    const dir = scope === 'project' ? path.join(cwd as string, '.openclod', 'agents') : this.userAgentsDir()
     const def: AgentDefinition = {
       name: input.name,
       description: input.description.trim(),
@@ -846,8 +893,10 @@ export class Orchestrator {
       kimi: 3,
       qwen: 4,
       openrouter: 5,
-      ollama: 6,
-      lmstudio: 7
+      // The embedded engine comes before the local servers the user has to install and run.
+      [LLAMACPP_PROVIDER_ID]: 6,
+      ollama: 7,
+      lmstudio: 8
     }
     const providers = settings.providers
       .filter((provider) => hasCredentials(provider, resolver))
@@ -936,7 +985,48 @@ export class Orchestrator {
   }
 
   /** Runs a whole turn. `keepTitle` preserves a title set by the caller (scheduled tasks). */
+  /**
+   * Slash commands visible from a folder: the ones that ship with the app (resources/commands), then the user's, then the
+   * project's `.claude/commands` and `.openclod/commands` (a later one with the same name wins).
+   */
+  commandsFor(cwd: string): CustomCommand[] {
+    const bundled = resourcePath('commands')
+    return loadCustomCommands([
+      ...(bundled ? [{ dir: bundled, source: 'app' as const }] : []),
+      { dir: path.join(this.options.userData, 'commands'), source: 'usuario' },
+      { dir: path.join(cwd, '.claude', 'commands'), source: 'projeto' },
+      { dir: path.join(cwd, '.openclod', 'commands'), source: 'projeto' }
+    ])
+  }
+
+  /**
+   * `/nome argumentos` before it reaches the model: a command becomes its text (with `@arquivo` files and its
+   * `allowed-tools`), `/skill argumentos` asks for that skill, and any other `/palavra` is refused as an unknown command
+   * instead of being sent as a prompt. A path (`/usr/bin/x`) is not a command.
+   */
+  expandSlash(sessionId: string, text: string): { text: string; allowedTools?: string[] } {
+    const word = slashWord(text)
+    const cwd = this.store.getSession(sessionId)?.meta.cwd
+    if (!word || !cwd) return { text }
+    const commands = this.commandsFor(cwd)
+    const match = matchCustomCommand(text, commands)
+    if (match) {
+      return {
+        text: expandCommand(match.command, match.args, { cwd }),
+        ...(match.command.allowedTools ? { allowedTools: match.command.allowedTools } : {})
+      }
+    }
+    const skill = this.skills.list().find((item) => item.name.toLowerCase() === word.name)
+    if (skill) return { text: `Use a skill "${skill.name}" para esta tarefa: ${word.args}`.trim() }
+    const known = commands.map((command) => `/${command.name}`).slice(0, 20).join(', ')
+    throw new Error(
+      `comando desconhecido: /${word.name}.${known ? ` Comandos disponíveis: ${known}.` : ''} Os da interface (/novo, /compactar...) são escolhidos no menu que abre ao digitar "/".`
+    )
+  }
+
   async send(sessionId: string, text: string, images?: ImagePart[], keepTitle = false): Promise<void> {
+    const slash = this.expandSlash(sessionId, text)
+    text = slash.text
     const runner = await this.ensureRunner(sessionId)
     if (runner.messages.length === 0 && !keepTitle) {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
@@ -944,7 +1034,7 @@ export class Orchestrator {
     }
     const messageId = id('msg')
     await this.captureFileCheckpoint(sessionId, messageId)
-    await runner.send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest' })
+    await runner.send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest', allowedTools: slash.allowedTools })
     await this.captureTurnMemory(sessionId, runner, text)
   }
 
@@ -954,10 +1044,18 @@ export class Orchestrator {
    * events. Failures before the turn starts are thrown here.
    */
   async startSend(sessionId: string, text: string, images?: ImagePart[], mode: 'steer' | 'queue' | 'auto' = 'auto'): Promise<void> {
+    // A slash command is expanded here, so every way in (the composer, scheduled tasks, the queue) gets the same.
+    const slash = this.expandSlash(sessionId, text)
+    text = slash.text
     const runner = await this.ensureRunner(sessionId)
     if (runner.busy) {
       const item = this.inbox.add(sessionId, { text, images, mode: mode === 'steer' ? 'steer' : 'queue' })
-      if (item.mode === 'steer') runner.steer(text)
+      // A steer delivered into the running turn now lives in the conversation, not in the inbox. If the turn ended in
+      // the meantime it waits in the queue instead.
+      if (item.mode === 'steer') {
+        this.inbox.remove(sessionId, item.id)
+        if (!runner.steer(text)) this.inbox.add(sessionId, { text, images, mode: 'queue' })
+      }
       this.onEvent({
         type: 'notice',
         sessionId,
@@ -969,7 +1067,8 @@ export class Orchestrator {
       })
       return
     }
-    if (mode === 'queue') this.inbox.add(sessionId, { text, images, mode: 'queue' })
+    // Nothing running: a "queue" message is simply sent now (keeping a copy in the inbox made the drain after this
+    // turn send it a second time).
     if (runner.messages.length === 0) {
       const title = text.replace(/\s+/g, ' ').slice(0, 60)
       await this.store.patchMeta(sessionId, { title })
@@ -977,7 +1076,7 @@ export class Orchestrator {
     const messageId = id('msg')
     await this.captureFileCheckpoint(sessionId, messageId)
     void runner
-      .send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest' })
+      .send(text, { images, messageId, prepare: this.mediaPrepare(sessionId, text), prepareLabel: 'media_ingest', allowedTools: slash.allowedTools })
       .then(async () => {
         await this.captureTurnMemory(sessionId, runner, text)
         await this.drainInbox(sessionId)
@@ -1115,7 +1214,62 @@ export class Orchestrator {
    * curated pages/handoffs, but a model that never calls memory_page still
    * leaves a durable session record in the project wiki.
    */
+  /** Turn memory being written right now, per session: discarding a plan waits for it, or it would write the capsule back. */
+  private readonly memoryWrites = new Map<string, Promise<void>>()
+
   private async captureTurnMemory(sessionId: string, runner: SessionRunner, userText: string): Promise<void> {
+    const write = this.writeTurnMemory(sessionId, runner, userText)
+    this.memoryWrites.set(sessionId, write)
+    try {
+      await write
+    } finally {
+      if (this.memoryWrites.get(sessionId) === write) this.memoryWrites.delete(sessionId)
+    }
+  }
+
+  /**
+   * Pictures pasted in the user's message (with the description the vision relay already wrote, when there is one) and
+   * the files whose absolute path the user wrote go into the project memory, linked to the turn and the session pages.
+   */
+  private async keepTurnFiles(memory: ProjectMemory, message: Message | undefined, userText: string, links: string[], title: string): Promise<void> {
+    const describe = (image: ImagePart, question?: string) => describeImage({ candidates: this.reserve.visionCandidates(), image, question })
+    const pictures = (message?.parts ?? []).filter((part): part is ImagePart & { type: 'image' } => part.type === 'image').slice(0, 8)
+    const named = findFilePaths(userText).filter((file) => {
+      try {
+        const stat = fs.statSync(file)
+        return stat.isFile() && stat.size <= 100 * 1024 * 1024
+      } catch {
+        return false
+      }
+    })
+    if (!pictures.length && !named.length) return
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+    let temp = ''
+    try {
+      for (const [index, picture] of pictures.entries()) {
+        temp ||= await fs.promises.mkdtemp(path.join(os.tmpdir(), 'openclod-memoria-'))
+        const ext = picture.mediaType === 'image/png' ? 'png' : picture.mediaType === 'image/webp' ? 'webp' : 'jpg'
+        const file = path.join(temp, `imagem-${index + 1}.${ext}`)
+        await fs.promises.writeFile(file, Buffer.from(picture.data, 'base64'))
+        await addMemoryFile(file, {
+          memory,
+          name: `${picture.label?.trim() || `imagem da conversa ${stamp}${pictures.length > 1 ? ` (${index + 1})` : ''}`}.${ext}`.replace(/(\.\w+)\.\w+$/, '$1'),
+          origin: `colada na conversa "${title}" em ${stamp}`,
+          ...(picture.description ? { description: picture.description, describedBy: picture.describedBy ?? 'relé de visão' } : { describe }),
+          question: userText.slice(0, 300),
+          links,
+          tags: ['conversa']
+        })
+      }
+      for (const file of named) await addMemoryFile(file, { memory, describe, question: userText.slice(0, 300), links, tags: ['conversa'] })
+    } catch (err) {
+      this.options.log?.(`memória: não guardei os arquivos da conversa: ${(err as Error).message}`)
+    } finally {
+      if (temp) await fs.promises.rm(temp, { recursive: true, force: true }).catch(() => undefined)
+    }
+  }
+
+  private async writeTurnMemory(sessionId: string, runner: SessionRunner, userText: string): Promise<void> {
     try {
       const state = await this.store.loadSession(sessionId)
       if (!state) return
@@ -1141,6 +1295,9 @@ export class Orchestrator {
         files
       })
       if (!captured) return
+      // What the user brought to the conversation stays with it: pasted pictures and the files named in the message become
+      // pages of the memory, linked to this turn and this session (in the background: nothing here waits for it).
+      void this.keepTurnFiles(memory, lastUser, userText, [captured.turn.slug, captured.session.slug], state.meta.title)
 
       // One small AI-Memory page per turn plus a session index page. The old
       // `s/<hash>.md` transcript is intentionally not written anymore: search
@@ -1229,6 +1386,62 @@ export class Orchestrator {
       pending.resolve(null)
     }
     this.onEvent({ type: 'status', sessionId, state: 'cancelled' })
+  }
+
+  /**
+   * ▶ on a plan step after the turn stopped: that step becomes the interrupted active one (the runner's `<retomada>`
+   * notice then makes the model reopen it) and a visible message starts the turn that continues from it.
+   */
+  async resumePlan(sessionId: string, itemId: string): Promise<void> {
+    const runner = await this.ensureRunner(sessionId)
+    if (runner.busy) throw new Error('a sessão ainda está trabalhando; pare o turno antes de retomar')
+    const item = runner.resumePlanFrom(itemId)
+    if (!item) throw new Error('esse passo não pode ser retomado (não está no plano ou já foi concluído)')
+    await this.startSend(sessionId, `Continue a partir do passo: ${item.text}`)
+  }
+
+  /**
+   * 🗑 on the plan dock: the user gave up. Stops the turn, empties the queue so nothing starts the work again, clears the
+   * plan (with a hidden note so the next turn does not pick it up from the history) and forgets the session's
+   * continuity capsule, so no other session is offered this work to "continue de onde paramos". There is no undo.
+   */
+  async discardPlan(sessionId: string): Promise<{ capsules: number }> {
+    const state = await this.store.loadSession(sessionId)
+    if (!state) throw new Error('sessão não encontrada')
+    this.inbox.clear(sessionId)
+    const live = this.runners.get(sessionId)
+    if (live?.busy) {
+      await this.abort(sessionId)
+      const deadline = Date.now() + 15_000
+      while (live.busy) {
+        if (Date.now() > deadline) throw new Error('o turno não parou a tempo; tente descartar de novo')
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    }
+    // The stopped turn still writes its memory (and the capsule) after it ends: wait, then remove what it wrote.
+    await this.memoryWrites.get(sessionId)?.catch(() => undefined)
+    const runner = this.runners.get(sessionId)
+    if (runner) {
+      runner.discardPlan()
+    } else if (state.plan?.length) {
+      const next: SessionState = { ...state, plan: [], messages: [...state.messages, discardedPlanNotice(state.plan)] }
+      await this.store.saveSession(next)
+      this.onEvent({ type: 'plan', sessionId, items: [] })
+    }
+    const capsules = await this.forgetContinuity(state.meta)
+    return { capsules }
+  }
+
+  /** Deletes the continuity capsule(s) of one session from the native wiki and from the AI-Memory index. */
+  private async forgetContinuity(meta: SessionMeta): Promise<number> {
+    const memoryScope = memoryScopeId(meta)
+    const memory = this.memoryForProject(memoryScope)
+    const capsules = (await memory.listPages()).filter((page) => page.tags.includes('estado') && page.context === `sessao:${meta.id}`)
+    for (const page of capsules) {
+      await memory.deletePage(page.slug)
+      await this.aiMemory.deletePage(memoryScope, `pages/${page.slug}.md`).catch(() => false)
+    }
+    return capsules.length
   }
 
   async setMode(sessionId: string, mode: SessionMeta['mode']): Promise<void> {
@@ -1472,6 +1685,28 @@ export class Orchestrator {
     return runner ? runner.snapshot() : undefined
   }
 
+  /** The "Permitir sempre" / "Negar sempre" choices saved per project (Configurações → Permissões). */
+  savedApprovals(): Array<{ projectId: string; projectName: string; allow: string[]; deny: string[] }> {
+    const projects = this.store.listProjects()
+    return this.approvals
+      .projects()
+      .map((projectId) => ({ projectId, ...this.approvals.rules(projectId) }))
+      .filter((item) => item.allow.length || item.deny.length)
+      .map((item) => ({ ...item, projectName: projects.find((project) => project.id === item.projectId)?.name ?? item.projectId }))
+  }
+
+  /** Takes back one saved choice; the sessions of that project stop using it at once. */
+  revokeApproval(projectId: string, rule: string, effect: 'allow' | 'deny'): boolean {
+    const removed = this.approvals.remove(projectId, rule, effect)
+    for (const [sessionId, policy] of this.sessionPolicies) {
+      if (this.store.getSession(sessionId)?.meta.projectId !== projectId || !policy.rules) continue
+      policy.rules[effect] = policy.rules[effect].filter((item) => item !== rule)
+      // The exact call allowed for the rest of the session goes too.
+      if (effect === 'allow') this.sessionAllow.delete(sessionId)
+    }
+    return removed
+  }
+
   resolveApproval(approvalId: string, approved: boolean, always = false, reason = ''): void {
     const pending = this.pending.get(approvalId)
     if (!pending) return
@@ -1486,14 +1721,28 @@ export class Orchestrator {
       // new sessions in the same folder do not ask again. Destructive tools
       // are only remembered for this session.
       const projectId = this.store.getSession(pending.sessionId)?.meta.projectId
-      // Without a preview the rule would cover every use of the tool.
+      // Without a preview the rule would cover every use of the tool. A command is saved by the words that name the
+      // operation (`git commit -m x` → `Bash(git commit:*)`), one rule per command of a chain; a patch one per file.
       if (projectId && pending.request.risk !== 'destructive' && pending.request.preview) {
-        const rule = ruleForApproval(pending.request.tool, pending.request.preview ?? '')
+        for (const rule of rulesForApproval(pending.request.tool, pending.request.preview)) {
+          try {
+            this.approvals.add(projectId, rule)
+            this.sessionPolicies.get(pending.sessionId)?.rules?.allow.push(rule)
+          } catch {
+            /* session-level allow still applies */
+          }
+        }
+      }
+    }
+    // "Negar sempre": the exact call is refused from now on in this project, without asking.
+    if (!approved && always && pending.request.preview) {
+      const projectId = this.store.getSession(pending.sessionId)?.meta.projectId
+      for (const rule of rulesForApproval(pending.request.tool, pending.request.preview, undefined, 'deny')) {
         try {
-          this.approvals.add(projectId, rule)
-          this.sessionPolicies.get(pending.sessionId)?.rules?.allow.push(rule)
+          if (projectId) this.approvals.add(projectId, rule, 'deny')
+          this.sessionPolicies.get(pending.sessionId)?.rules?.deny.push(rule)
         } catch {
-          /* session-level allow still applies */
+          /* this answer still denies */
         }
       }
     }
@@ -2296,15 +2545,32 @@ export class Orchestrator {
     if (this.syncedMemories.has(projectId) || !this.aiMemory.available) return
     const running = this.memorySyncs.get(projectId)
     if (running) return running
-    const task = this.doSyncNativeToAi(projectId).finally(() => {
-      this.memorySyncs.delete(projectId)
-      this.syncedMemories.add(projectId)
-    })
+    const task = this.doSyncNativeToAi(projectId)
+      .then((outcome) => {
+        // Only a pass that reached the end counts as synced. A pass that stopped at its time budget goes on by itself a
+        // moment later (it used to wait for the next start of the app: ~15 pages per launch, never the whole wiki); one
+        // that failed tries again in 30 s. One retry waits per project, however many screens ask meanwhile.
+        if (outcome === 'complete') {
+          this.syncedMemories.add(projectId)
+          // A pass where nothing changed is cheap: two minutes later the next call checks again for pages written since.
+          setTimeout(() => this.syncedMemories.delete(projectId), 120_000).unref?.()
+          return
+        }
+        this.syncedMemories.add(projectId)
+        setTimeout(() => {
+          this.syncedMemories.delete(projectId)
+          this.syncNativeToAiInBackground(projectId)
+        }, outcome === 'paused' ? 3_000 : 30_000).unref?.()
+      })
+      .finally(() => {
+        this.memorySyncs.delete(projectId)
+      })
     this.memorySyncs.set(projectId, task)
     return task
   }
 
-  private async doSyncNativeToAi(projectId: string): Promise<void> {
+  /** Whether the whole wiki is in the index, the pass stopped at its time budget, or it failed. */
+  private async doSyncNativeToAi(projectId: string): Promise<'complete' | 'paused' | 'failed'> {
     const startedAt = Date.now()
     // Pages already copied (by content fingerprint) are skipped, so only the first sync is long.
     const cacheFile = path.join(userDataPath(this.options.userData, 'data'), 'memory', 'projects', projectId, 'ai-sync.json')
@@ -2317,9 +2583,12 @@ export class Orchestrator {
     const saveCache = async (): Promise<void> => {
       await fs.promises.writeFile(cacheFile, JSON.stringify(copied), 'utf8').catch(() => undefined)
     }
+    const state = { done: 0, total: 0, running: true }
+    this.memorySyncState.set(projectId, state)
     try {
       const native = await this.memoryForProject(projectId).listPages()
-      if (!native.length) return
+      state.total = native.length
+      if (!native.length) return 'complete'
       const indexed = await this.aiMemory.recent(projectId, 100)
       // If AI-Memory lost its index (fresh data folder) the cache would hide that: start over.
       if (!indexed.length) copied = {}
@@ -2331,65 +2600,191 @@ export class Orchestrator {
         }
       }
       let done = 0
-      for (const summary of native) {
-        // A long first sync is spread over several runs instead of hammering the sidecar for minutes.
-        if (Date.now() - startedAt > 60_000) {
-          this.options.log?.(`sincronização com AI-Memory: pausada após ${done} páginas; continua na próxima vez`)
-          break
+      let paused = false
+      const live = new Set(native.map((summary) => `pages/${summary.slug}.md`))
+      state.done = Object.keys(copied).filter((key) => live.has(key)).length
+      const copyOne = async (summary: (typeof native)[number]): Promise<void> => {
+        // A long first sync is spread over several passes instead of hammering the sidecar for minutes.
+        if (paused || Date.now() - startedAt > 60_000) {
+          paused = true
+          return
         }
         const path = `pages/${summary.slug}.md`
         const page = await this.memoryForProject(projectId).readPage(summary.slug)
-        if (!page) continue
+        if (!page) return
         // Legacy session transcript pages are replaced by the atomic turn
         // notes; any remaining one is not a useful graph node.
         if (summary.tags.includes('sessao') && summary.tags.includes('automatico')) {
           await this.aiMemory.deletePage(projectId, path).catch(() => false)
-          continue
+          return
         }
         const fingerprint = crypto.createHash('sha1').update(JSON.stringify([page.title, page.body, page.tags, page.pinned, summary.tags])).digest('hex')
-        if (copied[path] === fingerprint) continue
+        if (copied[path] === fingerprint) return
+        // Neighbours from the wiki's own index (in process, instant): asking the sidecar for them cost a full-text search
+        // of seconds per page, which is what kept a 2000-page project from ever reaching the index.
         const related = page.body.includes('## Relacionados')
-          ? ''
-          : await this.aiMemory
-              .relatedMarkdown(projectId, `${page.title}\n${page.body}`, path, 4)
-              .catch(() => '')
+          ? []
+          : relatedDurable(native, { slug: summary.slug, title: page.title, tags: page.tags, hint: page.body.slice(0, 300) }, { limit: 4 })
         const written = await this.aiMemory
           .writePage(projectId, {
             path,
             title: page.title,
-            body: related ? `${page.body}\n\n## Relacionados\n\n${related}` : page.body,
+            body: related.length
+              ? `${page.body}\n\n## Relacionados\n\n${related.map((item) => `- [[pages/${item.slug}.md]] — ${item.title}`).join('\n')}`
+              : page.body,
             tags: page.tags,
             pinned: page.pinned,
             tier: summary.tags.includes('turno') ? 'episodic' : 'semantic'
           })
           .then(() => true, () => false)
         if (written) {
+          const fresh = copied[path] === undefined
           copied[path] = fingerprint
           done++
-          if (done % 10 === 0) await saveCache()
+          if (fresh) state.done++
+          if (done % 25 === 0) await saveCache()
         }
       }
+      // Three writes at a time: the sidecar serializes its own commits, so more only queues.
+      let next = 0
+      await Promise.all(
+        Array.from({ length: 3 }, async () => {
+          while (next < native.length && !paused) await copyOne(native[next++])
+        })
+      )
+      if (paused) this.options.log?.(`sincronização com AI-Memory: ${state.done} de ${state.total} páginas no índice; continua em seguida`)
       // A page that left the wiki (archived hub, deleted page) must not stay searchable in the index.
-      const live = new Set(native.map((summary) => `pages/${summary.slug}.md`))
       for (const mirrored of Object.keys(copied)) {
         if (live.has(mirrored)) continue
         await this.aiMemory.deletePage(projectId, mirrored).catch(() => false)
         delete copied[mirrored]
       }
       await saveCache()
+      return paused ? 'paused' : 'complete'
     } catch (err) {
       this.options.log?.(`sincronização da memória nativa com AI-Memory falhou: ${(err as Error).message}`)
+      return 'failed'
+    } finally {
+      state.running = false
     }
   }
 
   async memoryStats(
     projectId: string
-  ): Promise<Awaited<ReturnType<ProjectMemory['stats']>> & { indexed?: number; aiRunning?: boolean }> {
+  ): Promise<
+    Awaited<ReturnType<ProjectMemory['stats']>> & {
+      indexed?: number
+      aiRunning?: boolean
+      indexSync?: { done: number; total: number; running: boolean }
+      files?: Record<string, number>
+    }
+  > {
     this.requireProject(projectId)
     this.syncNativeToAiInBackground(projectId)
     const stats = await this.memoryForProject(projectId).stats()
-    const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
-    return { ...stats, indexed: indexed.length, aiRunning: this.aiMemory.status().running }
+    // The real number of pages the index holds for the project (it used to be the length of a "recent" list capped at 100).
+    const indexed = await this.aiMemory.pageCount(projectId).catch(() => undefined)
+    const sync = this.memorySyncState.get(projectId)
+    return {
+      ...stats,
+      ...(indexed !== undefined ? { indexed } : {}),
+      aiRunning: this.aiMemory.status().running,
+      ...(sync ? { indexSync: { ...sync } } : {}),
+      files: countMemoryFiles(this.memoryForProject(projectId).root)
+    }
+  }
+
+  /* ------------------------------ files in the memory ------------------------------ */
+
+  /** Files kept in the project memory (pictures, PDFs, documents...), newest first. */
+  memoryFiles(projectId: string): MemoryFileInfo[] {
+    this.requireProject(projectId)
+    return listMemoryFiles(this.memoryForProject(projectId).root).map((meta) => ({
+      slug: meta.slug,
+      kind: meta.kind,
+      name: meta.name,
+      bytes: meta.bytes,
+      added: meta.added,
+      ...(meta.description ? { description: meta.description } : {}),
+      ...(meta.describedBy ? { describedBy: meta.describedBy } : {}),
+      ...(meta.width && meta.height ? { width: meta.width, height: meta.height } : {}),
+      ...(meta.pages ? { pages: meta.pages } : {}),
+      textChars: meta.textChars,
+      tags: meta.tags,
+      links: meta.links,
+      thumb: Boolean(meta.thumb)
+    }))
+  }
+
+  /** The thumbnail of a file in the memory, as a data URL (null when it has none). */
+  memoryFileThumb(projectId: string, slug: string): string | null {
+    this.requireProject(projectId)
+    const thumb = memoryFileThumb(this.memoryForProject(projectId).root, slug)
+    return thumb ? `data:${thumb.mediaType};base64,${thumb.data}` : null
+  }
+
+  /** The copy kept in the memory (or the original, for a file too big to copy). */
+  memoryFilePath(projectId: string, slug: string): string {
+    this.requireProject(projectId)
+    const found = findMemoryFile(this.memoryForProject(projectId).root, slug)
+    if (!found) throw new Error('arquivo não encontrado na memória')
+    return found.meta.stored ? path.join(found.dir, found.meta.stored) : found.meta.source
+  }
+
+  private memoryJobs = new Map<string, MemoryAddJobInfo>()
+
+  memoryAddStatus(projectId: string): MemoryAddJobInfo | null {
+    const job = this.memoryJobs.get(projectId)
+    return job ? { ...job, failed: [...job.failed] } : null
+  }
+
+  /**
+   * Memória → Adicionar arquivos/pasta: saves the chosen files (a folder with its subfolders) into the project memory in
+   * the background. Pictures are described by the first model that reads images; the screen polls memoryAddStatus.
+   */
+  memoryAddFiles(projectId: string, paths: string[]): MemoryAddJobInfo {
+    this.requireProject(projectId)
+    if (this.memoryJobs.get(projectId)?.active) throw new Error('Já há arquivos sendo guardados nesta memória.')
+    const job: MemoryAddJobInfo = { active: true, done: 0, total: 0, current: 'procurando os arquivos…', added: 0, cached: 0, described: 0, failed: [] }
+    this.memoryJobs.set(projectId, job)
+    const memory = this.memoryForProject(projectId)
+    void (async () => {
+      try {
+        const files: string[] = []
+        for (const given of paths) {
+          const stat = await fs.promises.stat(given).catch(() => null)
+          if (!stat) job.failed.push(`${given}: não encontrado`)
+          else if (stat.isDirectory()) files.push(...(await collectMemoryFiles(given, { recursive: true, limit: 5_000 - files.length })))
+          else files.push(given)
+          if (files.length >= 5_000) break
+        }
+        job.total = files.length
+        for (const file of files) {
+          job.current = path.basename(file)
+          try {
+            const result = await addMemoryFile(file, {
+              memory,
+              describe: (image, question) => describeImage({ candidates: this.reserve.visionCandidates(), image, question }),
+              onProgress: (text) => (job.current = text)
+            })
+            if (result.cached) job.cached++
+            else job.added++
+            if (result.meta.description) job.described++
+          } catch (err) {
+            job.failed.push(`${path.basename(file)}: ${(err as Error).message}`)
+          }
+          job.done++
+        }
+      } finally {
+        job.active = false
+        job.current = ''
+        this.options.log?.(`memória: ${job.added} arquivo(s) guardado(s), ${job.cached} já estava(m), ${job.failed.length} falha(s)`)
+        // The new pages go into the long-term index now, not two minutes from now.
+        this.syncedMemories.delete(projectId)
+        this.syncNativeToAiInBackground(projectId)
+      }
+    })()
+    return { ...job }
   }
 
   /**
@@ -2653,6 +3048,7 @@ function userDataPath(base: string, child: string): string {
 function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => ResolvedToolPolicy | undefined): ToolRegistry {
   return new ToolRegistry()
     .register(...fsTools)
+    .register(applyPatchTool)
     .register(...searchTools)
     .register(...shellTools)
     .register(...terminalTools)
@@ -2666,6 +3062,7 @@ function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => Resolve
     .register(...limitationTools)
     .register(...askTools)
     .register(...projectMemoryTools)
+    .register(...memoryFileTools)
     .register(...agentForgeTools)
     .register(...externalAgentTools)
     .register(...codeIntelligenceTools)

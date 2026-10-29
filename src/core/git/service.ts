@@ -408,7 +408,7 @@ async function validateBranchName(root: string, raw: string): Promise<string> {
 }
 
 /**
- * Keeps `<root>/.forja/` out of the main repository's status without touching
+ * Keeps `<root>/.openclod/` out of the main repository's status without touching
  * tracked files: appends it to `.git/info/exclude` unless something already
  * ignores it. Best effort — failing here must not fail the worktree.
  */
@@ -421,7 +421,7 @@ async function ensureWorktreesIgnored(root: string, sample: string): Promise<voi
     const file = path.resolve(root, where.stdout.replace(/\r?\n$/, ''))
     const current = await fs.promises.readFile(file, 'utf8').catch(() => '')
     await fs.promises.mkdir(path.dirname(file), { recursive: true })
-    await fs.promises.appendFile(file, `${current && !current.endsWith('\n') ? '\n' : ''}/.forja/\n`, 'utf8')
+    await fs.promises.appendFile(file, `${current && !current.endsWith('\n') ? '\n' : ''}/.openclod/\n`, 'utf8')
   } catch {
     /* ignore */
   }
@@ -435,7 +435,7 @@ export async function listWorktrees(repoCwd: string): Promise<WorktreeInfo[]> {
 
 /**
  * Creates a new branch checked out in its own worktree (session isolation).
- * The default location is `<main worktree>/.forja/worktrees/<safe-branch>`;
+ * The default location is `<main worktree>/.openclod/worktrees/<safe-branch>`;
  * a numeric suffix is added when that directory is already taken. The branch
  * must not exist yet.
  */
@@ -466,11 +466,11 @@ export async function createWorktree(repoCwd: string, options: CreateWorktreeOpt
     dir = path.resolve(main.path, options.dir.trim())
     if (await isOccupied(dir)) throw new Error(`O diretório já existe e não está vazio: ${dir}`)
   } else {
-    const parent = path.join(main.path, '.forja', 'worktrees')
+    const parent = path.join(main.path, '.openclod', 'worktrees')
     const name = safeWorktreeName(branch)
     dir = path.join(parent, name)
     for (let n = 2; (await pathExists(dir)) && n < 100; n++) dir = path.join(parent, `${name}-${n}`)
-    await ensureWorktreesIgnored(main.path, `.forja/worktrees/${name}`)
+    await ensureWorktreesIgnored(main.path, `.openclod/worktrees/${name}`)
   }
 
   const add = await runGit(main.path, ['worktree', 'add', '-b', branch, '--', dir, baseRef], {
