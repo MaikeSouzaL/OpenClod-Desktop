@@ -2,21 +2,28 @@
 """Servidor de LLM do Openclod para o Google Colab (e para qualquer máquina Linux com GPU NVIDIA).
 
 Este arquivo é o único código do notebook: o .ipynb gerado pelo Openclod Desktop só o grava no Colab e chama as funções
-`step_*` abaixo, uma por célula. Usa apenas a biblioteca padrão do Python.
+`step_*` abaixo, uma por célula. Usa apenas a biblioteca padrão do Python. Desde a versão 1.3.0 (a mesma do bridge-ccp) ele
+também fala as APIs do Claude Desktop, do Claude Code e do Codex, além da de chat que o Openclod usa.
 
 O que o notebook inteiro faz, sem nenhum passo manual:
   1. lê a GPU (nvidia-smi), MOSTRA todos os modelos abertos que cabem nela (de todo tipo, inclusive sem censura) e PARA numa caixa de
      seleção com o botão "Usar este modelo" (você também pode escolher pelo número, pelo tipo ou digitando a etiqueta); se você não
      escolher em 2 minutos, roda sozinho o melhor com VISÃO + FERRAMENTAS + contexto grande, e só então baixa alguma coisa;
   2. instala o Ollama (binário oficial, versão e SHA-256 fixos), baixa o modelo e confere que ele cabe 100% na GPU;
-  3. sobe um servidor compatível com a API da OpenAI (/v1/models e /v1/chat/completions com stream, imagens e tools) que
-     exige uma chave aleatória gerada na hora;
+  3. sobe um servidor autenticado na frente do Ollama (que já fala as três APIs; nada é traduzido aqui, só exposto e adaptado):
+       POST /v1/messages              API Anthropic Messages (Claude Code, Claude Desktop), com SSE e ferramentas
+       POST /v1/messages/count_tokens contagem de tokens (o Ollama não tem: a resposta é uma ESTIMATIVA local)
+       POST /v1/responses             API OpenAI Responses (Codex)
+       POST /v1/chat/completions      API OpenAI Chat Completions (stream, imagens e tools)
+       GET  /v1/models                lista (formato OpenAI + campos da Anthropic)
+     A chave aceita é uma só, aleatória, gerada na hora: vale como "Authorization: Bearer" ou como "x-api-key";
   4. abre um túnel "quick tunnel" da Cloudflare (cloudflared oficial, versão e SHA-256 fixos);
-  5. testa tudo pelo endereço público (texto, streaming, imagem, ferramenta) e só então imprime o CÓDIGO DE CONEXÃO;
+  5. testa tudo pelo endereço público (texto, streaming, imagem, ferramenta, /v1/messages e /v1/responses) e só então imprime o
+     CÓDIGO DE CONEXÃO;
   6. fica vivo com um painel de status.
 
 Segurança: a chave nunca vai para log; o código de conexão é a única coisa que a contém; o processo do Ollama e o do
-túnel não recebem a chave; só as rotas /v1/models, /v1/chat/completions, /healthz e /openclod/status são expostas.
+túnel não recebem a chave; só as rotas acima, /healthz e /openclod/status são expostas.
 
 Uso fora do Colab (testes e depuração):
   python openclod_llm_server.py serve --engine-url http://127.0.0.1:11434 --model qwen3.5:4b --key SEGREDO
@@ -57,7 +64,7 @@ import zlib
 # Versões e fontes (tudo que o notebook baixa é fixado por versão e conferido por SHA-256)
 # --------------------------------------------------------------------------------------------------------------------
 
-NOTEBOOK_VERSION = "1.2.0"
+NOTEBOOK_VERSION = "1.3.0"   # 1.2.0 = só chat; 1.3.0 = também /v1/messages e /v1/responses (o bridge-ccp confere pelo `routes` do status)
 CODE_PREFIX = "OCLC1"
 CODE_FORMAT = 1
 USER_AGENT = "openclod-colab/" + NOTEBOOK_VERSION
@@ -78,8 +85,15 @@ WORK_DIR = os.environ.get("OPENCLOD_COLAB_DIR") or (
 ENGINE_PORT = 11434
 SERVER_PORT = 8000
 
-# Rotas que o túnel publica. Qualquer outra coisa do motor (ex.: /api/pull, /api/delete) fica inacessível de fora.
-PUBLIC_ROUTES = ("/v1/models", "/v1/chat/completions", "/healthz", "/openclod/status")
+# Rotas de API que o túnel publica (a lista que o /openclod/status devolve em "routes": é por ela que o bridge-ccp reconhece um
+# notebook 1.3.0; o 1.2.0 não tinha /v1/messages nem /v1/responses). Qualquer outra coisa do motor (ex.: /api/pull, /api/delete) fica inacessível de fora.
+API_ROUTES = ("/v1/models", "/v1/chat/completions", "/v1/messages", "/v1/messages/count_tokens", "/v1/responses")
+PUBLIC_ROUTES = API_ROUTES + ("/healthz", "/openclod/status")
+
+# As três famílias de API e o que o motor (Ollama) responde a cada uma. O formato do erro segue a família da rota.
+API_CHAT, API_MESSAGES, API_RESPONSES = "chat", "messages", "responses"
+POST_APIS = {"/v1/chat/completions": API_CHAT, "/v1/messages": API_MESSAGES, "/v1/responses": API_RESPONSES}
+UPSTREAM_PATHS = {api: path for path, api in POST_APIS.items()}   # o motor serve as três no mesmo caminho da rota pública
 
 MAX_BODY_BYTES = 128 * 1024 * 1024
 # Sem resposta do motor nesse tempo, o servidor abre o SSE e manda comentários: o túnel da Cloudflare corta uma
@@ -138,7 +152,7 @@ _Q35 = ["https://ollama.com/library/qwen3.5", "https://huggingface.co/Qwen/Qwen3
 
 # Do maior para o menor. O primeiro candidato do degrau é o preferido; os seguintes entram quando o anterior não cabe
 # 100% na GPU (o notebook confere com `ollama ps`). Os pesos em GB são os tamanhos publicados nas páginas do Ollama.
-# Contexto: o prompt-base do Openclod tem ~9 mil tokens, então o mínimo é 32 mil e o alvo é 64 mil ou mais.
+# Contexto: o prompt-base dos agentes (Claude Code, Codex) tem de ~10 a ~20 mil tokens, então o mínimo é 32 mil e o alvo é 64 mil ou mais.
 # KV cache (estimado com as configurações públicas do Qwen3.5/3.8: só 1 em cada 4 camadas guarda KV): 3.8-27B = 64 KiB
 # por token em f16; 3.5-9B = 32 KiB por token. Licença dos dois: Apache-2.0, sem acesso restrito.
 TIERS = [
@@ -198,7 +212,7 @@ TIERS = [
         "min", 0, "GPU pequena (menos de 8 GB)",
         [Candidate("qwen3.5:4b-q4_K_M", 32768, "f16", 1, "off", 3.3),
          Candidate("qwen3.5:2b-q8_0", 32768, "f16", 1, "off", 2.7)],
-        "Qwen3.5-4B em Q4_K_M (3,3 GB): é o limite do que o Openclod consegue usar como agente.",
+        "Qwen3.5-4B em Q4_K_M (3,3 GB): é o limite do que dá para usar como agente.",
         _Q35,
     ),
 ]
@@ -719,19 +733,30 @@ GIB = float(2 ** 30)
 KV_Q8_FACTOR = 17.0 / 32.0        # cache KV em 8 bits: ~17/32 do tamanho em f16
 FIT_OVERHEAD_GIB = 2.0            # buffers do motor, ativações e o que o nvidia-smi não mostra (a mesma folga da tabela por VRAM)
 CTX_LADDER = (131072, 65536, 32768, 16384, 8192)
-AGENT_MIN_CTX = 32768             # o prompt-base do Openclod tem ~9 mil tokens: com menos contexto o modelo só serve para conversar
+AGENT_MIN_CTX = 32768             # o prompt-base dos agentes tem ~10 a ~20 mil tokens: com menos contexto o modelo só serve para conversar
 LIGHT_MAX_GB = 6.0                # "leve e rápido": modelos de até este tamanho de arquivo
 REGISTRY_URL = "https://registry.ollama.ai/v2"
 
-LIST_GROUPS = (
-    ("agente-visao", "Agentes com visão e ferramentas (o que o Openclod usa melhor)"),
-    ("agente", "Agentes só texto (com ferramentas)"),
-    ("codigo", "Código"),
-    ("raciocinio", "Raciocínio"),
-    ("visao", "Visão, sem ferramentas"),
-    ("conversa", "Só conversa (sem ferramentas nem visão)"),
+# A lista da etapa 2: primeiro os modelos originais, depois os sem censura; em cada parte, um bloco por combinação de capacidades
+# (visão, ferramentas, pensamento), do mais completo para agente ao só conversa. Código, raciocínio, áudio e MoE vão como marca na linha.
+LIST_SECTIONS = (
+    ("originais", "Modelos originais"),
     ("sem-censura", "Sem censura (uncensored / abliterated)"),
 )
+LIST_TIERS = (
+    ("vfp", "Visão + ferramentas + pensamento"),
+    ("vf", "Visão + ferramentas"),
+    ("fp", "Ferramentas + pensamento (só texto)"),
+    ("f", "Ferramentas (só texto)"),
+    ("vp", "Visão + pensamento, sem ferramentas"),
+    ("v", "Visão, sem ferramentas"),
+    ("p", "Pensamento, sem ferramentas"),
+    ("", "Só conversa (sem visão, ferramentas nem pensamento)"),
+)
+LIST_GROUPS = tuple(("%s/%s" % (section, tier), "%s · %s" % ("Sem censura" if section == "sem-censura" else "Originais", title))
+                    for section, _name in LIST_SECTIONS for tier, title in LIST_TIERS)
+CAPS_LEGEND = ("V = visão (lê imagens) · F = ferramentas (age como agente: lê e edita arquivos, roda comandos) · "
+               "P = pensamento (raciocina antes de responder) · - = não tem")
 
 # O que cada opção do formulário `tipo_de_modelo` quer dizer (a chave já sem acento e em minúsculas).
 KINDS = {"": "", "automatico": "", "sem censura": "sem-censura", "codigo": "codigo", "raciocinio": "raciocinio",
@@ -832,20 +857,14 @@ def fit_model(model, usable):
     return fallback
 
 
+def _tier_of(variant):
+    """A combinação de capacidades da etiqueta: "vfp" (visão, ferramentas, pensamento), "vf", "fp", "f", "vp", "v", "p" ou ""."""
+    return "".join(mark for mark, on in (("v", variant["vision"]), ("f", variant["tools"]), ("p", variant["thinking"])) if on)
+
+
 def _group_of(variant):
-    if variant["uncensored"]:
-        return "sem-censura"
-    if variant["code"]:
-        return "codigo"
-    if variant["reasoning"]:
-        return "raciocinio"
-    if variant["vision"] and variant["tools"]:
-        return "agente-visao"
-    if variant["tools"]:
-        return "agente"
-    if variant["vision"]:
-        return "visao"
-    return "conversa"
+    """O bloco da lista: parte (originais | sem-censura) / combinação de capacidades, como em LIST_GROUPS."""
+    return "%s/%s" % ("sem-censura" if variant["uncensored"] else "originais", _tier_of(variant))
 
 
 def build_listing(usable):
@@ -861,8 +880,10 @@ def build_listing(usable):
             ctx = _contexts(lightest)[-1]
             near.append({"model": model, "variant": lightest, "ctx": ctx, "need_gib": need_gib(lightest, ctx)})
     order = [key for key, _title in LIST_GROUPS]
-    # Dentro de cada tipo, primeiro os que servem de agente (contexto de 32k ou mais); o maior modelo vem antes.
-    fitting.sort(key=lambda row: (order.index(row["group"]), row["ctx"] < AGENT_MIN_CTX, -row["variant"]["gb"], row["variant"]["nome"]))
+    # Dentro de cada bloco, primeiro os que servem de agente (contexto de 32k ou mais); depois o modelo com mais parâmetros (a régua de
+    # qualidade; o arquivo em GB engana nos MoE e nos "E" do Gemma) e, empatando, o arquivo maior.
+    fitting.sort(key=lambda row: (order.index(row["group"]), row["ctx"] < AGENT_MIN_CTX, -params_b(row["variant"]),
+                                  -row["variant"]["gb"], row["variant"]["nome"]))
     by_number = {}
     for number, row in enumerate(fitting, 1):
         row["numero"] = number
@@ -889,10 +910,18 @@ def params_b(variant):
 def pick_by_kind(rows, kind):
     """As linhas do tipo pedido, da melhor para a pior: com ferramentas primeiro, depois contexto de agente, depois o modelo com mais
     parâmetros (e, empatando, o de arquivo maior)."""
-    if kind == "leve":
-        pool = [row for row in rows if row["variant"]["gb"] <= LIGHT_MAX_GB and not row["variant"]["uncensored"]]
-    else:
-        pool = [row for row in rows if row["group"] == kind]
+    def of_kind(variant):
+        if kind == "leve":
+            return variant["gb"] <= LIGHT_MAX_GB and not variant["uncensored"]
+        if kind == "sem-censura":
+            return variant["uncensored"]
+        if kind == "codigo":
+            return variant["code"] and not variant["uncensored"]
+        if kind == "raciocinio":
+            return variant["reasoning"] and not variant["code"] and not variant["uncensored"]
+        return False
+
+    pool = [row for row in rows if of_kind(row["variant"])]
     return sorted(pool, key=lambda row: (row["variant"]["tools"], row["ctx"] >= AGENT_MIN_CTX, params_b(row["variant"]), row["variant"]["gb"]),
                   reverse=True)
 
@@ -930,31 +959,55 @@ def _caps_text(variant):
     return ", ".join(parts)
 
 
+def _badges(variant):
+    """As três capacidades numa coluna fixa, para ler a lista de cima a baixo: "[V F P]", "[V F -]", "[- F P]"... (ver CAPS_LEGEND).
+    Hífen, e não ponto, para não se confundir com o separador " · " da caixa de escolha."""
+    return "[%s]" % " ".join(mark if variant[key] else "-" for mark, key in (("V", "vision"), ("F", "tools"), ("P", "thinking")))
+
+
+def _extras(variant):
+    """Especialidades e detalhes que não decidem o bloco: código, raciocínio, áudio, MoE."""
+    return ", ".join(name for name, key in (("código", "code"), ("raciocínio", "reasoning"), ("áudio", "audio"), ("MoE", "moe"))
+                     if variant[key])
+
+
+def _plural(count, one, many):
+    return "%d %s" % (count, one if count == 1 else many)
+
+
 def listing_lines(listing, chosen_tag="", unavailable=(), mark="<== rodando esta"):
-    """O texto da lista que a etapa 2 imprime: um modelo por linha, numerado, agrupado por tipo; no fim, o que quase cabe.
-    `mark` é o que vai na linha de `chosen_tag` ("rodando esta"; "automático" quando a caixa de escolha ainda vai perguntar)."""
-    lines = []
-    for key, title in LIST_GROUPS:
-        group = [row for row in listing["rows"] if row["group"] == key]
-        if not group:
+    """O texto da lista que a etapa 2 imprime: um modelo por linha, numerado; primeiro os originais, depois os sem censura, e em cada
+    parte um bloco por combinação de capacidades (V F P); no fim, o que quase cabe. `mark` é o que vai na linha de `chosen_tag`
+    ("rodando esta"; "automático" quando a caixa de escolha ainda vai perguntar)."""
+    lines = ["", "Capacidades: " + CAPS_LEGEND]
+    for section, section_title in LIST_SECTIONS:
+        rows = [row for row in listing["rows"] if row["group"].split("/")[0] == section]
+        if not rows:
             continue
         lines.append("")
-        lines.append("%s: %d %s" % (title, len(group), "modelo" if len(group) == 1 else "modelos"))
-        if key == "sem-censura":
-            lines.append("      Menos recusas do que os modelos originais; a qualidade e o uso de ferramentas variam, e o uso é por sua conta.")
-        for row in group:
-            variant = row["variant"]
-            marks = []
-            if row["ctx"] < AGENT_MIN_CTX:
-                marks.append("contexto curto: só conversa")
-            if variant["tag"] in unavailable:
-                marks.append("[não está mais no registro do Ollama]")
-            if variant["tag"] == chosen_tag:
-                marks.append(mark)
-            license_text = variant["licenca"] if variant["licenca"] and variant["licenca"] != "ver a página do modelo" else "licença: ver a página"
-            lines.append("  %3d. %-36s %-7s %6s GB  ctx %-5s %s | %s%s" % (
-                row["numero"], variant["nome"], variant["quant"], _dec(variant["gb"]), _ctx_text(row["ctx"]), _caps_text(variant),
-                license_text, ("  " + "  ".join(marks)) if marks else ""))
+        lines.append("=== %s: %s ===" % (section_title, _plural(len(rows), "modelo", "modelos")))
+        if section == "sem-censura":
+            lines.append("    Menos recusas do que os modelos originais; a qualidade e o uso de ferramentas variam, e o uso é por sua conta.")
+        for tier, tier_title in LIST_TIERS:
+            group = [row for row in rows if row["group"] == "%s/%s" % (section, tier)]
+            if not group:
+                continue
+            lines.append("")
+            lines.append("  %s: %s" % (tier_title, _plural(len(group), "modelo", "modelos")))
+            for row in group:
+                variant = row["variant"]
+                marks = []
+                if row["ctx"] < AGENT_MIN_CTX:
+                    marks.append("contexto curto: só conversa")
+                if variant["tag"] in unavailable:
+                    marks.append("[não está mais no registro do Ollama]")
+                if variant["tag"] == chosen_tag:
+                    marks.append(mark)
+                license_text = variant["licenca"] if variant["licenca"] and variant["licenca"] != "ver a página do modelo" else "licença: ver a página"
+                extras = _extras(variant)
+                lines.append("  %3d. %-36s %-7s %6s GB  ctx %-5s  %s  %s| %s%s" % (
+                    row["numero"], variant["nome"], variant["quant"], _dec(variant["gb"]), _ctx_text(row["ctx"]), _badges(variant),
+                    (extras + " ") if extras else "", license_text, ("  " + "  ".join(marks)) if marks else ""))
     near = listing["near"][:6]
     if near:
         lines.append("")
@@ -1023,7 +1076,7 @@ CHOICE_GRACE_SECONDS = 30       # folga do lado do Python, além do prazo da cai
 
 # Avisos que a caixa mostra sob o modelo selecionado (cada opção aponta para os que valem para ela).
 CHOICE_WARNINGS = {
-    "ferramentas": "Este modelo não declara chamada de ferramentas: o Openclod só consegue conversar com ele, não usá-lo como agente "
+    "ferramentas": "Este modelo não declara chamada de ferramentas: o Openclod, o Claude Code e o Codex só conseguem conversar com ele, não usá-lo como agente "
                    "(ler e editar arquivos, rodar comandos).",
     "curto": "Com o contexto que cabe nesta GPU (menos de 32k) ele só serve para conversar, não como agente.",
     "sem-censura": "Modelo da comunidade sem as recusas do original: a qualidade, o uso de ferramentas e a origem dos pesos não foram "
@@ -1047,59 +1100,202 @@ window.openclodEscolher = async function (dados) {
     try { google.colab.output.setIframeHeight(doc.documentElement.scrollHeight, true); } catch (erro) { /* fora do Colab */ }
   };
   const relogio = (total) => Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  const ficha = (texto, ligado) => el('span', 'display:inline-block;min-width:24px;padding:1px 7px;border-radius:999px;' +
+    'font:600 13px/1.6 system-ui,sans-serif;text-align:center;' +
+    (ligado ? 'background:#e6f4ea;color:#137333;border:1px solid #a8dab5' : 'background:#f1f3f4;color:#9aa0a6;border:1px solid #e0e3e7'), texto);
 
-  const raiz = el('div', 'font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#202124;background:#f8f9fa;' +
-    'border:1px solid #dadce0;border-radius:10px;padding:14px 16px;margin:8px 0;max-width:820px;box-sizing:border-box');
+  const raiz = el('div', 'font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#202124;background:#f8f9fa;' +
+    'border:1px solid #dadce0;border-radius:12px;padding:18px 20px;margin:8px 0;max-width:1280px;box-sizing:border-box');
   raiz.setAttribute('data-openclod', 'escolha-do-modelo');
-  raiz.appendChild(el('div', 'font-weight:600;font-size:15px', 'Escolha o modelo antes de baixar'));
-  raiz.appendChild(el('div', 'color:#5f6368;margin:2px 0 8px',
-    'Selecione um modelo e clique em «Usar este modelo». O automático já está marcado: se você não escolher, é ele que roda.'));
+  raiz.appendChild(el('div', 'font-weight:600;font-size:19px', 'Escolha o modelo antes de baixar'));
+  raiz.appendChild(el('div', 'color:#5f6368;margin:2px 0 12px',
+    'Clique numa linha e depois em «Usar este modelo». O automático já está marcado: se você não escolher, é ele que roda.'));
 
-  const caixa = el('select', 'width:100%;box-sizing:border-box;font:13px/1.5 system-ui,sans-serif;padding:4px;' +
-    'border:1px solid #bdc1c6;border-radius:6px;background:#fff;color:#202124');
-  caixa.setAttribute('aria-label', 'Modelo');
-  const itens = new Map();
-  const automatico = doc.createElement('option');
-  automatico.value = '0';
-  automatico.textContent = dados.automatico.texto;
-  caixa.appendChild(automatico);
-  itens.set('0', dados.automatico);
-  let linhas = 1;
-  for (const grupo of dados.grupos) {
-    const bloco = doc.createElement('optgroup');
-    bloco.label = grupo.titulo + ' (' + grupo.itens.length + ')';
-    for (const item of grupo.itens) {
-      const opcao = doc.createElement('option');
-      opcao.value = String(item.n);
-      opcao.textContent = item.texto;
-      bloco.appendChild(opcao);
-      itens.set(opcao.value, item);
-      linhas += 1;
-    }
-    caixa.appendChild(bloco);
-    linhas += 1;
+  const legenda = el('div', 'display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;color:#5f6368;font-size:14px;margin:0 0 12px');
+  for (const [marca, texto] of [['V', 'visão: lê imagens'], ['F', 'ferramentas: age como agente (lê e edita arquivos, roda comandos)'],
+                                ['P', 'pensamento: raciocina antes de responder']]) {
+    const parteDaLegenda = el('span', 'display:inline-flex;align-items:center;gap:6px');
+    parteDaLegenda.appendChild(ficha(marca, true));
+    parteDaLegenda.appendChild(doc.createTextNode(texto));
+    legenda.appendChild(parteDaLegenda);
   }
-  caixa.size = Math.max(2, Math.min(12, linhas));
-  caixa.value = '0';
-  raiz.appendChild(caixa);
+  raiz.appendChild(legenda);
 
-  const detalhe = el('div', 'margin-top:8px;color:#3c4043;min-height:1.5em');
+  // Filtros: só o que tem visão / ferramentas / pensamento, e originais ou sem censura. O automático sempre fica na lista.
+  const filtros = el('div', 'display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:0 0 10px;font-size:15px');
+  filtros.setAttribute('data-parte', 'filtros');
+  filtros.appendChild(el('span', 'color:#5f6368;font-weight:600', 'Mostrar só:'));
+  const marcar = (texto, chave) => {
+    const rotulo = el('label', 'display:inline-flex;align-items:center;gap:6px;cursor:pointer');
+    const caixinha = doc.createElement('input');
+    caixinha.type = 'checkbox';
+    caixinha.style.cssText = 'width:17px;height:17px;margin:0';
+    caixinha.setAttribute('data-filtro', chave);
+    rotulo.appendChild(caixinha);
+    rotulo.appendChild(doc.createTextNode(texto));
+    filtros.appendChild(rotulo);
+    return caixinha;
+  };
+  const exigir = { v: marcar('com visão', 'v'), f: marcar('com ferramentas', 'f'), p: marcar('com pensamento', 'p') };
+  const parte = doc.createElement('select');
+  parte.setAttribute('aria-label', 'Originais ou sem censura');
+  parte.setAttribute('data-filtro', 'parte');
+  parte.style.cssText = 'font:15px system-ui,sans-serif;padding:4px 8px;border:1px solid #bdc1c6;border-radius:6px;background:#fff;color:#202124';
+  for (const [valor, texto] of [['todos', 'originais e sem censura'], ['originais', 'só os originais'], ['sem-censura', 'só os sem censura']]) {
+    const opcao = doc.createElement('option');
+    opcao.value = valor;
+    opcao.textContent = texto;
+    parte.appendChild(opcao);
+  }
+  filtros.appendChild(parte);
+  const total = el('span', 'color:#5f6368');
+  total.setAttribute('data-parte', 'total');
+  filtros.appendChild(total);
+  raiz.appendChild(filtros);
+
+  // A lista: uma tabela grande, com rolagem própria, cabeçalho fixo e um bloco por parte e capacidade.
+  const lista = el('div', 'max-height:620px;overflow:auto;border:1px solid #dadce0;border-radius:8px;background:#fff');
+  lista.setAttribute('data-parte', 'lista');
+  lista.setAttribute('role', 'radiogroup');
+  lista.setAttribute('aria-label', 'Modelo');
+  const tabela = el('table', 'width:100%;border-collapse:collapse;font-size:14px');
+  lista.appendChild(tabela);
+  raiz.appendChild(lista);
+
+  const itens = new Map();
+  itens.set('0', dados.automatico);
+  for (const grupo of dados.grupos) for (const item of grupo.itens) itens.set(String(item.n), item);
+  let escolhido = '0';
+  let radios = [];
+  let linhasDaTabela = [];
+  const COLUNAS = [['Nº', 'right'], ['Modelo', 'left'], ['Quant.', 'left'], ['Tamanho', 'right'], ['Contexto', 'right'],
+                   ['V', 'center'], ['F', 'center'], ['P', 'center'], ['Observações', 'left']];
+  const celula = (css, texto) => el('td', 'padding:7px 12px;border-bottom:1px solid #f1f3f4;vertical-align:middle;' + (css || ''), texto);
+  const passa = (item) => {
+    const c = item.c || {};
+    if ((exigir.v.checked && !c.v) || (exigir.f.checked && !c.f) || (exigir.p.checked && !c.p)) return false;
+    if (parte.value === 'originais' && c.u) return false;
+    if (parte.value === 'sem-censura' && !c.u) return false;
+    return true;
+  };
+  const pintar = () => {
+    for (const tr of linhasDaTabela) {
+      const ativo = tr.getAttribute('data-valor') === escolhido;
+      tr.style.background = ativo ? '#e8f0fe' : '';
+      tr.style.boxShadow = ativo ? 'inset 4px 0 0 #1a73e8' : '';
+    }
+    for (const radio of radios) radio.checked = radio.value === escolhido;
+  };
+  let mostrar = () => {};
+  const selecionar = (valor) => {
+    escolhido = valor;
+    pintar();
+    mostrar();
+  };
+  const linhaDo = (valor, item, automatico) => {
+    const tr = el('tr', 'cursor:pointer');
+    tr.setAttribute('data-valor', valor);
+    const radio = doc.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'openclod-modelo';
+    radio.value = valor;
+    radio.style.cssText = 'width:16px;height:16px;margin:0 8px 0 0;vertical-align:middle';
+    radio.setAttribute('aria-label', item.texto);
+    radio.addEventListener('change', () => { if (radio.checked) selecionar(valor); });
+    radios.push(radio);
+    const primeira = celula('text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#5f6368');
+    primeira.appendChild(radio);
+    primeira.appendChild(doc.createTextNode(automatico ? '' : String(item.n)));
+    tr.appendChild(primeira);
+    if (automatico) {
+      const resumo = celula('font-weight:600;color:#1a73e8', item.texto);
+      resumo.colSpan = COLUNAS.length - 1;
+      tr.appendChild(resumo);
+    } else {
+      tr.appendChild(celula('font-weight:500', item.nome));
+      tr.appendChild(celula('color:#5f6368;white-space:nowrap', item.quant));
+      tr.appendChild(celula('text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums', item.gb));
+      tr.appendChild(celula('text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums', item.ctx));
+      for (const chave of ['v', 'f', 'p']) {
+        const tem = !!(item.c && item.c[chave]);
+        const td = celula('text-align:center');
+        td.appendChild(ficha(tem ? '✓' : '–', tem));
+        tr.appendChild(td);
+      }
+      tr.appendChild(celula('color:#5f6368', [item.extras].concat(item.notas || []).filter(Boolean).join(' · ')));
+    }
+    tr.addEventListener('click', () => { if (!radio.disabled) selecionar(valor); });
+    linhasDaTabela.push(tr);
+    return tr;
+  };
+  const montar = () => {
+    while (tabela.firstChild) tabela.removeChild(tabela.firstChild);
+    radios = [];
+    linhasDaTabela = [];
+    const cabeca = doc.createElement('thead');
+    const linhaCabeca = doc.createElement('tr');
+    for (const [titulo, lado] of COLUNAS) {
+      linhaCabeca.appendChild(el('th', 'position:sticky;top:0;z-index:1;background:#f8f9fa;padding:8px 12px;text-align:' + lado +
+        ';font-weight:600;color:#3c4043;border-bottom:1px solid #dadce0;white-space:nowrap', titulo));
+    }
+    cabeca.appendChild(linhaCabeca);
+    tabela.appendChild(cabeca);
+    const corpo = doc.createElement('tbody');
+    corpo.appendChild(linhaDo('0', dados.automatico, true));
+    let visiveis = 0;
+    let todos = 0;
+    let parteAnterior = '';
+    for (const grupo of dados.grupos) {
+      todos += grupo.itens.length;
+      const deste = grupo.itens.filter(passa);
+      if (!deste.length) continue;
+      const nomeDaParte = grupo.titulo.split(' · ')[0];
+      if (nomeDaParte !== parteAnterior) {
+        parteAnterior = nomeDaParte;
+        const tituloDaParte = el('td', 'padding:12px 12px 6px;font-weight:700;font-size:15px;color:#202124;background:#eef1f4;' +
+          'border-top:2px solid #dadce0', nomeDaParte === 'Sem censura' ? 'Sem censura (uncensored / abliterated): menos recusas; ' +
+          'a qualidade e o uso de ferramentas variam, e o uso é por sua conta' : 'Modelos originais');
+        tituloDaParte.colSpan = COLUNAS.length;
+        const trParte = doc.createElement('tr');
+        trParte.appendChild(tituloDaParte);
+        corpo.appendChild(trParte);
+      }
+      const tituloDoBloco = el('td', 'padding:8px 12px 4px 22px;font-weight:600;color:#3c4043;background:#f8f9fa',
+        grupo.titulo.split(' · ').slice(1).join(' · ') + ' (' + deste.length + ')');
+      tituloDoBloco.colSpan = COLUNAS.length;
+      const trBloco = doc.createElement('tr');
+      trBloco.appendChild(tituloDoBloco);
+      corpo.appendChild(trBloco);
+      for (const item of deste) {
+        corpo.appendChild(linhaDo(String(item.n), item, false));
+        visiveis += 1;
+      }
+    }
+    tabela.appendChild(corpo);
+    if (!linhasDaTabela.some((tr) => tr.getAttribute('data-valor') === escolhido)) escolhido = '0';
+    total.textContent = visiveis === todos ? todos + ' modelos' : visiveis + ' de ' + todos + ' modelos';
+    pintar();
+    ajustarAltura();
+  };
+  montar();
+
+  const detalhe = el('div', 'margin-top:10px;color:#3c4043;min-height:1.5em;font-size:14px');
   detalhe.setAttribute('data-parte', 'detalhe');
-  const avisos = el('div', 'margin-top:4px;color:#b3261e');
+  const avisos = el('div', 'margin-top:4px;color:#b3261e;font-size:14px');
   avisos.setAttribute('data-parte', 'avisos');
   raiz.appendChild(detalhe);
   raiz.appendChild(avisos);
-  const mostrar = () => {
-    const item = itens.get(caixa.value) || dados.automatico;
+  mostrar = () => {
+    const item = itens.get(escolhido) || dados.automatico;
     detalhe.textContent = item.detalhe || '';
     while (avisos.firstChild) avisos.removeChild(avisos.firstChild);
     for (const chave of item.av || []) avisos.appendChild(el('div', 'margin-top:2px', dados.avisos[chave] || ''));
     ajustarAltura();
   };
-  caixa.addEventListener('change', mostrar);
+  for (const controle of [exigir.v, exigir.f, exigir.p, parte]) controle.addEventListener('change', () => { montar(); mostrar(); });
 
-  const linha = el('div', 'display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap');
-  const botao = el('button', 'font:600 14px system-ui,sans-serif;padding:8px 18px;border:0;border-radius:6px;background:#1a73e8;' +
+  const linha = el('div', 'display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap');
+  const botao = el('button', 'font:600 16px system-ui,sans-serif;padding:10px 22px;border:0;border-radius:8px;background:#1a73e8;' +
     'color:#fff;cursor:pointer', 'Usar este modelo');
   botao.type = 'button';
   const contagem = el('span', 'color:#5f6368;font-variant-numeric:tabular-nums');
@@ -1107,13 +1303,13 @@ window.openclodEscolher = async function (dados) {
   linha.appendChild(botao);
   linha.appendChild(contagem);
   raiz.appendChild(linha);
-  const trilha = el('div', 'height:4px;background:#e0e3e7;border-radius:2px;margin-top:8px;overflow:hidden');
+  const trilha = el('div', 'height:4px;background:#e0e3e7;border-radius:2px;margin-top:10px;overflow:hidden');
   trilha.setAttribute('data-parte', 'trilha');
   const barra = el('div', 'height:4px;width:100%;background:#1a73e8');
   barra.setAttribute('data-parte', 'barra');
   trilha.appendChild(barra);
   raiz.appendChild(trilha);
-  const estado = el('div', 'margin-top:8px;font-weight:600');
+  const estado = el('div', 'margin-top:10px;font-weight:600');
   estado.setAttribute('data-parte', 'estado');
   estado.setAttribute('aria-live', 'polite');
   raiz.appendChild(estado);
@@ -1128,7 +1324,8 @@ window.openclodEscolher = async function (dados) {
       if (fim) return;
       fim = true;
       if (cronometro !== null) clearInterval(cronometro);
-      caixa.disabled = true;
+      for (const controle of raiz.querySelectorAll('input,select')) controle.disabled = true;
+      for (const tr of linhasDaTabela) tr.style.cursor = 'default';
       botao.disabled = true;
       botao.style.background = '#9aa0a6';
       botao.style.cursor = 'default';
@@ -1140,8 +1337,8 @@ window.openclodEscolher = async function (dados) {
     };
     window.openclodEscolher.atual = { cancelar: (motivo) => terminar('cancelado', 0, motivo) };
     botao.addEventListener('click', () => {
-      const item = itens.get(caixa.value);
-      terminar('usuario', Number(caixa.value), 'Escolhido: ' + (item ? item.texto : caixa.value) + '. O notebook continua (acompanhe a saída desta célula).');
+      const item = itens.get(escolhido);
+      terminar('usuario', Number(escolhido), 'Escolhido: ' + (item ? item.texto : escolhido) + '. O notebook continua (acompanhe a saída desta célula).');
     });
     const atualizar = () => {
       const restante = Math.max(0, limite - Date.now());
@@ -1205,10 +1402,16 @@ def choice_item(row, automatic_tag=""):
         warnings.append("sem-censura")
     if automatic_tag and variant["tag"] == automatic_tag:
         notes.append("é o automático")
+    extras = _extras(variant)
     text = " · ".join(["%d" % row["numero"], variant["nome"], variant["quant"], "%s GB" % _dec(variant["gb"]),
-                       "ctx %s" % _ctx_text(row["ctx"]), _caps_text(variant)] + notes)
+                       "ctx %s" % _ctx_text(row["ctx"]), _badges(variant)] + ([extras] if extras else []) + notes)
     license_text = variant["licenca"] if variant["licenca"] and variant["licenca"] != "ver a página do modelo" else "ver " + ollama_page(variant["tag"])
-    return {"n": row["numero"], "texto": text, "detalhe": "%s · licença: %s" % (variant["tag"], license_text), "av": warnings}
+    return {"n": row["numero"], "texto": text, "detalhe": "%s · %s · licença: %s" % (variant["tag"], _caps_text(variant), license_text),
+            "av": warnings, "c": {"v": int(variant["vision"]), "f": int(variant["tools"]), "p": int(variant["thinking"]),
+                                  "u": int(variant["uncensored"])},
+            # colunas da tabela da caixa
+            "nome": variant["nome"], "quant": variant["quant"], "gb": "%s GB" % _dec(variant["gb"]), "ctx": _ctx_text(row["ctx"]),
+            "extras": extras, "notas": notes}
 
 
 def choice_automatic(plan):
@@ -1331,7 +1534,7 @@ def make_connection_code(info):
 
 def parse_connection_code(text):
     """Lê um código colado (aceita espaços, quebras de linha e texto em volta). Levanta ValueError em português."""
-    cleaned = re.sub(r"[\s​‌‍⁠﻿]+", "", text or "")
+    cleaned = re.sub(r"[\s\u200b\u200c\u200d\u2060\ufeff]+", "", text or "")   # espaços e caracteres invisíveis de uma colagem
     match = re.search(re.escape(CODE_PREFIX) + r"\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})", cleaned)
     if not match:
         if re.search(re.escape(CODE_PREFIX) + r"\.[A-Za-z0-9_-]{8,}", cleaned):
@@ -1407,8 +1610,9 @@ def fail(message):
     raise StepFailed("Etapa interrompida: veja a mensagem acima.")
 
 
-def http_json(method, url, key=None, body=None, timeout=60.0):
-    """(status, texto) de uma chamada HTTP; nunca levanta por status diferente de 2xx."""
+def http_json(method, url, key=None, body=None, timeout=60.0, extra_headers=None):
+    """(status, texto) de uma chamada HTTP; nunca levanta por status diferente de 2xx. `key` vai como Bearer; `extra_headers` soma outros
+    (ex.: x-api-key e anthropic-version)."""
     data = None
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if body is not None:
@@ -1416,6 +1620,7 @@ def http_json(method, url, key=None, body=None, timeout=60.0):
         headers["Content-Type"] = "application/json"
     if key:
         headers["Authorization"] = "Bearer " + key
+    headers.update(extra_headers or {})
     request = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -1588,6 +1793,8 @@ class ServerState(object):
                  gpu="", notebook=NOTEBOOK_VERSION, engine="ollama"):
         self.key = key
         self.model = model
+        known = catalog_variant(model)   # o nome de exibição do /v1/models (campo `display_name` da Anthropic)
+        self.display_name = ("%s (%s)" % (known["nome"], known["quant"])) if known else model
         self.engine_url = engine_url.rstrip("/")
         self.ctx = ctx
         self.vision = vision
@@ -1621,23 +1828,32 @@ class ServerState(object):
                     "images": self.images,
                     "last_request_ago": (time.time() - self.last_request_at) if self.last_request_at else None,
                     "last_error": self.last_error, "model": self.model, "ctx": self.ctx, "vision": self.vision,
-                    "tools": self.tools, "gpu": self.gpu, "notebook": self.notebook, "events": list(self.events)[-10:]}
+                    "tools": self.tools, "gpu": self.gpu, "notebook": self.notebook, "events": list(self.events)[-10:],
+                    "routes": list(API_ROUTES), "thinking": self.thinking_capable,
+                    "display_name": getattr(self, "display_name", "") or self.model}
+
+
+def rfc3339(epoch):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(epoch))
 
 
 def models_document(state, engine_ok=True):
-    """O `GET /v1/models`: além do formato da OpenAI, traz o que o Openclod precisa saber (visão, ferramentas, janela)."""
+    """O `GET /v1/models`: o formato da OpenAI (que o Openclod e o bridge-ccp leem: janela, visão, ferramentas) MAIS os campos da Anthropic por item
+    (`type`, `display_name`, `created_at` em RFC 3339) e, no topo, `has_more`, `first_id` e `last_id`: assim o Claude Code e o Claude
+    Desktop também conseguem listar. É um superconjunto: quem lê só o formato OpenAI não vê diferença."""
     params = ["temperature", "top_p", "max_tokens", "stop", "seed", "stream"]
     if state.tools:
         params += ["tools", "tool_choice"]
     entry = {
         "id": state.model, "object": "model", "created": int(state.started), "owned_by": "openclod-colab",
-        "context_length": state.ctx, "max_model_len": state.ctx,
+        "type": "model", "display_name": getattr(state, "display_name", "") or state.model, "created_at": rfc3339(state.started),
+        "context_length": state.ctx, "max_model_len": state.ctx, "max_input_tokens": state.ctx,
         "architecture": {"input_modalities": ["text", "image"] if state.vision else ["text"], "output_modalities": ["text"]},
         "supported_parameters": params,
         "capabilities": {"vision": state.vision, "tools": state.tools, "thinking": state.thinking_capable},
         "openclod": {"gpu": state.gpu, "notebook": state.notebook, "engine": state.engine, "engine_ok": engine_ok},
     }
-    return {"object": "list", "data": [entry]}
+    return {"object": "list", "data": [entry], "has_more": False, "first_id": state.model, "last_id": state.model}
 
 
 def _json_bytes(obj):
@@ -1645,10 +1861,118 @@ def _json_bytes(obj):
 
 
 def error_body(message, kind="server_error", code=None):
+    """Erro no formato da OpenAI (chat/completions, responses, models e rotas desconhecidas)."""
     error = {"message": message, "type": kind}
     if code is not None:
         error["code"] = code
     return {"error": error}
+
+
+# O `type` do erro da Anthropic por status HTTP (https://docs.anthropic.com/en/api/errors).
+_ANTHROPIC_ERRORS = {400: "invalid_request_error", 401: "authentication_error", 403: "permission_error", 404: "not_found_error",
+                     405: "invalid_request_error", 413: "request_too_large", 429: "rate_limit_error", 529: "overloaded_error"}
+
+
+def anthropic_error_body(message, status=500, kind=None):
+    """Erro no formato da Anthropic: {"type": "error", "error": {"type": ..., "message": ...}}."""
+    return {"type": "error", "error": {"type": kind or _ANTHROPIC_ERRORS.get(int(status or 0), "api_error"), "message": message}}
+
+
+def api_error_body(api, message, status=500, kind="server_error", code=None):
+    """O erro no formato da API da rota: Anthropic para /v1/messages, OpenAI para o resto (o `kind` e o `code` são os da OpenAI)."""
+    if api == API_MESSAGES:
+        return anthropic_error_body(message, status)
+    return error_body(message, kind, code)
+
+
+def estimate_input_tokens(body):
+    """Estimativa de `input_tokens` para o /v1/messages/count_tokens (o Ollama não tem essa rota e não expõe o tokenizador).
+
+    ~1 token a cada 3,2 caracteres do JSON de `system`, `messages`, `tools` e `tool_choice` (um pouco acima do inglês comum, ~4, para errar
+    para mais: quem usa o número para decidir quando compactar a conversa prefere folga), com as imagens trocadas por 1000 tokens cada
+    (o base64 delas não é texto). É só uma estimativa: o valor exato do uso vem na resposta de cada pedido (`usage`)."""
+    images = [0]
+
+    def clean(node):
+        if isinstance(node, dict):
+            if node.get("type") in ("image", "image_url", "input_image", "document"):
+                images[0] += 1
+                return {"type": node.get("type")}
+            return {key: clean(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [clean(item) for item in node]
+        return node
+
+    parts = {key: clean(body[key]) for key in ("system", "messages", "tools", "tool_choice") if key in body}
+    text = json.dumps(parts, ensure_ascii=False, separators=(",", ":"))
+    return max(1, int(len(text) / 3.2) + 1 + 1000 * images[0])
+
+
+def adapt_request(api, body, state):
+    """O que o servidor muda no pedido antes de mandar ao motor (a mesma regra nas três rotas):
+      1. `model` vira a etiqueta servida: o motor responde 404 a qualquer outro nome, e o Claude Code manda nomes como `claude-haiku-...`
+         nas tarefas de fundo;
+      2. pensamento: se o plano deixou o pensamento desligado e o cliente NÃO pediu nada, o servidor pede "sem pensar" no formato da
+         rota (chat: reasoning_effort "none"; messages: thinking {"type": "disabled"}; responses: reasoning {"effort": "none"}). Se o
+         cliente pediu (qualquer valor), vale o dele. Modelo que não pensa: nada é acrescentado (o motor recusa), e um pedido de
+         pensamento do cliente é descartado em vez de virar erro;
+      3. ferramentas: o Codex e o Claude Code SEMPRE mandam a lista de ferramentas, e o motor recusa o pedido inteiro ("does not
+         support tools") quando o modelo não as declara. Num modelo assim elas saem do pedido: ele não age como agente, mas conversa.
+    Devolve o corpo (o mesmo dict, alterado)."""
+    body["model"] = state.model
+    if not state.tools:
+        for name in ("tools", "tool_choice", "parallel_tool_calls"):
+            body.pop(name, None)
+    capable = state.thinking_capable
+    off_by_default = capable and state.thinking_default == "off"
+    if api == API_CHAT:
+        if off_by_default and "reasoning_effort" not in body and "think" not in body:
+            body["reasoning_effort"] = "none"
+    elif api == API_MESSAGES:
+        asked = body.get("thinking")
+        if not capable and isinstance(asked, dict) and asked.get("type") != "disabled":
+            body.pop("thinking", None)
+        elif off_by_default and "thinking" not in body and "think" not in body:
+            body["thinking"] = {"type": "disabled"}
+    elif api == API_RESPONSES:
+        asked = body.get("reasoning")
+        if not capable and isinstance(asked, dict) and asked.get("effort") not in (None, "none"):
+            body.pop("reasoning", None)
+        elif off_by_default and "think" not in body:
+            if asked is None:
+                body["reasoning"] = {"effort": "none"}
+            elif isinstance(asked, dict) and "effort" not in asked:
+                asked["effort"] = "none"   # o Codex manda só {"summary": "auto"}: sem esforço pedido, vale o plano
+    return body
+
+
+def count_images(api, body):
+    """Quantas imagens o pedido traz (só o número: o conteúdo nunca é guardado)."""
+    kinds = {API_CHAT: ("image_url",), API_MESSAGES: ("image",), API_RESPONSES: ("input_image",)}[api]
+    total = 0
+
+    def walk(node, depth=0):
+        nonlocal total
+        if depth > 8:
+            return
+        if isinstance(node, dict):
+            if node.get("type") in kinds:
+                total += 1
+            elif isinstance(node.get("content"), list):   # tool_result da Anthropic também carrega imagens dentro de `content`
+                walk(node["content"], depth + 1)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item, depth + 1)
+
+    for key in ("messages", "input"):
+        value = body.get(key)
+        if isinstance(value, list):
+            for message in value:
+                if isinstance(message, dict) and isinstance(message.get("content"), list):
+                    walk(message["content"])
+                elif isinstance(message, dict) and message.get("type") in kinds:
+                    total += 1
+    return total
 
 
 class _Upstream(object):
@@ -1700,7 +2024,7 @@ class _Upstream(object):
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
-    server_version = "OpenclodColab/" + NOTEBOOK_VERSION
+    server_version = "VisionColab/" + NOTEBOOK_VERSION
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):  # nada de log de acesso: corpos e cabeçalhos nunca aparecem
@@ -1753,10 +2077,28 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.flush()
 
     # ---- autenticação ----
-    def _authorized(self):
+    def _api_of(self, path):
+        """A família da API pela rota, que decide o FORMATO DO ERRO: Anthropic em /v1/messages*, OpenAI no resto. O /v1/models também
+        responde no formato da Anthropic quando o cliente se anuncia como um (cabeçalho `anthropic-version`)."""
+        if path.startswith("/v1/messages"):
+            return API_MESSAGES
+        if path == "/v1/models" and self.headers.get("anthropic-version"):
+            return API_MESSAGES
+        return API_CHAT
+
+    def _given_keys(self):
+        """A chave vale como `Authorization: Bearer <chave>` (Codex, Claude Desktop, Claude Code com ANTHROPIC_AUTH_TOKEN) ou como
+        `x-api-key: <chave>` (Claude Code com ANTHROPIC_API_KEY, SDK da Anthropic). Qualquer um dos dois que bata vale."""
         header = self.headers.get("Authorization", "")
-        given = header[7:].strip() if header.lower().startswith("bearer ") else (self.headers.get("x-api-key") or "").strip()
-        ok = bool(given) and hmac.compare_digest(given.encode("utf-8"), self.state.key.encode("utf-8"))
+        given = [header[7:].strip()] if header.lower().startswith("bearer ") else []
+        given.append((self.headers.get("x-api-key") or "").strip())
+        return [item for item in given if item]
+
+    def _authorized(self, api=API_CHAT):
+        secret = self.state.key.encode("utf-8")
+        ok = False
+        for given in self._given_keys():
+            ok = hmac.compare_digest(given.encode("utf-8"), secret) or ok   # tempo constante; sem atalho entre os dois cabeçalhos
         if not ok:
             now = time.time()
             with self.state.lock:
@@ -1764,7 +2106,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 recent = sum(1 for stamp in self.state.auth_failures if now - stamp < 60)
             if recent > 20:  # alguém está tentando adivinhar a chave: devagar
                 time.sleep(1.5)
-            self._send_json(401, error_body("Chave de API ausente ou inválida.", "invalid_request_error", "invalid_api_key"),
+            self._send_json(401, api_error_body(api, "Chave de API ausente ou inválida.", 401, "invalid_request_error", "invalid_api_key"),
                             {"WWW-Authenticate": "Bearer"})
         return ok
 
@@ -1779,36 +2121,40 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._route()
 
     def _route(self):
-        path = urllib.parse.urlsplit(self.path).path.rstrip("/") or "/"
+        path = urllib.parse.urlsplit(self.path).path.rstrip("/") or "/"   # a query (`?beta=true` do Claude Code) não conta
+        api = self._api_of(path)
         try:
             if path in ("/", "/healthz"):
                 self._send_json(200, {"status": "ok", "service": "openclod-colab", "notebook": NOTEBOOK_VERSION})
                 return
             if path not in PUBLIC_ROUTES:
-                self._send_json(404, error_body("Rota inexistente.", "invalid_request_error", "not_found"))
+                self._send_json(404, api_error_body(api, "Rota inexistente.", 404, "invalid_request_error", "not_found"))
                 return
-            if not self._authorized():
+            if not self._authorized(api):
                 return
             if path == "/v1/models" and self.command in ("GET", "HEAD"):
                 alive = self._engine_alive()
                 if not alive:
-                    self._send_json(503, error_body("O motor (Ollama) não está respondendo no Colab.", "server_error", 503))
+                    self._send_json(503, api_error_body(api, "O motor (Ollama) não está respondendo no Colab.", 503, "server_error", 503))
                     return
                 self._send_json(200, models_document(self.state, alive))
                 return
             if path == "/openclod/status" and self.command in ("GET", "HEAD"):
                 self._send_json(200, self.state.snapshot())
                 return
-            if path == "/v1/chat/completions" and self.command == "POST":
-                self._chat()
+            if path == "/v1/messages/count_tokens" and self.command == "POST":
+                self._count_tokens_route()
                 return
-            self._send_json(405, error_body("Método não permitido.", "invalid_request_error", "method_not_allowed"))
+            if path in POST_APIS and self.command == "POST":
+                self._proxy(POST_APIS[path])
+                return
+            self._send_json(405, api_error_body(api, "Método não permitido.", 405, "invalid_request_error", "method_not_allowed"))
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             self.close_connection = True
         except Exception as exc:  # noqa: BLE001
             self.state.note("erro interno: %s" % type(exc).__name__)
             try:
-                self._send_json(500, error_body("Erro interno do servidor do notebook.", "server_error", 500))
+                self._send_json(500, api_error_body(api, "Erro interno do servidor do notebook.", 500, "server_error", 500))
             except Exception:
                 pass
 
@@ -1843,33 +2189,52 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return None
         return self.rfile.read(length) if length else b""
 
-    # ---- chat ----
-    def _chat(self):
-        state = self.state
-        raw = self._read_body()
+    # ---- pedidos que vão ao motor ----
+    def _read_json(self, api):
+        """O corpo como objeto JSON. Em erro (grande demais, inválido) já responde, no formato da API da rota, e devolve None."""
+        try:
+            raw = self._read_body()
+        except ValueError:   # tamanho de bloco inválido no corpo "chunked"
+            raw = b"{"
         if raw is None:
-            self._send_json(413, error_body("Pedido grande demais (limite de %d MB)." % (MAX_BODY_BYTES // 1048576), "invalid_request_error", 413))
-            return
+            self._send_json(413, api_error_body(api, "Pedido grande demais (limite de %d MB)." % (MAX_BODY_BYTES // 1048576),
+                                                413, "invalid_request_error", 413))
+            return None
         try:
             body = json.loads(raw.decode("utf-8"))
             if not isinstance(body, dict):
                 raise ValueError("o corpo não é um objeto")
         except Exception:
-            self._send_json(400, error_body("O corpo precisa ser um JSON válido.", "invalid_request_error", 400))
+            self._send_json(400, api_error_body(api, "O corpo precisa ser um JSON válido.", 400, "invalid_request_error", 400))
+            return None
+        return body
+
+    def _count_tokens_route(self):
+        """POST /v1/messages/count_tokens. O Ollama responde 404 a esta rota, então a resposta é local e é uma ESTIMATIVA (ver
+        estimate_input_tokens). Não passa pelo motor e não conta como pedido de geração."""
+        body = self._read_json(API_MESSAGES)
+        if body is None:
+            return
+        if not any(key in body for key in ("messages", "system", "tools")):
+            self._send_json(400, anthropic_error_body("messages: campo obrigatório.", 400))
+            return
+        self._send_json(200, {"input_tokens": estimate_input_tokens(body)})
+
+    def _proxy(self, api):
+        """Os três POST que vão ao motor (chat/completions, messages, responses): mesmo caminho, mesma regra de stream, de comentário
+        de espera e de cancelamento; muda só o que `adapt_request` altera e o formato dos erros."""
+        state = self.state
+        body = self._read_json(api)
+        if body is None:
             return
         wants_stream = bool(body.get("stream"))
-        # Só existe um modelo carregado: qualquer nome pedido vai para ele (subagentes com "modelo herdado", por exemplo).
-        body["model"] = state.model
-        if state.thinking_capable and state.thinking_default == "off" and "reasoning_effort" not in body and "think" not in body:
-            body["reasoning_effort"] = "none"
-        if wants_stream:
+        adapt_request(api, body, state)   # só existe um modelo carregado: qualquer nome pedido vai para ele; pensamento padrão
+        if api == API_CHAT and wants_stream:
             options = body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}
             options.setdefault("include_usage", True)
             body["stream_options"] = options
         payload = _json_bytes(body)
-        pictures = sum(
-            1 for message in body.get("messages") or [] if isinstance(message, dict) and isinstance(message.get("content"), list)
-            for part in message["content"] if isinstance(part, dict) and part.get("type") == "image_url")
+        pictures = count_images(api, body)
         with state.lock:
             state.requests += 1
             state.images += pictures
@@ -1878,17 +2243,34 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         started = time.time()
         label = "?"
         try:
-            label = self._forward(payload, wants_stream)
+            label = self._forward(api, payload, wants_stream)
         finally:
             with state.lock:
                 state.active -= 1
                 if label not in ("200", "cancelado"):
                     state.errors += 1
-            state.note("%s %s em %.1fs" % ("stream" if wants_stream else "chat", label, time.time() - started))
+            state.note("%s%s %s em %.1fs" % (api, " stream" if wants_stream else "", label, time.time() - started))
 
-    def _forward(self, payload, wants_stream):
+    def _sse_error(self, api, message, status, tail=b""):
+        """O erro como evento SSE, no formato da API da rota, para quando o fluxo já foi aberto e o status HTTP não pode mais mudar:
+          chat       data: {"error": ...} e data: [DONE]
+          messages   event: error  + {"type": "error", "error": {"type", "message"}}   (evento `error` da Anthropic)
+          responses  event: response.failed + {"type": "response.failed", "response": {"status": "failed", "error": {...}}}
+        `tail` são os últimos bytes que o motor mandou: se terminaram no meio de um evento, uma linha em branco o fecha antes do nosso."""
+        prefix = b"" if (not tail or tail.endswith(b"\n\n")) else b"\n\n"
+        if api == API_MESSAGES:
+            return prefix + b"event: error\ndata: " + _json_bytes(anthropic_error_body(message, status)) + b"\n\n"
+        if api == API_RESPONSES:
+            numbers = re.findall(rb'"sequence_number"\s*:\s*(\d+)', tail)
+            event = {"type": "response.failed", "sequence_number": (int(numbers[-1]) + 1) if numbers else 0, "response": {
+                "id": "resp_" + secrets.token_hex(8), "object": "response", "created_at": int(time.time()), "status": "failed",
+                "model": self.state.model, "output": [], "error": {"code": "server_error", "message": message}}}
+            return prefix + b"event: response.failed\ndata: " + _json_bytes(event) + b"\n\n"
+        return prefix + b"data: " + _json_bytes(error_body(message, "upstream_error", status)) + b"\n\ndata: [DONE]\n\n"
+
+    def _forward(self, api, payload, wants_stream):
         state = self.state
-        upstream = _Upstream(state.engine_url, "/v1/chat/completions", payload,
+        upstream = _Upstream(state.engine_url, UPSTREAM_PATHS[api], payload,
                              "text/event-stream" if wants_stream else "application/json").start()
         begun = False
         tail = b""
@@ -1904,7 +2286,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         self._start_sse()  # o motor ainda processa o prompt: abre o fluxo para o túnel não cortar a conexão
                         begun = True
                     if begun:
-                        self._chunk(b": aguardando o modelo\n\n")
+                        self._chunk(b": aguardando o modelo\n\n")   # comentário SSE: os clientes das três APIs o ignoram
                     continue
                 kind = item[0]
                 if kind == "headers":
@@ -1922,21 +2304,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     finished = True
                     if up_status == 200 and wants_stream:
                         self._end_chunks()
-                        self._count_tokens(tail)
+                        self._note_usage(api, tail)
                         return "200"
                     data = b"".join(pieces)
-                    if begun:  # o fluxo já estava aberto e o motor respondeu erro: o erro vai como evento SSE
+                    if begun:  # o fluxo já estava aberto e o motor respondeu erro: o erro vai como evento SSE da API
                         message = self._engine_message(data, up_status)
-                        self._chunk(b"data: " + _json_bytes(error_body(message, "upstream_error", up_status)) + b"\n\ndata: [DONE]\n\n")
+                        self._chunk(self._sse_error(api, message, up_status))
                         self._end_chunks()
                         self._record_error(message)
                         return str(up_status)
                     if up_status == 200:
-                        self._count_tokens(data[-6144:])
+                        self._note_usage(api, data[-6144:])
                         self._send_raw(200, data, "application/json; charset=utf-8")
                         return "200"
                     self._record_error(self._engine_message(data, up_status))
-                    self._send_raw(up_status or 502, data or _json_bytes(error_body("Erro do motor.", "upstream_error", up_status)),
+                    self._send_raw(up_status or 502,
+                                   data or _json_bytes(api_error_body(api, "Erro do motor.", up_status or 502, "upstream_error", up_status)),
                                    "application/json; charset=utf-8")
                     return str(up_status)
                 elif kind == "error":
@@ -1944,10 +2327,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     message = "O motor (Ollama) não respondeu: %s" % type(item[1]).__name__
                     self._record_error(message)
                     if begun:
-                        self._chunk(b"data: " + _json_bytes(error_body(message, "upstream_error", 502)) + b"\n\ndata: [DONE]\n\n")
+                        self._chunk(self._sse_error(api, message, 502, tail))
                         self._end_chunks()
                     else:
-                        self._send_json(502, error_body(message, "upstream_error", 502))
+                        self._send_json(502, api_error_body(api, message, 502, "upstream_error", 502))
                     return "502"
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
             return "cancelado"  # o cliente fechou (o usuário parou a resposta): o motor para de gerar
@@ -1971,10 +2354,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         with self.state.lock:
             self.state.last_error = message[:300]
 
-    def _count_tokens(self, tail):
+    def _note_usage(self, api, tail):
+        """Soma os tokens do `usage` da resposta (só os números; o texto nunca é guardado). chat: prompt_tokens/completion_tokens;
+        messages e responses: input_tokens/output_tokens. No fluxo da Anthropic o `message_delta` final traz os totais: vale o último."""
         text = tail.decode("utf-8", errors="replace")
-        prompt = re.findall(r'"prompt_tokens"\s*:\s*(\d+)', text)
-        completion = re.findall(r'"completion_tokens"\s*:\s*(\d+)', text)
+        names = ("prompt_tokens", "completion_tokens") if api == API_CHAT else ("input_tokens", "output_tokens")
+        prompt = re.findall(r'"%s"\s*:\s*(\d+)' % names[0], text)
+        completion = re.findall(r'"%s"\s*:\s*(\d+)' % names[1], text)
         with self.state.lock:
             if prompt:
                 self.state.prompt_tokens += int(prompt[-1])
@@ -2054,6 +2440,95 @@ def _post_stream(url, key, body, timeout=240.0):
     except Exception as exc:  # noqa: BLE001
         return 0, frames, first, time.time() - started, "%s: %s" % (type(exc).__name__, exc)
     return status, frames, first, time.time() - started, ""
+
+
+def _post_events(url, headers, body, timeout=240.0):
+    """POST com stream SSE que entende `event:` (Anthropic e Responses): devolve (status, eventos, tempo_do_primeiro_pedaço,
+    tempo_total, erro), com eventos = [(nome, json_ou_None)]. Linhas de comentário (`: aguardando o modelo`) são ignoradas."""
+    merged = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
+    merged.update(headers)
+    request = urllib.request.Request(url, data=_json_bytes(body), method="POST", headers=merged)
+    started = time.time()
+    first = None
+    events = []
+
+    def take(raw):
+        name, data = "", []
+        for line in raw.splitlines():
+            if line.startswith("event:"):
+                name = line[6:].strip()
+            elif line.startswith("data:"):
+                data.append(line[5:].strip())
+        if not name and not data:
+            return
+        try:
+            parsed = json.loads("\n".join(data)) if data else None
+        except ValueError:
+            parsed = None
+        if not name and isinstance(parsed, dict):
+            name = str(parsed.get("type") or "")   # sem `event:`, o nome é o `type` do dado
+        events.append((name, parsed))
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = response.status
+            buffer = ""
+            while True:
+                block = response.read1(8192) if hasattr(response, "read1") else response.read(8192)
+                if not block:
+                    break
+                if first is None:
+                    first = time.time() - started
+                buffer += block.decode("utf-8", errors="replace").replace("\r\n", "\n")
+                while "\n\n" in buffer:
+                    raw, buffer = buffer.split("\n\n", 1)
+                    take(raw)
+            if buffer.strip():
+                take(buffer)
+    except urllib.error.HTTPError as err:
+        return err.code, [], None, time.time() - started, err.read().decode("utf-8", errors="replace")[:300]
+    except Exception as exc:  # noqa: BLE001
+        return 0, events, first, time.time() - started, "%s: %s" % (type(exc).__name__, exc)
+    return status, events, first, time.time() - started, ""
+
+
+def _anthropic_text(document):
+    """O texto dos blocos `text` de uma resposta do /v1/messages."""
+    return "".join(block.get("text", "") for block in (document or {}).get("content") or [] if isinstance(block, dict) and block.get("type") == "text")
+
+
+def _anthropic_tool_calls(events):
+    """As chamadas de ferramenta de um fluxo do /v1/messages: [{name, args}] (o `input` vem em pedaços `input_json_delta`)."""
+    calls = {}
+    for name, data in events:
+        if not isinstance(data, dict):
+            continue
+        if name == "content_block_start" and isinstance(data.get("content_block"), dict) and data["content_block"].get("type") == "tool_use":
+            block = data["content_block"]
+            calls[data.get("index", 0)] = {"name": block.get("name", ""), "args": "", "input": block.get("input") or {}}
+        elif name == "content_block_delta" and isinstance(data.get("delta"), dict) and data["delta"].get("type") == "input_json_delta":
+            slot = calls.get(data.get("index", 0))
+            if slot is not None:
+                slot["args"] += data["delta"].get("partial_json") or ""
+    out = []
+    for index in sorted(calls):
+        slot = calls[index]
+        try:
+            args = json.loads(slot["args"]) if slot["args"] else slot["input"]
+        except ValueError:
+            args = None
+        out.append({"name": slot["name"], "args": args, "raw": slot["args"]})
+    return out
+
+
+def _responses_text(document):
+    """O texto das partes `output_text` de uma resposta do /v1/responses."""
+    parts = []
+    for item in (document or {}).get("output") or []:
+        for part in (item.get("content") or []) if isinstance(item, dict) else []:
+            if isinstance(part, dict) and part.get("type") == "output_text":
+                parts.append(part.get("text") or "")
+    return "".join(parts)
 
 
 def _content_of(frames):
@@ -2161,7 +2636,114 @@ def selftest(base_url, key, model, vision=True, tools=True, log=say, think_off=F
                 shown = "argumentos inválidos: %r" % first_call["args"][:60]
         record("Chamada de ferramenta (stream)", code == 200 and good, shown, started)
 
+    _selftest_anthropic(base, key, model, tools, record, think_off)
+    _selftest_responses(base, key, model, record, think_off)
     return {"ok": all(item["ok"] for item in results), "results": results}
+
+
+def _selftest_anthropic(base, key, model, tools, record, think_off):
+    """O que o Claude Code e o Claude Desktop usam: a chave como x-api-key, o erro no formato da Anthropic, /v1/messages (sem stream,
+    com stream e, se o modelo tem ferramentas, uma chamada de ferramenta) e a contagem de tokens."""
+    by_header = {"x-api-key": key, "anthropic-version": "2023-06-01"}   # Claude Code com ANTHROPIC_API_KEY
+    by_bearer = {"Authorization": "Bearer " + key, "anthropic-version": "2023-06-01"}   # Claude Desktop / ANTHROPIC_AUTH_TOKEN
+    extra = {"thinking": {"type": "disabled"}} if think_off else {}
+
+    started = time.time()
+    status, text = http_json("GET", base + "/models", timeout=60, extra_headers=by_header)
+    listed = status == 200 and model in text and '"has_more"' in text
+    record("Anthropic: chave por x-api-key", listed, ("modelo %s listado" % model) if listed else "HTTP %s" % status, started)
+
+    started = time.time()
+    status, text = http_json("POST", base + "/messages", timeout=60, extra_headers={"x-api-key": "chave-errada", "anthropic-version": "2023-06-01"},
+                             body={"model": model, "max_tokens": 8, "messages": [{"role": "user", "content": "oi"}]})
+    shape = ""
+    try:
+        document = json.loads(text)
+        shape = "%s/%s" % (document.get("type"), (document.get("error") or {}).get("type"))
+    except ValueError:
+        pass
+    record("Anthropic: erro no formato da Anthropic", status == 401 and shape == "error/authentication_error", "HTTP %s %s" % (status, shape), started)
+
+    started = time.time()
+    status, text = http_json("POST", base + "/messages", timeout=300, extra_headers=by_bearer, body={
+        "model": model, "max_tokens": 400, "temperature": 0, **extra,
+        "messages": [{"role": "user", "content": "Responda apenas com a palavra: pong"}]})
+    answer = ""
+    try:
+        answer = _anthropic_text(json.loads(text))
+    except ValueError:
+        pass
+    record("Anthropic: /v1/messages", status == 200 and bool(answer.strip()),
+           ("respondeu %r" % answer.strip()[:40]) if status == 200 else "HTTP %s %s" % (status, text[:120]), started)
+
+    started = time.time()
+    code, events, first, total, err = _post_events(base + "/messages", by_header, {
+        "model": model, "stream": True, "max_tokens": 400, "temperature": 0, **extra,
+        "messages": [{"role": "user", "content": "Conte de 1 a 12 separando por vírgulas."}]})
+    names = [name for name, _data in events]
+    deltas = names.count("content_block_delta")
+    ok = code == 200 and "message_start" in names and deltas >= 3 and "message_stop" in names and "error" not in names
+    record("Anthropic: /v1/messages em stream (SSE)", ok,
+           ("%d pedaços, o 1º em %.1f s, total %.1f s" % (deltas, first or 0, total)) if ok else (err or "HTTP %s, eventos: %s" % (code, ",".join(sorted(set(names)))[:120])),
+           started)
+
+    if tools:
+        started = time.time()
+        code, events, first, total, err = _post_events(base + "/messages", by_header, {
+            "model": model, "stream": True, "max_tokens": 1000, "temperature": 0, **extra, "tool_choice": {"type": "auto"},
+            "tools": [{"name": "somar_numeros", "description": "Soma dois números e devolve o resultado.",
+                       "input_schema": {"type": "object", "properties": {"a": {"type": "number"}, "b": {"type": "number"}}, "required": ["a", "b"]}}],
+            "messages": [{"role": "user", "content": "Use a ferramenta somar_numeros para calcular 17 + 25. Chame a ferramenta; não responda com texto."}]})
+        calls = _anthropic_tool_calls(events)
+        good = False
+        shown = err or "sem chamada de ferramenta (HTTP %s)" % code
+        if calls:
+            args = calls[0]["args"]
+            try:
+                good = calls[0]["name"] == "somar_numeros" and float(args.get("a")) == 17 and float(args.get("b")) == 25
+                shown = "%s(%s)" % (calls[0]["name"], calls[0]["raw"][:60] or json.dumps(args)[:60])
+            except Exception:
+                shown = "argumentos inválidos: %r" % (calls[0]["raw"][:60],)
+        record("Anthropic: chamada de ferramenta (stream)", code == 200 and good, shown, started)
+
+    started = time.time()
+    status, text = http_json("POST", base + "/messages/count_tokens", timeout=60, extra_headers=by_header, body={
+        "model": model, "messages": [{"role": "user", "content": "Conte os tokens desta frase de teste."}]})
+    count = 0
+    try:
+        count = json.loads(text).get("input_tokens")
+    except (ValueError, AttributeError):
+        pass
+    record("Anthropic: contagem de tokens (estimativa)", status == 200 and isinstance(count, int) and count > 0,
+           ("%s tokens" % count) if status == 200 else "HTTP %s %s" % (status, text[:120]), started)
+
+
+def _selftest_responses(base, key, model, record, think_off):
+    """O que o Codex usa: /v1/responses sem stream e com stream."""
+    extra = {"reasoning": {"effort": "none"}} if think_off else {}
+
+    started = time.time()
+    status, text = http_json("POST", base + "/responses", key=key, timeout=300, body={
+        "model": model, "max_output_tokens": 400, "temperature": 0, **extra, "input": "Responda apenas com a palavra: pong"})
+    answer = ""
+    try:
+        answer = _responses_text(json.loads(text))
+    except ValueError:
+        pass
+    record("Responses: /v1/responses", status == 200 and bool(answer.strip()),
+           ("respondeu %r" % answer.strip()[:40]) if status == 200 else "HTTP %s %s" % (status, text[:120]), started)
+
+    started = time.time()
+    code, events, first, total, err = _post_events(base + "/responses", {"Authorization": "Bearer " + key}, {
+        "model": model, "stream": True, "max_output_tokens": 400, "temperature": 0, **extra,
+        "input": [{"role": "user", "content": [{"type": "input_text", "text": "Conte de 1 a 12 separando por vírgulas."}]}]})
+    names = [name for name, _data in events]
+    deltas = names.count("response.output_text.delta")
+    ok = code == 200 and "response.created" in names and deltas >= 3 and "response.completed" in names and \
+        "response.failed" not in names and "error" not in names
+    record("Responses: /v1/responses em stream (SSE)", ok,
+           ("%d pedaços, o 1º em %.1f s, total %.1f s" % (deltas, first or 0, total)) if ok else (err or "HTTP %s, eventos: %s" % (code, ",".join(sorted(set(names)))[:120])),
+           started)
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -2179,6 +2761,7 @@ def render_panel(snapshot, public_url, gpu, extra=""):
         "Contexto ... %s tokens" % format(int(snapshot.get("ctx") or 0), ",").replace(",", "."),
         "Visão ...... %s     Ferramentas ... %s" % ("sim" if snapshot.get("vision") else "não", "sim" if snapshot.get("tools") else "não"),
         "Endereço ... %s" % public_url,
+        "Rotas ...... /v1/messages (Claude Code, Claude Desktop) · /v1/responses (Codex) · /v1/chat/completions",
         "",
         "No ar há ... %s" % human_duration(snapshot.get("uptime", 0)),
         "Pedidos .... %d (em andamento: %d, com erro: %d)" % (snapshot.get("requests", 0), snapshot.get("active", 0), snapshot.get("errors", 0)),
@@ -2192,7 +2775,7 @@ def render_panel(snapshot, public_url, gpu, extra=""):
 
 
 def connection_block(code):
-    return ("CÓDIGO DE CONEXÃO: copie a linha inteira e cole no Openclod, em Configurações > Provedores > Google Colab.\n"
+    return ("CÓDIGO DE CONEXÃO: copie a linha inteira e cole no Openclod, na tela do Google Colab.\n"
             "Ele contém a chave de acesso e vale só enquanto esta execução durar: trate como uma senha e não compartilhe.\n\n" + code)
 
 
@@ -2550,14 +3133,14 @@ def step_model():
             continue
         if not caps["tools"]:
             if candidate.get("explicit") or candidate.get("no_tools_ok"):
-                say("   [!] o modelo '%s' não declara chamada de ferramentas: o Openclod não poderá usá-lo como agente (só para "
+                say("   [!] o modelo '%s' não declara chamada de ferramentas: o Openclod, o Claude Code e o Codex não poderão usá-lo como agente (só para "
                     "conversar). Seguindo, porque foi você quem o escolheu." % tag)
             else:
-                say("   [!] o modelo '%s' não declara chamada de ferramentas e o Openclod depende delas como agente; tentando a "
+                say("   [!] o modelo '%s' não declara chamada de ferramentas e os agentes (Claude Code, Codex) dependem delas; tentando a "
                     "próxima opção." % tag)
                 continue
         if not caps["vision"]:
-            say("   [!] o modelo '%s' não declara visão: o Openclod vai usar o relé de visão (outro modelo descreve as imagens)." % tag)
+            say("   [!] o modelo '%s' não declara visão: ele não vai entender imagens (só texto)." % tag)
         SESSION.chosen = dict(candidate)
         SESSION.chosen["ctx"] = int(ctx or candidate["ctx"])
         SESSION.caps = caps
@@ -2885,7 +3468,7 @@ def _cli(argv):
             return 2
     if args.cmd == "version":
         print(json.dumps({"notebook": NOTEBOOK_VERSION, "hash": module_hash(), "code_prefix": CODE_PREFIX, "ollama": OLLAMA_VERSION,
-                          "cloudflared": CLOUDFLARED_VERSION}))
+                          "cloudflared": CLOUDFLARED_VERSION, "routes": list(API_ROUTES)}))
         return 0
     if args.cmd == "table":
         print(json.dumps(table_rows(), ensure_ascii=False))

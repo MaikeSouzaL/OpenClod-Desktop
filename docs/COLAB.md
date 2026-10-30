@@ -54,7 +54,7 @@ O notebook não tem lógica própria: uma célula grava `openclod_llm_server.py`
 
 Servidor (cada requisição):
 
-- Só quatro rotas saem pelo túnel: `/v1/models`, `/v1/chat/completions`, `/healthz` (público, sem dados) e `/openclod/status` (com chave). Tudo do motor (`/api/pull`, `/api/delete`...) fica inacessível de fora.
+- Só estas rotas saem pelo túnel: `/v1/models`, `/v1/chat/completions` (a que o Openclod usa), `/v1/messages` e `/v1/messages/count_tokens` (Claude Desktop e Claude Code), `/v1/responses` (Codex), `/healthz` (público, sem dados) e `/openclod/status` (com chave). Tudo do motor (`/api/pull`, `/api/delete`...) fica inacessível de fora. As três rotas novas são do notebook 1.3.0 (seção 4.6).
 - Chave `occ_` + 24 bytes aleatórios, comparada em tempo constante; depois de 20 tentativas erradas por minuto, cada resposta de erro demora 1,5 s.
 - `GET /v1/models` devolve, além do formato da OpenAI, a **janela de contexto real**, `input_modalities` (visão) e `supported_parameters` (`tools`), que o harness lê ("Detectar modelos").
 - Com o motor lento (prompt grande), o servidor **abre o SSE e manda comentários `: aguardando o modelo`** a cada 8 s, para o túnel não cortar a conexão; se o motor responder um erro depois disso, o erro vai como evento SSE (o harness já entende `data: {"error": ...}`). Se o usuário apertar "parar", o servidor fecha a conexão com o motor e ele para de gerar.
@@ -198,6 +198,49 @@ Pedido do usuário, depois de rodar o 1.1.0 num Colab real: "Faça no próprio C
 - Todo texto entra na tela por `textContent` (nada de `innerHTML`), os dados vão como JSON, a caixa não usa rede nem armazenamento, e a contagem usa o relógio (`Date.now()`): uma aba em segundo plano roda os timers mais devagar, mas o prazo não estica.
 
 **O que o Colab real provou (T4, 2026-10-27, no Chrome do usuário) e o que não.** O lado Python do Colab é público e foi lido; o do navegador não é, então isto só uma execução real mostra. **Provado:** a caixa **aparece** na saída da célula 2 (depois da lista e de "Conferi no registro do Ollama: 97 etiquetas existem, 0 não."), com o automático marcado, os grupos, a etiqueta e a licença do modelo selecionado e a contagem andando (marcou 1:40 com a célula em execução havia ~24 s); a célula **ficou esperando** (status "Em execução"); o usuário selecionou o n.º 59 (Gemma 4 abliterated E4B, sem censura) e clicou em *Usar este modelo*: a caixa mostrou "Escolhido: 59 · …" com o botão desativado, a célula terminou em 1 min e o notebook seguiu para a célula 3. Ou seja, o `eval_js` do Colab **espera a Promise** da caixa e a resposta **chega ao Python**. Também provado: `segundos_para_escolher` aparece como campo numérico no formulário do Colab e o `private_outputs` vale (o Colab avisou "este notebook está aberto com saídas particulares: elas não serão salvas"). **Não provado:** o desfecho do **tempo esgotado** (o usuário clicou antes dos 2 minutos), "Executar tudo" sem ninguém clicar, e as etapas 4 a 7 com um modelo escolhido na caixa (o usuário assumiu as células a partir da 3). Também não li o texto que o Python imprimiu depois do clique: a saída da célula estava recolhida.
+
+### 4.6 Notebook 1.3.0: o mesmo servidor do bridge-ccp (2026-10-29)
+
+Pedido do usuário: "adicione esse código do Colab lá no nosso harness Openclod também". O servidor do notebook
+(`resources/colab/openclod_llm_server.py`) agora é o mesmo do bridge-ccp
+(`Vision/vision/invision_app/colab/vision_llm_server.py`). Ficaram os nomes do Openclod:
+
+- a pasta `/content/openclod` e a variável `OPENCLOD_COLAB_DIR`;
+- `OPENCLOD_COLAB_OFFLINE`;
+- o user-agent `openclod-colab/1.3.0`;
+- `window.openclodEscolher` e `data-openclod` na caixa.
+
+O que muda para quem roda o notebook:
+
+- **Rotas do Claude e do Codex.** Entraram `/v1/messages` (Anthropic, com SSE e ferramentas), `/v1/messages/count_tokens`
+  (estimativa local, porque o Ollama não tem essa rota) e `/v1/responses` (OpenAI Responses). O Ollama 0.40 já fala as três;
+  o servidor só expõe, autentica (Bearer ou `x-api-key`) e troca o `model`. O `/v1/chat/completions` do Openclod não muda,
+  e o autoteste da etapa 5 passa pelas três rotas antes de mostrar o código.
+- **Modelo sem ferramentas.** O Ollama recusa o pedido inteiro quando um modelo sem suporte a ferramentas recebe `tools`. O
+  servidor tira `tools`, `tool_choice` e `parallel_tool_calls` nesse caso, e a conversa continua (sem agir como agente).
+- **A lista da etapa 2.** Primeiro vêm os **modelos originais**, depois os **sem censura**. Em cada parte há um bloco por
+  combinação de capacidades: visão + ferramentas + pensamento, visão + ferramentas, ferramentas + pensamento, ferramentas,
+  ..., só conversa. Cada linha tem a marca `[V F P]` (hífen = não tem). Código, raciocínio, áudio e MoE vão como
+  observação na linha.
+- **A caixa de escolha** virou uma tabela grande, com colunas (nº, modelo, quantização, tamanho, contexto, V, F, P,
+  observações) e um título por parte e por bloco. Ela tem filtros: "com visão", "com ferramentas", "com pensamento" e
+  "originais / sem censura", com o total "X de Y modelos". Um modelo escondido pelo filtro volta para o automático. O
+  botão "Usar este modelo", os 2 minutos e o "cancelar" do Python continuam como na 4.5.
+- `COLAB_NOTEBOOK_VERSION` = `NOTEBOOK_VERSION` = **1.3.0**. Códigos de notebooks 1.x antigos continuam aceitos
+  (`COLAB_MIN_NOTEBOOK_VERSION` = 1.0.0), e o hash do servidor no notebook é recalculado sozinho.
+
+**Testes.**
+
+- **Python** (`tests/colab/test_openclod_llm_server.py`, 110 testes): o motor falso agora atende as três rotas, e há
+  testes novos das rotas do Claude e do Codex, da contagem local e da retirada das ferramentas.
+- **TypeScript** (`tests/colab-*.test.ts`, 154 testes):
+  - a lista nova na etapa 2;
+  - a caixa nova num Chrome de verdade: escolher pela linha, os avisos, a resposta, o tempo esgotado, o "cancelar", o
+    texto hostil que não vira marcação e um teste novo dos filtros.
+- `npm run typecheck` passou.
+
+Ainda não foi rodado num Colab real com o 1.3.0 do Openclod. No bridge-ccp, o mesmo servidor já foi provado com o Codex e
+o Claude Code reais.
 
 ## 5. Limites e termos do Colab
 

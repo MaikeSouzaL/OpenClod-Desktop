@@ -22,6 +22,8 @@ interface ChoiceItem {
   texto: string
   detalhe: string
   av: string[]
+  nome: string
+  c: { v?: boolean; f?: boolean; p?: boolean; u?: boolean }
 }
 interface ChoiceData {
   segundos: number
@@ -49,6 +51,7 @@ function loadBox(seconds = 120, hostile = false): Box {
     '    evil = \'<img src=x onerror="window.__pwned = 1"><b id=intruso>x</b>\'',
     '    first = data["grupos"][0]["itens"][0]',
     '    first["texto"] += " " + evil',
+    '    first["nome"] += " " + evil',
     '    first["detalhe"] += " " + evil',
     '    data["automatico"]["texto"] += " " + evil',
     '    data["automatico"]["detalhe"] += " " + evil',
@@ -104,7 +107,31 @@ async function value<T>(page: Page, expression: string): Promise<T> {
 }
 
 const part = (name: string): string => `[data-parte=${name}]`
-const BOTH_OFF = "document.querySelector('select').disabled && document.querySelector('button').disabled"
+const RADIO = 'input[name=openclod-modelo]'
+const BOTH_OFF = `[...document.querySelectorAll('${RADIO}')].every((r) => r.disabled) && document.querySelector('button').disabled`
+const SELECTED = `(document.querySelector('${RADIO}:checked') || {}).value`
+
+/** Picks a model the way the user does: a click on its row of the table (0 = the automatic). */
+async function choose(page: Page, n: number | string): Promise<void> {
+  await page.click(`tr[data-valor="${n}"]`)
+}
+
+/** The section and block titles the table shows for these groups, in order (as the box draws them). */
+function titles(groups: ChoiceData['grupos']): string[] {
+  const out: string[] = []
+  let last = ''
+  for (const group of groups) {
+    const [section, ...rest] = group.titulo.split(' · ')
+    if (section !== last) {
+      last = section
+      out.push(section === 'Sem censura'
+        ? 'Sem censura (uncensored / abliterated): menos recusas; a qualidade e o uso de ferramentas variam, e o uso é por sua conta'
+        : 'Modelos originais')
+    }
+    out.push(`${rest.join(' · ')} (${group.itens.length})`)
+  }
+  return out
+}
 
 describe('the script itself', () => {
   it.skipIf(!python)('is one definition and one call that both compile, and the definition does not use anything risky', () => {
@@ -123,16 +150,16 @@ describe('the box in a real browser', () => {
     const box = loadBox()
     const { page } = await openBox(box)
     try {
-      const view = await value<{ size: number; selected: string; first: string; groups: string[]; options: number; button: string; countdown: string; heights: number; overflow: number }>(
+      const view = await value<{ selected: string; first: string; groups: string[]; rows: number; total: string; button: string; countdown: string; heights: number; overflow: number }>(
         page,
         `(() => {
-          const select = document.querySelector('select')
+          const rows = [...document.querySelectorAll('tr[data-valor]')]
           return {
-            size: select.size,
-            selected: select.value,
-            first: select.options[0].textContent,
-            groups: [...select.querySelectorAll('optgroup')].map((g) => g.label),
-            options: select.options.length,
+            selected: ${SELECTED},
+            first: rows[0].textContent,
+            groups: [...document.querySelectorAll('${part('lista')} tbody tr:not([data-valor]) td')].map((td) => td.textContent),
+            rows: rows.length,
+            total: document.querySelector('${part('total')}').textContent,
             button: document.querySelector('button').textContent,
             countdown: document.querySelector('${part('contagem')}').textContent,
             heights: (window.__alturas || []).length,
@@ -144,10 +171,11 @@ describe('the box in a real browser', () => {
       expect(view.selected).toBe('0')
       expect(view.first).toBe(box.data.automatico.texto)
       expect(view.first).toMatch(/^Automático \(recomendado\): Qwen3\.5 9B · Q8_0 · ctx 64k/)
-      expect(view.options).toBe(items.length + 1)
-      expect(view.groups).toEqual(box.data.grupos.map((group) => `${group.titulo} (${group.itens.length})`))
-      expect(view.size).toBeGreaterThan(1)
-      expect(view.size).toBeLessThanOrEqual(12)
+      expect(view.rows).toBe(items.length + 1)
+      expect(view.total).toBe(`${items.length} modelos`)
+      expect(view.groups).toEqual(titles(box.data.grupos))
+      expect(view.groups[0]).toBe('Modelos originais')
+      expect(view.groups.some((title) => title.startsWith('Sem censura'))).toBe(true)
       expect(view.button).toBe('Usar este modelo')
       expect(view.countdown).toMatch(/^Sem escolha, segue com o automático em (2:00|1:59|1:58)$/)
       expect(view.heights).toBeGreaterThan(0)
@@ -168,16 +196,17 @@ describe('the box in a real browser', () => {
       const plain = items.find((item) => item.av.length === 0)!
       const warnings = async (): Promise<string[]> => value<string[]>(page, `[...document.querySelectorAll('${part('avisos')} > div')].map((d) => d.textContent)`)
       const detail = async (): Promise<string> => (await page.locator(part('detalhe')).textContent()) ?? ''
-      await page.selectOption('select', String(uncensored.n))
+      await choose(page, uncensored.n)
+      expect(await value<string>(page, SELECTED)).toBe(String(uncensored.n))
       expect(await warnings()).toEqual(uncensored.av.map((key) => box.data.avisos[key]))
       expect(await detail()).toBe(uncensored.detalhe)
       expect((await warnings()).join(' ')).toContain('por sua conta')
-      expect((await warnings()).join(' ')).toContain('só consegue conversar')
+      expect((await warnings()).join(' ')).toContain('só conseguem conversar')
       await shot(page, 'escolha-2-aviso-sem-censura')
-      await page.selectOption('select', String(plain.n))
+      await choose(page, plain.n)
       expect(await warnings()).toEqual([])
       expect(await detail()).toBe(plain.detalhe)
-      await page.selectOption('select', '0')
+      await choose(page, 0)
       expect(await warnings()).toEqual([])
       expect(await detail()).toBe(box.data.automatico.detalhe)
     } finally {
@@ -191,7 +220,7 @@ describe('the box in a real browser', () => {
     const { page, reply } = await openBox(box)
     try {
       const item = box.data.grupos.flatMap((group) => group.itens).find((candidate) => candidate.texto.includes('Qwen3.5 4B · Q8_0'))!
-      await page.selectOption('select', String(item.n))
+      await choose(page, item.n)
       await page.click('button')
       expect(JSON.parse(await reply)).toEqual({ quem: 'usuario', numero: item.n })
       expect(await value<boolean>(page, BOTH_OFF)).toBe(true)
@@ -243,7 +272,7 @@ describe('the box in a real browser', () => {
     try {
       await page.clock.fastForward(6_000)
       expect(JSON.parse(await reply).quem).toBe('tempo')
-      await page.evaluate("document.querySelector('select').disabled = false; document.querySelector('button').disabled = false; document.querySelector('button').click()")
+      await page.evaluate(`for (const r of document.querySelectorAll('${RADIO}')) r.disabled = false; document.querySelector('button').disabled = false; document.querySelector('button').click()`)
       expect(await page.locator(part('estado')).textContent()).toBe('Tempo esgotado: o notebook seguiu com o automático.')
     } finally {
       await page.close()
@@ -268,17 +297,18 @@ describe('the box in a real browser', () => {
     const box = loadBox(120, true)
     const { page, reply } = await openBox(box)
     try {
-      await page.selectOption('select', String(box.data.grupos[0].itens[0].n))
-      const view = await value<{ images: number; intruder: boolean; pwned: unknown; option: string; label: string; detail: string; warning: string }>(
+      const first = box.data.grupos[0].itens[0]
+      await choose(page, first.n)
+      const view = await value<{ images: number; intruder: boolean; pwned: unknown; option: string; automatic: string; label: string; detail: string; warning: string }>(
         page,
         `(() => {
-          const select = document.querySelector('select')
           return {
             images: document.querySelectorAll('img').length,
             intruder: !!document.getElementById('intruso'),
             pwned: window.__pwned === undefined ? null : window.__pwned,
-            option: select.options[select.selectedIndex].textContent,
-            label: select.querySelector('optgroup').label,
+            option: document.querySelector('tr[data-valor="${first.n}"]').textContent,
+            automatic: document.querySelector('tr[data-valor="0"]').textContent,
+            label: [...document.querySelectorAll('${part('lista')} tbody tr:not([data-valor]) td')].map((td) => td.textContent).join(' | '),
             detail: document.querySelector('${part('detalhe')}').textContent,
             warning: document.querySelector('${part('avisos')}').textContent
           }
@@ -288,11 +318,43 @@ describe('the box in a real browser', () => {
       expect(view.intruder).toBe(false)
       expect(view.pwned).toBeNull()
       expect(view.option).toContain('<img src=x onerror=')
+      expect(view.automatic).toContain('<img src=x onerror=')
       expect(view.label).toContain('<img src=x onerror=')
       expect(view.detail).toContain('<b id=intruso>x</b>')
       expect(view.warning).toContain('<img src=x onerror=')
       await page.click('button')
       expect(JSON.parse(await reply).quem).toBe('usuario')
+    } finally {
+      await page.close()
+    }
+  })
+
+  it.skipIf(!python)('filters by capability and by original / uncensored, and a model hidden by the filter falls back to the automatic', async (ctx) => {
+    if (!browser) return ctx.skip()
+    const box = loadBox()
+    const { page, reply } = await openBox(box)
+    try {
+      const items = box.data.grupos.flatMap((group) => group.itens)
+      const shown = async (): Promise<number[]> =>
+        value<number[]>(page, `[...document.querySelectorAll('tr[data-valor]')].map((tr) => Number(tr.getAttribute('data-valor'))).filter((n) => n > 0)`)
+      const blind = items.find((item) => !item.c.v)!
+      await choose(page, blind.n)
+      await page.check('[data-filtro=v]')
+      const withVision = await shown()
+      expect(withVision).toEqual(items.filter((item) => item.c.v).map((item) => item.n))
+      expect(await page.locator(part('total')).textContent()).toBe(`${withVision.length} de ${items.length} modelos`)
+      expect(await value<string>(page, SELECTED)).toBe('0')
+      await page.uncheck('[data-filtro=v]')
+      await page.selectOption('[data-filtro=parte]', 'sem-censura')
+      expect(await shown()).toEqual(items.filter((item) => item.c.u).map((item) => item.n))
+      await page.selectOption('[data-filtro=parte]', 'originais')
+      expect(await shown()).toEqual(items.filter((item) => !item.c.u).map((item) => item.n))
+      await page.check('[data-filtro=f]')
+      await page.check('[data-filtro=p]')
+      expect(await shown()).toEqual(items.filter((item) => !item.c.u && item.c.f && item.c.p).map((item) => item.n))
+      await shot(page, 'escolha-6-filtros')
+      await page.click('button')
+      expect(JSON.parse(await reply)).toEqual({ quem: 'usuario', numero: 0 })
     } finally {
       await page.close()
     }

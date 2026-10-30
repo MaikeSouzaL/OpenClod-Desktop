@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto'
 
 export const COLAB_CODE_PREFIX = 'OCLC1'
 /** Version of the notebook this build ships; must equal NOTEBOOK_VERSION in the Python module (a test checks). */
-export const COLAB_NOTEBOOK_VERSION = '1.2.0'
+export const COLAB_NOTEBOOK_VERSION = '1.3.0'
 /** Oldest notebook this build still talks to. */
 export const COLAB_MIN_NOTEBOOK_VERSION = '1.0.0'
 /** Colab ends a session after at most 12 h (24 h on Pro+); a code older than that is almost surely dead. */

@@ -50,16 +50,20 @@ def png_first_pixel(data_url):
 COLOR_NAMES = {(220, 30, 30): "Vermelho", (30, 170, 60): "verde", (30, 60, 220): "azul", (240, 210, 30): "amarelo"}
 
 
+ENGINE_PATHS = ("/v1/chat/completions", "/v1/messages", "/v1/responses")
+
+
 class FakeEngine(object):
-    """Faz o papel do Ollama: /api/version, /api/show e /v1/chat/completions com comportamentos programáveis."""
+    """Faz o papel do Ollama: /api/version, /api/show e as três rotas de geração, com comportamentos programáveis."""
 
     def __init__(self):
         self.header_delay = 0.0          # espera antes de responder (cabeçalhos)
         self.chunk_delay = 0.0           # espera entre os pedaços do stream
-        self.fail_status = 0             # responde esse erro em vez do chat
+        self.fail_status = 0             # responde esse erro em vez da geração
         self.fail_message = "falhou"
-        self.mode = "normal"             # normal | notool | blind (não reconhece imagem) | silent-after-headers
+        self.mode = "normal"             # normal | notool (não chama ferramenta) | blind (não reconhece imagem)
         self.seen = []                   # corpos recebidos (JSON)
+        self.paths = []                  # o caminho de cada corpo de `seen`
         self.closed_early = threading.Event()
         self.thinking = True
         engine = self
@@ -91,24 +95,30 @@ class FakeEngine(object):
                     caps = ["completion", "vision", "tools"] + (["thinking"] if engine.thinking else [])
                     self._json(200, {"capabilities": caps})
                     return
-                if self.path != "/v1/chat/completions":
+                if self.path not in ENGINE_PATHS:
                     self._json(404, {"error": "no"})
                     return
                 engine.seen.append(body)
+                engine.paths.append(self.path)
                 time.sleep(engine.header_delay)
                 if engine.fail_status:
-                    self._json(engine.fail_status, {"error": {"message": engine.fail_message, "type": "invalid_request_error"}})
+                    if self.path == "/v1/messages":   # o Ollama erra no formato da Anthropic nesta rota
+                        self._json(engine.fail_status, {"type": "error", "error": {"type": "invalid_request_error", "message": engine.fail_message}})
+                    else:
+                        self._json(engine.fail_status, {"error": {"message": engine.fail_message, "type": "invalid_request_error"}})
                     return
-                self._answer(body)
+                self._answer(self.path, body)
 
             def _sse(self, frames):
+                """frames: lista de (nome_do_evento_ou_None, dado). Chat usa só `data:`; Anthropic e Responses usam `event:` + `data:`."""
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Transfer-Encoding", "chunked")
                 self.end_headers()
                 try:
-                    for frame in frames:
-                        data = ("data: %s\n\n" % frame).encode()
+                    for name, frame in frames:
+                        text = frame if isinstance(frame, str) else json.dumps(frame)
+                        data = (("event: %s\n" % name if name else "") + "data: %s\n\n" % text).encode()
                         self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
                         self.wfile.flush()
                         time.sleep(engine.chunk_delay)
@@ -116,44 +126,106 @@ class FakeEngine(object):
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     engine.closed_early.set()
 
-            def _answer(self, body):
-                messages = body.get("messages", [])
-                last = messages[-1]["content"] if messages else ""
+            def _answer(self, path, body):
+                last, image = self._last_user(path, body)
                 stream = bool(body.get("stream"))
                 text = "pong"
                 tool_call = None
-                if isinstance(last, list):
-                    image = next((p for p in last if p.get("type") == "image_url"), None)
-                    if image:
-                        text = "não sei" if engine.mode == "blind" else COLOR_NAMES.get(png_first_pixel(image["image_url"]["url"]), "cinza")
-                elif "ferramenta" in str(last) and body.get("tools") and engine.mode != "notool":
+                if image:
+                    text = "não sei" if engine.mode == "blind" else COLOR_NAMES.get(png_first_pixel(image), "cinza")
+                elif "ferramenta" in last and body.get("tools") and engine.mode != "notool":
                     tool_call = ("somar_numeros", '{"a":17,"b":25}')
-                elif "Conte de 1 a 12" in str(last):
+                elif "Conte de 1 a 12" in last:
                     text = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12"
+                words = text.split(" ")
+                pieces = [word + (" " if index < len(words) - 1 else "") for index, word in enumerate(words)]
+                if path == "/v1/chat/completions":
+                    self._chat(body, stream, text, pieces, tool_call)
+                elif path == "/v1/messages":
+                    self._messages(body, stream, text, pieces, tool_call)
+                else:
+                    self._responses(body, stream, text, pieces)
+
+            def _last_user(self, path, body):
+                """(texto da última mensagem do usuário, imagem em data: URL ou None) nas três formas de entrada."""
+                if path == "/v1/responses":
+                    value = body.get("input")
+                    if isinstance(value, list) and value and isinstance(value[-1], dict):
+                        value = value[-1].get("content")
+                else:
+                    messages = body.get("messages") or []
+                    value = messages[-1].get("content") if messages else ""
+                if isinstance(value, list):
+                    image = next((p["image_url"]["url"] for p in value if isinstance(p, dict) and p.get("type") == "image_url"), None)
+                    return " ".join(str(p.get("text", "")) for p in value if isinstance(p, dict)), image
+                return str(value or ""), None
+
+            def _chat(self, body, stream, text, pieces, tool_call):
                 if not stream:
-                    message = {"role": "assistant", "content": text}
-                    self._json(200, {"choices": [{"message": message, "finish_reason": "stop"}], "usage": {"prompt_tokens": 7, "completion_tokens": 3}})
+                    self._json(200, {"choices": [{"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+                                     "usage": {"prompt_tokens": 7, "completion_tokens": 3}})
                     return
                 frames = []
                 if tool_call:
-                    frames.append(json.dumps({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": tool_call[0], "arguments": ""}}]}}]}))
+                    frames.append((None, {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": tool_call[0], "arguments": ""}}]}}]}))
                     for piece in (tool_call[1][:6], tool_call[1][6:]):
-                        frames.append(json.dumps({"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": piece}}]}}]}))
-                    frames.append(json.dumps({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}))
+                        frames.append((None, {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": piece}}]}}]}))
+                    frames.append((None, {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]}))
                 else:
-                    words = text.split(" ")
-                    for index, word in enumerate(words):
-                        frames.append(json.dumps({"choices": [{"delta": {"content": word + (" " if index < len(words) - 1 else "")}}]}))
-                    frames.append(json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}]}))
-                frames.append(json.dumps({"choices": [], "usage": {"prompt_tokens": 21, "completion_tokens": 9}}))
-                frames.append("[DONE]")
+                    frames += [(None, {"choices": [{"delta": {"content": piece}}]}) for piece in pieces]
+                    frames.append((None, {"choices": [{"delta": {}, "finish_reason": "stop"}]}))
+                frames.append((None, {"choices": [], "usage": {"prompt_tokens": 21, "completion_tokens": 9}}))
+                frames.append((None, "[DONE]"))
+                self._sse(frames)
+
+            def _messages(self, body, stream, text, pieces, tool_call):
+                message = {"id": "msg_1", "type": "message", "role": "assistant", "model": body.get("model"), "content": []}
+                if not stream:
+                    if tool_call:
+                        message["content"] = [{"type": "tool_use", "id": "toolu_1", "name": tool_call[0], "input": json.loads(tool_call[1])}]
+                    else:
+                        message["content"] = [{"type": "text", "text": text}]
+                    message.update({"stop_reason": "tool_use" if tool_call else "end_turn", "usage": {"input_tokens": 7, "output_tokens": 3}})
+                    self._json(200, message)
+                    return
+                frames = [("message_start", {"type": "message_start", "message": dict(message, usage={"input_tokens": 5, "output_tokens": 0})})]
+                if tool_call:
+                    frames.append(("content_block_start", {"type": "content_block_start", "index": 0,
+                                                           "content_block": {"type": "tool_use", "id": "toolu_1", "name": tool_call[0], "input": {}}}))
+                    for piece in (tool_call[1][:6], tool_call[1][6:]):
+                        frames.append(("content_block_delta", {"type": "content_block_delta", "index": 0,
+                                                               "delta": {"type": "input_json_delta", "partial_json": piece}}))
+                else:
+                    frames.append(("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}))
+                    for piece in pieces:
+                        frames.append(("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": piece}}))
+                frames.append(("content_block_stop", {"type": "content_block_stop", "index": 0}))
+                frames.append(("message_delta", {"type": "message_delta", "delta": {"stop_reason": "tool_use" if tool_call else "end_turn"},
+                                                 "usage": {"input_tokens": 21, "output_tokens": 9}}))
+                frames.append(("message_stop", {"type": "message_stop"}))
+                self._sse(frames)
+
+            def _responses(self, body, stream, text, pieces):
+                response = {"id": "resp_1", "object": "response", "status": "completed", "model": body.get("model"),
+                            "output": [{"id": "msg_1", "type": "message", "role": "assistant",
+                                        "content": [{"type": "output_text", "text": text, "annotations": []}]}],
+                            "usage": {"input_tokens": 7, "output_tokens": 3, "total_tokens": 10}}
+                if not stream:
+                    self._json(200, response)
+                    return
+                frames = [("response.created", {"type": "response.created", "sequence_number": 0, "response": dict(response, status="in_progress", output=[], usage=None)})]
+                for index, piece in enumerate(pieces):
+                    frames.append(("response.output_text.delta", {"type": "response.output_text.delta", "sequence_number": index + 1, "output_index": 0,
+                                                                  "content_index": 0, "delta": piece}))
+                response["usage"] = {"input_tokens": 21, "output_tokens": 9, "total_tokens": 30}
+                frames.append(("response.completed", {"type": "response.completed", "sequence_number": len(pieces) + 1, "response": response}))
                 self._sse(frames)
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
         self.server.handle_error = lambda *args: None  # o proxy fecha a conexão de propósito (cancelamento)
         self.port = self.server.server_address[1]
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
 
     @property
     def url(self):
@@ -431,13 +503,20 @@ class CatalogTests(unittest.TestCase):
         self.assertGreater(counts[0], 5)  # even 6 GB gets a real list
 
     def test_the_list_is_grouped_by_kind_uncensored_ones_in_their_own_group(self):
+        # first the original models, then the uncensored ones; inside each part one block per combination of capabilities
+        # (vision, tools, thinking), from the most complete agent to "only chat"
         listing = oc.build_listing(oc.usable_gib(15360, 14913))
         order = [key for key, _title in oc.LIST_GROUPS]
         positions = [order.index(row["group"]) for row in listing["rows"]]
         self.assertEqual(positions, sorted(positions))
-        self.assertTrue({"agente-visao", "agente", "codigo", "raciocinio", "conversa", "sem-censura"} <= set(row["group"] for row in listing["rows"]))
+        groups = set(row["group"] for row in listing["rows"])
+        self.assertTrue({"originais/vfp", "originais/vf", "originais/fp", "originais/f"} <= groups, groups)
+        self.assertTrue(any(group.startswith("sem-censura/") for group in groups), groups)
         for row in listing["rows"]:
-            self.assertEqual(row["group"] == "sem-censura", row["variant"]["uncensored"], row["variant"]["tag"])
+            variant = row["variant"]
+            self.assertEqual(row["group"].startswith("sem-censura/"), variant["uncensored"], variant["tag"])
+            self.assertEqual(row["group"].split("/")[1], oc._tier_of(variant), variant["tag"])
+        self.assertEqual(oc._badges({"vision": True, "tools": False, "thinking": True}), "[V - P]")
         # inside a group the models that work as an agent (32k of context or more) come before the short-context ones
         for key in order:
             group = [row["ctx"] >= oc.AGENT_MIN_CTX for row in listing["rows"] if row["group"] == key]
@@ -473,10 +552,12 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(oc.plan_for(15360, "qwen3.5:4b-q8_0", 32768, free_mib=14913)["candidates"][0]["ctx"], 32768)
 
     def test_choosing_by_kind(self):
-        for tipo, group in (("sem censura", "sem-censura"), ("código", "codigo"), ("raciocínio", "raciocinio"), ("CODIGO", "codigo")):
+        kinds = (("sem censura", lambda v: v["uncensored"]), ("código", lambda v: v["code"] and not v["uncensored"]),
+                 ("raciocínio", lambda v: v["reasoning"] and not v["uncensored"]), ("CODIGO", lambda v: v["code"] and not v["uncensored"]))
+        for tipo, of_kind in kinds:
             plan = oc.plan_for(15360, tipo=tipo, free_mib=14913)
             first = oc.catalog_variant(plan["candidates"][0]["tag"])
-            self.assertEqual(oc._group_of(first), group, tipo)
+            self.assertTrue(of_kind(first), tipo)
             self.assertTrue(first["tools"], tipo)  # with tools when the kind has any that fit
             self.assertFalse(plan["candidates"][0]["explicit"])  # the next options may take over if this one does not load 100% on the GPU
             self.assertGreater(len(set(item["tag"] for item in plan["candidates"])), 1)
@@ -605,7 +686,7 @@ class StepModelPolicyTests(unittest.TestCase):
     def test_a_chosen_model_without_tools_runs_with_a_warning(self):
         chosen = self.run_step([self.candidate("dolphin3:8b", explicit=True)], {("dolphin3:8b", 32768): (True, 100, 32768, self.CAPS_TEXT)})
         self.assertEqual(chosen["tag"], "dolphin3:8b")
-        self.assertIn("não poderá usá-lo como agente", self.text())
+        self.assertIn("não poderão usá-lo como agente", self.text())
         self.assertIn("foi você quem o escolheu", self.text())
 
     def test_a_model_the_catalog_already_knows_has_no_tools_runs_with_a_warning_too(self):
@@ -735,7 +816,7 @@ class ChoiceBoxTests(unittest.TestCase):
         self.assertTrue(without_tools)
         for item in without_tools:
             self.assertIn("sem ferramentas: só conversa", item["texto"])
-        self.assertIn("só consegue conversar", oc.CHOICE_WARNINGS["ferramentas"])
+        self.assertIn("só conseguem conversar", oc.CHOICE_WARNINGS["ferramentas"])
         self.assertIn("por sua conta", oc.CHOICE_WARNINGS["sem-censura"])
         short = [row for row in self.listing["rows"] if row["variant"]["tools"] and row["ctx"] < oc.AGENT_MIN_CTX]
         for row in short:
@@ -1270,7 +1351,65 @@ class ChatTests(ProxyTestCase):
         self.assertIn("Imagens recebidas: 2", oc.render_panel(snapshot, "https://x.trycloudflare.com", "Tesla T4 (15 GB)"))
 
 
+class ClaudeAndCodexRoutesTests(ProxyTestCase):
+    """Since 1.3.0 the server also serves the Anthropic Messages API (Claude Desktop, Claude Code) and the OpenAI Responses API
+    (Codex), straight from the engine (the Ollama speaks both); the chat route the Openclod uses stays as it was."""
+
+    ANTHROPIC = {"x-api-key": KEY, "anthropic-version": "2023-06-01"}
+
+    def call(self, method, path, body=None, headers=None):
+        conn, response = request(self.port, method, path, body=body, headers=headers)
+        raw = response.read()
+        conn.close()
+        return response.status, json.loads(raw.decode() or "null")
+
+    def test_status_lists_every_route(self):
+        status, data = self.call("GET", "/openclod/status", headers=auth())
+        self.assertEqual(status, 200)
+        self.assertEqual(data["routes"], ["/v1/models", "/v1/chat/completions", "/v1/messages", "/v1/messages/count_tokens", "/v1/responses"])
+
+    def test_messages_with_x_api_key_and_errors_in_the_anthropic_format(self):
+        body = {"model": "claude-sonnet-4-5", "max_tokens": 20, "messages": [{"role": "user", "content": "oi"}]}
+        status, data = self.call("POST", "/v1/messages?beta=true", body=body, headers=self.ANTHROPIC)
+        self.assertEqual((status, data["type"], data["content"][0]["text"]), (200, "message", "pong"))
+        self.assertEqual((self.engine.paths[-1], self.engine.seen[-1]["model"]), ("/v1/messages", "modelo-teste:9b"))
+        status, data = self.call("POST", "/v1/messages", body=body, headers={"x-api-key": "errada"})
+        self.assertEqual((status, data["type"], data["error"]["type"]), (401, "error", "authentication_error"))
+
+    def test_responses_for_the_codex(self):
+        status, data = self.call("POST", "/v1/responses", body={"model": "gpt-5-codex", "input": "oi"}, headers=auth())
+        self.assertEqual((status, data["object"], data["output"][0]["content"][0]["text"]), (200, "response", "pong"))
+        self.assertEqual((self.engine.paths[-1], self.engine.seen[-1]["model"]), ("/v1/responses", "modelo-teste:9b"))
+
+    def test_count_tokens_is_a_local_estimate(self):
+        body = {"model": "x", "messages": [{"role": "user", "content": "uma frase qualquer para contar"}]}
+        status, data = self.call("POST", "/v1/messages/count_tokens", body=body, headers=self.ANTHROPIC)
+        self.assertEqual(status, 200)
+        self.assertGreater(data["input_tokens"], 0)
+        self.assertEqual(self.engine.seen, [], "the engine is never asked")
+
+    def test_a_model_without_tools_gets_the_request_without_them(self):
+        # the Ollama refuses the WHOLE request when a model without tool support receives tools: the server takes them out
+        self.state.tools = False
+        tool = {"type": "function", "function": {"name": "f", "parameters": {"type": "object"}}}
+        body = {"model": "x", "messages": [{"role": "user", "content": "oi"}], "tools": [tool], "tool_choice": "auto"}
+        status, _ = self.call("POST", "/v1/chat/completions", body=body, headers=auth())
+        self.assertEqual(status, 200)
+        self.assertNotIn("tools", self.engine.seen[-1])
+        self.assertNotIn("tool_choice", self.engine.seen[-1])
+
+    def test_engine_routes_stay_private(self):
+        for path in ("/api/pull", "/api/delete", "/v1/messages/batches", "/v1/responses/resp_1"):
+            status, _ = self.call("POST", path, body={}, headers=auth())
+            self.assertEqual(status, 404, path)
+
+
 class SelftestTests(ProxyTestCase):
+    # since 1.3.0 the selftest also goes through the Anthropic (Claude) and Responses (Codex) routes
+    NEW_CHECKS = ["Anthropic: chave por x-api-key", "Anthropic: erro no formato da Anthropic", "Anthropic: /v1/messages",
+                  "Anthropic: /v1/messages em stream (SSE)", "Anthropic: chamada de ferramenta (stream)", "Anthropic: contagem de tokens (estimativa)",
+                  "Responses: /v1/responses", "Responses: /v1/responses em stream (SSE)"]
+
     def run_selftest(self, **kwargs):
         lines = []
         outcome = oc.selftest("http://127.0.0.1:%d/v1" % self.port, kwargs.pop("key", KEY), "modelo-teste:9b", log=lines.append, **kwargs)
@@ -1281,9 +1420,16 @@ class SelftestTests(ProxyTestCase):
         names = [item["name"] for item in outcome["results"]]
         self.assertTrue(outcome["ok"], outcome)
         self.assertEqual(len([n for n in names if n.startswith("Imagem")]), 2)
-        self.assertIn("Streaming (SSE)", names)
-        self.assertIn("Chamada de ferramenta (stream)", names)
+        for name in ["Streaming (SSE)", "Chamada de ferramenta (stream)"] + self.NEW_CHECKS:
+            self.assertIn(name, names)
         self.assertFalse(any(KEY in line for line in lines))
+        # what the engine saw: /v1/messages (no stream, stream and with a tool) and /v1/responses (no stream and stream)
+        seen = list(zip(self.engine.paths, self.engine.seen))
+        messages = [body for path, body in seen if path == "/v1/messages"]
+        responses = [body for path, body in seen if path == "/v1/responses"]
+        self.assertEqual([bool(b.get("stream")) for b in messages], [False, True, True])
+        self.assertTrue(any(b.get("tools") for b in messages))
+        self.assertEqual([bool(b.get("stream")) for b in responses], [False, True])
 
     def test_wrong_key_fails_loudly(self):
         outcome, _ = self.run_selftest(key="outra-chave")
@@ -1299,12 +1445,15 @@ class SelftestTests(ProxyTestCase):
         self.engine.mode = "notool"
         outcome, _ = self.run_selftest()
         self.assertFalse(outcome["ok"])
-        self.assertEqual([i["name"] for i in outcome["results"] if not i["ok"]], ["Chamada de ferramenta (stream)"])
+        self.assertEqual([i["name"] for i in outcome["results"] if not i["ok"]],
+                         ["Chamada de ferramenta (stream)", "Anthropic: chamada de ferramenta (stream)"])
 
     def test_vision_and_tools_can_be_skipped(self):
         outcome, _ = self.run_selftest(vision=False, tools=False)
         self.assertTrue(outcome["ok"])
-        self.assertEqual(len(outcome["results"]), 4)
+        names = [item["name"] for item in outcome["results"]]
+        self.assertEqual(len(names), 4 + len(self.NEW_CHECKS) - 1)   # without the Anthropic tool call
+        self.assertNotIn("Anthropic: chamada de ferramenta (stream)", names)
 
     def test_a_thinking_model_is_asked_not_to_think_during_the_selftest(self):
         # The test proves the path (text, stream, image, tool), not the reasoning: a model that thinks could spend the whole
@@ -1312,13 +1461,16 @@ class SelftestTests(ProxyTestCase):
         self.state.thinking_default = "auto"
         outcome, _ = self.run_selftest(think_off=True)
         self.assertTrue(outcome["ok"], outcome)
-        chats = [body for body in self.engine.seen if "messages" in body]
-        self.assertGreaterEqual(len(chats), 5)
-        self.assertTrue(all(body.get("reasoning_effort") == "none" for body in chats))
+        for path, field, value in (("/v1/chat/completions", "reasoning_effort", "none"), ("/v1/messages", "thinking", {"type": "disabled"}),
+                                   ("/v1/responses", "reasoning", {"effort": "none"})):
+            bodies = [body for seen_path, body in zip(self.engine.paths, self.engine.seen) if seen_path == path]
+            self.assertGreaterEqual(len(bodies), 2, path)
+            self.assertTrue(all(body.get(field) == value for body in bodies), path)
         self.engine.seen.clear()
+        self.engine.paths.clear()
         outcome, _ = self.run_selftest(think_off=False)
         self.assertTrue(outcome["ok"])
-        self.assertFalse(any("reasoning_effort" in body for body in self.engine.seen))
+        self.assertFalse(any({"reasoning_effort", "thinking", "reasoning"} & set(body) for body in self.engine.seen))
 
 
 class CliAndPathsTests(unittest.TestCase):

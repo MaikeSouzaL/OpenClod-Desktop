@@ -261,11 +261,13 @@ describe('notebook: the cells run in order (stub GPU, no downloads)', () => {
 
   it.skipIf(!python)('step 2 shows every kind of model that fits the GPU, numbered, uncensored ones included, and marks the one that runs', () => {
     const run = runFirstCells(15360)
-    for (const title of ['Agentes com visão e ferramentas', 'Agentes só texto', 'Código:', 'Raciocínio:', 'Só conversa', 'Sem censura (uncensored / abliterated)']) {
+    // originals first, then the uncensored ones; in each part one block per combination of capabilities, marked [V F P]
+    for (const title of ['=== Modelos originais:', '=== Sem censura (uncensored / abliterated):', 'Visão + ferramentas + pensamento:',
+      'Ferramentas (só texto):', 'Só conversa (sem visão, ferramentas nem pensamento):', 'Capacidades: V = visão']) {
       expect(run.out).toContain(title)
     }
-    expect(run.out).toMatch(/\n\s+1\. Qwen3\.5 9B\s+Q8_0\s+10,4 GB\s+ctx 64k\s+visão, ferramentas, pensamento/)
-    expect(run.out).toMatch(/<== rodando esta/)
+    expect(run.out.indexOf('=== Modelos originais:')).toBeLessThan(run.out.indexOf('=== Sem censura'))
+    expect(run.out).toMatch(/\n\s+\d+\. Qwen3\.5 9B\s+Q8_0\s+10,4 GB\s+ctx 64k\s+\[V F P\][^\n]*<== rodando esta/)
     expect(run.out).toMatch(/abliterated/)
     expect(run.out).toMatch(/Dolphin 3 8B/)
     expect(run.out).toContain('Não cabem nesta GPU')
