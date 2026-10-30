@@ -143,6 +143,8 @@ export const qualityDiscoverTool: ToolDef = {
 
 export const qualityRunTool: ToolDef = {
   name: 'quality_run',
+  // Test suites and builds can be silent for long: the run's own timeout, plus a margin.
+  idleLimitMs: (raw) => ((raw as { timeout_ms?: number } | undefined)?.timeout_ms ?? 15 * 60_000) + 30_000,
   description:
     'Executa testes, typecheck, lint ou build descobertos no workspace, preserva stdout/stderr e códigos de saída, e transforma falhas em diagnósticos estruturados. Use check para escolher um id ou omita para executar todas.',
   risk: 'exec',

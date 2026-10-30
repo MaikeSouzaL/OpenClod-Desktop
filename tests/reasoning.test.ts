@@ -294,6 +294,21 @@ describe('OpenAI-compatible reasoning_effort', () => {
     expect(resolveCompat({ model: 'deepseek-flash', baseUrl: 'http://x', compat: undefined }).reasoningEffort).toBe(true)
   })
 
+  it('turns the thinking off only on the embedded llama.cpp when asked (a picture described, not a puzzle)', async () => {
+    const server = await capture((_b, res) => sse(res, [{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]))
+    const run = async (id: string, thinking?: boolean): Promise<any> => {
+      const provider = new OpenAICompatibleProvider(
+        { id, kind: 'openai', label: id, baseUrl: server.url, model: 'qwen3.5-4b', contextWindow: 32_000, supportsVision: true, supportsTools: true },
+        'k'
+      )
+      for await (const _ of provider.stream({ system: 's', messages: [user], tools: [], thinking })) void _
+      return server.bodies.at(-1)
+    }
+    expect((await run('llamacpp', false)).chat_template_kwargs).toEqual({ enable_thinking: false })
+    expect((await run('llamacpp')).chat_template_kwargs).toBeUndefined()
+    expect((await run('ollama', false)).chat_template_kwargs).toBeUndefined()
+  })
+
   it('replays reasoning_content on every assistant turn for DeepSeek V4', async () => {
     const server = await capture((_b, res) => sse(res, [{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]))
     const provider = new OpenAICompatibleProvider(

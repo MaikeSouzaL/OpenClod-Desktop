@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from 'react'
 import type { Project } from '../../../shared/types'
 import type { MemoryAddJobInfo, MemoryFileInfo, MemoryPageContent, MemoryPageInfo, MemoryStatsInfo } from '../../../shared/api'
 import { errorMessage, unwrap } from '../lib/api'
@@ -8,6 +8,9 @@ import { MemoryGraph } from './MemoryGraph'
 import { MEMORY_KINDS, MemoryAddBanner, MemoryFileCard, MemoryKindBar, MemoryThumb, type MemoryFilter } from './MemoryFiles'
 import { EMPTY_SELECTION, deletionText, masterState, prune, selectAll, selectRange, toggle, type Selection } from '../lib/memory-selection'
 import './memory-select.css'
+
+/** Cards drawn at a time: a memory of thousands of pages must not put thousands of cards in the page at once. */
+const CARD_BATCH = 120
 
 function memorySlug(value: string): string {
   return value
@@ -73,6 +76,9 @@ export function MemoryPage({
   const [files, setFiles] = useState<MemoryFileInfo[]>([])
   const [filter, setFilter] = useState<MemoryFilter>('tudo')
   const [job, setJob] = useState<MemoryAddJobInfo | null>(null)
+  // How many of the listed pages have a card now; more come as the end of the grid scrolls into view.
+  const [shownCards, setShownCards] = useState(CARD_BATCH)
+  const moreRef = useRef<HTMLDivElement | null>(null)
 
   const project = useMemo(
     () => projects.find((item) => item.id === projectId) ?? null,
@@ -242,6 +248,23 @@ export function MemoryPage({
         (words.length > 0 && words.every((word) => page.terms?.some((term) => term.includes(word))))
     )
   }, [pages, query, filter, fileKinds])
+
+  // A new search, kind or project starts again from the first cards.
+  useEffect(() => setShownCards(CARD_BATCH), [query, filter, projectId])
+
+  // The end of the grid in view (or close to it): the next cards.
+  useEffect(() => {
+    const node = moreRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setShownCards((count) => count + CARD_BATCH)
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [shownCards, filtered.length, view])
 
   /** Under a kind: the files of that kind (matching the search by name, description or tag). */
   const kindFiles = useMemo(() => {
@@ -504,7 +527,7 @@ export function MemoryPage({
             </div>
           </div>
 
-          <MemoryKindBar counts={stats?.files ?? {}} filter={filter} onFilter={setFilter} />
+          <MemoryKindBar counts={stats?.files ?? {}} index={stats?.fileIndex} filter={filter} onFilter={setFilter} />
           {job && (job.active || job.done) ? <MemoryAddBanner job={job} /> : null}
 
           {selected ? (
@@ -650,7 +673,7 @@ export function MemoryPage({
                   {projectId
                     ? kindFiles.map((file) => <MemoryFileCard key={file.slug} projectId={projectId} file={file} onOpen={(slug) => void openPage(slug)} />)
                     : null}
-                  {filtered.map((page) => {
+                  {filtered.slice(0, shownCards).map((page) => {
                     const marked = selection.slugs.has(page.slug)
                     const file = page.tags.includes('arquivo') && !page.tags.includes('parte') ? fileOf(page.slug) : undefined
                     return (
@@ -687,6 +710,13 @@ export function MemoryPage({
                       </div>
                     )
                   })}
+                  {filtered.length > shownCards ? (
+                    <div ref={moreRef} className="memory-more">
+                      <button type="button" className="btn ghost small" onClick={() => setShownCards((count) => count + CARD_BATCH)}>
+                        Mostrar mais ({(filtered.length - shownCards).toLocaleString('pt-BR')} restantes)
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </>

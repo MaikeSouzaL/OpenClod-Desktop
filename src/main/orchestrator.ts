@@ -101,11 +101,12 @@ import { memoryFileTools } from '../core/memory/file-tools.js'
 import {
   addMemoryFile,
   collectFiles as collectMemoryFiles,
-  countMemoryFiles,
   findFilePaths,
   findMemoryFile,
   listMemoryFiles,
-  memoryFileThumb
+  memoryFileIndex,
+  memoryFileThumb,
+  type MemoryFileIndexEntry
 } from '../core/memory/files.js'
 import { describeImage } from '../core/vision/relay.js'
 import { findMediaPaths } from '../core/media/paths.js'
@@ -114,7 +115,7 @@ import { imageTools } from '../core/tools/images.js'
 import { PluginManager } from '../core/plugins/manager.js'
 import { id } from '../core/util/ids.js'
 import { ChromeBridge } from './chrome/bridge.js'
-import { buildNativeMemoryGraph } from '../core/memory/graph.js'
+import { graphSourceOf, prepareMemoryGraphAsync, selectMemoryGraph, type PreparedMemoryGraph } from '../core/memory/graph.js'
 import type { AgentDefinition, AgentsListing, PolicyConfig, ReasoningEffort } from '../shared/types.js'
 import type {
   ConnectInput,
@@ -180,6 +181,10 @@ export class Orchestrator {
   private browsers = new Map<string, BrowserLayer>()
   private memories = new Map<string, MemoryStore>()
   private projectMemories = new Map<string, ProjectMemory>()
+  /** Each project's graph, until its memory changes (the key says which version of the memory it was built from). */
+  private readonly memoryGraphs = new Map<string, { key: string; prepared: PreparedMemoryGraph }>()
+  /** The AI-Memory sidecar's graph of each project, refreshed in the background. */
+  private readonly sidecarGraphs = new Map<string, { at: number; graph: import('./ai-memory.js').AiMemoryGraph | null; loading?: boolean }>()
   /** Projects whose native wiki was already mirrored into AI-Memory this run. */
   private syncedMemories = new Set<string>()
   /** Mirror of each project's wiki into the AI-Memory index: pages copied so far, of how many, and whether it is running. */
@@ -340,6 +345,35 @@ export class Orchestrator {
     // background: a missing binary or a slow model must never delay the UI.
     void this.aiMemory.start().catch((err) => this.options.log?.(`ai-memory: ${(err as Error).message}`))
     void toolchains() // warm the cache; the probes spawn processes
+    this.startServiceWatchdog()
+  }
+
+  /**
+   * The services' watchdog: every minute it checks what the sessions depend on and fixes what is stuck by itself. The
+   * AI-Memory sidecar that stopped answering is restarted; MCP servers that dropped are reconnected by their own clients,
+   * and a stuck tool call is stopped by the runner's watchdog (which restarts its MCP server).
+   */
+  private serviceWatch: NodeJS.Timeout | null = null
+  private serviceCheckRunning = false
+
+  private startServiceWatchdog(): void {
+    if (this.serviceWatch) return
+    this.serviceWatch = setInterval(() => {
+      if (this.serviceCheckRunning) return
+      this.serviceCheckRunning = true
+      void this.aiMemory
+        .selfCheck()
+        .then((outcome) => {
+          if (outcome === 'missed') this.options.log?.('vigia: AI-Memory não respondeu à checagem de saúde')
+          if (outcome === 'restarted') this.options.log?.('vigia: AI-Memory parou de responder e foi reiniciado')
+          if (outcome === 'restart-failed') this.options.log?.('vigia: AI-Memory parou de responder e não voltou ao reiniciar')
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          this.serviceCheckRunning = false
+        })
+    }, 60_000)
+    this.serviceWatch.unref?.()
   }
 
   /* ------------------------------- registry ------------------------------ */
@@ -1634,6 +1668,8 @@ export class Orchestrator {
       Promise.race([work.catch(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, ms))])
     for (const timer of this.mcpStartRetries.values()) clearTimeout(timer)
     this.mcpStartRetries.clear()
+    if (this.serviceWatch) clearInterval(this.serviceWatch)
+    this.serviceWatch = null
     // Sessions whose runner was dropped by a settings change still get SessionEnd.
     const sessions = [...new Set([...this.runners.keys(), ...this.sessionHooks.keys()])]
     await within(Promise.all(sessions.map((sessionId) => this.dispose(sessionId, 'app_quit'))), 4_000)
@@ -2620,6 +2656,19 @@ export class Orchestrator {
         }
         const fingerprint = crypto.createHash('sha1').update(JSON.stringify([page.title, page.body, page.tags, page.pinned, summary.tags])).digest('hex')
         if (copied[path] === fingerprint) return
+        // Not in the cache: the index may have it already (the import writes each page there, an earlier cache was lost).
+        // A read costs milliseconds, a write seconds (the sidecar commits its whole wiki to git on every write): the same
+        // text is recorded as copied instead of written again.
+        if (copied[path] === undefined) {
+          const indexed = await this.aiMemory.readPage(projectId, path).catch(() => null)
+          if (indexed && sameIndexedText(indexed.body, page.body)) {
+            copied[path] = fingerprint
+            done++
+            state.done++
+            if (done % 25 === 0) await saveCache()
+            return
+          }
+        }
         // Neighbours from the wiki's own index (in process, instant): asking the sidecar for them cost a full-text search
         // of seconds per page, which is what kept a 2000-page project from ever reaching the index.
         const related = page.body.includes('## Relacionados')
@@ -2677,20 +2726,25 @@ export class Orchestrator {
       aiRunning?: boolean
       indexSync?: { done: number; total: number; running: boolean }
       files?: Record<string, number>
+      fileIndex?: Record<string, MemoryFileIndexEntry>
     }
   > {
     this.requireProject(projectId)
     this.syncNativeToAiInBackground(projectId)
     const stats = await this.memoryForProject(projectId).stats()
     // The real number of pages the index holds for the project (it used to be the length of a "recent" list capped at 100).
-    const indexed = await this.aiMemory.pageCount(projectId).catch(() => undefined)
+    // Only from a sidecar that is already up: the screen must not wait for it to start (that takes half a minute on a
+    // big index), the background sync starts it.
+    const indexed = this.aiMemory.status().running ? await this.aiMemory.pageCount(projectId).catch(() => undefined) : undefined
     const sync = this.memorySyncState.get(projectId)
+    const fileIndex = await memoryFileIndex(this.memoryForProject(projectId).root)
     return {
       ...stats,
       ...(indexed !== undefined ? { indexed } : {}),
       aiRunning: this.aiMemory.status().running,
       ...(sync ? { indexSync: { ...sync } } : {}),
-      files: countMemoryFiles(this.memoryForProject(projectId).root)
+      files: Object.fromEntries(Object.entries(fileIndex).map(([kind, entry]) => [kind, entry.total])),
+      fileIndex
     }
   }
 
@@ -2797,7 +2851,8 @@ export class Orchestrator {
     this.requireProject(projectId)
     this.syncNativeToAiInBackground(projectId)
     const native = await this.memoryForProject(projectId).listPages()
-    const indexed = await this.aiMemory.recent(projectId, 100).catch(() => [])
+    // Pages only the index has, when it is already up: the list never waits for the sidecar to start.
+    const indexed = this.aiMemory.status().running ? await this.aiMemory.recent(projectId, 100).catch(() => []) : []
     const known = new Set(native.map((page) => page.title.trim().toLowerCase()))
     const extra = indexed
       .filter(
@@ -2869,83 +2924,70 @@ export class Orchestrator {
    * sidecar contributes extra transcript nodes; both are merged by path/title
    * so one page can never disappear merely because the sidecar indexed it.
    */
-  async memoryGraph(projectId: string): Promise<import('./ai-memory.js').AiMemoryGraph> {
+  async memoryGraph(projectId: string, query = ''): Promise<import('./ai-memory.js').AiMemoryGraph> {
     this.requireProject(projectId)
     this.syncNativeToAiInBackground(projectId)
+    // The wiki's in-memory index has what the graph needs (title, tags, words, links): no page is read from disk. Reading
+    // and comparing every page of a 4600-page memory froze the main process for over a minute.
     const summaries = await this.memoryForProject(projectId).listPages()
-    const native = await Promise.all(summaries.map((summary) => this.memoryForProject(projectId).readPage(summary.slug)))
-    const sidecar = await this.aiMemory.graph(projectId).catch(() => null)
-
-    const nodes: Array<{
-      id: string
-      path: string
-      title: string
-      kind: 'session' | 'page' | 'fact'
-      tags: string[]
-      updated: string
-      degree: number
-      terms: string[]
-      summary?: string
-    }> = native.flatMap((page) => {
-      if (!page) return []
-      const path = `pages/${page.slug}.md`
-      const twin = sidecar?.nodes.find((node) => node.path === path || node.path === page.slug)
-      return [{
-        id: page.slug,
-        path: page.slug,
-        title: page.title,
-        kind: (page.tags.includes('sessao') ? 'session' : 'page') as 'session' | 'page',
-        tags: page.tags,
-        updated: page.updated,
-        degree: twin?.degree ?? 0,
-        terms: graphKeywords(`${page.title} ${page.body}`, 24),
-        summary: page.body.replace(/\s+/g, ' ').trim().slice(0, 600)
-      }]
-    })
-    const nativeKeys = new Set(nodes.flatMap((node) => [node.path.toLowerCase(), node.title.trim().toLowerCase()]))
-    for (const node of sidecar?.nodes ?? []) {
-      if (nativeKeys.has(node.path.toLowerCase()) || nativeKeys.has(node.title.trim().toLowerCase())) continue
-      const wrapped = await this.aiMemory.readPage(projectId, node.path).catch(() => null)
-      nodes.push({
-        ...node,
-        terms: graphKeywords(`${node.title} ${node.tags.join(' ')} ${wrapped?.body ?? ''}`, 24),
-        summary: (wrapped?.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 600)
-      })
+    // The sidecar's own graph is fetched in the background and used once it arrives: the screen never waits for it.
+    this.refreshSidecarGraph(projectId)
+    const sidecar = this.sidecarGraphs.get(projectId)
+    let newest = ''
+    let slugChars = 0
+    for (const summary of summaries) {
+      if (summary.updated > newest) newest = summary.updated
+      slugChars += summary.slug.length
     }
-
-    const byId = new Map(nodes.map((node) => [node.id, node]))
-    const edges = new Map<string, import('./ai-memory.js').AiMemoryGraphEdge>()
-    const addEdge = (source: string, target: string, kind: 'link' | 'tag' | 'term', weight: number): void => {
-      if (!byId.has(source) || !byId.has(target) || source === target) return
-      const [a, b] = source < target ? [source, target] : [target, source]
-      const key = `${a}|${b}`
-      const current = edges.get(key)
-      if (!current || current.weight < weight) edges.set(key, { source: a, target: b, kind, weight })
+    const key = `${summaries.length}:${slugChars}:${newest}:${sidecar?.at ?? 0}`
+    let cached = this.memoryGraphs.get(projectId)
+    if (cached?.key !== key) {
+      const native = new Set(summaries.map((summary) => summary.slug))
+      const titles = new Set(summaries.map((summary) => summary.title.trim().toLowerCase()))
+      // A sidecar path is the native page it mirrors (`pages/<slug>.md`) or a page only the index has (opened as `ai:`).
+      const idOf = (pagePath: string): string => {
+        const slug = /^pages\/(.+)\.md$/i.exec(pagePath)?.[1]
+        return slug && native.has(slug) ? slug : native.has(pagePath) ? pagePath : `${AI_PAGE_PREFIX}${pagePath}`
+      }
+      const sources = summaries.map(graphSourceOf)
+      for (const node of sidecar?.graph?.nodes ?? []) {
+        const id = idOf(node.path)
+        if (native.has(id) || titles.has(node.title.trim().toLowerCase())) continue
+        sources.push({
+          slug: id,
+          title: node.title,
+          tags: node.tags,
+          updated: node.updated,
+          terms: graphKeywords(`${node.title} ${node.tags.join(' ')}`, 24),
+          kind: node.kind
+        })
+        native.add(id)
+      }
+      const extraEdges = (sidecar?.graph?.edges ?? []).map((edge) => ({ ...edge, source: idOf(edge.source), target: idOf(edge.target) }))
+      // Built in slices of a few ms (the main process keeps answering) and kept until the memory changes: a search only
+      // picks nodes from it.
+      cached = { key, prepared: await prepareMemoryGraphAsync(sources, extraEdges) }
+      this.memoryGraphs.set(projectId, cached)
     }
-
-    // Explicit wiki links resolve by slug or title, the same convention used by
-    // Obsidian: [[memory-page]] and [[Memory page]] point to the same node.
-    const nativeGraph = buildNativeMemoryGraph(native.filter((page): page is NonNullable<typeof page> => Boolean(page)))
-    for (const edge of nativeGraph.edges) addEdge(edge.source, edge.target, edge.kind, edge.weight)
-    for (const edge of sidecar?.edges ?? []) {
-      const source = edge.source.startsWith('pages/') ? edge.source.slice(6, -3) : edge.source
-      const target = edge.target.startsWith('pages/') ? edge.target.slice(6, -3) : edge.target
-      addEdge(source, target, edge.kind, edge.weight)
-    }
-
-    for (const node of nodes) node.degree = 0
-    for (const edge of edges.values()) {
-      const source = byId.get(edge.source)
-      const target = byId.get(edge.target)
-      if (source) source.degree++
-      if (target) target.degree++
-    }
+    const graph = selectMemoryGraph(cached.prepared, { limit: MEMORY_GRAPH_LIMIT, query })
     return {
-      nodes,
-      edges: [...edges.values()].sort((a, b) => b.weight - a.weight),
-      truncated: (sidecar?.nodes.length ?? 0) >= 100,
-      source: sidecar?.nodes.length ? 'ai-memory' : 'native'
+      nodes: graph.nodes,
+      edges: graph.edges,
+      total: graph.total,
+      truncated: graph.nodes.length < graph.total,
+      source: sidecar?.graph?.nodes.length ? 'ai-memory' : 'native'
     }
+  }
+
+  /** The sidecar's graph of the project, fetched at most every two minutes and only from a sidecar already up. */
+  private refreshSidecarGraph(projectId: string): void {
+    const current = this.sidecarGraphs.get(projectId)
+    if (!this.aiMemory.status().running || current?.loading || (current && Date.now() - current.at < 120_000)) return
+    this.sidecarGraphs.set(projectId, { at: current?.at ?? 0, graph: current?.graph ?? null, loading: true })
+    void this.aiMemory
+      .graph(projectId)
+      .catch(() => null)
+      .then((graph) => this.sidecarGraphs.set(projectId, { at: Date.now(), graph: graph ?? current?.graph ?? null }))
   }
 
   /** Public status used by Configurações → Memória. */
@@ -2960,6 +3002,8 @@ export class Orchestrator {
     for (const session of sessions) await this.deleteSession(session.meta.id)
     await this.store.removeProject(projectId)
     this.projectMemories.delete(projectId)
+    this.memoryGraphs.delete(projectId)
+    this.sidecarGraphs.delete(projectId)
     this.syncedMemories.delete(projectId)
     this.memorySyncs.delete(projectId)
     this.approvals.clear(projectId)
@@ -3023,9 +3067,18 @@ export class Orchestrator {
 /* ------------------------------- helpers -------------------------------- */
 
 const AI_PAGE_PREFIX = 'ai:'
+/** Nodes the graph shows at once; the others are reached by searching (the most connected and recent come first). */
+const MEMORY_GRAPH_LIMIT = 900
 
 function aiPageId(pagePath: string): string {
   return `${AI_PAGE_PREFIX}${pagePath}`
+}
+
+/** The index holds the page's text (plus, maybe, the "Relacionados" links the sync appends): the same text, already there. */
+function sameIndexedText(indexed: string, native: string): boolean {
+  const flat = (value: string): string => value.replace(/\s+/g, ' ').trim()
+  const mine = flat(native)
+  return Boolean(mine) && flat(indexed).startsWith(mine.slice(0, 4_000))
 }
 
 function shortHash(value: string): string {

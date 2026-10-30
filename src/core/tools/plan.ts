@@ -182,6 +182,8 @@ const AGENT_INTRO =
 
 export const agentTool: ToolDef = {
   name: 'agent',
+  // Subagents run their own turns, whose tools the watchdog watches one by one.
+  idleLimitMs: null,
   description: `${AGENT_INTRO} Os que casam com o pedido vêm sugeridos em <contexto-do-turno>; para o catálogo, carregue list_agents (tool_load).`,
   // Delegating adds no privilege: the child inherits the caller's policy (and asks when the caller is not in auto mode).
   risk: 'read',

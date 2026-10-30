@@ -65,6 +65,14 @@ import type { SubagentCaller } from '../agents/types.js'
 import { DEFAULT_MAX_AGENT_DEPTH } from '../agents/limits.js'
 
 const TOOL_TIMEOUT_MS = 10 * 60 * 1000
+/**
+ * The watchdog: a tool call with no result and no sign of life (progress) for this long is stuck. It is aborted and the turn
+ * goes on with a result that says so, instead of the whole session waiting. Tools declare their own limit (`idleLimitMs`).
+ */
+const DEFAULT_TOOL_IDLE_MS = 240_000
+const WATCH_TICK_MS = 2_000
+/** After the abort, a moment for the tool to stop by itself and hand back what it had. */
+const STUCK_GRACE_MS = 5_000
 /** Inline budget for one tool result; longer output is written to a file instead. */
 const MAX_RESULT_CHARS = 60_000
 /** Non-read_file tools spill earlier: their output is re-sent every iteration. */
@@ -416,6 +424,8 @@ export interface RunnerDeps {
   rootSessionId?: string
   /** Aborting this signal aborts every turn of this runner (set for subagents, so cancelling the user's turn stops the whole tree). */
   parentSignal?: AbortSignal
+  /** The tool watchdog's timings (tests make them short). */
+  watchdog?: { idleMs?: number; tickMs?: number; graceMs?: number }
   /** Base delay before re-requesting after a transient stream failure. */
   retryBaseMs?: number
   /**
@@ -2208,6 +2218,85 @@ export class SessionRunner {
    * every later request (and every model that takes over) reuses it. Nothing here throws: without a model that sees,
    * the pictures stay undescribed and the request says so.
    */
+  /**
+   * Runs one tool call under the watchdog. A call silent for longer than its limit (no result, no progress), or longer than
+   * the hard cap, is aborted and answered with a result that says it was stuck: the turn never waits on it. A tool that
+   * ignores the abort is left behind and its late result dropped. A stuck MCP tool gets its server restarted.
+   */
+  private async watchTool(
+    tool: ToolDef,
+    call: { id: string; name: string; args: unknown },
+    toolCtx: ToolContext,
+    toolAbort: AbortController,
+    lastSignal: () => number,
+    started: number
+  ): Promise<ToolResult> {
+    const options = this.deps.watchdog ?? {}
+    const limit = toolIdleLimit(tool, call.args, options.idleMs ?? DEFAULT_TOOL_IDLE_MS)
+    const tick = options.tickMs ?? WATCH_TICK_MS
+    const run = tool.execute(call.args, toolCtx)
+    let timer: NodeJS.Timeout | undefined
+    const verdict = await Promise.race([
+      run.then(
+        (value) => ({ kind: 'done' as const, value }),
+        (error: unknown) => ({ kind: 'error' as const, error })
+      ),
+      new Promise<{ kind: 'stuck'; silentFor: number; hardCap: boolean }>((resolve) => {
+        const check = (): void => {
+          const now = Date.now()
+          if (now - started >= TOOL_TIMEOUT_MS) return resolve({ kind: 'stuck', silentFor: now - lastSignal(), hardCap: true })
+          if (limit !== null && now - lastSignal() >= limit) return resolve({ kind: 'stuck', silentFor: now - lastSignal(), hardCap: false })
+          timer = setTimeout(check, tick)
+        }
+        timer = setTimeout(check, tick)
+      })
+    ])
+    if (timer) clearTimeout(timer)
+    if (verdict.kind === 'done') return verdict.value
+    if (verdict.kind === 'error') throw verdict.error
+    toolAbort.abort()
+    // A late rejection of the abandoned call must not surface as an unhandled one.
+    const late = run.catch(() => null)
+    const settled = await Promise.race([late, new Promise<null>((resolve) => setTimeout(() => resolve(null), options.graceMs ?? STUCK_GRACE_MS))])
+    return this.stuckResult(call, tool, verdict, settled)
+  }
+
+  /** What the agent and the user are told about a call the watchdog stopped, and the server restart it triggers. */
+  private async stuckResult(
+    call: { id: string; name: string; args: unknown },
+    tool: ToolDef,
+    verdict: { silentFor: number; hardCap: boolean },
+    settled: ToolResult | null
+  ): Promise<ToolResult> {
+    const seconds = Math.round(verdict.silentFor / 1000)
+    const why = verdict.hardCap ? `passou do limite de ${TOOL_TIMEOUT_MS / 60_000} min` : `ficou ${seconds}s sem nenhum sinal`
+    const server = tool.mcp?.server ?? (call.name === 'mcp_call' ? String((call.args as { server?: unknown } | undefined)?.server ?? '') : '')
+    let restart = ''
+    if (server && this.deps.services.mcp?.reload) {
+      // Self-correction: a server that stopped answering is started again, so the next call can work.
+      restart = await withTimeout(this.deps.services.mcp.reload(server), 45_000, 'reinício demorou demais')
+        .then(() => ` O servidor MCP "${server}" foi reiniciado; pode tentar de novo uma vez.`)
+        .catch((err: Error) => ` Tentei reiniciar o servidor MCP "${server}" e não deu: ${err.message.slice(0, 160)}.`)
+    }
+    this.emit({
+      type: 'notice',
+      sessionId: this.deps.sessionId,
+      level: 'warn',
+      text: `Vigia: "${call.name}" ${why} e foi interrompida; o agente segue.${server ? restart : ''}`
+    })
+    this.emit({ type: 'audit', sessionId: this.deps.sessionId, level: 'warn', message: `vigia interrompeu ${call.name}: ${why}` })
+    const note =
+      `O VIGIA do harness interrompeu ${call.name}: ${why} (travada).` +
+      restart +
+      ' Não repita a mesma chamada do mesmo jeito: verifique o que ela esperava (outro programa, uma janela, a rede, entrada do teclado) e siga por outro caminho.'
+    return settled
+      ? { ...settled, ok: false, text: `${note}
+
+--- o que a ferramenta devolveu ao parar ---
+${settled.text ?? ''}`, data: { ...(settled.data ?? {}), watchdog: true } }
+      : { ok: false, text: note, summary: 'travada · interrompida pelo vigia', data: { watchdog: true, silentSeconds: seconds } }
+  }
+
   private async describePendingImages(signal: AbortSignal, question: string): Promise<void> {
     if (this.provider.supportsVision || Date.now() < this.visionRestUntil) return
     const pending = pendingImages(this.messages)
@@ -2653,12 +2742,20 @@ export class SessionRunner {
         name: item.call.name,
         args: item.call.args
       })
+      // Each call can be stopped on its own (the watchdog) as well as with the turn.
+      const toolAbort = new AbortController()
+      const forwardAbort = (): void => toolAbort.abort()
+      if (signal.aborted) toolAbort.abort()
+      else signal.addEventListener('abort', forwardAbort, { once: true })
+      let lastSignalAt = started
       const toolCtx: ToolContext = {
         ...ctx,
+        signal: toolAbort.signal,
         toolCallId: item.call.id,
         vision: this.provider.supportsVision,
         model: this.providerConfig.model,
-        progress: (text, data) =>
+        progress: (text, data) => {
+          lastSignalAt = Date.now()
           this.emit({
             type: 'tool_progress',
             sessionId: this.deps.sessionId,
@@ -2667,14 +2764,11 @@ export class SessionRunner {
             text,
             data
           })
+        }
       }
       let result: ToolResult
       try {
-        result = await withTimeout(
-          item.tool.execute(item.call.args, toolCtx),
-          TOOL_TIMEOUT_MS,
-          `ferramenta ${item.call.name} excedeu ${TOOL_TIMEOUT_MS / 1000}s`
-        )
+        result = await this.watchTool(item.tool, item.call, toolCtx, toolAbort, () => lastSignalAt, started)
       } catch (err) {
         const message = (err as Error).message
         const injected = scanForInjection(message)
@@ -2685,6 +2779,8 @@ export class SessionRunner {
           level: injected.length ? 'warn' : 'info',
           message: `${item.call.name} falhou em ${Date.now() - started}ms: ${message.slice(0, 300)}`
         })
+      } finally {
+        signal.removeEventListener('abort', forwardAbort)
       }
       const post = await this.runHook(
         'PostToolUse',
@@ -2777,6 +2873,12 @@ export function parseToolArgs(tool: Pick<ToolDef, 'schema'>, raw: unknown): Pars
     }
   }
   return changed ? tool.schema.safeParse(copy) : first
+}
+
+/** How long a call of this tool may go without a result or a progress event before the watchdog stops it; null = never. */
+export function toolIdleLimit(tool: ToolDef, args: unknown, fallback = DEFAULT_TOOL_IDLE_MS): number | null {
+  const own = typeof tool.idleLimitMs === 'function' ? tool.idleLimitMs(args) : tool.idleLimitMs
+  return own === undefined ? fallback : own
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {

@@ -14,6 +14,7 @@ import {
   findFilePaths,
   findMemoryFile,
   listMemoryFiles,
+  memoryFileIndex,
   memoryFileThumb,
   removeMemoryFile,
   splitText
@@ -132,6 +133,31 @@ describe('files in the project memory', () => {
     fs.writeFileSync(path.join(media, 'manifest.json'), JSON.stringify({ kind: 'video' }))
     await addMemoryFile(path.join(root, 'vault', 'imagens', '1.png'), { memory, ocr: false })
     expect(countMemoryFiles(memory.root)).toEqual({ imagem: 1, video: 1 })
+  })
+
+  it('tells, by kind, how many files the agent can find by their text or description, and which lost the file', async () => {
+    // A picture without OCR or description: kept, but nothing of it is searchable yet.
+    await addMemoryFile(await png('docs/tela.png'), { memory, ocr: false })
+    const described = await addMemoryFile(await png('docs/pedido.png', '#00aa00'), { memory, ocr: false, description: 'Tela do pedido com o botão Faturar.' })
+    text('docs/regras.md', '# Regras\n\nO pedido só fatura com o contrato assinado.')
+    await addMemoryFile(path.join(root, 'docs', 'regras.md'), { memory })
+    const transcribed = path.join(memory.root, 'media', 'reuniao-abc')
+    fs.mkdirSync(transcribed, { recursive: true })
+    fs.writeFileSync(path.join(transcribed, 'manifest.json'), JSON.stringify({ kind: 'audio', source: { path: path.join(root, 'sumiu.ogg'), name: 'sumiu.ogg' }, transcript: { segments: [{ start: 0, end: 1, text: 'oi' }] } }))
+    const pending = path.join(memory.root, 'media', 'video-xyz')
+    fs.mkdirSync(pending, { recursive: true })
+    fs.writeFileSync(path.join(pending, 'manifest.json'), JSON.stringify({ kind: 'video', transcript: { segments: [] }, frames: [] }))
+    // The copy of the described picture is gone, and so is its original: only its text is left.
+    const found = findMemoryFile(memory.root, described.meta.slug)!
+    fs.rmSync(path.join(found.dir, found.meta.stored!))
+    fs.rmSync(path.join(root, 'docs', 'pedido.png'))
+
+    expect(await memoryFileIndex(memory.root)).toEqual({
+      imagem: { total: 2, indexed: 1, missing: 1 },
+      texto: { total: 1, indexed: 1, missing: 0 },
+      audio: { total: 1, indexed: 1, missing: 1 },
+      video: { total: 1, indexed: 0, missing: 0 }
+    })
   })
 
   it('keeps a pasted picture under the name and origin given (its temporary path says nothing)', async () => {

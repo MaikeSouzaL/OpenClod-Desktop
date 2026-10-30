@@ -71,9 +71,12 @@ describe('memory sync into AI-Memory', () => {
   interface FakeAi {
     available: true
     writes: string[]
+    /** What the index holds, by path (the sidecar keeps what was written to it). */
+    pages: Map<string, string>
     recent: () => Promise<unknown[]>
     relatedMarkdown: () => Promise<string>
-    writePage: (projectId: string, input: { path: string }) => Promise<{ path: string; pageId: string }>
+    writePage: (projectId: string, input: { path: string; body: string }) => Promise<{ path: string; pageId: string }>
+    readPage: (projectId: string, path: string) => Promise<{ path: string; title: string; body: string } | null>
     deletePage: () => Promise<boolean>
   }
 
@@ -81,12 +84,15 @@ describe('memory sync into AI-Memory', () => {
     const ai: FakeAi = {
       available: true,
       writes: [],
+      pages: new Map(),
       recent: async () => [{ path: 'pages/x.md', title: 'x', snippet: '' }], // non-empty: the index is alive
       relatedMarkdown: async () => '',
       writePage: async (_projectId, input) => {
         ai.writes.push(input.path)
+        ai.pages.set(input.path, input.body)
         return { path: input.path, pageId: input.path }
       },
+      readPage: async (_projectId, path) => (ai.pages.has(path) ? { path, title: path, body: ai.pages.get(path)! } : null),
       deletePage: async () => true
     }
     return ai
@@ -129,8 +135,28 @@ describe('memory sync into AI-Memory', () => {
     await sync()
     expect(ai.writes).toHaveLength(1)
     ai.recent = async () => [] // fresh sidecar data folder
+    ai.pages.clear()
     ai.writes.length = 0
     await sync()
     expect(ai.writes).toHaveLength(1)
+  }, 40_000)
+
+  it('records a page the index already has with the same text instead of writing it again (an import put it there)', async () => {
+    const { orchestrator, projectId } = await boot()
+    const ai = fakeAi()
+    ;(orchestrator as unknown as { aiMemory: FakeAi }).aiMemory = ai
+    const memory = (orchestrator as unknown as { memoryForProject: (id: string) => { writePage: (input: { title: string; body: string }) => Promise<{ slug: string }> } }).memoryForProject(projectId)
+    const imported = await memory.writePage({ title: 'Importada', body: 'texto que a importação já mandou ao índice' })
+    const changed = await memory.writePage({ title: 'Diferente', body: 'texto novo' })
+    ai.pages.set(`pages/${imported.slug}.md`, 'texto que a importação já mandou ao índice')
+    ai.pages.set(`pages/${changed.slug}.md`, 'texto antigo')
+    const sync = (): Promise<void> =>
+      (orchestrator as unknown as { doSyncNativeToAi: (id: string) => Promise<void> }).doSyncNativeToAi(projectId)
+    await sync()
+    expect(ai.writes).not.toContain(`pages/${imported.slug}.md`)
+    expect(ai.writes).toContain(`pages/${changed.slug}.md`)
+    ai.writes.length = 0
+    await sync()
+    expect(ai.writes).toHaveLength(0)
   }, 40_000)
 })

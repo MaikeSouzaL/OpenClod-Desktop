@@ -203,6 +203,11 @@ export interface ModelRequest {
   toolChoice?: 'auto' | 'none'
   /** Per-session reasoning depth; providers map it to what their API supports. */
   effort?: ReasoningEffort
+  /**
+   * false: answer straight away, without a thinking phase, where the server can be told so (llama.cpp passes it to the
+   * chat template). A local Qwen describing a picture spent its whole token budget thinking and answered nothing.
+   */
+  thinking?: boolean
   signal?: AbortSignal
   /**
    * The caller has another model to move to when this one fails: do not wait out a long rate-limit pause and retry at

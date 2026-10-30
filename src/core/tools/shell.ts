@@ -30,6 +30,8 @@ interface BackgroundProcess {
 }
 
 const background = new Map<string, Map<number, BackgroundProcess>>()
+/** run_command without a timeout of its own: this long with no output moves the command to the background. */
+export const SILENT_HANDOFF_MS = 90_000
 
 function track(sessionId: string, child: ChildProcess): void {
   const set = registry.get(sessionId) ?? new Set()
@@ -102,15 +104,23 @@ function spawnCommand(command: string, cwd: string, environment?: EnvironmentPro
 function startBackground(command: string, cwd: string, sessionId: string, environment?: EnvironmentProfile): BackgroundProcess {
   const child = spawnCommand(command, cwd, environment)
   track(sessionId, child)
+  return adoptBackground(child, command, cwd, sessionId)
+}
+
+/**
+ * Puts a running process in the session's background list: its output from now on is kept for read_process_output.
+ * `seen` is what the caller already showed (counted as read, so the next read returns only what is new).
+ */
+function adoptBackground(child: ChildProcess, command: string, cwd: string, sessionId: string, seen = '', startedAt = Date.now()): BackgroundProcess {
   const record: BackgroundProcess = {
     pid: child.pid ?? -1,
     command,
     cwd,
-    startedAt: Date.now(),
-    output: '',
+    startedAt,
+    output: seen,
     dropped: 0,
-    readOffset: 0,
-    exitCode: null,
+    readOffset: seen.length,
+    exitCode: child.exitCode,
     child
   }
   const decoder = new StreamDecoder()
@@ -226,6 +236,8 @@ export interface ShellRunResult {
   stderr: string
   timedOut: boolean
   pid?: number
+  /** Silent for `idleMs`: left running and moved to the session's background list (read_process_output, stop_process). */
+  handedOff?: boolean
 }
 
 export function runShellCommand(
@@ -235,7 +247,8 @@ export function runShellCommand(
   sessionId: string,
   signal: AbortSignal,
   environment?: EnvironmentProfile,
-  onOutput?: (stream: 'out' | 'err', text: string) => void
+  onOutput?: (stream: 'out' | 'err', text: string) => void,
+  options: { idleMs?: number; command?: string; cwd?: string } = {}
 ): Promise<ShellRunResult> {
   return new Promise((resolve) => {
     let child: ChildProcess
@@ -255,6 +268,7 @@ export function runShellCommand(
       if (settled) return
       settled = true
       clearTimeout(timer)
+      if (idleTimer) clearTimeout(idleTimer)
       if (graceTimer) clearTimeout(graceTimer)
       signal.removeEventListener('abort', onAbort)
       const err = stderr.toString()
@@ -262,9 +276,28 @@ export function runShellCommand(
 ${extraErr}` : err, timedOut, pid: child.pid ?? undefined })
     }
 
+    const startedAt = Date.now()
+    let idleTimer: NodeJS.Timeout | undefined
+    // A command silent for that long is almost always waiting on something (another program, a socket, a dialog): the
+    // turn gets its control back and the process keeps running in the background, where the agent can read or stop it.
+    const armIdle = (): void => {
+      if (!options.idleMs || settled) return
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        signal.removeEventListener('abort', onAbort)
+        const seen = `${stdout.toString()}${stderr.toString()}`
+        adoptBackground(child, options.command ?? command, options.cwd ?? cwd, sessionId, seen, startedAt)
+        resolve({ code: null, stdout: stdout.toString(), stderr: stderr.toString(), timedOut: false, pid: child.pid ?? undefined, handedOff: true })
+      }, options.idleMs)
+    }
+
     const append = (target: 'out' | 'err', data: Buffer): void => {
       const text = (target === 'out' ? stdout : stderr).push(data)
       onOutput?.(target, text)
+      armIdle()
     }
 
     child.stdout?.on('data', (d: Buffer) => append('out', d))
@@ -282,6 +315,7 @@ ${extraErr}` : err, timedOut, pid: child.pid ?? undefined })
     }, timeoutMs)
     const onAbort = (): void => terminate()
     signal.addEventListener('abort', onAbort, { once: true })
+    armIdle()
 
     child.on('error', (err) => finish(-1, err.message))
     child.on('close', (code) => finish(code))
@@ -290,6 +324,8 @@ ${extraErr}` : err, timedOut, pid: child.pid ?? undefined })
 
 export const runCommandTool: ToolDef = {
   name: 'run_command',
+  // Its own watch: silent for SILENT_HANDOFF_MS it goes to the background; with timeout_ms, the timeout kills it.
+  idleLimitMs: null,
   description:
     'Executa um comando no terminal do projeto (cmd.exe no Windows). Use para testes, builds, instaladores e git. Saída limitada; comandos destrutivos são bloqueados. Com run_in_background=true, devolve o PID na hora e a saída fica disponível em read_process_output (servidores, watchers, builds longos).',
   risk: 'exec',
@@ -336,6 +372,9 @@ export const runCommandTool: ToolDef = {
       }
     }
     const timeoutMs = args.timeout_ms ?? ctx.policy.shellTimeoutSec * 1000
+    // With no timeout of its own, a command that prints nothing for a while goes to the background instead of holding the
+    // whole turn (a script waiting on another program kept a session "stuck" for minutes until the user cancelled).
+    const idleMs = args.timeout_ms === undefined && timeoutMs > SILENT_HANDOFF_MS ? SILENT_HANDOFF_MS : undefined
     const started = Date.now()
     let liveOutput = ''
     let lastProgressAt = 0
@@ -353,9 +392,24 @@ export const runCommandTool: ToolDef = {
       ctx.sessionId,
       ctx.signal,
       ctx.environment,
-      onOutput
+      onOutput,
+      { idleMs, command: args.command, cwd }
     )
     const elapsed = ((Date.now() - started) / 1000).toFixed(1)
+    if (result.handedOff) {
+      const seen = `${result.stdout}${result.stderr}`.trim()
+      return {
+        ok: true,
+        text: [
+          `$ ${args.command}`,
+          `sem nenhuma saída nova há ${Math.round(SILENT_HANDOFF_MS / 1000)}s: o comando CONTINUA rodando em segundo plano · pid=${result.pid}`,
+          seen ? `--- saída até agora ---\n${truncateMiddle(seen, 12_000)}` : '(nenhuma saída até agora)',
+          `Acompanhe com read_process_output (pid ${result.pid}, wait_ms para esperar saída nova) ou encerre com stop_process se ele estiver esperando algo que não vai acontecer (outro programa, uma janela, entrada do teclado).`
+        ].join('\n'),
+        summary: `pid ${result.pid} · segundo plano após ${elapsed}s sem saída`,
+        data: { pid: result.pid, command: args.command, background: true, handedOff: true }
+      }
+    }
     const parts = [`$ ${args.command}`, `exit=${result.code ?? 'null'} · ${elapsed}s${result.timedOut ? ' · TIMEOUT' : ''}`]
     if (result.stdout.trim()) parts.push(`--- stdout ---\n${truncateMiddle(result.stdout.trim(), 28_000)}`)
     if (result.stderr.trim()) parts.push(`--- stderr ---\n${truncateMiddle(result.stderr.trim(), 12_000)}`)

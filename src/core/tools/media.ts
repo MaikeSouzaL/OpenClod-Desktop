@@ -71,6 +71,8 @@ export function mediaMirror(ctx: Pick<ToolContext, 'services' | 'projectId'>): (
 
 export const mediaIngestTool: ToolDef = {
   name: 'media_ingest',
+  // Transcribing a long recording has long silent stretches.
+  idleLimitMs: 20 * 60_000,
   description:
     'Processa um áudio ou vídeo local de ponta a ponta e guarda tudo na memória do projeto, para você e qualquer outro modelo usarem como contexto sem reler a mídia: ' +
     'transcreve a fala (Whisper embutido, offline); em vídeo, extrai os frames que importam (cortes de cena, sem repetições), monta folhas de contato e lê o texto da tela (OCR). ' +

@@ -256,6 +256,51 @@ describe('project memory: automatic turn capture', () => {
     expect(bodies.every((page) => page?.body.includes('[[sessao-antiga]]'))).toBe(true)
   })
 
+  it('migrates a legacy session whose slug differs from its title only once', async () => {
+    await memory.writePage({
+      title: 'Sessao Claude (front) - 2026-09-02 - msg (parte 1/8)',
+      slug: 'sessao-claude-front-2026-09-02-msg-p1',
+      body: ['### 02/09/2026, 10:00', '', '**Pedido:** ler as mensagens', '', '**Resultado:** lidas'].join('\n'),
+      tags: ['sessao', 'automatico'],
+      source: 'import'
+    })
+
+    const primeira = new ProjectMemory(root)
+    await primeira.init()
+    const index = await primeira.readPage('sessao-claude-front-2026-09-02-msg-p1')
+    expect(index?.tags).toContain('indice')
+    expect(index?.body).not.toMatch(/^### /m)
+    const turnos = (await primeira.listPages()).filter((item) => item.kind === 'turn')
+    expect(turnos).toHaveLength(1)
+    const antes = turnos[0].updated
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const segunda = new ProjectMemory(root)
+    await segunda.init()
+    const depois = (await segunda.listPages()).filter((item) => item.kind === 'turn')
+    expect(depois).toHaveLength(1)
+    expect(depois[0].updated).toBe(antes)
+    expect((await segunda.listPages()).filter((item) => item.tags.includes('sessao') && item.tags.includes('indice'))).toHaveLength(1)
+  })
+
+  it('leaves an imported session summary with section headings untouched', async () => {
+    const corpo = ['### Pedido', '', 'corrigir as abas do cliente', '', '### Investigado', '', 'o componente de abas', '', '### Aprendido', '', 'as abas vêm do perfil'].join('\n')
+    await memory.writePage({
+      title: 'Sessao Claude (front) - 2026-09-03 - abas do cliente',
+      slug: 'sessao-claude-front-2026-09-03-abas-do-cliente',
+      body: corpo,
+      tags: ['urmobo', 'sessao', 'claude-mem'],
+      source: 'import'
+    })
+
+    const fresh = new ProjectMemory(root)
+    await fresh.init()
+    const pagina = await fresh.readPage('sessao-claude-front-2026-09-03-abas-do-cliente')
+    expect(pagina?.body).toContain('### Investigado')
+    expect(pagina?.tags).not.toContain('indice')
+    expect((await fresh.listPages()).filter((item) => item.kind === 'turn')).toHaveLength(0)
+  })
+
   it('resolves wikilinks and backlinks across topic pages', async () => {
     await memory.writePage({ title: 'Tópico A', body: 'Veja [[Tópico B]] para o detalhe.' })
     await memory.writePage({ title: 'Tópico B', body: 'Detalhe do tópico B.' })

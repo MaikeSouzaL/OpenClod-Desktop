@@ -69,6 +69,8 @@ export interface AiMemoryGraphEdge {
 export interface AiMemoryGraph {
   nodes: AiMemoryGraphNode[]
   edges: AiMemoryGraphEdge[]
+  /** Pages there are (or that match the search) before the graph's limit. */
+  total?: number
   truncated: boolean
   source: 'ai-memory' | 'native'
 }
@@ -79,7 +81,11 @@ interface ServerState {
   pid?: number
 }
 
-const START_TIMEOUT_MS = 20_000
+/**
+ * On a big data folder the sidecar needs ~35 s before it answers (migrations, loading the embedding model, the embedding
+ * backfill). With 20 s it was killed just before it was ready, every time, and the index never came up.
+ */
+const START_TIMEOUT_MS = 90_000
 const REQUEST_TIMEOUT_MS = 15_000
 
 export class AiMemoryService {
@@ -128,7 +134,9 @@ export class AiMemoryService {
   private async startInternal(): Promise<void> {
     await fs.promises.mkdir(this.dataDir, { recursive: true })
     const previous = await this.readServerState()
-    if (previous && (await this.healthy(previous))) {
+    // A sidecar of an earlier run is reused when it answers (a busy one gets a few seconds); one that does not still holds
+    // the serve lock, and a new sidecar could never start: it is stopped first.
+    if (previous && (await this.healthy(previous, 5_000))) {
       this.server = previous
       await this.compactLongPaths().catch((err) => {
         this.lastError = `migração de caminhos: ${(err as Error).message}`
@@ -139,6 +147,7 @@ export class AiMemoryService {
       return
     }
 
+    if (previous) await this.releaseStale(previous)
     if (!fs.existsSync(path.join(this.dataDir, 'config.toml'))) {
       await this.run(['init', '--data-dir', this.dataDir], 60_000)
     }
@@ -215,10 +224,10 @@ export class AiMemoryService {
     throw new Error('ai-memory não gerou o token de acesso')
   }
 
-  private async healthy(state: ServerState): Promise<boolean> {
+  private async healthy(state: ServerState, timeoutMs = 2_000): Promise<boolean> {
     try {
       const response = await fetch(`http://127.0.0.1:${state.port}/healthz`, {
-        signal: AbortSignal.timeout(2_000)
+        signal: AbortSignal.timeout(timeoutMs)
       })
       return response.ok
     } catch {
@@ -703,6 +712,60 @@ export class AiMemoryService {
     walk(root)
   }
 
+  /**
+   * Stops the sidecar a previous run left behind when it does not answer (its pid is in server.json): alive, it keeps the
+   * single-instance serve lock and every new start fails with "não respondeu". Returns whether a process was stopped.
+   */
+  async releaseStale(previous: { pid?: number }): Promise<boolean> {
+    const pid = previous.pid
+    if (!pid || pid === this.child?.pid || !processAlive(pid)) return false
+    try {
+      if (process.platform === 'win32') spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+      else process.kill(pid, 'SIGKILL')
+    } catch {
+      return false
+    }
+    // The lock goes with the process: a moment for the system to let it go.
+    for (let i = 0; i < 20 && processAlive(pid); i++) await sleep(150)
+    await fs.promises.rm(path.join(this.dataDir, 'server.json'), { force: true }).catch(() => undefined)
+    return !processAlive(pid)
+  }
+
+  /** Health checks in a row that a sidecar supposed to be up did not answer. */
+  private unanswered = 0
+
+  /**
+   * The watchdog's check (every minute): a sidecar that is up but stopped answering /healthz — hung, not dead (a dead one
+   * is noticed by its exit) — is killed and started again after three missed checks in a row. Each check waits 10 s: a
+   * sidecar busy committing a big write must not be taken for a hung one.
+   */
+  async selfCheck(): Promise<'ok' | 'idle' | 'missed' | 'restarted' | 'restart-failed'> {
+    const server = this.server
+    if (!server || this.starting) return 'idle'
+    if (await this.healthy(server, 10_000)) {
+      this.unanswered = 0
+      return 'ok'
+    }
+    if (++this.unanswered < 3) return 'missed'
+    this.unanswered = 0
+    // A sidecar reused from an earlier run is not our child: it is killed by the pid it wrote down.
+    const pid = this.child?.pid ?? server.pid
+    await this.stop()
+    if (pid) {
+      try {
+        if (process.platform === 'win32') spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+        else process.kill(pid, 'SIGKILL')
+      } catch {
+        /* already gone */
+      }
+    }
+    await fs.promises.rm(path.join(this.dataDir, 'server.json'), { force: true }).catch(() => undefined)
+    return this.start().then(
+      () => (this.server ? 'restarted' : 'restart-failed'),
+      () => 'restart-failed'
+    )
+  }
+
   async stop(): Promise<void> {
     const child = this.child
     this.child = null
@@ -718,6 +781,16 @@ export class AiMemoryService {
         /* best-effort */
       }
     }
+  }
+}
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    // EPERM: it exists but belongs to someone else.
+    return (err as NodeJS.ErrnoException).code === 'EPERM'
   }
 }
 

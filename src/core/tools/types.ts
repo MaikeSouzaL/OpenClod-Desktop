@@ -288,6 +288,12 @@ export interface ToolDef {
   resolveCall?(args: unknown): { risk?: RiskLevel; approval?: 'allow' | 'ask'; deny?: string } | undefined
   /** Description sent to the model when it depends on the session (e.g. the agents it may call). Falls back to `description`. */
   dynamicDescription?(ctx: Pick<ToolContext, 'agents'>): string
+  /**
+   * The watchdog: how long a call may go with no result and no progress before it is stopped as stuck (default 4 min).
+   * null for tools that wait on purpose (the user's answer, subagents with their own watched tools, a command with its own
+   * timeout). A function gets the call's arguments.
+   */
+  idleLimitMs?: number | null | ((rawArgs: unknown) => number | null)
   describe(rawArgs: unknown): ToolDescription
   execute(rawArgs: unknown, ctx: ToolContext): Promise<ToolResult>
 }

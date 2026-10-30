@@ -49,6 +49,8 @@ function normalize(questions: z.infer<typeof questionSchema>[]): QuestionSpec[] 
  */
 export const askUserTool: ToolDef = {
   name: 'ask_user',
+  // Waits for the user's answer, however long it takes: not a stuck call.
+  idleLimitMs: null,
   description:
     'Faz de 1 a 6 perguntas ao usuário e pausa até ele responder. Use quando faltar contexto que muda a solução ' +
     '(preferência, escopo, escolha de caminho, credencial, formato de entrega) em vez de adivinhar. Cada pergunta ' +

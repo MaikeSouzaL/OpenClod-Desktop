@@ -768,6 +768,8 @@ export interface MemoryStatsInfo {
   indexSync?: { done: number; total: number; running: boolean }
   /** Files kept in the memory, by kind (imagem, pdf, documento, planilha, apresentacao, texto, codigo, audio, video, arquivo). */
   files?: Record<string, number>
+  /** The same files with how many have their text or description in the index (found by the agent at any time) and how many lost the file on disk. */
+  fileIndex?: Record<string, { total: number; indexed: number; missing: number }>
   conflicts?: number
   superseded?: number
   invalidated?: number
@@ -850,6 +852,8 @@ export interface MemoryGraphEdgeInfo {
 export interface MemoryGraphInfo {
   nodes: MemoryGraphNodeInfo[]
   edges: MemoryGraphEdgeInfo[]
+  /** Pages there are (or that match the search) before the graph's limit; `truncated` when some are left out. */
+  total?: number
   truncated: boolean
   source: 'ai-memory' | 'native'
 }
@@ -1387,7 +1391,8 @@ export interface OpenclodApi {
     /** Sidecar status (binary, server, port, last error). */
     aiStatus(): Promise<IpcResult<{ available: boolean; running: boolean; root: string; port?: number; error?: string }>>
     /** Obsidian-style graph: explicit + semantic connections for one project. */
-    graph(projectId: string): Promise<IpcResult<MemoryGraphInfo>>
+    /** The most connected pages, or with `query` the pages that match it and their linked neighbours. */
+    graph(projectId: string, query?: string): Promise<IpcResult<MemoryGraphInfo>>
     /** Saves every page as one Markdown bundle; returns the chosen path. */
     exportMarkdown(projectId: string): Promise<IpcResult<string | null>>
     /** Imports all .md files from a chosen folder as memory pages. */

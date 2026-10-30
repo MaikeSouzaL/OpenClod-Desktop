@@ -10214,6 +10214,27 @@ button.env-row:hover {
   border-top-style: dotted;
 }
 
+/* The canvas graph draws links in the page colour and tags/words in the text colour, fainter. */
+.memory-graph-legend i.line.link {
+  border-top-color: rgba(240, 179, 90, 0.85);
+}
+
+.memory-graph-legend i.line.faint {
+  opacity: 0.45;
+}
+
+.memory-graph-busy {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--elevated);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
 .memory-graph-detail {
   position: absolute;
   top: 12px;

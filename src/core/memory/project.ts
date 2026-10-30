@@ -208,16 +208,62 @@ export class ProjectMemory {
         // All three only maintain derived pages (turn notes, tags, subject hubs): one that fails (a file held by another
         // program) must not keep the memory from opening — the wiki is intact, and the next start tries again.
         try {
-          let pages = await this.readWiki()
-          if (await this.migrateLegacyPages(pages)) pages = await this.readWiki()
-          await this.enrichTurnTags(pages)
-          await this.rebuildTopicHubs(pages)
+          await this.batch(async () => {
+            let pages = await this.readWiki()
+            if (await this.migrateLegacyPages(pages)) pages = await this.readWiki()
+            await this.enrichTurnTags(pages)
+            await this.rebuildTopicHubs(pages)
+          })
         } catch {
           /* maintenance only */
         }
       })()
     }
     return this.initPromise
+  }
+
+  /** Inside a batch, writePage keeps the index in memory; it is saved once when the outermost batch ends. */
+  private batchDepth = 0
+  /** A page was written inside the current batch: the index must be saved when it ends. */
+  private batchDirty = false
+
+  /**
+   * Many writes in a row (the migration of imported sessions writes thousands of turn notes): each writePage used to
+   * reread the wiki's stamps and rewrite the whole index, minutes for a big memory. Here the index is updated in memory
+   * and written once at the end.
+   */
+  private async batch<T>(work: () => Promise<T>): Promise<T> {
+    this.batchDepth++
+    try {
+      return await work()
+    } finally {
+      this.batchDepth--
+      if (!this.batchDepth && this.batchDirty && this.loadedIndex) {
+        this.batchDirty = false
+        const index: IndexFile = {
+          version: 1,
+          pages: withBacklinks(sortSummaries(this.loadedIndex.pages)),
+          stamps: this.loadedIndex.stamps
+        }
+        this.loadedIndex = index
+        // The next index() compares these stamps with the disk: only what changed behind the batch is read again.
+        this.indexSignature = ''
+        await this.writeIndex(index)
+      }
+    }
+  }
+
+  /** Many writes from outside in a row (a bulk import of files): the index is kept in memory and saved once at the end. */
+  async bulk<T>(work: () => Promise<T>): Promise<T> {
+    return this.batch(work)
+  }
+
+  /**
+   * What the screens read (list, counts) waits for the start-up maintenance only a moment: a memory with sessions to
+   * migrate shows what it has now, and the rest appears as the maintenance goes on in the background.
+   */
+  private async initForReading(maxMs = 1_500): Promise<void> {
+    await Promise.race([this.init(), new Promise<void>((resolve) => setTimeout(resolve, maxMs))])
   }
 
   /**
@@ -350,7 +396,7 @@ export class ProjectMemory {
     let migrated = false
     for (const { page } of entries) {
       if (!page.tags.includes('sessao') || page.tags.includes('indice')) continue
-      if (!/^###\s+/m.test(page.body)) continue
+      if (!LEGACY_TURN_HEADING.test(page.body)) continue
       const sections = splitLegacySections(page.body)
       if (!sections.length) continue
       const links: string[] = []
@@ -370,6 +416,7 @@ export class ProjectMemory {
       migrated = true
       await this.writePage({
         title: page.title,
+        slug: page.slug,
         body: ['## Turnos', '', ...links.slice(-300)].join('\n'),
         tags: [...new Set(['sessao', 'indice', ...page.tags.filter((tag) => tag !== 'automatico')])],
         source: 'auto',
@@ -401,11 +448,12 @@ export class ProjectMemory {
         return
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code
-        if (attempt >= 5 || !(code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
+        // Eight tries over ~7 s: during a bulk import the antivirus holds each new file for seconds while it scans it.
+        if (attempt >= 8 || !(code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
           await fs.promises.rm(tmp, { force: true }).catch(() => undefined)
           throw err
         }
-        await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt))
+        await new Promise((resolve) => setTimeout(resolve, Math.min(2_000, 50 * 2 ** attempt)))
       }
     }
   }
@@ -525,7 +573,7 @@ export class ProjectMemory {
     }
     const supersedes = input.supersedes ? clean(input.supersedes, 80) : undefined
     if (supersedes && !/^[a-z0-9][a-z0-9-]{0,80}$/.test(supersedes)) throw new Error('slug substituído inválido')
-    const indexBefore = await this.index()
+    const indexBefore = this.batchDepth && this.loadedIndex ? this.loadedIndex : await this.index()
     let pageBody = body
     if (input.relate && !/^##\s+Relacionados\s*$/m.test(pageBody)) {
       const hint = typeof input.relate === 'string' ? input.relate : body.slice(0, 300)
@@ -574,14 +622,31 @@ export class ProjectMemory {
     // The index read above is fresh (index() rebuilds it when the wiki changed behind it): only this page, and the one it
     // supersedes, change in it.
     const changed = new Set([slug, ...(supersedes ? [supersedes] : [])])
-    const pages = indexBefore.pages.filter((item) => !changed.has(item.slug))
     const summary = summarize(page)
-    pages.push(summary)
-    if (supersedes) {
-      const replaced = await this.readPage(supersedes)
+    const replaced = supersedes ? await this.readPage(supersedes) : null
+    const merge = (from: MemoryPageSummary[]): MemoryPageSummary[] => {
+      const pages = from.filter((item) => !changed.has(item.slug))
+      pages.push(summary)
       if (replaced) pages.push(summarize(replaced))
+      return pages
     }
-    await this.saveIndex(pages)
+    if (this.batchDepth) {
+      // Saved (sorted, with backlinks) when the batch ends. The stamps are those of the files just written, so a change
+      // someone else makes to them before the end is still seen as a change.
+      const written = await Promise.all(
+        [...changed].map(async (item) => {
+          const stat = await fs.promises.stat(path.join(this.wikiDir, `${item}.md`)).catch(() => null)
+          return [`${item}.md`, stat ? `${stat.size}:${stat.mtimeMs}` : ''] as const
+        })
+      )
+      const current = this.loadedIndex ?? indexBefore
+      const stamps = current.stamps ?? {}
+      for (const [file, stamp] of written) if (stamp) stamps[file] = stamp
+      this.loadedIndex = { version: 1, pages: merge(current.pages), stamps }
+      this.batchDirty = true
+    } else {
+      await this.saveIndex(merge(indexBefore.pages))
+    }
     return summary
   }
 
@@ -606,7 +671,7 @@ export class ProjectMemory {
   }
 
   async listPages(): Promise<MemoryPageSummary[]> {
-    await this.init()
+    await this.initForReading()
     return sortSummaries((await this.index()).pages)
   }
 
@@ -947,7 +1012,7 @@ export class ProjectMemory {
   }
 
   async stats(): Promise<MemoryStats> {
-    await this.init()
+    await this.initForReading()
     const index = await this.index()
     const handoffs = (await this.handoffFile()).items.filter((item) => item.state === 'open')
     return {
@@ -1112,8 +1177,10 @@ function shortHash(value: string): string {
  *   **Pedido:** ...
  *   **Resultado:** ...
  */
+const LEGACY_TURN_HEADING = /^###\s+\d{1,2}\/\d{1,2}\/\d{2,4}/m
+
 function splitLegacySections(body: string): Array<{ stamp: string; request: string; body: string }> {
-  const chunks = body.split(/\n(?=###\s+)/).filter((chunk) => /^###\s+/m.test(chunk))
+  const chunks = body.split(/\n(?=###\s+\d{1,2}\/\d{1,2}\/\d{2,4})/).filter((chunk) => LEGACY_TURN_HEADING.test(chunk))
   const sections: Array<{ stamp: string; request: string; body: string }> = []
   for (const chunk of chunks) {
     const lines = chunk.trim().split(/\r?\n/)

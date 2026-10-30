@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import type { MemoryAddJobInfo, MemoryFileInfo } from '../../../shared/api'
+import type { MemoryAddJobInfo, MemoryFileInfo, MemoryStatsInfo } from '../../../shared/api'
 import { Icon, type IconName } from './Icons'
 import { unwrap } from '../lib/api'
 import './memory-files.css'
@@ -21,25 +21,74 @@ export const MEMORY_KINDS: Array<{ kind: string; label: string; icon: IconName }
 /** What the page grid shows: everything, only the wiki pages, or one kind of file. */
 export type MemoryFilter = 'tudo' | 'paginas' | string
 
-/** Counters of the files in the memory, by kind; a click filters the grid by that kind. */
-export function MemoryKindBar({ counts, filter, onFilter }: { counts: Record<string, number>; filter: MemoryFilter; onFilter(next: MemoryFilter): void }): ReactElement | null {
-  const kinds = MEMORY_KINDS.filter((item) => counts[item.kind])
-  const total = kinds.reduce((sum, item) => sum + (counts[item.kind] ?? 0), 0)
+/** Shown even at zero: whether the memory has pictures, PDFs, documents, sheets, audio and video is what people look for. */
+const ALWAYS_SHOWN = new Set(['imagem', 'pdf', 'documento', 'planilha', 'audio', 'video'])
+
+/**
+ * Counters of the files in the memory, by kind, with how many of them the agent finds at any time (their text, transcript
+ * or description is in the index) and how many lost the file on disk. A click filters the grid by that kind.
+ */
+export function MemoryKindBar({
+  counts,
+  index,
+  filter,
+  onFilter
+}: {
+  counts: Record<string, number>
+  index?: MemoryStatsInfo['fileIndex']
+  filter: MemoryFilter
+  onFilter(next: MemoryFilter): void
+}): ReactElement | null {
+  const totalOf = (kind: string): number => index?.[kind]?.total ?? counts[kind] ?? 0
+  const kinds = MEMORY_KINDS.filter((item) => ALWAYS_SHOWN.has(item.kind) || totalOf(item.kind))
+  const total = MEMORY_KINDS.reduce((sum, item) => sum + totalOf(item.kind), 0)
+  const indexed = MEMORY_KINDS.reduce((sum, item) => sum + (index?.[item.kind]?.indexed ?? 0), 0)
   return (
-    <div className="memory-kinds" role="toolbar" aria-label="Arquivos na memória">
-      <button type="button" className={filter === 'tudo' ? 'on' : ''} onClick={() => onFilter('tudo')}>
-        Tudo
-      </button>
-      <button type="button" className={filter === 'paginas' ? 'on' : ''} onClick={() => onFilter('paginas')}>
-        <Icon name="file" size={12} /> Páginas
-      </button>
-      {kinds.map((item) => (
-        <button key={item.kind} type="button" className={filter === item.kind ? 'on' : ''} onClick={() => onFilter(filter === item.kind ? 'tudo' : item.kind)} data-kind={item.kind}>
-          <Icon name={item.icon} size={12} />
-          <strong>{counts[item.kind]}</strong> {item.label}
+    <div className="memory-files-summary">
+      <div className="memory-files-head">
+        <strong>Arquivos na memória</strong>
+        <span className="muted">
+          {total
+            ? `${total.toLocaleString('pt-BR')} guardado(s) · ${indexed.toLocaleString('pt-BR')} indexado(s): o agente acha pelo texto, pela transcrição ou pela descrição, a qualquer momento`
+            : 'Nenhum arquivo guardado ainda: use “Guardar arquivos” ou peça ao agente (memory_file).'}
+        </span>
+      </div>
+      <div className="memory-kinds" role="toolbar" aria-label="Arquivos na memória">
+        <button type="button" className={filter === 'tudo' ? 'on' : ''} onClick={() => onFilter('tudo')}>
+          Tudo
         </button>
-      ))}
-      {!total ? <span className="muted">Nenhum arquivo guardado ainda: use “Guardar arquivos” ou peça ao agente (memory_file).</span> : null}
+        <button type="button" className={filter === 'paginas' ? 'on' : ''} onClick={() => onFilter('paginas')}>
+          <Icon name="file" size={12} /> Páginas
+        </button>
+        {kinds.map((item) => {
+          const count = totalOf(item.kind)
+          const entry = index?.[item.kind]
+          return (
+            <button
+              key={item.kind}
+              type="button"
+              className={`${filter === item.kind ? 'on' : ''}${count ? '' : ' empty'}`}
+              disabled={!count}
+              onClick={() => onFilter(filter === item.kind ? 'tudo' : item.kind)}
+              data-kind={item.kind}
+              title={
+                entry
+                  ? `${entry.total} guardado(s), ${entry.indexed} com texto, transcrição ou descrição no índice${entry.missing ? `, ${entry.missing} sem o arquivo no disco (só o texto ficou)` : ''}`
+                  : undefined
+              }
+            >
+              <Icon name={item.icon} size={12} />
+              <strong>{count.toLocaleString('pt-BR')}</strong> {item.label}
+              {entry && count ? (
+                <small className={entry.missing || entry.indexed < entry.total ? 'warn' : ''}>
+                  {entry.indexed === entry.total ? 'todos indexados' : `${entry.indexed.toLocaleString('pt-BR')} indexado(s)`}
+                  {entry.missing ? ` · ${entry.missing.toLocaleString('pt-BR')} sem arquivo` : ''}
+                </small>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

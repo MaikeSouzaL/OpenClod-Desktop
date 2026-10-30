@@ -25,10 +25,10 @@ export const FILE_KINDS: Record<MemoryFileKind, { label: string; extensions: str
   documento: { label: 'Documento', extensions: ['.docx', '.doc', '.odt', '.rtf'] },
   planilha: { label: 'Planilha', extensions: ['.xlsx', '.xls', '.ods', '.csv', '.tsv'] },
   apresentacao: { label: 'Apresentação', extensions: ['.pptx', '.ppt', '.odp'] },
-  texto: { label: 'Texto', extensions: ['.md', '.mdx', '.txt', '.html', '.htm', '.json', '.xml', '.yaml', '.yml', '.log', '.ini', '.toml', '.svg'] },
+  texto: { label: 'Texto', extensions: ['.md', '.mdx', '.txt', '.html', '.htm', '.json', '.xml', '.yaml', '.yml', '.log', '.ini', '.toml', '.svg', '.drawio'] },
   codigo: {
     label: 'Código',
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.cs', '.java', '.kt', '.go', '.rs', '.c', '.h', '.cpp', '.hpp', '.php', '.rb', '.swift', '.sql', '.sh', '.ps1', '.bat', '.css', '.scss', '.vue', '.svelte']
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.cs', '.java', '.kt', '.go', '.rs', '.c', '.h', '.cpp', '.hpp', '.php', '.rb', '.swift', '.sql', '.sh', '.ps1', '.bat', '.css', '.scss', '.vue', '.svelte', '.patch', '.diff', '.csproj', '.sln', '.props']
   },
   audio: { label: 'Áudio', extensions: ['.mp3', '.wav', '.m4a', '.ogg', '.opus', '.flac', '.aac', '.wma'] },
   video: { label: 'Vídeo', extensions: ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.wmv', '.m4v'] },
@@ -216,6 +216,77 @@ export function countMemoryFiles(memoryRoot: string): Record<string, number> {
     }
   }
   return counts
+}
+
+/** One kind of file in the memory, as the Memória screen counts it. */
+export interface MemoryFileIndexEntry {
+  /** Files kept (a copy in the memory, or the reference to a file too big to copy). */
+  total: number
+  /** Their text (PDF, document, OCR, transcript) or description is in the wiki: memory_recall and the turn context find it. */
+  indexed: number
+  /** Neither the copy in the memory nor the original is on disk any more: only the text already read is left. */
+  missing: number
+}
+
+const exists = (file: string): Promise<boolean> =>
+  fs.promises.access(file).then(
+    () => true,
+    () => false
+  )
+
+/**
+ * What the harness can reach, by kind: the files added to the memory plus the audio and video the media pipeline keeps
+ * in `<memory>/media` (indexed once it has a transcript or frames). Asynchronous on purpose: a memory with thousands of
+ * files must not stall the main process every time the screen asks for its counts.
+ */
+export async function memoryFileIndex(memoryRoot: string): Promise<Record<string, MemoryFileIndexEntry>> {
+  const out: Record<string, MemoryFileIndexEntry> = {}
+  const bump = (kind: string, indexed: boolean, missing: boolean): void => {
+    const entry = (out[kind] ??= { total: 0, indexed: 0, missing: 0 })
+    entry.total++
+    if (indexed) entry.indexed++
+    if (missing) entry.missing++
+  }
+  const readJson = async <T>(file: string): Promise<T | null> => {
+    try {
+      return JSON.parse(await fs.promises.readFile(file, 'utf8')) as T
+    } catch {
+      return null
+    }
+  }
+  const root = filesRoot(memoryRoot)
+  const names = await fs.promises.readdir(root).catch(() => [] as string[])
+  for (let start = 0; start < names.length; start += 64) {
+    await Promise.all(
+      names.slice(start, start + 64).map(async (name) => {
+        const dir = path.join(root, name)
+        const meta = await readJson<MemoryFileMeta>(path.join(dir, 'meta.json'))
+        if (!meta || typeof meta.slug !== 'string') return
+        const present = (meta.stored ? await exists(path.join(dir, meta.stored)) : false) || (await exists(meta.source))
+        // Every file gets a page, but a picture with no OCR text and no description has nothing in it to be found by.
+        bump(meta.kind, Boolean(meta.textChars > 0 || meta.description), !present)
+      })
+    )
+  }
+  const media = path.join(memoryRoot, 'media')
+  const dirs = await fs.promises.readdir(media).catch(() => [] as string[])
+  for (let start = 0; start < dirs.length; start += 64) {
+    await Promise.all(
+      dirs.slice(start, start + 64).map(async (dir) => {
+        const manifest = await readJson<{ kind?: string; source?: string | { path?: string }; frames?: unknown[]; transcript?: { segments?: unknown[] } }>(
+          path.join(media, dir, 'manifest.json')
+        )
+        if (!manifest) return
+        const indexed = Boolean(manifest.transcript?.segments?.length || manifest.frames?.length)
+        // The frames and the transcript stay in the memory even if the original goes away: only the playback is lost.
+        // The pipeline writes the source as { path, name, size, mtime }.
+        const source = typeof manifest.source === 'string' ? manifest.source : manifest.source?.path
+        const missing = source ? !(await exists(source)) : false
+        bump(manifest.kind === 'video' ? 'video' : 'audio', indexed, missing)
+      })
+    )
+  }
+  return out
 }
 
 export function findMemoryFile(memoryRoot: string, slug: string): { meta: MemoryFileMeta; dir: string } | null {

@@ -12,6 +12,7 @@ import { resolveCompat } from './compat.js'
 import { isDeepSeekV4Model, openaiReasoningEffort } from './reasoning.js'
 import { estimateTokens } from '../util/ids.js'
 import { modelSeesImages } from './order.js'
+import { LLAMACPP_PROVIDER_ID } from '../../shared/llamacpp.js'
 
 /**
  * Silêncio tolerado entre pedaços do stream antes de abandonar o pedido. 10 min era alto demais: um túnel do Colab
@@ -210,6 +211,9 @@ export class OpenAICompatibleProvider implements Provider {
     if (req.effort && compat.reasoningEffort) {
       body.reasoning_effort = openaiReasoningEffort(req.effort, this.config.model)
     }
+    // llama-server hands these to the model's chat template (Qwen3 and others skip their thinking block); other servers
+    // could reject an unknown field, so it goes only to the embedded one.
+    if (req.thinking === false && this.config.id === LLAMACPP_PROVIDER_ID) body.chat_template_kwargs = { enable_thinking: false }
 
     const url = `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`
     const response = await postStream({ url, headers, body, signal: req.signal, fastFail: req.fastFail })

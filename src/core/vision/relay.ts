@@ -91,8 +91,10 @@ async function describeWith(candidate: DescribeCandidate, image: ImagePart, ques
       ],
       tools: [],
       maxTokens: MAX_DESCRIBE_TOKENS,
-      // Describing is not a puzzle: models that think are asked to think little (the rest ignore it).
+      // Describing is not a puzzle: models that think are asked to think little, or not at all where the server allows it
+      // (the rest ignore both).
       effort: 'low',
+      thinking: false,
       signal: guard.signal
     })
     for await (const event of stream) {

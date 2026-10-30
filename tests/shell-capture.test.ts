@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { OutputCapture } from '../src/core/util/output-capture'
 import { StreamDecoder, decodeLine } from '../src/core/util/oem-decode'
-import { runShellCommand } from '../src/core/tools/shell'
+import { readProcessOutputTool, runShellCommand } from '../src/core/tools/shell'
+import type { ToolContext } from '../src/core/tools/types'
 
 describe('OutputCapture', () => {
   it('keeps everything while small', () => {
@@ -116,5 +117,45 @@ describe('run_command timeouts', () => {
     expect(result.text).toMatch(/sem nenhuma saída/)
     expect(result.text).toMatch(/Não repita o mesmo comando/)
     expect(result.text).toContain('run_in_background=true')
+  }, 20_000)
+})
+
+describe('a command silent for too long goes to the background instead of holding the turn', () => {
+  it('hands a silent command over, and its later output is read with read_process_output', async () => {
+    const controller = new AbortController()
+    const started = Date.now()
+    const result = await runShellCommand(
+      `node -e "setTimeout(() => console.log('FIM-DO-SCRIPT'), 2500)"`,
+      process.cwd(),
+      60_000,
+      'ses_shell_idle',
+      controller.signal,
+      undefined,
+      undefined,
+      { idleMs: 700 }
+    )
+    expect(result.handedOff).toBe(true)
+    expect(Date.now() - started).toBeLessThan(2_000)
+    expect(result.pid).toBeGreaterThan(0)
+    const ctx = { sessionId: 'ses_shell_idle', signal: controller.signal } as unknown as ToolContext
+    const read = await readProcessOutputTool.execute({ pid: result.pid, wait_ms: 8_000 }, ctx)
+    expect(read.text).toContain('FIM-DO-SCRIPT')
+  }, 20_000)
+
+  it('leaves alone a command that keeps printing', async () => {
+    const controller = new AbortController()
+    const result = await runShellCommand(
+      `node -e "let n=0; const t=setInterval(() => { console.log('passo ' + n); if (++n === 6) clearInterval(t) }, 300)"`,
+      process.cwd(),
+      60_000,
+      'ses_shell_idle',
+      controller.signal,
+      undefined,
+      undefined,
+      { idleMs: 900 }
+    )
+    expect(result.handedOff).toBeFalsy()
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain('passo 5')
   }, 20_000)
 })

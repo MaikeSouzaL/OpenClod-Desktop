@@ -30,6 +30,8 @@ interface FakeAi {
   recent: () => Promise<unknown[]>
   relatedMarkdown: () => Promise<string>
   writePage: (projectId: string, input: { path: string; title: string; body: string; tier?: string }) => Promise<{ path: string; pageId: string }>
+  /** What the index holds: the last write of each path, as the sidecar reads it back. */
+  readPage: (projectId: string, path: string) => Promise<{ path: string; title: string; body: string } | null>
   deletePage: (projectId: string, path: string) => Promise<boolean>
 }
 
@@ -48,6 +50,10 @@ async function boot() {
     writePage: async (_projectId, input) => {
       ai.writes.push(input)
       return { path: input.path, pageId: input.path }
+    },
+    readPage: async (_projectId, pagePath) => {
+      const written = [...ai.writes].reverse().find((item) => item.path === pagePath)
+      return written && !ai.deletes.includes(pagePath) ? { path: pagePath, title: written.title, body: written.body } : null
     },
     deletePage: async (_projectId, pagePath) => {
       ai.deletes.push(pagePath)

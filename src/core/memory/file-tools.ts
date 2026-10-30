@@ -44,6 +44,8 @@ function storeOf(ctx: ToolContext): MemoryFileStore {
 
 export const memoryFileTool: ToolDef = {
   name: 'memory_file',
+  // A big folder: each file reports progress, but one picture described on a CPU takes minutes.
+  idleLimitMs: 15 * 60_000,
   description:
     'Guarda arquivos na memória do projeto e os acha depois: imagens (com descrição escrita por um modelo que enxerga e o texto lido por OCR), PDFs, Word, Excel, PowerPoint, texto, código, áudio, vídeo, qualquer arquivo. ' +
     'Cada arquivo vira uma página da memória (copiada para a pasta da memória, indexada para busca e ligada às páginas que você indicar), então outra sessão ou outro modelo acha a imagem pelo que há nela. ' +

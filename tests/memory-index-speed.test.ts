@@ -68,4 +68,35 @@ describe('the memory index of a big wiki', () => {
     expect(pages.some((item) => item.title === 'Escrita por fora')).toBe(true)
     expect(fs.readdirSync(root).filter((name) => name.endsWith('.tmp'))).toEqual([])
   }, 30_000)
+
+  it('migrates an imported session into turn notes writing the index once, not once per note', async () => {
+    const wiki = path.join(root, 'wiki')
+    fs.mkdirSync(wiki, { recursive: true })
+    const sections = Array.from({ length: 60 }, (_, i) =>
+      [`### 26/10/2026, 15:${String(i).padStart(2, '0')}`, '', `**Pedido:** pedido ${i}`, '', `**Resultado:** resultado ${i}`, ''].join('\n')
+    )
+    fs.writeFileSync(path.join(wiki, 'sessao-importada.md'), page('Sessão: Importada', ['sessao', 'automatico'], sections.join('\n')))
+
+    const memory = new ProjectMemory(root)
+    const indexFile = path.join(root, 'index.json')
+    const realRename = fs.promises.rename
+    const rename = vi.spyOn(fs.promises, 'rename').mockImplementation((from, to) => realRename(from, to))
+    // A page the agent writes while the migration runs goes into the same index.
+    await Promise.all([memory.init(), memory.writePage({ title: 'Escrita durante a manutenção', body: 'no meio do lote', tags: ['teste'] })])
+    const indexWrites = rename.mock.calls.filter(([, to]) => path.resolve(String(to)) === indexFile).length
+    expect(indexWrites).toBeLessThanOrEqual(2)
+
+    const pages = await memory.listPages()
+    expect(pages.filter((item) => item.kind === 'turn')).toHaveLength(60)
+    expect(pages.some((item) => item.title === 'Escrita durante a manutenção')).toBe(true)
+
+    // A turn note edited by hand after the batch is read again; a new instance sees the same index on disk.
+    const turn = pages.find((item) => item.kind === 'turn')!
+    const file = path.join(wiki, `${turn.slug}.md`)
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/^title: .*$/m, 'title: "Turno editado à mão"'))
+    expect((await memory.listPages()).some((item) => item.title === 'Turno editado à mão')).toBe(true)
+    const reopened = await new ProjectMemory(root).listPages()
+    expect(reopened.filter((item) => item.kind === 'turn')).toHaveLength(60)
+    expect(reopened.some((item) => item.title === 'Escrita durante a manutenção')).toBe(true)
+  }, 30_000)
 })

@@ -42,6 +42,8 @@ node scripts/ui-llamacpp.cjs --root <snapshot>  # Provedores → llama.cpp na ja
 node scripts/colab-catalog.mjs --write  # recria o catálogo de modelos do notebook do Colab (tamanhos, cache KV e capacidades medidos no registro do Ollama; precisa de internet); veja docs/COLAB.md
 node scripts/provider-logos.mjs         # recria src/renderer/src/lib/provider-logos.ts (marcas da grade de provedores, do simple-icons; sem Anthropic/Claude); THIRD_PARTY_NOTICES.md §5
 node scripts/ui-memory-select.cjs       # Memória: caixa nos cards, Shift+clique, selecionar todas, apagar em massa com confirmação (perfil descartável); veja docs/AI-MEMORY.md
+node scripts/ui-memory-graph.cjs --root <snapshot>  # Memória grande (cópia de uma wiki real, perfil descartável): contadores por tipo de arquivo e grafo sem travar (IPC e quadros medidos)
+npx tsx scripts/memory-import-files.ts --project <prj_…> --manifest <arquivo.json>  # importa muitos arquivos na memória de um projeto (OCR, texto, descrição/transcrição pronta, tags, ligações); retomável, com o app aberto
 npm run pack:chrome-extension  # release/openclod-chrome-extension-v<versão>.zip
 node scripts/embed-office.mjs  # python-docx/openpyxl/python-pptx no Python embutido (depois do embed-stt; --check confere)
 node scripts/ui-cowork.cjs --scenario deliver --root <snapshot> --system-python nolibs   # Cowork entrega .docx/.xlsx/.pptx (modelo real)

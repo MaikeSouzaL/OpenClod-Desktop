@@ -2239,7 +2239,9 @@ function registerIpc(): void {
     )
   )
   handle(CH.memoryAiStatus, async () => need().aiMemoryStatus())
-  handle(CH.memoryGraph, async (projectId) => need().memoryGraph(str(projectId, 'projectId', 80)))
+  handle(CH.memoryGraph, async (projectId, query) =>
+    need().memoryGraph(str(projectId, 'projectId', 80), typeof query === 'string' ? query.slice(0, 200) : '')
+  )
   handle(CH.memoryExport, async (projectId) => {
     const id = str(projectId, 'projectId', 80)
     const bundle = await need().memoryExportMarkdown(id)
