@@ -20,3 +20,5 @@ resources/runtime/
 resources/models/
 resources/bin/
 resources/llamacpp/
+# REA embutido (Node + rea-agents + motores): scripts/embed-rea.mjs; o código-fonte fica em vendor/rea
+resources/rea/

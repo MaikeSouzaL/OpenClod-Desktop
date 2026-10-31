@@ -56,7 +56,10 @@ import type { TerminalRunner } from '../core/terminal/runner.js'
 import { webTools } from '../core/tools/web.js'
 import { browserTools } from '../core/tools/browser.js'
 import { computerTools } from '../core/tools/computer.js'
+import { ReaLayer } from '../core/rea/layer.js'
+import { buildReaTools } from '../core/rea/tools.js'
 import { planTools } from '../core/tools/plan.js'
+import { loopTools } from '../core/tools/loop.js'
 import { limitationTools } from '../core/tools/limitations.js'
 import { askTools } from '../core/tools/ask.js'
 import { projectMemoryTools } from '../core/memory/tools.js'
@@ -97,6 +100,7 @@ import { externalAgentTools, killExternalAgentProcesses } from '../core/tools/ex
 import { codeIntelligenceTools } from '../core/tools/code-intelligence.js'
 import { documentTools } from '../core/tools/documents.js'
 import { mediaTools } from '../core/tools/media.js'
+import { designTools } from '../core/tools/design.js'
 import { memoryFileTools } from '../core/memory/file-tools.js'
 import {
   addMemoryFile,
@@ -160,6 +164,9 @@ export class Orchestrator {
   readonly store: SessionStore
   readonly settings: SettingsStore
   readonly computer: ComputerLayer
+  /** REA bundled in resources/rea: started on the first rea_* call ("REA Engineering" mode). */
+  readonly rea: ReaLayer
+  private readonly reaTools: ToolDef[]
   readonly skills: SkillLibrary
   readonly aiMemory: AiMemoryService
   readonly inbox: InboxStore
@@ -244,6 +251,8 @@ export class Orchestrator {
     })
     this.approvals = new ApprovalStore(path.join(userDataPath(options.userData, 'data'), 'permissions'))
     this.computer = new ComputerLayer()
+    this.rea = new ReaLayer({ tmpDir: path.join(userDataPath(options.userData, 'data'), 'rea', 'tmp'), log: (message) => this.options.log?.(message) })
+    this.reaTools = buildReaTools(this.rea)
     this.skills = new SkillLibrary([])
     this.aiMemory = new AiMemoryService(path.join(userDataPath(options.userData, 'data'), 'ai-memory'))
     this.inbox = new InboxStore(path.join(userDataPath(options.userData, 'data'), 'inbox'))
@@ -270,7 +279,7 @@ export class Orchestrator {
       this.options.log?.(`Parar pelo Chrome: sessão ${sessionId}`)
       void this.abort(sessionId).catch(() => undefined)
     })
-    this.baseRegistry = buildBaseRegistry()
+    this.baseRegistry = buildBaseRegistry(undefined, this.reaTools)
   }
 
   /**
@@ -319,6 +328,9 @@ export class Orchestrator {
     const userSkills = path.join(this.options.userData, 'skills')
     await ensureStarterSkills(userSkills)
     this.skills.addRoot(userSkills, 'usuario')
+    // REA's own skill (reverse-engineer-anything), straight from the bundled release so it always matches its tools.
+    const reaSkills = resourcePath('rea', 'app', 'skills')
+    if (reaSkills) this.skills.addRoot(reaSkills, 'usuario')
     await this.skills.reload()
     await this.refreshPluginSkills()
 
@@ -379,7 +391,7 @@ export class Orchestrator {
   /* ------------------------------- registry ------------------------------ */
 
   private rebuildRegistry(): void {
-    const next = buildBaseRegistry((server, tool) => this.mcpClients.get(server)?.policyFor(tool))
+    const next = buildBaseRegistry((server, tool) => this.mcpClients.get(server)?.policyFor(tool), this.reaTools)
     for (const tool of this.plugins.toolDefs()) if (!next.get(tool.name)) next.register(tool)
     // Every tool of every connected MCP server is a tool of its own (mcp__server__tool).
     for (const tool of this.mcpDirectTools()) if (!next.get(tool.name)) next.register(tool)
@@ -782,11 +794,12 @@ export class Orchestrator {
       agents,
       autoAgents: Boolean(settings.autoAgents),
       selfReview: settings.selfReview !== false,
+      loopBudget: settings.loopBudget,
       surface: state.meta.surface ?? 'code',
       createAgent: (input) => this.createAgentFromTool(input, agents, state.meta.cwd),
       runSubagent: (spec, caller) => spawnAgent(agentEnv, caller, spec),
       persist: (snapshot) => this.persist(sessionId, snapshot),
-      initial: { messages: state.messages, plan: state.plan, usage: state.usage },
+      initial: { messages: state.messages, plan: state.plan, usage: state.usage, loop: state.loop },
       depth: 0
     })
 
@@ -1677,6 +1690,7 @@ export class Orchestrator {
       ...[...this.mcpClients.values()].map((client) => within(client.stop(), 4_000)),
       within(this.aiMemory.stop(), 4_000),
       within(this.computer.close(), 4_000),
+      within(this.rea.stop(), 4_000),
       within(this.chromeBridge.stop(), 2_000)
     ])
   }
@@ -1883,6 +1897,7 @@ export class Orchestrator {
       ...current,
       messages: stripImages(snapshot.messages),
       plan: snapshot.plan,
+      ...(snapshot.loop ? { loop: snapshot.loop } : {}),
       usage: snapshot.usage,
       changes: this.trackers.get(sessionId)?.changes() ?? current.changes,
       state: snapshot.state
@@ -3098,7 +3113,10 @@ function userDataPath(base: string, child: string): string {
   return path.join(base, child)
 }
 
-function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => ResolvedToolPolicy | undefined): ToolRegistry {
+function buildBaseRegistry(
+  mcpPolicy?: (server: string, tool: string) => ResolvedToolPolicy | undefined,
+  reaTools: ToolDef[] = []
+): ToolRegistry {
   return new ToolRegistry()
     .register(...fsTools)
     .register(applyPatchTool)
@@ -3112,6 +3130,7 @@ function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => Resolve
     .register(...createMcpTools(mcpPolicy))
     .register(...lazyTools)
     .register(...planTools)
+    .register(...loopTools)
     .register(...limitationTools)
     .register(...askTools)
     .register(...projectMemoryTools)
@@ -3121,7 +3140,9 @@ function buildBaseRegistry(mcpPolicy?: (server: string, tool: string) => Resolve
     .register(...codeIntelligenceTools)
     .register(...documentTools)
     .register(...mediaTools)
+    .register(...designTools)
     .register(...imageTools)
+    .register(...reaTools)
 }
 
 /**

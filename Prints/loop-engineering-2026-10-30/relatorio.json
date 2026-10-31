@@ -1,0 +1,147 @@
+{
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "task": "Neste projeto a função soma (soma.js) está errada e os testes falham. Corrija a soma e crie um CLI cli.js: `node cli.js 2 3` deve imprimir 5, e `node cli.js` sem os dois números deve imprimir uma mensagem de uso e sair com código 1. Acrescente testes para o CLI no mesmo estilo (node:test). Trabalhe em voltas até o juiz provar que está tudo pronto.",
+  "budget": {
+    "rounds": 6,
+    "minutes": 40
+  },
+  "slowShots": [
+    {
+      "name": "05-loop-concluido.png",
+      "ms": 61149
+    },
+    {
+      "name": "06-configuracoes-harness.png",
+      "ms": 61203
+    }
+  ],
+  "seconds": 354,
+  "loop": {
+    "goal": "Corrigir soma.js, criar cli.js com uso e código de saída 1, e adicionar testes node:test do CLI",
+    "status": "done",
+    "round": 1,
+    "maxRounds": 6,
+    "startedAt": 1793398800154,
+    "maxMinutes": 40,
+    "deadlineAt": 1793401200154,
+    "phase": "julgar",
+    "criteria": [
+      {
+        "id": "c1",
+        "text": "soma.js soma corretamente (2+3=5, -1+4=3)",
+        "check": "node --test soma.test.js",
+        "status": "met",
+        "evidence": "$ node --test soma.test.js\nexit=0 · 0.2s\n--- stdout ---\nTAP version 13\n# Subtest: soma dois positivos\nok 1 - soma dois positivos\n  ---\n  duration_ms: 1.2769\n  type: 'test'\n  ...\n# Subtest: soma com negativo\nok 2 - soma com negativo\n  ---\n  duration_ms: 0.1897\n  type: 'test'\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 101.0407",
+        "checkedAt": 1793399133460
+      },
+      {
+        "id": "c2",
+        "text": "node cli.js 2 3 imprime 5",
+        "check": "node -e \"const{execSync}=require('child_process');const o=execSync('node cli.js 2 3',{encoding:'utf8'}).trim();process.exit(o==='5'?0:1)\"",
+        "status": "met",
+        "evidence": "$ node -e \"const{execSync}=require('child_process');const o=execSync('node cli.js 2 3',{encoding:'utf8'}).trim();process.exit(o==='5'?0:1)\"\nexit=0 · 0.2s\n(sem saída)",
+        "checkedAt": 1793399133460
+      },
+      {
+        "id": "c3",
+        "text": "node cli.js sem args imprime uso e sai com código 1",
+        "check": "node -e \"const{spawnSync}=require('child_process');const r=spawnSync('node',['cli.js'],{encoding:'utf8'});process.exit(r.status===1&&r.stdout.length>0?0:1)\"",
+        "status": "met",
+        "evidence": "$ node -e \"const{spawnSync}=require('child_process');const r=spawnSync('node',['cli.js'],{encoding:'utf8'});process.exit(r.status===1&&r.stdout.length>0?0:1)\"\nexit=0 · 0.2s\n(sem saída)",
+        "checkedAt": 1793399133460
+      },
+      {
+        "id": "c4",
+        "text": "Suíte completa (soma + CLI) passa com node --test",
+        "check": "node --test",
+        "status": "met",
+        "evidence": "$ node --test\nexit=0 · 0.6s\n--- stdout ---\nTAP version 13\n# Subtest: cli soma dois positivos\nok 1 - cli soma dois positivos\n  ---\n  duration_ms: 63.3858\n  type: 'test'\n  ...\n# Subtest: cli soma com negativo\nok 2 - cli soma com negativo\n  ---\n  duration_ms: 59.1789\n  type: 'test'\n  ...\n# Subtest: cli sem argumentos mostra uso e sai com 1\nok 3 - cli sem argumentos mostra uso e sai com 1\n  ---\n  duration_ms: 56.8537\n  type: 'test'\n  ...\n# Subtest: cli com um argumento so mostra uso e sai com 1\nok 4 - cli com um argumento so mostra uso e sai com 1\n  ---\n  duration_ms: 58.8207\n  type: 'test'\n  ...\n# Subtest: cli com argumento nao numerico mostra uso e sai com 1\nok 5 - cli com argumento nao numerico mostra uso e sai com 1\n  ---\n  duration_ms: 57.0086\n  type: 'test'\n  ...\n# Subtest: cli com dois argumentos vazios mostra uso e nao imprime 0\nok 6 - cli com dois argumentos vazios mostra uso e nao imprime 0\n  ---\n  duration_ms: 59.2415\n  type: 'test'\n  ...\n# Subtest: cli com primeiro argumento so espaco mostra uso e sai com 1\nok 7 - cli com primeiro argumento so espaco mostra uso e sai com 1\n  ---\n  duration_ms: 62.3689\n  type: 'test'\n  ...\n# Subtest: soma dois positivos\nok 8 - soma dois positivos\n  ---\n  duration_ms: 1.5316\n  type: 'test'\n  ...\n# Subtest: soma com negativo\nok 9 - soma com negativo\n  ---\n  duration_ms: 0.2257\n  type: 'test'\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 531.4023",
+        "checkedAt": 1793399133460
+      }
+    ],
+    "verdicts": [
+      {
+        "round": 1,
+        "decision": "done",
+        "summary": "soma.js corrigida (a + b), cli.js criado (2 3 → 5; sem args → uso + exit 1) e cli.test.js com 7 testes node:test. Suíte 9/9 passando e juiz deu PRONTO.",
+        "at": 1793399133460
+      }
+    ],
+    "roundAgents": [
+      "tester",
+      "tester",
+      "loop-critic",
+      "tester",
+      "loop-judge"
+    ],
+    "agents": [
+      "tester",
+      "loop-critic",
+      "loop-judge"
+    ],
+    "stagnantRounds": 0,
+    "strategyChanges": 0,
+    "endedAt": 1793399133460,
+    "reason": "o juiz deu PRONTO e todos os critérios estão provados"
+  },
+  "agents": [
+    "tester",
+    "tester",
+    "loop-critic",
+    "tester",
+    "loop-judge"
+  ],
+  "loopCalls": [
+    "define",
+    "check",
+    "check",
+    "check",
+    "verdict"
+  ],
+  "toolCalls": 35,
+  "independentTests": {
+    "status": 0,
+    "tail": [
+      "# tests 9",
+      "# suites 0",
+      "# pass 9",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "# duration_ms 526.4207"
+    ]
+  },
+  "files": [
+    "CLAUDE.md",
+    "cli.js",
+    "cli.test.js",
+    "package.json",
+    "soma.js",
+    "soma.test.js"
+  ],
+  "checks": {
+    "opção \"Código Loop Engineering\" no menu Modo do agente": "ok",
+    "a sessão passa para o modo loop": "ok",
+    "painel do loop aparece antes do pedido": "ok",
+    "o painel mostra o orçamento": "ok",
+    "o turno terminou com resposta do modelo": "ok",
+    "a sessão terminou no modelo escolhido": "ok",
+    "critérios de pronto definidos pela ferramenta loop": "ok",
+    "ao menos um critério tem comando que o harness roda": "ok",
+    "especialistas chamados com agent (além do juiz)": "ok",
+    "o juiz loop-judge foi chamado": "ok",
+    "o tester escreveu os testes novos": "ok",
+    "o veredito foi registrado com loop action=verdict": "ok",
+    "o loop terminou PRONTO": "ok",
+    "todos os critérios provados": "ok",
+    "o último veredito é PRONTO": "ok",
+    "prova independente: node --test passa": "ok",
+    "prova independente: node cli.js 2 3 imprime 5": "ok",
+    "prova independente: node cli.js sem números sai com código 1": "ok",
+    "o painel mostra Concluído": "ok",
+    "Configurações → Harness mostra o orçamento do loop": "ok",
+    "sem erros no console da janela": "ok"
+  }
+}

@@ -462,6 +462,63 @@
       "sha256": "5f3fa9b3ec948e6cb1af3c8f1063fa39c79f58bb5dc9bb9dfb2db890d098508d",
       "license": "MIT (libomp: Apache-2.0 WITH LLVM-exception, see LICENSE-LLVM-OpenMP)",
       "path": "llamacpp/b11972-vulkan"
+    },
+    {
+      "name": "Node.js (REA runtime)",
+      "version": "24.22.2",
+      "source": "https://nodejs.org/dist/v24.22.2/node-v24.22.2-win-x64.zip",
+      "sha256": "ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2",
+      "license": "MIT",
+      "path": "rea/node"
+    },
+    {
+      "name": "REA (rea-agents)",
+      "version": "6.8.0",
+      "source": "https://registry.npmjs.org/rea-agents/-/rea-agents-6.8.0.tgz (sha512-9QDeRnGqEDzABZyr04eLnBXBv/c6I9/TWu/6M0MD4pEfkySI/BIgwTODIbAReX3C1x6hjw9+Jlx4A2yUSPZ9ww==); production dependencies from vendor/rea/package-lock.json (rea-agents-6.8.0 @ 160d821ac9a0310afcb8d1fc427862dd6508add5)",
+      "license": "MIT (Windows addon: GCC runtime under GPL-3.0 WITH GCC-exception-3.1; dependencies: see licenses/rea)",
+      "licensePath": "licenses/rea/LICENSE",
+      "path": "rea/app"
+    },
+    {
+      "name": "Eclipse Temurin JDK (REA engine)",
+      "version": "21.0.13+9",
+      "source": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip",
+      "sha256": "a4dbaa05fca4bd89d84584e58c459bd732efebb1722af80ab13c6516832004f9",
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+      "sourceOffer": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk-sources_21.0.13_9.tar.gz",
+      "path": "rea/engines/jdk"
+    },
+    {
+      "name": "Ghidra (REA engine)",
+      "version": "12.1.4",
+      "source": "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip",
+      "sha256": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db",
+      "license": "Apache-2.0 (GPL/ components ship with their source inside the release)",
+      "path": "rea/engines/ghidra"
+    },
+    {
+      "name": "jadx-headless-mcp (JADX) (REA engine)",
+      "version": "0.7.1",
+      "source": "https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.7.1/jadx-headless-mcp-0.7.1-all.jar",
+      "sha256": "6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75",
+      "license": "Apache-2.0",
+      "path": "rea/engines/jadx"
+    },
+    {
+      "name": "Apktool (REA engine)",
+      "version": "3.0.3",
+      "source": "https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar",
+      "sha256": "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423",
+      "license": "Apache-2.0",
+      "path": "rea/engines/apktool"
+    },
+    {
+      "name": "WABT (REA engine)",
+      "version": "1.0.42",
+      "source": "https://github.com/WebAssembly/wabt/releases/download/1.0.42/wabt-1.0.42-windows-x64.tar.gz",
+      "sha256": "62f1eb2b51aa57cf0f0b8ba333bf2c72a049930aa9c5de01dcad271c4fe48c88",
+      "license": "Apache-2.0",
+      "path": "rea/engines/wabt"
     }
   ]
 }

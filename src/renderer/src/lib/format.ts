@@ -8,7 +8,9 @@ export const MODE_LABELS: Record<AgentMode, string> = {
   review: 'Revisar',
   computer: 'Computer Use',
   web: 'Web',
-  autonomous: 'Autônomo'
+  autonomous: 'Autônomo',
+  loop: 'Loop Engineering',
+  rea: 'REA Engineering'
 }
 
 export const MODE_HINTS: Record<AgentMode, string> = {
@@ -19,7 +21,9 @@ export const MODE_HINTS: Record<AgentMode, string> = {
   review: 'Aponta bugs e riscos com arquivo:linha',
   computer: 'Controla aplicativos reais do Windows',
   web: 'Navega, coleta e cita fontes',
-  autonomous: 'Executa uma tarefa longa de ponta a ponta'
+  autonomous: 'Executa uma tarefa longa de ponta a ponta',
+  loop: 'Uma equipe de agentes repete até o juiz provar que terminou',
+  rea: 'Engenharia reversa com o REA: binários, apps, JavaScript, Frida'
 }
 
 export const STATE_LABELS: Record<RunState, string> = {

@@ -1,0 +1,17 @@
+{
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "task": "Neste projeto a função soma (soma.js) está errada e os testes falham. Corrija a soma e crie um CLI cli.js: `node cli.js 2 3` deve imprimir 5, e `node cli.js` sem os dois números deve imprimir uma mensagem de uso e sair com código 1. Acrescente testes para o CLI no mesmo estilo (node:test). Trabalhe em voltas até o juiz provar que está tudo pronto.",
+  "budget": {
+    "rounds": 6,
+    "minutes": 40
+  },
+  "seconds": 507,
+  "checks": {
+    "opção \"Código Loop Engineering\" no menu Modo do agente": "ok",
+    "a sessão passa para o modo loop": "ok",
+    "painel do loop aparece antes do pedido": "ok",
+    "o painel mostra o orçamento": "ok",
+    "o roteiro rodou até o fim": "FALHOU: page.screenshot: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - taking page screenshot\u001b[22m\n\u001b[2m  - waiting for fonts to load...\u001b[22m\n\u001b[2m  - fonts loaded\u001b[22m\n"
+  }
+}

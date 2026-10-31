@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-10-31T00:04:28.802Z",
+  "prompt": "Desenhe no FigCraft 4 telas de celular (390×844) de um app fictício de delivery de comida chamado \"Prato Feito\": DEL-INI-01 Início (busca, categorias, restaurantes), DEL-RES-01 Restaurante (cardápio), DEL-CAR-01 Carrinho e DEL-CAR-01b Carrinho vazio. Siga a skill design-telas. Trabalhe sem janela (FigCraft headless) e, no fim, entregue as telas em folha de contato com design_sheet. Não use o computador nem o navegador.",
+  "approvals": [],
+  "provider": "opencode-go/gemini-4-argon",
+  "minutes": 5.4,
+  "tools": {
+    "use_skill": 1,
+    "tool_search": 1,
+    "update_plan": 5,
+    "tool_load": 1,
+    "mcp__figcraft__guide": 2,
+    "mcp__figcraft__connect": 1,
+    "mcp__figcraft__run_command": 1,
+    "mcp__figcraft__inspect_document": 1,
+    "mcp__figcraft__list_commands": 1,
+    "mcp__figcraft__batch": 12,
+    "mcp__figcraft__get_node": 7,
+    "mcp__figcraft__screenshot": 3,
+    "mcp__figcraft__save_file": 2,
+    "design_sheet": 2
+  },
+  "sheets": [
+    {
+      "ok": true,
+      "text": "1 folha(s) com 4 tela(s) em C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-design-HT7s11\\projeto\\.openclod\\folhas\\2026-10-31-00-09-29:\n- folha 1: C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-design-HT7s11\\projeto\\.openclod\\folhas\\2026-10-31-00-09-29\\folha-01.png (1302×759) — DEL-INI-01 Início, DEL-RES-01 Restaurante, DEL-CAR-01 Carrinho, DEL-CAR-01b Carrinho vazio",
+      "images": 1,
+      "preview": 0
+    },
+    {
+      "ok": true,
+      "text": "1 folha(s) com 4 tela(s) em C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-design-HT7s11\\projeto\\.openclod\\folhas\\2026-10-31-00-09-42:\n- folha 1: C:\\Users\\Administrator\\AppData\\Local\\Temp\\openclod-design-HT7s11\\projeto\\.openclod\\folhas\\2026-10-31-00-09-42\\folha-01.png (1302×759) — DEL-INI-01 Início, DEL-RES-01 Restaurante, DEL-CAR-01 Carrinho, DEL-CAR-01b Carrinho vazio",
+      "images": 1,
+      "preview": 0
+    }
+  ],
+  "conversation": "Prints\\design-folhas-2026-10-30\\01-conversa.png",
+  "reply": "As 4 telas do aplicativo **Prato Feito** (390×844) foram desenhadas no FigCraft em modo headless, seguindo a skill `design-telas` (com página dedicada de Design System e componentes reutilizáveis por instância).\n\n### Resumo da entrega\n- **Telas criadas (4 telas, área `DEL`):**\n  - `DEL-INI-01 Início` — endereço, pílula da sacola ativa, busca, banner promocional, chips de categorias e lista de restaurantes.\n  - `DEL-RES-01 Restaurante` — cabeçalho do restaurante *Tempero da Dona Helena*, abas do cardápio, pratos mais pedidos e CTA fixo da sacola.\n  - `DEL-CAR-01 Carrinho` — endereço de entrega, itens com seletor de quantidade, cupom `PF10` aplicado, resumo de valores e CTA de finalização.\n  - `DEL-CAR-01b Carrinho vazio` — variação de estado vazio com ação primária para explorar restaurantes e dica de cupom.\n- **Premissas assumidas:** paleta quente inspirada em culinária caseira brasileira (laranja terracota `#D9480F`, fundo creme suave `#F8F6F2`, verde sucesso `#16A34A`), tipografia `Segoe UI` (validada no motor local), margens laterais de 24 px e grid em múltiplos de 4/8 px.\n- **Arquivo `.figcraft` salvo:** `prato-feito.figcraft` (na raiz do projeto).\n- **Folha de contato (`design_sheet`):** `.openclod/folhas/2026-10-31-00-09-42/folha-01.png` (exibida acima).",
+  "checks": {
+    "o turno termina com uma resposta": "ok",
+    "carregou a skill design-telas": "ok",
+    "desenhou pelo FigCraft (MCP)": "ok",
+    "chamou design_sheet e as folhas foram montadas": "ok",
+    "os PNG das folhas existem no projeto": "ok",
+    "a folha aparece desenhada na conversa": "ok",
+    "sem erros no console da tela": "ok"
+  }
+}

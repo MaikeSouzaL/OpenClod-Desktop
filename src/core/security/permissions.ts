@@ -1,5 +1,6 @@
 import type { AgentMode, Decision, PermissionEffect, PolicyConfig } from '../../shared/types.js'
 import type { ToolDef } from '../tools/types.js'
+import { reaModeToolNames } from '../rea/names.js'
 import { evaluateRulesFor } from './rules.js'
 import { checkSensitiveAccess, sensitiveReason } from './sensitive.js'
 
@@ -176,6 +177,24 @@ function evaluateToolBase(
   }
 }
 
+/** Everything an autonomous session may use: code, terminal, browser and the whole desktop. */
+const FULL_TOOLS = [
+  'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
+  'run_command', 'start_process', 'read_process_output', 'list_processes', 'stop_process', 'list_ports',
+  'git_status', 'git_diff', 'git_log', 'git_commit', 'git_checkout',
+  'fetch_url', 'web_search', 'download_file',
+  'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
+  'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
+  'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
+  'code_intelligence', 'quality_discover', 'quality_run',
+  'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
+  'computer_snapshot', 'computer_screenshot', 'computer_click',
+  'computer_mouse_move', 'computer_mouse_button',
+  'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
+  'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window',
+  'computer_secondary_action'
+]
+
 const MODE_TOOLS: Record<AgentMode, string[]> = {
   ask: [
     'read_file', 'list_dir', 'grep', 'glob', 'git_status', 'git_diff', 'git_log',
@@ -259,21 +278,19 @@ const MODE_TOOLS: Record<AgentMode, string[]> = {
     'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
     'computer_snapshot', 'computer_screenshot'
   ],
-  autonomous: [
-    'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob', 'delete_path',
+  autonomous: [...FULL_TOOLS],
+  // Loop Engineering does everything the other modes do, plus the loop tool that drives its rounds.
+  loop: [...FULL_TOOLS, 'loop'],
+  // REA Engineering: REA's tools (rea_*), reading and writing the project (reports, reconstructions), the terminal, the
+  // web for documentation and delegation. No desktop control: runtime observation goes through REA's own audited tools.
+  rea: [
+    'read_file', 'write_file', 'edit_file', 'list_dir', 'grep', 'glob',
     'run_command', 'start_process', 'read_process_output', 'list_processes', 'stop_process', 'list_ports',
-    'git_status', 'git_diff', 'git_log', 'git_commit', 'git_checkout',
+    'git_status', 'git_diff', 'git_log',
     'fetch_url', 'web_search', 'download_file',
-    'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
-    'browser_press', 'browser_read', 'browser_screenshot', 'browser_console', 'browser_wait',
-    'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents', 'external_agent',
-    'code_intelligence', 'quality_discover', 'quality_run',
-    'computer_list_apps', 'computer_list_windows', 'computer_window_at', 'computer_get_window', 'computer_cursor_position',
-    'computer_snapshot', 'computer_screenshot', 'computer_click',
-    'computer_mouse_move', 'computer_mouse_button',
-    'computer_set_value', 'computer_type_text', 'computer_press_key', 'computer_scroll',
-    'computer_drag', 'computer_launch', 'computer_open_path', 'computer_activate', 'computer_wait', 'computer_wait_for', 'computer_wait_for_window',
-    'computer_secondary_action'
+    'update_plan', 'list_skills', 'use_skill', 'memory_search', 'memory_write', 'task', 'agent', 'list_agents',
+    'code_intelligence', 'computer_open_path',
+    ...reaModeToolNames()
   ]
 }
 
@@ -308,20 +325,33 @@ for (const tools of Object.values(MODE_TOOLS)) {
 }
 
 // Surgical edits are available wherever files can be written.
-for (const mode of ['code', 'debug', 'web', 'autonomous'] as const) {
+for (const mode of ['code', 'debug', 'web', 'autonomous', 'loop', 'rea'] as const) {
   if (!MODE_TOOLS[mode].includes('patch_file')) MODE_TOOLS[mode].push('patch_file')
   if (!MODE_TOOLS[mode].includes('apply_patch')) MODE_TOOLS[mode].push('apply_patch')
   if (!MODE_TOOLS[mode].includes('image_edit')) MODE_TOOLS[mode].push('image_edit')
 }
 
 // Reading and changing the page's cookies goes with the interactive browser (clicking, typing), not read-only modes.
-for (const mode of ['code', 'debug', 'web', 'autonomous', 'computer'] as const) {
+for (const mode of ['code', 'debug', 'web', 'autonomous', 'computer', 'loop'] as const) {
   if (!MODE_TOOLS[mode].includes('browser_cookies')) MODE_TOOLS[mode].push('browser_cookies')
 }
 
+// The modes that do everything can also delegate to rea-engineer (a child never gets a tool its caller lacks). The REA
+// tools stay deferred there: found with tool_search, and the risky ones ask on every call like in REA Engineering.
+for (const mode of ['autonomous', 'loop'] as const) {
+  for (const name of reaModeToolNames()) if (!MODE_TOOLS[mode].includes(name)) MODE_TOOLS[mode].push(name)
+}
+
 // Growing the roster is a coding/autonomous capability, never a read-only one.
-for (const mode of ['code', 'debug', 'autonomous'] as const) {
+for (const mode of ['code', 'debug', 'autonomous', 'loop'] as const) {
   if (!MODE_TOOLS[mode].includes('create_agent')) MODE_TOOLS[mode].push('create_agent')
+}
+
+// Files kept in the project memory go with the rest of the memory: every mode, writes still decided by the policy.
+// Contact sheets of screens write PNGs: the modes that write files.
+for (const tools of Object.values(MODE_TOOLS)) {
+  if (!tools.includes('memory_file')) tools.push('memory_file')
+  if (tools.includes('write_file') && !tools.includes('design_sheet')) tools.push('design_sheet')
 }
 
 export function toolsForMode(mode: AgentMode): string[] {
@@ -329,5 +359,5 @@ export function toolsForMode(mode: AgentMode): string[] {
 }
 
 export function modeAllowsWrite(mode: AgentMode): boolean {
-  return ['code', 'debug', 'web', 'autonomous'].includes(mode)
+  return ['code', 'debug', 'web', 'autonomous', 'loop', 'rea'].includes(mode)
 }

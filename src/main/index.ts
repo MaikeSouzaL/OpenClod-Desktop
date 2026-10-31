@@ -22,16 +22,19 @@ import type { BuildKind } from '../core/llamacpp/builds.js'
 import { splitExtra } from '../core/llamacpp/options.js'
 import {
   AGENT_MODES,
+  DEFAULT_LOOP_BUDGET,
   REASONING_EFFORTS,
   type ReasoningEffort,
   type AppSettings,
   type HarnessEvent,
   type HooksConfig,
   type ImagePart,
+  type LoopBudgetSettings,
   type ModelCompat,
   type PermissionMode,
   type QuestionAnswer
 } from '../shared/types.js'
+import { clampBudget } from '../core/loop/engine.js'
 import { PROVIDER_PRESETS } from '../core/providers/presets.js'
 import { HOOK_EVENTS, normalizeHookDefinition } from '../core/hooks/runner.js'
 import { normalizeMcpServerSettings } from '../core/mcp/client.js'
@@ -397,6 +400,10 @@ function sanitizeSettingsPatch(raw: unknown): Partial<AppSettings> {
   if (typeof input.profileName === 'string') patch.profileName = input.profileName.trim().slice(0, 80)
   if (typeof input.autoAgents === 'boolean') patch.autoAgents = input.autoAgents
   if (typeof input.selfReview === 'boolean') patch.selfReview = input.selfReview
+  if (input.loopBudget && typeof input.loopBudget === 'object') {
+    const budget = input.loopBudget as Partial<LoopBudgetSettings>
+    patch.loopBudget = clampBudget({ rounds: Number(budget.rounds), minutes: Number(budget.minutes) }, DEFAULT_LOOP_BUDGET)
+  }
   if (typeof input.useAllModels === 'boolean') patch.useAllModels = input.useAllModels
   const providerIds = (value: unknown): string[] =>
     Array.isArray(value) ? [...new Set(value.map((item) => String(item).slice(0, 60)).filter(Boolean))].slice(0, 60) : []

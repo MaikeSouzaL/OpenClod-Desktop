@@ -9,7 +9,7 @@ import type {
   ProviderConfig,
   ReasoningEffort
 } from '../../../shared/types'
-import { AGENT_MODES, REASONING_EFFORTS } from '../../../shared/types'
+import { AGENT_MODES, DEFAULT_LOOP_BUDGET, REASONING_EFFORTS } from '../../../shared/types'
 import { effortLevelsFor } from '../../../shared/reasoning'
 import { modelSeesImages, orderedProviders, reserveModels } from '../../../core/providers/order'
 import { describeFailure } from '../../../core/providers/health'
@@ -119,6 +119,7 @@ export function SettingsDialog({
   const [policy, setPolicy] = useState<PolicyConfig>(settings.policy)
   const [autoAgents, setAutoAgents] = useState(Boolean(settings.autoAgents))
   const [selfReview, setSelfReview] = useState(settings.selfReview !== false)
+  const [loopBudget, setLoopBudget] = useState(settings.loopBudget ?? DEFAULT_LOOP_BUDGET)
   const [useAllModels, setUseAllModels] = useState(settings.useAllModels !== false)
   const [fallbackOrder, setFallbackOrder] = useState<string[]>(settings.fallbackOrder ?? [])
   const [fallbackExclude, setFallbackExclude] = useState<string[]>(settings.fallbackExclude ?? [])
@@ -577,6 +578,7 @@ export function SettingsDialog({
         policy: nextPolicy,
         autoAgents,
         selfReview,
+        loopBudget,
         useAllModels,
         fallbackOrder,
         fallbackExclude,
@@ -2328,6 +2330,35 @@ export function SettingsDialog({
                 Quando um turno alterou arquivos, o agente vê o diff do que mudou (uma vez por turno) e confere se faz o
                 que foi pedido, se sobrou depuração e se verificou com testes; se achar um problema, corrige. Custa uma
                 chamada a mais ao modelo nos turnos que mudam arquivos. Não vale no modo somente leitura nem no Chat.
+              </p>
+              <h3>Loop Engineering</h3>
+              <div className="grid-3">
+                <label className="field">
+                  <span>Voltas por pedido</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={loopBudget.rounds}
+                    onChange={(event) => setLoopBudget({ ...loopBudget, rounds: Number(event.target.value) })}
+                  />
+                </label>
+                <label className="field">
+                  <span>Minutos por pedido</span>
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    value={loopBudget.minutes}
+                    onChange={(event) => setLoopBudget({ ...loopBudget, minutes: Number(event.target.value) })}
+                  />
+                </label>
+              </div>
+              <p className="field-help">
+                No modo Código Loop Engineering o maestro repete planejar → fazer → verificar → criticar → julgar até o
+                juiz dar PRONTO com todos os critérios provados. O loop para antes disso quando acabam as voltas ou os
+                minutos, quando precisa de você ou quando a mesma falha volta depois de duas mudanças de estratégia. Os
+                limites de tokens e de custo do turno continuam valendo; iterações, ferramentas e tempo valem por volta.
               </p>
               <h3>Auto-correção do harness</h3>
               <p className="field-help">

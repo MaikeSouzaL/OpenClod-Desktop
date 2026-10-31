@@ -7,6 +7,7 @@ import type {
   FileChange,
   HarnessEvent,
   ImagePart,
+  LoopState,
   PlanItem,
   PolicyConfig,
   QuestionAnswer,
@@ -33,6 +34,8 @@ export interface Tracker {
   hasRead(path: string): boolean
   recordChange(path: string, before: string | null, after: string | null): void
   changes(): FileChange[]
+  /** What the current turn changed (FileTracker); optional for trackers that do not follow turns. */
+  turnChanges?(): FileChange[]
   readFiles(): string[]
 }
 
@@ -229,6 +232,8 @@ export interface ToolContext {
   /** Structured questions to the user (ask_user); null when skipped/timed out. */
   ask?(request: { questions: QuestionSpec[] }): Promise<QuestionAnswer[] | null>
   setPlan(items: PlanItem[]): void
+  /** The Loop Engineering state of the session; present only for the conductor of a session in mode 'loop'. */
+  loop?: { get(): LoopState | null; set(next: LoopState): void }
   runSubagent(spec: SubagentSpec): Promise<SubagentOutcome>
   agents: AgentCatalog
   /** Writes a new specialist to the user's agents folder and registers it now. */

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { DEFAULT_LOOP_BUDGET } from '../../shared/types.js'
 import type {
   AgentMode,
   ApprovalDecision,
@@ -11,6 +12,8 @@ import type {
   HarnessLimits,
   ImagePart,
   LimitationReport,
+  LoopBudgetSettings,
+  LoopState,
   Message,
   PlanItem,
   PolicyConfig,
@@ -45,6 +48,7 @@ import { mergePlanTimes } from './plan-times.js'
 import { appendPlanActivity, planActivityEntry } from './plan-activity.js'
 import { discardedPlanNotice, resumePlanAt } from './plan-control.js'
 import { buildAutoLimitation } from './auto-limitation.js'
+import { gate as loopGate, interrupted as loopInterrupted, noteCalls as noteLoopCalls, startLoop, timeUp as loopTimeUp, timeUpPrompt as loopTimeUpPrompt } from '../loop/engine.js'
 import { detectRepetition, MAX_REASONING_ONLY_CHARS, MAX_REASONING_ONLY_MS, type RepetitionHit } from './loop-detection.js'
 import { addUsage, usageCost } from './usage.js'
 import { billableTokens, effectiveMaxTokens } from '../../shared/limits.js'
@@ -107,7 +111,7 @@ function isLocalProvider(config: ProviderConfig): boolean {
 
 export const TURN_CANCELLED = 'turno cancelado pelo usuário'
 /** Modes that may use MCP server tools (read-only modes never do: every MCP tool is at least `exec` risk). */
-const MCP_MODES = new Set<string>(['ask', 'code', 'debug', 'autonomous', 'web', 'computer'])
+const MCP_MODES = new Set<string>(['ask', 'code', 'debug', 'autonomous', 'web', 'computer', 'loop'])
 /** Delegation tools: offered only when this runner has someone to delegate to. */
 const AGENT_TOOLS = new Set<string>(['agent', 'list_agents'])
 /** Automatic "continue" requests after the model hits its output cap. */
@@ -400,6 +404,8 @@ export interface RunnerDeps {
    * set to false in Configurações → Harness).
    */
   selfReview?: boolean
+  /** Rounds and minutes of a Loop Engineering session (mode 'loop'); DEFAULT_LOOP_BUDGET when missing. */
+  loopBudget?: LoopBudgetSettings
   /** UI surface; Cowork and Chat get their own operating guidance. */
   surface?: SessionSurface
   /** Ordered alternatives to switch to when the active model is exhausted or unavailable. */
@@ -413,7 +419,7 @@ export interface RunnerDeps {
   vision?: { candidates(): DescribeCandidate[] }
   persist?: (state: RunnerSnapshot) => void
   systemExtra?: string
-  initial?: { messages?: Message[]; plan?: PlanItem[]; usage?: Usage }
+  initial?: { messages?: Message[]; plan?: PlanItem[]; usage?: Usage; loop?: LoopState | null }
   /** Set by the parent when this runner is a subagent. */
   depth?: number
   /** Definition this runner runs as; undefined for the user's own session. */
@@ -440,6 +446,8 @@ export interface RunnerSnapshot {
   plan: PlanItem[]
   usage: Usage
   state: RunState
+  /** Loop Engineering state (mode 'loop' only). */
+  loop?: LoopState | null
 }
 
 export interface SendOptions {
@@ -586,6 +594,13 @@ export class SessionRunner {
   private readonly spillRoots: string[] = []
   /** Ids of the interrupted plan items already announced in this runner. */
   private resumeNoticeFor: string | null = null
+  /** Loop Engineering (mode 'loop'): the state of the session's loop, see core/loop/engine.ts. */
+  private loopState: LoopState | null = null
+  /**
+   * Keys the agent tree of the current loop round: the per-turn cap on subagents (24) applies to each round, not to the whole
+   * loop. Aborted with the turn.
+   */
+  private loopRound: AbortController | null = null
 
   constructor(deps: RunnerDeps) {
     this.deps = deps
@@ -597,6 +612,7 @@ export class SessionRunner {
       : []
     this.plan = deps.initial?.plan ? [...deps.initial.plan] : []
     this.usage = deps.initial?.usage ?? { input: 0, output: 0 }
+    this.loopState = deps.initial?.loop ?? null
     hydrateTurnContext(this.turnContext, this.messages)
     // A session whose last answer came from another model: the user switched models (or one ran out of quota).
     const previousModel = [...this.messages].reverse().find((message) => message.role === 'assistant' && message.model)?.model
@@ -612,8 +628,34 @@ export class SessionRunner {
       messages: this.messages,
       plan: this.plan,
       usage: this.usage,
-      state: this.state
+      state: this.state,
+      ...(this.loopState ? { loop: this.loopState } : {})
     }
+  }
+
+  /** The loop of this session, for the UI and the tests. */
+  get loop(): LoopState | null {
+    return this.loopState
+  }
+
+  /** Only the user's own session in mode 'loop' runs a loop; its subagents work inside a round. */
+  private loopActive(): boolean {
+    return this.deps.mode === 'loop' && !this.deps.depth
+  }
+
+  private setLoop(next: LoopState): void {
+    if (next === this.loopState) return
+    this.loopState = next
+    this.emit({ type: 'loop', sessionId: this.deps.sessionId, loop: next })
+    this.persist()
+  }
+
+  /** A fresh agent tree for the next round, still aborted when the turn is. */
+  private newLoopRound(signal: AbortSignal): void {
+    const round = new AbortController()
+    if (signal.aborted) round.abort()
+    else signal.addEventListener('abort', () => round.abort(), { once: true })
+    this.loopRound = round
   }
 
   private persist(): void {
@@ -831,9 +873,9 @@ export class SessionRunner {
     return [...allowed].filter((name) => (this.isCoreTool(name) || this.loadedTools.has(name)) && this.toolAllowed(name).ok)
   }
 
-  /** Max effort or the user's "separate into agents" toggle: delegating is the point of the session. */
+  /** Max effort, the user's "separate into agents" toggle or Loop Engineering: delegating is the point of the session. */
   private teamMode(): boolean {
-    return this.deps.effort === 'max' || Boolean(this.deps.autoAgents)
+    return this.deps.effort === 'max' || Boolean(this.deps.autoAgents) || this.loopActive()
   }
 
   /**
@@ -856,6 +898,7 @@ export class SessionRunner {
    */
   private isCoreTool(name: string): boolean {
     if (CORE_TOOL_NAMES.has(name)) return true
+    if (name === 'loop') return this.loopActive()
     if (TEAM_CORE_TOOL_NAMES.has(name) && (this.teamMode() || Boolean(this.deps.allowedTools?.includes(name)))) return true
     const mcp = this.deps.registry.get(name)?.mcp
     return Boolean(mcp && !mcp.deferred)
@@ -884,6 +927,9 @@ export class SessionRunner {
     }
     if (AGENT_TOOLS.has(name) && !this.canDelegate()) {
       return { ok: false, reason: 'delegação indisponível nesta sessão' }
+    }
+    if (name === 'loop' && !this.loopActive()) {
+      return { ok: false, reason: 'só o maestro de uma sessão Loop Engineering usa esta ferramenta' }
     }
     return { ok: true }
   }
@@ -1076,7 +1122,7 @@ export class SessionRunner {
       limits: deps.limits,
       // A specialist may find (tool_search) the MCP tools the caller has not loaded yet, if its definition names them; the
       // essentials that wait for tool_load in this session (memory_search, list_skills, list_agents...) stay in its pool too.
-      availableTools: [...new Set([...this.availableTools(), ...this.deferredEssentialTools(), ...this.mcpToolDefs().map((tool) => tool.name)])],
+      availableTools: this.childToolPool(),
       signal,
       hooks: deps.hooks,
       workspace: deps.workspace,
@@ -1088,6 +1134,20 @@ export class SessionRunner {
       autoAgents: deps.autoAgents,
       createAgent: deps.createAgent
     }
+  }
+
+  /**
+   * What a child may be given. Usually the tools of the caller's current request; in Loop Engineering every tool the mode
+   * allows (a specialist such as app-prover needs the browser and the desktop even when the conductor never loaded them),
+   * minus the loop tool, which only the conductor drives.
+   */
+  private childToolPool(): string[] {
+    const pool = new Set([...this.availableTools(), ...this.deferredEssentialTools(), ...this.mcpToolDefs().map((tool) => tool.name)])
+    if (this.loopActive()) {
+      for (const name of toolsForMode(this.deps.mode)) if (this.deps.registry.get(name) && this.toolAllowed(name).ok) pool.add(name)
+    }
+    pool.delete('loop')
+    return [...pool]
   }
 
   private buildSystem(): string {
@@ -1104,7 +1164,7 @@ export class SessionRunner {
       projectName: this.deps.project.name,
       gitBranch: this.deps.project.branch,
       isGitRepo: this.deps.project.isGitRepo,
-      teamMode: this.deps.effort === 'max' || Boolean(this.deps.autoAgents),
+      teamMode: this.teamMode(),
       environment: this.deps.environment ? `${this.deps.environment.label} (${this.deps.environment.kind})` : undefined,
       extra: extra || undefined
     })
@@ -1356,9 +1416,12 @@ export class SessionRunner {
         this.emit({ type: 'plan', sessionId: deps.sessionId, items: this.plan })
         this.persist()
       },
+      ...(this.loopActive()
+        ? { loop: { get: () => this.loopState, set: (next: LoopState) => this.setLoop(next) } }
+        : {}),
       runSubagent: async (spec) => {
         if (!deps.runSubagent) return { ok: false, text: 'subagentes indisponíveis nesta sessão', sessionId: '' }
-        return deps.runSubagent(spec, this.callerInfo(signal))
+        return deps.runSubagent(spec, this.callerInfo(this.loopRound?.signal ?? signal))
       },
       agents: this.agentCatalog(),
       createAgent: async (input) => {
@@ -1448,6 +1511,10 @@ export class SessionRunner {
       ]
     }
     this.addMessage(userMessage)
+    if (this.loopActive()) {
+      this.setLoop(startLoop(text, this.deps.loopBudget ?? DEFAULT_LOOP_BUDGET, Date.now(), this.loopState))
+      this.newLoopRound(signal)
+    }
     const interrupted = this.plan.filter((item) => item.interrupted)
     if (interrupted.length) {
       const key = interrupted.map((item) => item.id).join(',')
@@ -1477,6 +1544,9 @@ export class SessionRunner {
     let stopHookLoops = 0
     let planGuardLoops = 0
     let selfReviewed = false
+    /** Loop Engineering: nudges sent in the current round, and the last answer after the loop stopped (no tools). */
+    let loopNudges = { defineNudges: 0, verdictNudges: 0 }
+    let loopFinal = false
     let steersSeen = this.steerCount
     let overflowCompactions = 0
     let fallbacksUsed = 0
@@ -1550,6 +1620,9 @@ export class SessionRunner {
         if (limitError) {
           if (this.limitKind === 'tokens' || this.limitKind === 'cost') {
             budgetFinal = true
+            if (this.loopActive() && this.loopState?.status === 'running') {
+              this.setLoop({ ...this.loopState, status: 'exhausted', endedAt: Date.now(), reason: limitError })
+            }
             if (!this.budgetReported) {
               this.budgetReported = true
               this.emit({ type: 'budget', sessionId: this.deps.sessionId, info: this.budgetInfo(iteration) })
@@ -1569,12 +1642,22 @@ export class SessionRunner {
           }
         }
 
+        // The loop's minutes ran out in the middle of a round: one last answer, without tools.
+        if (this.loopActive() && this.loopState && !loopFinal && !budgetFinal) {
+          const over = loopTimeUp(this.loopState, Date.now())
+          if (over) {
+            this.setLoop(over)
+            loopFinal = true
+            this.hiddenUserMessage(loopTimeUpPrompt(over))
+          }
+        }
+
         // The last iteration (or a budget stop) keeps the tool list
         // (cache-friendly) but forbids calls, so the turn ends with a summary.
-        const finalStep = budgetFinal || iteration === this.deps.limits.maxIterations
+        const finalStep = budgetFinal || loopFinal || iteration === this.deps.limits.maxIterations
         this.iterationNow = iteration
-        if (finalStep) this.hiddenUserMessage(budgetFinal ? BUDGET_FINAL_PROMPT : FINAL_STEP_PROMPT)
-        else this.remindAboutPlan(iteration)
+        if (finalStep && !loopFinal) this.hiddenUserMessage(budgetFinal ? BUDGET_FINAL_PROMPT : FINAL_STEP_PROMPT)
+        else if (!finalStep) this.remindAboutPlan(iteration)
 
         let system = this.buildSystem()
         const takenOver = this.modelChanged
@@ -1889,7 +1972,7 @@ export class SessionRunner {
           usage: usageDelta ?? undefined
         })
 
-        if (budgetFinal && toolCalls.length) {
+        if ((budgetFinal || loopFinal) && toolCalls.length) {
           // The provider ignored toolChoice: do not spend more tokens running tools.
           stopReason = 'stop'
           break
@@ -1897,7 +1980,7 @@ export class SessionRunner {
 
         if (!toolCalls.length) {
           if (finalStep) {
-            if (budgetFinal) {
+            if (budgetFinal || loopFinal) {
               // The budget notice already explained the stop; the summary is
               // the final assistant message.
               stopReason = 'stop'
@@ -1924,6 +2007,41 @@ export class SessionRunner {
               '<instrucao-pendente>\nO usuário mandou a instrução acima enquanto você escrevia esta resposta. Atenda a ela agora.\n</instrucao-pendente>'
             )
             continue
+          }
+          // Loop Engineering: ending the answer ends the round, not the turn. The gate decides whether the round still
+          // owes something (criteria, a verdict), the next round starts, or the loop stopped (done, the user, the budget).
+          if (this.loopActive() && this.loopState && !signal.aborted) {
+            const { state: gated, gate: step } = loopGate(this.loopState, Date.now(), loopNudges)
+            this.setLoop(gated)
+            if (step.kind === 'nudge') {
+              loopNudges =
+                step.reason === 'define'
+                  ? { ...loopNudges, defineNudges: loopNudges.defineNudges + 1 }
+                  : { ...loopNudges, verdictNudges: loopNudges.verdictNudges + 1 }
+              this.hiddenUserMessage(step.prompt)
+              continue
+            }
+            if (step.kind === 'round') {
+              // Every round gets the per-turn caps again (iterations, tool calls, wall clock, subagents); the loop's own
+              // rounds and minutes are the limit of the whole loop. Tokens and cost keep adding up for the turn.
+              iteration = 0
+              this.toolCallCount = 0
+              this.startedAt = Date.now()
+              this.planTouchedAt = 0
+              this.planRemindedAt = 0
+              this.planReminders = 0
+              planGuardLoops = 0
+              lengthContinuations = 0
+              loopNudges = { defineNudges: 0, verdictNudges: 0 }
+              this.newLoopRound(signal)
+              this.hiddenUserMessage(step.prompt)
+              continue
+            }
+            if (step.kind === 'final') {
+              loopFinal = true
+              this.hiddenUserMessage(step.prompt)
+              continue
+            }
           }
           // A plan is a promise to the user: never end with open work while
           // the agent can still act. Blocked items are a legitimate stop.
@@ -1971,6 +2089,7 @@ export class SessionRunner {
         }
 
         this.setState('tool')
+        if (this.loopActive() && this.loopState) this.setLoop(noteLoopCalls(this.loopState, toolCalls))
         const results = await this.executeToolCalls(toolCalls, signal)
 
         const resultParts: Message['parts'] = []
@@ -2045,6 +2164,12 @@ export class SessionRunner {
       this.setState('error', errorMessage)
     } finally {
       unlinkParent()
+      // The turn ended while the loop was still running (an error, the user's stop, a round past its iteration cap).
+      if (this.loopActive() && this.loopState?.status === 'running') {
+        const how = errorMessage === TURN_CANCELLED ? 'cancelled' : stopReason === 'error' ? 'error' : 'length'
+        this.setLoop(loopInterrupted(this.loopState, how, errorMessage, Date.now()))
+      }
+      this.loopRound = null
       try {
         this.recordAutoLimitation({ stopReason, errorMessage, goal: text, turnStart, blockedBefore, loop: Boolean(loopState.current) })
       } catch (err) {

@@ -115,12 +115,25 @@ tamanhos e hashes estão em `resources/MANIFEST.json`.
 | ripgrep 14.1.1 | **MIT OR Unlicense** | Busca de arquivos. |
 | llama.cpp b11972 — `llama-server` e as DLLs do ggml (build Vulkan oficial para Windows x64) | **MIT** — Copyright (c) 2023-2026 The ggml authors. Texto em `resources/licenses/llama.cpp/LICENSE` | Motor local de LLM (Configurações → Provedores → llama.cpp). `scripts/embed-llamacpp.mjs` baixa o zip oficial de https://github.com/ggml-org/llama.cpp/releases, confere o SHA-256 e guarda só o servidor e as DLLs que ele carrega em `resources/llamacpp/b11972-vulkan/`. Sem modificações. |
 | LLVM OpenMP runtime (`libomp.dll`, dentro do zip do llama.cpp) | **Apache-2.0 WITH LLVM-exception** | Threads do llama.cpp na CPU. A licença vai junto dos binários (`resources/llamacpp/b11972-vulkan/LICENSE-LLVM-OpenMP`). |
+| REA (rea-agents) 6.8.0 — código-fonte em `vendor/rea` (tag `rea-agents-6.8.0`, commit `160d821`) e pacote oficial em `resources/rea/app` | **MIT** — Copyright (c) 2026 morluto. Textos em `vendor/rea/LICENSE` e `resources/licenses/rea/` (com o `THIRD_PARTY_NOTICES.md`, o `DISCLAIMER.md` e a pasta `licenses/` do próprio REA) | Modo e agente "REA Engineering" (engenharia reversa). `scripts/embed-rea.mjs` baixa o tarball do npm (integridade sha512 fixada), instala as dependências de produção pelo `package-lock.json` do código copiado e confere o SHA-256 do componente nativo do Windows. O componente nativo linka o runtime do GCC: **GPL-3.0 WITH GCC-exception-3.1**, textos preservados em `resources/licenses/rea/licenses/`. As dependências npm (Frida, playwright-core, node-pty...) estão listadas em `licenses/npm-dependencies.txt` do REA. https://github.com/morluto/rea |
+| Node.js 24.22.2 (runtime do REA, `resources/rea/node`) | **MIT** (e os avisos dos componentes no `LICENSE` que vai junto) | O REA 6.8 exige Node `^24.22.1`; o Electron 45 traz 24.22.0. |
+| Ghidra 12.1.4 (`resources/rea/engines/ghidra`) | **Apache-2.0**; os componentes em `GPL/` são GPL-3.0 e vêm com o código-fonte dentro do próprio release | Descompilação de binários nativos pelo REA. Zip oficial da NSA no GitHub, SHA-256 fixado. Sem modificações. |
+| Eclipse Temurin JDK 21.0.13+9 (`resources/rea/engines/jdk`) | **GPL-2.0-only WITH Classpath-exception-2.0** | Java do Ghidra, do JADX e do Apktool. Zip oficial da Adoptium, SHA-256 fixado. Código-fonte correspondente: https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk-sources_21.0.13_9.tar.gz |
+| jadx-headless-mcp 0.7.1 (JADX 1.5.6 embutido) | **Apache-2.0** | Classes e métodos de APK/DEX pelo REA (o REA fixa o SHA-256 desta versão). |
+| Apktool 3.0.3 | **Apache-2.0** | Recursos e manifesto de APK. O `apktool.cmd` ao lado do jar é do Openclod (o `apktool.bat` original termina em `pause`). |
+| WABT 1.0.42 | **Apache-2.0** | WebAssembly pelo REA. As DLLs do Visual C++ ao lado (`msvcp140`, `vcruntime140`, `vcruntime140_1`) são as mesmas do Python embutido, sob os termos de "Distributable Code" da Microsoft. |
 
 As versões CUDA e "só CPU" do llama.cpp (Versões) **não vêm no instalador**: são baixadas
 do mesmo release oficial do GitHub quando a pessoa pede, conferidas pelo SHA-256 que o
 GitHub publica. As CUDA trazem o runtime da NVIDIA (`cudart`, cuBLAS), sob a NVIDIA CUDA
 Toolkit EULA. Os modelos GGUF baixados do Hugging Face (Baixar) têm cada um a sua licença,
 mostrada antes do download; alguns exigem aceitar termos na página do modelo.
+
+Motores do REA que **não vêm no instalador**: o rizin 0.9.1 (LGPL-3.0, com oferta de código-fonte)
+só entra com `node scripts/embed-rea.mjs --only rizin`; o ADB (Android platform-tools) não pode
+ser redistribuído (Android SDK License, §3.4), então o app só usa um SDK já instalado; Wireshark
+(tshark, capinfos) e GNU objdump também são só detectados. IDA, JEB e Hopper são comerciais e
+nunca são empacotados; Kuna, wakaru, binwalk e unblob o próprio REA 6.8.0 recusa no Windows.
 
 O `edge-tts` acessa o serviço de leitura em voz alta do Microsoft Edge, sem chave
 de API. O recurso exige internet, pode mudar ou ficar indisponível por decisão da

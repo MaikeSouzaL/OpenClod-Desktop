@@ -20,7 +20,7 @@ import type {
   SkillInfo,
   Usage
 } from '../../shared/types'
-import { defaultAgentMode } from '../../shared/types'
+import { DEFAULT_LOOP_BUDGET, defaultAgentMode } from '../../shared/types'
 import type { AppVersions, ProviderPresetInfo } from '../../shared/api'
 import { billableTokens } from '../../shared/limits'
 import { Sidebar, type SidebarPage } from './components/Sidebar'
@@ -36,6 +36,7 @@ import { QuestionDock } from './components/QuestionDock'
 import { BudgetDock } from './components/BudgetDock'
 import { SessionPanel, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, type PanelLayout } from './components/SessionPanel'
 import { PlanDock } from './components/PlanDock'
+import { LoopDock } from './components/LoopDock'
 import { reduceActivity, type ActivityState } from './lib/activity'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { SettingsDialog } from './components/SettingsDialog'
@@ -566,6 +567,9 @@ export default function App(): ReactElement {
           break
         case 'plan':
           setSession((current) => (current ? { ...current, plan: event.items } : current))
+          break
+        case 'loop':
+          setSession((current) => (current ? { ...current, loop: event.loop } : current))
           break
         case 'diff':
           setChanges(event.files)
@@ -1786,6 +1790,9 @@ export default function App(): ReactElement {
         onSkip={(id) => void answerQuestion(id, [])}
       />
       <ApprovalDock approvals={approvals} onResolve={(id, approved, always, reason) => void resolveApproval(id, approved, always, reason)} />
+      {session.meta.mode === 'loop' ? (
+        <LoopDock loop={session.loop} running={BUSY_STATES.includes(runState)} budget={settings?.loopBudget ?? DEFAULT_LOOP_BUDGET} />
+      ) : null}
       <PlanDock
         plan={session.plan}
         running={BUSY_STATES.includes(runState)}

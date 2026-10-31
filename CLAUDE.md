@@ -42,7 +42,12 @@ node scripts/ui-llamacpp.cjs --root <snapshot>  # Provedores → llama.cpp na ja
 node scripts/colab-catalog.mjs --write  # recria o catálogo de modelos do notebook do Colab (tamanhos, cache KV e capacidades medidos no registro do Ollama; precisa de internet); veja docs/COLAB.md
 node scripts/provider-logos.mjs         # recria src/renderer/src/lib/provider-logos.ts (marcas da grade de provedores, do simple-icons; sem Anthropic/Claude); THIRD_PARTY_NOTICES.md §5
 node scripts/ui-memory-select.cjs       # Memória: caixa nos cards, Shift+clique, selecionar todas, apagar em massa com confirmação (perfil descartável); veja docs/AI-MEMORY.md
+node scripts/ui-loop.cjs --root <snapshot> --provider opencode-go --model deepseek-v4.1-flash  # modo Código Loop Engineering: menu, painel, voltas até o juiz dar PRONTO, prova independente (modelo real); veja docs/LOOP-ENGINEERING.md
+node scripts/embed-rea.mjs [--cache "<pastas>"] [--check]  # REA 6.8.0 (código em vendor/rea) + Node 24.22.2 + Ghidra/JDK/JADX/Apktool/WABT em resources/rea, hashes fixados; modo e agente REA Engineering; veja docs/REA-ENGINEERING.md
+npx tsx scripts/rea-real.ts --ghidra  # REA embutido sem a janela: app JS, PE, WASM, Apktool, APK (JADX) e pseudocódigo do Ghidra pelas ferramentas rea_*
+node scripts/ui-rea.cjs --root <snapshot> --provider opencode-go --model deepseek-v4.1-flash  # modo REA Engineering na janela real: menu, análise com evidência, Frida num processo pede aprovação mesmo em Ignorar permissões
 node scripts/ui-memory-graph.cjs --root <snapshot>  # Memória grande (cópia de uma wiki real, perfil descartável): contadores por tipo de arquivo e grafo sem travar (IPC e quadros medidos)
+node scripts/ui-design.cjs --root <snapshot> --provider <id> --model <modelo>  # telas no FigCraft (sem janela) + skill design-telas + design_sheet: folhas de contato desenhadas na conversa; veja docs/DESIGN-TELAS.md
 npx tsx scripts/memory-import-files.ts --project <prj_…> --manifest <arquivo.json>  # importa muitos arquivos na memória de um projeto (OCR, texto, descrição/transcrição pronta, tags, ligações); retomável, com o app aberto
 npm run pack:chrome-extension  # release/openclod-chrome-extension-v<versão>.zip
 node scripts/embed-office.mjs  # python-docx/openpyxl/python-pptx no Python embutido (depois do embed-stt; --check confere)

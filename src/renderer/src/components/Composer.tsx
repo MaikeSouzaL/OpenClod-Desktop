@@ -681,7 +681,9 @@ export function Composer({
     { id: 'mode-debug', label: 'Depurar', icon: 'hammer', checked: mode === 'debug', onSelect: () => onModeChange('debug') },
     { id: 'mode-review', label: 'Revisar', icon: 'eye', checked: mode === 'review', onSelect: () => onModeChange('review') },
     { id: 'mode-computer', label: 'Computer Use', icon: 'monitor', checked: mode === 'computer', onSelect: () => onModeChange('computer') },
-    { id: 'mode-web', label: 'Navegar', icon: 'globe', checked: mode === 'web', onSelect: () => onModeChange('web') }
+    { id: 'mode-web', label: 'Navegar', icon: 'globe', checked: mode === 'web', onSelect: () => onModeChange('web') },
+    { id: 'mode-loop', label: 'Código Loop Engineering', icon: 'refresh', checked: mode === 'loop', onSelect: () => onModeChange('loop') },
+    { id: 'mode-rea', label: 'REA Engineering', icon: 'cpu', checked: mode === 'rea', onSelect: () => onModeChange('rea') }
   ]
 
   const attachItems: MenuItem[] = [

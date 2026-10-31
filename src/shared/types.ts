@@ -12,6 +12,10 @@ export type AgentMode =
   | 'computer'
   | 'web'
   | 'autonomous'
+  /** "Código Loop Engineering": a conductor runs define → plan → do → verify → criticize → judge until a checked "done" (core/loop). */
+  | 'loop'
+  /** "REA Engineering": reverse engineering with the REA bundled in resources/rea (core/rea). */
+  | 'rea'
 
 export const AGENT_MODES: AgentMode[] = [
   'ask',
@@ -21,7 +25,9 @@ export const AGENT_MODES: AgentMode[] = [
   'review',
   'computer',
   'web',
-  'autonomous'
+  'autonomous',
+  'loop',
+  'rea'
 ]
 
 /**
@@ -494,6 +500,8 @@ export type HarnessEvent =
   | { type: 'budget'; sessionId: string; info: BudgetInfo }
   | { type: 'limitation'; sessionId: string; report: LimitationReport }
   | { type: 'plan'; sessionId: string; items: PlanItem[] }
+  /** The Loop Engineering state of the session changed (round, phase, criteria, verdict, end). */
+  | { type: 'loop'; sessionId: string; loop: LoopState }
   | { type: 'usage'; sessionId: string; usage: Usage; total: Usage; turn?: Usage; limit?: number; providerId?: string; providerLabel?: string; model?: string; costUsd?: number }
   | { type: 'status'; sessionId: string; state: RunState; detail?: string }
   | { type: 'audit'; sessionId: string; level: AuditLevel; message: string }
@@ -577,6 +585,75 @@ export interface PlanItem {
   /** What the agent did while this item was active, persisted with the plan. */
   activity?: PlanStepActivity[]
 }
+
+/* ------------------------------------------------------------------ */
+/* Loop Engineering (mode 'loop', see core/loop)                       */
+/* ------------------------------------------------------------------ */
+
+/** One verifiable condition of "done". With `check`, the harness itself runs the command: exit 0 means met. */
+export interface LoopCriterion {
+  id: string
+  text: string
+  /** Shell command run by the harness (tests, typecheck, build, a script that checks the app). */
+  check?: string
+  status: 'pending' | 'met' | 'failed'
+  /** Last proof: the tail of the command output, or the evidence the judge quoted. */
+  evidence?: string
+  checkedAt?: number
+}
+
+export type LoopPhase = 'definir' | 'planejar' | 'fazer' | 'verificar' | 'criticar' | 'julgar' | 'memoria'
+
+/**
+ * running: rounds go on · done: the judge said PRONTO and every check passed · blocked: needs the user ·
+ * exhausted: out of rounds or time · stalled: the same failure kept coming back after changes of strategy ·
+ * cancelled: the user stopped the turn.
+ */
+export type LoopStatus = 'running' | 'done' | 'blocked' | 'exhausted' | 'stalled' | 'cancelled'
+
+export interface LoopVerdict {
+  round: number
+  decision: 'done' | 'continue' | 'blocked'
+  summary: string
+  /** What is still missing (continue) or what the user must answer (blocked). */
+  missing?: string[]
+  at: number
+}
+
+export interface LoopState {
+  goal: string
+  status: LoopStatus
+  /** Current round (1 = the first). */
+  round: number
+  maxRounds: number
+  startedAt: number
+  /** Time budget of the loop, from startedAt (renewed when the user continues a loop that stopped). */
+  maxMinutes: number
+  deadlineAt: number
+  phase: LoopPhase
+  criteria: LoopCriterion[]
+  verdicts: LoopVerdict[]
+  /** Agents called in the current round, in order (the judge must be one of them before PRONTO). */
+  roundAgents: string[]
+  /** Every agent called in this loop, once each (the tester must be among them before PRONTO when code changed). */
+  agents?: string[]
+  /** Rounds in a row that ended with the same failure. */
+  stagnantRounds: number
+  /** Changes of strategy forced by the stagnation guard since the last progress. */
+  strategyChanges: number
+  lastFailure?: string
+  endedAt?: number
+  /** Why the loop stopped, in pt-BR. */
+  reason?: string
+}
+
+/** Defaults of the loop budget (Configurações → Harness → Loop Engineering). */
+export interface LoopBudgetSettings {
+  rounds: number
+  minutes: number
+}
+
+export const DEFAULT_LOOP_BUDGET: LoopBudgetSettings = { rounds: 8, minutes: 90 }
 
 export interface FileChange {
   path: string
@@ -705,6 +782,8 @@ export interface SessionState {
   meta: SessionMeta
   messages: Message[]
   plan: PlanItem[]
+  /** Loop Engineering state of the last loop of this session (mode 'loop'). */
+  loop?: LoopState
   changes: FileChange[]
   approvals: ApprovalRequest[]
   usage: Usage
@@ -811,6 +890,8 @@ export interface AppSettings {
   autoAgents?: boolean
   /** Before a turn that changed files ends, the agent reviews its own diff once (on unless false). */
   selfReview?: boolean
+  /** Rounds and minutes a Loop Engineering session may spend before it stops (DEFAULT_LOOP_BUDGET when missing). */
+  loopBudget?: LoopBudgetSettings
   /** Execution environments shown in the composer. */
   environments?: EnvironmentProfile[]
   /**
